@@ -4,20 +4,14 @@ import os
 import subprocess
 from pathlib import Path
 
-from PySide6.QtGui import QIcon, QDesktopServices
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QToolBar, QToolButton, QWidget, QSizePolicy
-from PySide6.QtCore import Qt, QSize, QUrl
+from PySide6.QtCore import Qt, QSize
 
 from anvil.widgets.instance_manager_dialog import InstanceManagerDialog
+from anvil.widgets.profile_dialog import ProfileDialog
 
 _ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
-
-NEXUS_GAME_URLS = {
-    "Cyberpunk 2077": "https://www.nexusmods.com/cyberpunk2077",
-    "Baldur's Gate 3": "https://www.nexusmods.com/baldursgate3",
-    "Skyrim Special Edition": "https://www.nexusmods.com/skyrimspecialedition",
-}
-NEXUS_FALLBACK_URL = "https://www.nexusmods.com"
 
 
 def _todo(name):
@@ -64,21 +58,12 @@ def create_toolbar(parent=None):
     )
     bar.addWidget(folder_btn)
     bar.addSeparator()
-    nexus_btn = QToolButton(bar)
-    nexus_btn.setIcon(_icon("nexus.svg"))
-    nexus_btn.setToolTip("Nexus/Web")
-    nexus_btn.setFixedSize(44, 44)
-
-    def _open_nexus_for_game():
-        win = bar.window()
-        current_game = getattr(win, "current_game", "Cyberpunk 2077")
-        url = NEXUS_GAME_URLS.get(current_game, NEXUS_FALLBACK_URL)
-        QDesktopServices.openUrl(QUrl(url))
-
-    nexus_btn.clicked.connect(_open_nexus_for_game)
-    bar.addWidget(nexus_btn)
-    add_icon("globe.svg", "Ansicht")
-    add_icon("profiles.svg", "Profil/Person")
+    profile_btn = QToolButton(bar)
+    profile_btn.setIcon(_icon("profiles.svg"))
+    profile_btn.setToolTip("Profil/Person")
+    profile_btn.setFixedSize(44, 44)
+    profile_btn.clicked.connect(lambda: ProfileDialog(bar.window()).exec())
+    bar.addWidget(profile_btn)
     bar.addSeparator()
     add_icon("refresh.svg", "Refresh")
     add_icon("executables.svg", "Executables")
