@@ -1,7 +1,12 @@
-"""Toolbar — MO2-Kopie: große Icons, Separatoren, rechte Status-Icons."""
+"""Toolbar — MO2-Kopie: Paper Dark SVG-Icons, Separatoren, rechte Status-Icons."""
 
-from PySide6.QtWidgets import QToolBar, QToolButton, QWidget, QStyle, QSizePolicy
+from pathlib import Path
+
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QToolBar, QToolButton, QWidget, QSizePolicy
 from PySide6.QtCore import Qt, QSize
+
+_ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
 
 
 def _todo(name):
@@ -10,44 +15,50 @@ def _todo(name):
     return _
 
 
+def _icon(name: str) -> QIcon:
+    path = _ICONS_DIR / name
+    if path.exists():
+        return QIcon(str(path))
+    return QIcon()
+
+
 def create_toolbar(parent=None):
     bar = QToolBar(parent)
     bar.setMovable(False)
     bar.setIconSize(QSize(32, 32))
     bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
     bar.setFixedHeight(52)
-    style = bar.style()
 
-    def add_icon(pixmap, tooltip):
+    def add_icon(icon_name: str, tooltip: str):
         btn = QToolButton(bar)
-        btn.setIcon(style.standardIcon(pixmap))
+        btn.setIcon(_icon(icon_name))
         btn.setToolTip(tooltip)
         btn.setFixedSize(44, 44)
         btn.clicked.connect(_todo(tooltip))
         bar.addWidget(btn)
 
-    # Links: MO2-Reihenfolge mit Separatoren
-    add_icon(QStyle.StandardPixmap.SP_ComputerIcon, "Instances/Game")
-    add_icon(QStyle.StandardPixmap.SP_DirIcon, "Ordner")
+    # Links: MO2-Reihenfolge mit Separatoren (Paper Dark SVGs)
+    add_icon("instances.svg", "Instances/Game")
+    add_icon("archives.svg", "Ordner")
     bar.addSeparator()
-    add_icon(QStyle.StandardPixmap.SP_DriveNetIcon, "Nexus/Web")
-    add_icon(QStyle.StandardPixmap.SP_FileDialogDetailedView, "Ansicht")
-    add_icon(QStyle.StandardPixmap.SP_DialogApplyButton, "Profil/Person")
+    add_icon("nexus.svg", "Nexus/Web")
+    add_icon("globe.svg", "Ansicht")
+    add_icon("profiles.svg", "Profil/Person")
     bar.addSeparator()
-    add_icon(QStyle.StandardPixmap.SP_BrowserReload, "Refresh")
-    add_icon(QStyle.StandardPixmap.SP_MediaSeekForward, "Executables")
-    add_icon(QStyle.StandardPixmap.SP_FileDialogContentsView, "Tools")
-    add_icon(QStyle.StandardPixmap.SP_DialogHelpButton, "Einstellungen")
+    add_icon("refresh.svg", "Refresh")
+    add_icon("executables.svg", "Executables")
+    add_icon("tools.svg", "Tools")
+    add_icon("settings.svg", "Einstellungen")
 
     # Spacer: rechte Icons bündig rechts
     spacer = QWidget()
     spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
     bar.addWidget(spacer)
 
-    # Rechts: 4 Status-Icons (32x32)
-    add_icon(QStyle.StandardPixmap.SP_DialogYesButton, "Endorse")
-    add_icon(QStyle.StandardPixmap.SP_MessageBoxWarning, "Benachrichtigungen")
-    add_icon(QStyle.StandardPixmap.SP_DesktopIcon, "Update")
-    add_icon(QStyle.StandardPixmap.SP_MessageBoxInformation, "Info")
+    # Rechts: 4 Status-Icons
+    add_icon("endorse.svg", "Endorse")
+    add_icon("problems.svg", "Benachrichtigungen")
+    add_icon("update.svg", "Update")
+    add_icon("help.svg", "Info")
 
     return bar
