@@ -1,21 +1,26 @@
-"""Game-Panel — MO2-Kopie: Icon, Starten (#006868), Verknüpfung, Tabs, Downloads mit Neu laden."""
+"""Game-Panel — MO2-Kopie: großes Game-Icon, Tabs, Downloads mit Neu laden."""
 
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QComboBox,
     QPushButton,
+    QToolButton,
+    QComboBox,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
     QCheckBox,
     QLineEdit,
+    QMenu,
+    QFrame,
 )
-from PySide6.QtGui import QPixmap, QColor
-from PySide6.QtCore import Qt
+import os
+
+from PySide6.QtGui import QPixmap, QIcon, QColor, QAction
+from PySide6.QtCore import Qt, QSize
 
 
 def _todo(name):
@@ -49,25 +54,52 @@ class GamePanel(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        # MO2: eine Zeile: Icon links, Spielname, Starten-Button RECHTS
-        top_row = QHBoxLayout()
-        pix = QPixmap(48, 48)
-        pix.fill(QColor("#141414"))
-        icon_label = QLabel()
-        icon_label.setPixmap(pix)
-        top_row.addWidget(icon_label)
-        top_row.addWidget(QLabel("Cyberpunk 2077"))
-        top_row.addStretch()
-        start_btn = QPushButton("► Starten")
+        # Rechte Seite oben: Game-Button (96x96) mit Dropdown + Label, Starten, Verknüpfung
+        top_frame = QFrame()
+        top_layout = QVBoxLayout(top_frame)
+        top_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pix = QPixmap(96, 96)
+        pix.fill(QColor("#242424"))
+        game_btn = QToolButton(self)
+        game_btn.setIcon(QIcon(pix))
+        game_btn.setIconSize(pix.size())
+        game_btn.setFixedSize(96, 96)
+        game_btn.setStyleSheet(
+            "QToolButton { background: #242424; border: 2px solid #3D3D3D; border-radius: 4px; }"
+            "QToolButton:hover { background: #2a2a2a; }"
+        )
+        game_menu = QMenu(self)
+        game_menu.setStyleSheet("QMenu { min-width: 300px; font-size: 14px; }")
+        game_menu.addAction(QAction("<Bearbeiten...>", self, triggered=_todo("<Bearbeiten...>")))
+        game_menu.addSeparator()
+        game_menu.addAction(QAction("Cyberpunk 2077", self, triggered=_todo("Cyberpunk 2077")))
+        game_menu.addAction(QAction("Cyberpunk 2077 - skip REDmod deploy", self, triggered=_todo("Cyberpunk 2077 - skip REDmod deploy")))
+        game_menu.addAction(QAction("Manually deploy REDmod", self, triggered=_todo("Manually deploy REDmod")))
+        game_menu.addAction(QAction("REDprelauncher", self, triggered=_todo("REDprelauncher")))
+        game_menu.addSeparator()
+        game_menu.addAction(QAction("Explore Virtual Folder", self, triggered=_todo("Explore Virtual Folder")))
+        game_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        game_btn.setMenu(game_menu)
+        top_layout.addWidget(game_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        game_label = QLabel("Cyberpunk 2077")
+        game_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        top_layout.addWidget(game_label)
+        start_btn = QPushButton()
         start_btn.setObjectName("startButton")
+        _play_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "files", "play.png")
+        if os.path.exists(_play_icon):
+            start_btn.setIcon(QIcon(_play_icon))
+            start_btn.setIconSize(QSize(32, 32))
+        start_btn.setMinimumWidth(180)
+        start_btn.setToolTip("Starten")
         start_btn.clicked.connect(_todo("Starten"))
-        top_row.addWidget(start_btn)
-        layout.addLayout(top_row)
-
-        link = QComboBox()
-        link.addItem("Verknüpfung")
-        link.currentTextChanged.connect(lambda t: _todo("Verknüpfung")())
-        layout.addWidget(link)
+        top_layout.addWidget(start_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        link_combo = QComboBox()
+        link_combo.addItem("Verknüpfung")
+        link_combo.setMinimumWidth(180)
+        link_combo.currentTextChanged.connect(lambda t: _todo("Verknüpfung")())
+        top_layout.addWidget(link_combo, 0, Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(top_frame)
 
         tabs = QTabWidget()
         data = QWidget()
