@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QToolButton,
-    QComboBox,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -16,11 +15,13 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMenu,
     QFrame,
+    QTreeWidget,
+    QTreeWidgetItem,
 )
 import os
 
 from PySide6.QtGui import QPixmap, QIcon, QColor, QAction
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QPoint
 
 
 def _todo(name):
@@ -54,22 +55,37 @@ class GamePanel(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        # Rechte Seite oben: Game-Button (96x96) mit Dropdown + Label, Starten, Verknüpfung
+        # Rechte Seite oben: Game-Button (140x140) mit Dropdown + Label, Starten; Verknüpfung-Button oben rechts
         top_frame = QFrame()
         top_layout = QVBoxLayout(top_frame)
         top_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pix = QPixmap(96, 96)
+
+        # Verknüpfung-Button oben rechts
+        link_btn = QPushButton()
+        link_btn.setObjectName("linkButton")
+        _exec_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "executables.svg")
+        if os.path.exists(_exec_icon):
+            link_btn.setIcon(QIcon(_exec_icon))
+        link_btn.setIconSize(QSize(24, 24))
+        link_btn.setToolTip("Verknüpfung")
+        link_btn.clicked.connect(_todo("Verknüpfung"))
+        link_btn_row = QHBoxLayout()
+        link_btn_row.addStretch()
+        link_btn_row.addWidget(link_btn)
+        top_layout.addLayout(link_btn_row)
+
+        pix = QPixmap(140, 140)
         pix.fill(QColor("#242424"))
         game_btn = QToolButton(self)
         game_btn.setIcon(QIcon(pix))
         game_btn.setIconSize(pix.size())
-        game_btn.setFixedSize(96, 96)
+        game_btn.setFixedSize(140, 140)
         game_btn.setStyleSheet(
             "QToolButton { background: #242424; border: 2px solid #3D3D3D; border-radius: 4px; }"
             "QToolButton:hover { background: #2a2a2a; }"
         )
         game_menu = QMenu(self)
-        game_menu.setStyleSheet("QMenu { min-width: 300px; font-size: 14px; }")
+        game_menu.setStyleSheet("QMenu { min-width: 350px; padding: 6px; font-size: 14px; }")
         game_menu.addAction(QAction("<Bearbeiten...>", self, triggered=_todo("<Bearbeiten...>")))
         game_menu.addSeparator()
         game_menu.addAction(QAction("Cyberpunk 2077", self, triggered=_todo("Cyberpunk 2077")))
@@ -78,8 +94,11 @@ class GamePanel(QWidget):
         game_menu.addAction(QAction("REDprelauncher", self, triggered=_todo("REDprelauncher")))
         game_menu.addSeparator()
         game_menu.addAction(QAction("Explore Virtual Folder", self, triggered=_todo("Explore Virtual Folder")))
-        game_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        game_btn.setMenu(game_menu)
+        game_btn.clicked.connect(
+            lambda: game_menu.exec(
+                game_btn.mapToGlobal(QPoint(game_btn.width() // 2 - game_menu.sizeHint().width() // 2, game_btn.height()))
+            )
+        )
         top_layout.addWidget(game_btn, 0, Qt.AlignmentFlag.AlignHCenter)
         game_label = QLabel("Cyberpunk 2077")
         game_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -89,26 +108,57 @@ class GamePanel(QWidget):
         _play_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "files", "play.png")
         if os.path.exists(_play_icon):
             start_btn.setIcon(QIcon(_play_icon))
-            start_btn.setIconSize(QSize(32, 32))
-        start_btn.setMinimumWidth(180)
+            start_btn.setIconSize(QSize(24, 24))
+        start_btn.setMinimumWidth(140)
+        start_btn.setFixedHeight(36)
         start_btn.setToolTip("Starten")
         start_btn.clicked.connect(_todo("Starten"))
         top_layout.addWidget(start_btn, 0, Qt.AlignmentFlag.AlignHCenter)
-        link_combo = QComboBox()
-        link_combo.addItem("Verknüpfung")
-        link_combo.setMinimumWidth(180)
-        link_combo.currentTextChanged.connect(lambda t: _todo("Verknüpfung")())
-        top_layout.addWidget(link_combo, 0, Qt.AlignmentFlag.AlignHCenter)
         layout.addWidget(top_frame)
 
         tabs = QTabWidget()
+        # Daten-Tab: Dateibrowser
         data = QWidget()
-        data.setLayout(QVBoxLayout())
-        data.layout().addWidget(QLabel("Daten (Platzhalter)"))
+        data_layout = QVBoxLayout(data)
+        data_reload_btn = QPushButton("Neu laden")
+        _refresh_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "refresh.svg")
+        if os.path.exists(_refresh_icon):
+            data_reload_btn.setIcon(QIcon(_refresh_icon))
+        data_reload_btn.setIconSize(QSize(20, 20))
+        data_reload_btn.clicked.connect(_todo("Daten neu laden"))
+        data_layout.addWidget(data_reload_btn)
+        data_tree = QTreeWidget()
+        data_tree.setColumnCount(5)
+        data_tree.setHeaderLabels(["Name", "Mod", "Type", "Größe", "Datum modifiziert"])
+        data_tree.setAlternatingRowColors(True)
+        data_tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        # Dummy: Ordner
+        for folder_name in ("archive", "bin", "engine", "mods", "r6", "red4ext", "root", "tools"):
+            folder_item = QTreeWidgetItem(data_tree, [folder_name, "", "Folder", "-", "-"])
+        # Dummy: Dateien
+        for file_name, size in (
+            ("launcher-configuration.json", "111 B"),
+            ("libcrypto-1_1-x64.dll", "3.11 MB"),
+            ("libssl-1_1-x64.dll", "647.57 KB"),
+        ):
+            file_item = QTreeWidgetItem(data_tree, [file_name, "<Unmanaged>", "", size, "2/4/2026 10:00"])
+        data_layout.addWidget(data_tree)
+        data_bar = QHBoxLayout()
+        data_bar.addWidget(QCheckBox("Nur Konflikte"))
+        data_bar.addWidget(QCheckBox("Archive"))
+        data_filter_edit = QLineEdit()
+        data_filter_edit.setPlaceholderText("Filter")
+        data_bar.addWidget(data_filter_edit)
+        data_bar.addStretch()
+        data_layout.addLayout(data_bar)
         tabs.addTab(data, "Daten")
         saves = QWidget()
-        saves.setLayout(QVBoxLayout())
-        saves.layout().addWidget(QLabel("Spielstände (Platzhalter)"))
+        saves_layout = QVBoxLayout(saves)
+        saves_tree = QTreeWidget()
+        saves_tree.setColumnCount(2)
+        saves_tree.setHeaderLabels(["Name", "Datei"])
+        saves_tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        saves_layout.addWidget(saves_tree)
         tabs.addTab(saves, "Spielstände")
 
         downloads = QWidget()
