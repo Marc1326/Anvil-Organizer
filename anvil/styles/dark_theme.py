@@ -57,16 +57,28 @@ QMenu::item:selected {{
 
 QToolBar {{
   background: {d["mittel"]};
-  border: 1px solid {d["mittel"]};
+  border: none;
+  border-bottom: 1px solid {d["dunkel"]};
+  spacing: 2px;
+  padding: 4px 8px;
+}}
+QToolBar::separator {{
+  background: {d["hell"]};
+  width: 1px;
+  margin: 8px 4px;
 }}
 QToolBar QToolButton {{
   background: transparent;
+  border: none;
+  border-radius: 6px;
   padding: 6px;
-  border-radius: 10px;
-  margin: 4px;
+  margin: 2px;
 }}
-QToolBar QToolButton:hover, QToolBar QToolButton:pressed {{
+QToolBar QToolButton:hover {{
   background: {d["hell"]};
+}}
+QToolBar QToolButton:pressed {{
+  background: {d["akzent"]};
 }}
 
 QPushButton, QToolButton {{
