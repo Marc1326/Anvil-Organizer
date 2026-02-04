@@ -65,7 +65,19 @@ def create_toolbar(parent=None):
     profile_btn.clicked.connect(lambda: ProfileDialog(bar.window()).exec())
     bar.addWidget(profile_btn)
     bar.addSeparator()
-    add_icon("refresh.svg", "Refresh")
+    refresh_btn = QToolButton(bar)
+    refresh_btn.setIcon(_icon("refresh.svg"))
+    refresh_btn.setToolTip("Refresh / Neu laden")
+    refresh_btn.setFixedSize(44, 44)
+
+    def _on_refresh():
+        print("Mod-Liste wird neu geladen...")
+        win = bar.window()
+        if win and hasattr(win, "statusBar") and win.statusBar():
+            win.statusBar().showMessage("Mod-Liste aktualisiert", 3000)
+
+    refresh_btn.clicked.connect(_on_refresh)
+    bar.addWidget(refresh_btn)
     add_icon("executables.svg", "Executables")
     add_icon("tools.svg", "Tools")
     add_icon("settings.svg", "Einstellungen")
