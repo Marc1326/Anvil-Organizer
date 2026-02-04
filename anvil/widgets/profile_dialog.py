@@ -36,14 +36,7 @@ QPushButton {
     padding: 4px;
     min-width: 80px;
 }
-QCheckBox {
-    background: #1C1C1C;
-    color: #D3D3D3;
-    border: none;
-    padding: 4px;
-}
 QListWidget::item:selected { background: #3D3D3D; color: #D3D3D3; }
-QCheckBox:disabled { color: #808080; }
 """
 
 

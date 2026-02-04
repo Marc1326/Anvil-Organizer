@@ -233,16 +233,6 @@ QLabel {{
 QCheckBox {{
   color: {d["text"]};
 }}
-QCheckBox::indicator {{
-  width: 14px;
-  height: 14px;
-  border: 2px solid {d["mittel"]};
-  border-radius: 3px;
-  background: {d["dunkel"]};
-}}
-QCheckBox::indicator:checked {{
-  background: {d["akzent"]};
-}}
 
 QSplitter::handle {{
   background: {d["mittel"]};

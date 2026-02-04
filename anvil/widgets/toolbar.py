@@ -10,6 +10,8 @@ from PySide6.QtCore import Qt, QSize
 
 from anvil.widgets.instance_manager_dialog import InstanceManagerDialog
 from anvil.widgets.profile_dialog import ProfileDialog
+from anvil.widgets.executables_dialog import ExecutablesDialog
+from anvil.widgets.settings_dialog import SettingsDialog
 
 _ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
 
@@ -78,9 +80,19 @@ def create_toolbar(parent=None):
 
     refresh_btn.clicked.connect(_on_refresh)
     bar.addWidget(refresh_btn)
-    add_icon("executables.svg", "Executables")
+    exec_btn = QToolButton(bar)
+    exec_btn.setIcon(_icon("executables.svg"))
+    exec_btn.setToolTip("Executables")
+    exec_btn.setFixedSize(44, 44)
+    exec_btn.clicked.connect(lambda: ExecutablesDialog(bar.window()).exec())
+    bar.addWidget(exec_btn)
     add_icon("tools.svg", "Tools")
-    add_icon("settings.svg", "Einstellungen")
+    settings_btn = QToolButton(bar)
+    settings_btn.setIcon(_icon("settings.svg"))
+    settings_btn.setToolTip("Einstellungen")
+    settings_btn.setFixedSize(44, 44)
+    settings_btn.clicked.connect(lambda: SettingsDialog(bar.window()).exec())
+    bar.addWidget(settings_btn)
 
     # Spacer: rechte Icons bündig rechts
     spacer = QWidget()
