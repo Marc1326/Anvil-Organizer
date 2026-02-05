@@ -16,6 +16,7 @@ from anvil.widgets.profile_bar import ProfileBar
 from anvil.widgets.mod_list import ModListView
 from anvil.widgets.game_panel import GamePanel
 from anvil.widgets.status_bar import StatusBarWidget
+from anvil.dialogs import ModDetailDialog
 
 
 def _todo(name):
@@ -53,13 +54,20 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout(left_pane)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.addWidget(ProfileBar(self))
-        left_layout.addWidget(ModListView())
+        self._mod_list_view = ModListView()
+        self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
+        left_layout.addWidget(self._mod_list_view)
         splitter.addWidget(left_pane)
         splitter.addWidget(GamePanel())
         splitter.setSizes([780, 420])
         main_layout.addWidget(splitter)
 
         self.setStatusBar(StatusBarWidget(self))
+
+    def _on_mod_double_click(self):
+        mod_name = self._mod_list_view.get_current_mod_name()
+        if mod_name:
+            ModDetailDialog(self, mod_name=mod_name).exec()
 
     def _on_about(self):
         QMessageBox.about(self, "Über Anvil Organizer", "Anvil Organizer v0.1.0\n\nPlatzhalter-GUI.")
