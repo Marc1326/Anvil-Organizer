@@ -1,6 +1,7 @@
 """Mod-Detail-Dialog — öffnet bei Doppelklick auf Mod in der Mod-Liste."""
 
 import os
+import subprocess
 
 from PySide6.QtWidgets import (
     QDialog,
@@ -19,7 +20,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QLineEdit,
 )
-from PySide6.QtCore import Qt, QRect, QSize
+from PySide6.QtCore import Qt, QRect, QSize, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont, QFontDatabase, QIcon
 
 _MOD_DETAIL_DIALOG_STYLE = """
@@ -238,47 +239,85 @@ def _build_textfiles_tab():
     btn_save.setObjectName("toolbarIconBtn")
     btn_save.setIcon(QIcon(_icon_path("diskette (1).png")))
     btn_save.setToolTip("Speichern")
-    btn_save.clicked.connect(_todo("Textdatei Speichern"))
     toolbar_layout.addWidget(btn_save)
 
-    btn_listview = QPushButton()
-    btn_listview.setObjectName("toolbarIconBtn")
-    btn_listview.setIcon(QIcon(_icon_path("dots.png")))
-    btn_listview.setToolTip("Listenansicht")
-    btn_listview.clicked.connect(_todo("Listenansicht"))
-    toolbar_layout.addWidget(btn_listview)
+    btn_ordner = QPushButton("Ordner")
+    toolbar_layout.addWidget(btn_ordner)
 
-    btn_explorer = QPushButton("Explorer")
-    btn_explorer.clicked.connect(_todo("Explorer öffnen"))
-    toolbar_layout.addWidget(btn_explorer)
+    btn_wrap = QPushButton()
+    btn_wrap.setObjectName("toolbarIconBtn")
+    btn_wrap.setIcon(QIcon(_icon_path("zeilenumbruch (1).png")))
+    btn_wrap.setToolTip("Zeilenumbruch ein/aus")
+    btn_wrap.setCheckable(True)
+    toolbar_layout.addWidget(btn_wrap)
 
-    path_label = QLabel("Keine Datei ausgewählt")
-    path_label.setStyleSheet("color: #808080;")
-    toolbar_layout.addWidget(path_label, 1)
+    path_edit = QLineEdit()
+    path_edit.setReadOnly(True)
+    path_edit.setPlaceholderText("Keine Datei ausgewählt")
+    path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
+    toolbar_layout.addWidget(path_edit, 1)
     right_layout.addWidget(toolbar_widget)
 
     editor = CodeEditor()
     editor.setFont(_code_font())
     editor.setPlaceholderText("Datei auswählen …")
     editor.setPlainText("")
+    editor.setReadOnly(False)
     editor.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     right_layout.addWidget(editor, 1)
+
+    current_path = [None]
 
     def on_file_selected():
         item = file_list.currentItem()
         if not item:
-            path_label.setText("Keine Datei ausgewählt")
+            current_path[0] = None
+            path_edit.clear()
+            path_edit.setPlaceholderText("Keine Datei ausgewählt")
             editor.setPlainText("")
             return
         name = item.text()
         path = os.path.join(test_mod, name)
-        path_label.setText(path)
+        current_path[0] = path
+        path_edit.setText(path)
         try:
             with open(path, encoding="utf-8") as f:
                 editor.setPlainText(f.read())
         except Exception as e:
             editor.setPlainText(f"Fehler beim Laden: {e}")
 
+    def on_save():
+        path = current_path[0]
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(editor.toPlainText())
+            path_edit.setText("Gespeichert!")
+            path_edit.setStyleSheet("color: #4CAF50; background: #1C1C1C; border: none;")
+            def restore():
+                path_edit.setText(path)
+                path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
+            QTimer.singleShot(2000, restore)
+        except Exception as e:
+            path_edit.setText(f"Fehler: {e}")
+
+    def on_wrap_toggled(checked):
+        mode = QPlainTextEdit.LineWrapMode.WidgetWidth if checked else QPlainTextEdit.LineWrapMode.NoWrap
+        editor.setLineWrapMode(mode)
+
+    def on_ordner():
+        path = current_path[0]
+        if path:
+            dirpath = os.path.dirname(path)
+            try:
+                subprocess.Popen(["xdg-open", dirpath])
+            except Exception:
+                pass
+
+    btn_ordner.clicked.connect(on_ordner)
+    btn_save.clicked.connect(on_save)
+    btn_wrap.toggled.connect(on_wrap_toggled)
     file_list.currentItemChanged.connect(lambda *a: on_file_selected())
     on_file_selected()
     splitter.addWidget(right_pane)
