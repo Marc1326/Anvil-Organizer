@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from anvil.models.mod_list_model import ModListModel
+from anvil.models.mod_list_model import ModListModel, COL_NAME
 
 
 def _todo(name):
@@ -60,3 +60,11 @@ class ModListView(QWidget):
         self._filter_right.textChanged.connect(lambda t: _todo("Filter")())
         filter_row.addWidget(self._filter_right)
         layout.addLayout(filter_row)
+
+    def get_current_mod_name(self):
+        """Liefert den Mod-Namen der aktuell gewählten Zeile oder None."""
+        idx = self._tree.currentIndex()
+        if not idx.isValid() or idx.row() < 0:
+            return None
+        name = self._model.data(self._model.index(idx.row(), COL_NAME), Qt.ItemDataRole.DisplayRole)
+        return name if name is not None else None
