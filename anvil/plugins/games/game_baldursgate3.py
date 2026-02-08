@@ -8,14 +8,14 @@ Features implemented:
   - Proton prefix paths for documents, saves, modsettings, pak mods
   - Executable list (Vulkan, DX11, Larian Launcher)
   - BG3-specific path helpers for mod management
+  - modsettings.lsx reading and writing (load order)
+  - Script Extender detection
+  - pak mod scanning (file-level, no metadata extraction)
+  - Unregistered mod detection
 
 TODO (future):
-  - pak-Scanner — .pak Dateien lesen, info.json extrahieren (UUID, Name, Dependencies)
-  - modsettings.lsx Parser/Writer — Load-Order verwalten
-  - Dependency-Resolver — Mods nach Dependencies sortieren
-  - GustavX Filter — Basegame-Eintrag nicht als Mod anzeigen
-  - Mod-Typen unterscheiden — pak-Mods vs Data-Mods vs Script Extender
-  - Forced DLL loads (DWrite.dll for Script Extender)
+  - pak metadata extraction — LSPK parser to read UUID, Name, Dependencies from .pak
+  - Dependency-Resolver — sort mods by dependencies from meta.lsx
   - Post-update cache cleanup
 """
 
@@ -24,6 +24,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from anvil.plugins.base_game import BaseGame
+from anvil.plugins.games.bg3_mod_handler import (
+    BG3ScriptExtender,
+    ModsettingsParser,
+    ModsettingsWriter,
+    find_unregistered_mods,
+    scan_pak_mods,
+)
 
 
 class BaldursGate3Game(BaseGame):
@@ -125,7 +132,6 @@ class BaldursGate3Game(BaseGame):
             Absolute path to modsettings.lsx, or None if the
             Proton prefix is not available.
         """
-        # TODO: modsettings.lsx Parser/Writer — Load-Order verwalten
         prefix = self.protonPrefix()
         if prefix is not None:
             return prefix / self._WIN_MODSETTINGS
@@ -140,7 +146,6 @@ class BaldursGate3Game(BaseGame):
         Returns:
             Absolute path to the Mods directory, or None.
         """
-        # TODO: pak-Scanner — .pak Dateien lesen, info.json extrahieren (UUID, Name, Dependencies)
         prefix = self.protonPrefix()
         if prefix is not None:
             return prefix / self._WIN_PAK_MODS
@@ -155,10 +160,68 @@ class BaldursGate3Game(BaseGame):
             Absolute path to the Data directory, or None if game
             path is not set.
         """
-        # TODO: Mod-Typen unterscheiden — pak-Mods vs Data-Mods vs Script Extender
         if self._game_path is not None:
             return self._game_path / "Data"
         return None
+
+    # ── Mod-Management (delegiert an bg3_mod_handler) ─────────────────
+
+    def read_mod_list(self) -> dict:
+        """Read the current mod list from modsettings.lsx.
+
+        Returns:
+            Dict with version, mod_order (UUID list), and mods
+            (list of mod metadata dicts).  Empty defaults if the
+            file doesn't exist.
+        """
+        path = self.modsettings_path()
+        if path is None:
+            return {"version": {}, "mod_order": [], "mods": []}
+        return ModsettingsParser.read(path)
+
+    def write_mod_list(
+        self, mod_order: list[str], mods: list[dict]
+    ) -> None:
+        """Write the mod list to modsettings.lsx.
+
+        Creates a backup before overwriting.  Gustav/GustavDev is
+        ensured as the first entry.
+
+        Args:
+            mod_order: List of UUIDs defining load order.
+            mods: List of mod dicts with uuid, name, folder, etc.
+        """
+        path = self.modsettings_path()
+        if path is None:
+            return
+        ModsettingsWriter.write(path, mod_order, mods)
+
+    def has_script_extender(self) -> bool:
+        """Check if BG3 Script Extender is installed."""
+        if self._game_path is None:
+            return False
+        return BG3ScriptExtender.detect(self._game_path)
+
+    def scan_mods(self) -> list[dict]:
+        """Scan the Mods directory for .pak files.
+
+        Returns file-level info only (filename, path, size).
+        Metadata extraction from inside .pak comes in Part 3.
+        """
+        path = self.pak_mods_path()
+        if path is None:
+            return []
+        return scan_pak_mods(path)
+
+    def find_new_mods(self) -> list[dict]:
+        """Find .pak files not registered in modsettings.lsx.
+
+        These are mods that were manually copied into the Mods
+        folder but not yet added to the load order.
+        """
+        pak_mods = self.scan_mods()
+        mod_list = self.read_mod_list()
+        return find_unregistered_mods(pak_mods, mod_list["mods"])
 
     def executables(self) -> list[dict[str, str]]:
         """Return executable definitions for Baldur's Gate 3.
