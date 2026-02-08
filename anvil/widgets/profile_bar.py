@@ -132,6 +132,10 @@ class ProfileBar(QWidget):
             layout.addWidget(btn)
 
         layout.addWidget(QLabel("Aktiv:"))
-        self._active = QLabel("62")
+        self._active = QLabel("0")
         self._active.setObjectName("activeCount")
         layout.addWidget(self._active)
+
+    def update_active_count(self, count: int) -> None:
+        """Update the active mod counter badge."""
+        self._active.setText(str(count))
