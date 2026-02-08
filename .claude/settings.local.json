@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(flatpak list:*)",
+      "Bash(sqlite3:*)",
+      "Bash(cat:*)",
+      "Bash(python3:*)",
+      "Bash(mkdir:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
