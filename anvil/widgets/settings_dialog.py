@@ -1,5 +1,10 @@
 """Einstellungen — QDialog (Platzhalter)."""
 
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -26,6 +31,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtCore import Qt
+
+from anvil.plugins.plugin_loader import PluginLoader, ensure_user_plugin_dir
 
 _SETTINGS_DIALOG_STYLE = """
 QDialog, QWidget { background: #1C1C1C; color: #D3D3D3; border: none; }
@@ -63,8 +70,9 @@ QTableWidget::item { padding: 4px; }
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, plugin_loader: PluginLoader | None = None):
         super().__init__(parent)
+        self._plugin_loader = plugin_loader
         self.setWindowTitle("Einstellungen")
         self.setMinimumSize(560, 520)
         self.setStyleSheet(_SETTINGS_DIALOG_STYLE)
@@ -377,62 +385,96 @@ class SettingsDialog(QDialog):
         # Tab Plugins
         plugins_tab = QWidget()
         pl_layout = QHBoxLayout(plugins_tab)
+
+        # ── Left: Plugin tree + filter + open-folder button ────────
         pl_left = QVBoxLayout()
-        pl_tree = QTreeWidget()
-        pl_tree.setHeaderLabels(["Plugin"])
-        pl_tree.setMinimumWidth(260)
-        diag = QTreeWidgetItem(pl_tree, ["Diagnose"])
-        basic = QTreeWidgetItem(diag, ["Basic diagnosis plugin"])
-        pl_tree.setCurrentItem(basic)
-        form43 = QTreeWidgetItem(diag, ["Form 43 Plugin Checker"])
+        self._pl_tree = QTreeWidget()
+        self._pl_tree.setHeaderLabels(["Plugin", "Version"])
+        self._pl_tree.setMinimumWidth(280)
+        self._pl_tree.setColumnWidth(0, 220)
+
         _italic_font = QFont()
         _italic_font.setItalic(True)
-        form43.setFont(0, _italic_font)
-        script_ext = QTreeWidgetItem(diag, ["Script Extender Plugin Lade-Überprüfer"])
-        script_ext.setFont(0, _italic_font)
-        file_mapper = QTreeWidgetItem(pl_tree, ["File Mapper"])
-        QTreeWidgetItem(file_mapper, ["INI Verwaltung"])
-        game = QTreeWidgetItem(pl_tree, ["Game"])
-        QTreeWidgetItem(game, ["Cyberpunk 2077 Support Plugin"])
-        QTreeWidgetItem(game, ["Weitere Platzhalter 1"])
-        QTreeWidgetItem(game, ["Weitere Platzhalter 2"])
-        pl_left.addWidget(pl_tree)
+
+        games_root = QTreeWidgetItem(self._pl_tree, ["Spiele", ""])
+        games_root.setExpanded(True)
+
+        self._plugin_items: dict[str, object] = {}  # short_name → BaseGame
+
+        if self._plugin_loader:
+            for plugin in self._plugin_loader.all_plugins():
+                item = QTreeWidgetItem(games_root, [plugin.Name, plugin.Version])
+                item.setCheckState(0, Qt.CheckState.Checked)
+                item.setData(0, Qt.ItemDataRole.UserRole, plugin.GameShortName)
+                if not plugin.isInstalled():
+                    item.setFont(0, _italic_font)
+                    item.setFont(1, _italic_font)
+                self._plugin_items[plugin.GameShortName] = plugin
+
+        pl_left.addWidget(self._pl_tree)
         pl_filter = QLineEdit()
         pl_filter.setPlaceholderText("Filter")
+        pl_filter.textChanged.connect(self._filter_plugins)
         pl_left.addWidget(pl_filter)
+
+        open_folder_btn = QPushButton("Plugin-Ordner öffnen")
+        open_folder_btn.clicked.connect(self._open_plugin_folder)
+        pl_left.addWidget(open_folder_btn)
+
         pl_layout.addLayout(pl_left)
+
+        # ── Right: Plugin detail panel ─────────────────────────────
         pl_right = QVBoxLayout()
-        pl_detail = QFormLayout()
-        pl_detail.addRow("Autor:", QLineEdit("Tannin"))
-        pl_detail.addRow("Version:", QLineEdit("1.1.3.0"))
-        pl_detail.addRow("Beschreibung:", QLineEdit("Prüft auf Probleme, die nicht im Zusammenhang mit anderen Plugins stehen."))
-        pl_cb_active = QCheckBox("Aktiviert")
-        pl_cb_active.setChecked(True)
-        pl_detail.addRow(pl_cb_active)
-        pl_right.addLayout(pl_detail)
-        pl_table = QTableWidget(9, 2)
-        pl_table.setHorizontalHeaderLabels(["Key", "Value"])
-        pl_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        _pl_rows = [
-            ("check_alternategames", "false"),
-            ("check_conflict", "true"),
-            ("check_errorlog", "true"),
-            ("check_fileattributes", "false"),
-            ("check_font", "true"),
-            ("check_missingmasters", "true"),
-            ("check_overwrite", "true"),
-            ("ow_ignore_empty", "false"),
-            ("ow_ignore_log", "false"),
-        ]
-        for row, (k, v) in enumerate(_pl_rows):
-            pl_table.setItem(row, 0, QTableWidgetItem(k))
-            pl_table.setItem(row, 1, QTableWidgetItem(v))
-        pl_right.addWidget(pl_table)
-        pl_right.addWidget(QLabel("Gesperrte Plugins (<entf> drücken um Plugins von dieser Liste zu entfernen):"))
-        pl_blocked_list = QListWidget()
-        pl_right.addWidget(pl_blocked_list)
+        self._pl_detail = QFormLayout()
+        self._pl_author = QLineEdit()
+        self._pl_author.setReadOnly(True)
+        self._pl_detail.addRow("Autor:", self._pl_author)
+        self._pl_version = QLineEdit()
+        self._pl_version.setReadOnly(True)
+        self._pl_detail.addRow("Version:", self._pl_version)
+        self._pl_game_name = QLineEdit()
+        self._pl_game_name.setReadOnly(True)
+        self._pl_detail.addRow("Spiel:", self._pl_game_name)
+        self._pl_store = QLineEdit()
+        self._pl_store.setReadOnly(True)
+        self._pl_detail.addRow("Store:", self._pl_store)
+        self._pl_path = QLineEdit()
+        self._pl_path.setReadOnly(True)
+        self._pl_detail.addRow("Spielpfad:", self._pl_path)
+        self._pl_prefix = QLineEdit()
+        self._pl_prefix.setReadOnly(True)
+        self._pl_detail.addRow("Proton-Prefix:", self._pl_prefix)
+        self._pl_cb_active = QCheckBox("Aktiviert")
+        self._pl_cb_active.setChecked(True)
+        self._pl_detail.addRow(self._pl_cb_active)
+        pl_right.addLayout(self._pl_detail)
+
+        # Nexus + Support Info
+        self._pl_nexus = QLabel("")
+        self._pl_nexus.setOpenExternalLinks(True)
+        pl_right.addWidget(self._pl_nexus)
+
+        pl_right.addStretch()
+
+        # Summary
+        if self._plugin_loader:
+            count = self._plugin_loader.plugin_count()
+            installed = self._plugin_loader.installed_count()
+            summary = QLabel(f"{count} Plugins geladen, {installed} Spiele erkannt")
+        else:
+            summary = QLabel("Plugin-Loader nicht verfügbar")
+        summary.setStyleSheet("color: #808080; font-style: italic;")
+        pl_right.addWidget(summary)
+
         pl_layout.addLayout(pl_right, 1)
         tabs.addTab(plugins_tab, "Plugins")
+
+        # Connect selection change + select first plugin
+        self._pl_tree.currentItemChanged.connect(self._on_plugin_selected)
+        if self._plugin_loader and self._plugin_loader.plugin_count() > 0:
+            first_child = games_root.child(0)
+            if first_child:
+                self._pl_tree.setCurrentItem(first_child)
 
         # Tab Workarounds
         workarounds_tab = QWidget()
@@ -544,3 +586,56 @@ class SettingsDialog(QDialog):
         btn_row.addWidget(ok_btn)
         btn_row.addWidget(cancel_btn)
         layout.addLayout(btn_row)
+
+    # ── Plugin-Tab helpers ────────────────────────────────────────────
+
+    def _on_plugin_selected(self, current: QTreeWidgetItem | None, _previous):
+        """Update the detail panel when a plugin is selected in the tree."""
+        if current is None:
+            return
+        short = current.data(0, Qt.ItemDataRole.UserRole)
+        plugin = self._plugin_items.get(short) if short else None
+        if plugin is None:
+            # Root node or unknown — clear fields
+            for field in (
+                self._pl_author, self._pl_version, self._pl_game_name,
+                self._pl_store, self._pl_path, self._pl_prefix,
+            ):
+                field.clear()
+            self._pl_nexus.clear()
+            return
+
+        self._pl_author.setText(plugin.Author)
+        self._pl_version.setText(plugin.Version)
+        self._pl_game_name.setText(plugin.GameName)
+        self._pl_store.setText(plugin.detectedStore() or "—")
+        gd = plugin.gameDirectory()
+        self._pl_path.setText(str(gd) if gd else "—")
+        pp = plugin.protonPrefix()
+        self._pl_prefix.setText(str(pp) if pp else "—")
+        self._pl_cb_active.setChecked(plugin.isInstalled())
+
+        nexus_id = getattr(plugin, "GameNexusName", "") or getattr(plugin, "GameShortName", "")
+        if nexus_id:
+            url = f"https://www.nexusmods.com/{nexus_id}"
+            self._pl_nexus.setText(f'<a href="{url}" style="color:#4FC3F7;">{url}</a>')
+        else:
+            self._pl_nexus.clear()
+
+    def _filter_plugins(self, text: str):
+        """Show/hide plugin tree items based on filter text."""
+        text_lower = text.lower()
+        root = self._pl_tree.topLevelItem(0)
+        if root is None:
+            return
+        for i in range(root.childCount()):
+            child = root.child(i)
+            if child is None:
+                continue
+            name = child.text(0).lower()
+            child.setHidden(bool(text_lower) and text_lower not in name)
+
+    def _open_plugin_folder(self):
+        """Open the user plugin directory in the file manager."""
+        path = ensure_user_plugin_dir()
+        subprocess.Popen(["xdg-open", str(path)])

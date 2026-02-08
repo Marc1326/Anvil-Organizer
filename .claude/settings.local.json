@@ -12,7 +12,16 @@
       "Bash(mkdir:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(head:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(ls:*)",
+      "Bash(pip3 list:*)",
+      "Bash(.venv/bin/python3:*)",
+      "Bash(pip list:*)",
+      "Bash(/usr/bin/python:*)",
+      "Bash(python3.14:*)",
+      "Bash(PYTHONPATH=\".venv/lib/python3.14/site-packages:$PYTHONPATH\" python3:*)"
     ],
     "deny": [],
     "ask": []

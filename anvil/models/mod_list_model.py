@@ -1,4 +1,4 @@
-"""QAbstractItemModel für Mod-Liste mit 20 Dummy-Mods."""
+"""QAbstractItemModel für Mod-Liste."""
 
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, QMimeData, QByteArray, QDataStream, QIODevice
 from PySide6.QtGui import QColor, QBrush
@@ -25,36 +25,23 @@ class ModRow:
         self.is_error = is_error
 
 
-def _dummy_mods():
-    return [
-        ModRow(True, "Limited HUD", "", "✓", "UI", "1.0", 10),
-        ModRow(True, "Realistic Map 4K", "⚠", "", "Maps", "1.4.5", 15),
-        ModRow(True, "SkyUI", "", "✓", "UI", "5.2", 16),
-        ModRow(True, "SKSE64", "", "", "Framework", "2.0.20", 20, is_framework=True),
-        ModRow(True, "Unofficial Patch", "", "✓", "Bugfix", "4.2.5", 25),
-        ModRow(True, "BrowserExtensionFramework", "", "✓", "Framework", "1.4c", 27, is_framework=True),
-        ModRow(True, "Preem Menu (No Blur)", "", "", "UI", "2.0", 28),
-        ModRow(True, "Smarter Scrapper", "⚠", "⚠", "Gameplay", "11/25/...", 35, is_error=True),
-        ModRow(True, "3D World Map Explorer", "", "", "Maps", "1.1", 36),
-        ModRow(True, "Equipment-EX", "", "", "Gameplay", "2.2.1", 38),
-        ModRow(True, "ENBSeries", "", "", "Visuals", "0.488", 40),
-        ModRow(True, "Immersive Armors", "", "✓", "Equipment", "8.1", 42),
-        ModRow(True, "Mod Settings Patch", "", "", "Tweaks", "1.1", 44),
-        ModRow(True, "Conflict Begone", "", "", "Tweaks", "1.0", 46),
-        ModRow(True, "Load Begone", "", "", "Tweaks", "1.2", 48, is_error=True),
-        ModRow(True, "BetterLootMarkers", "", "", "UI", "1.0", 50),
-        ModRow(True, "Stand Still Please", "", "", "Tweaks", "1.0", 52),
-        ModRow(True, "Status Bar Bug Fixes", "", "", "Bugfix", "1.1", 54),
-        ModRow(True, "Survival System", "", "", "Gameplay", "2.0", 56),
-        ModRow(True, "Custom Quickslots", "", "", "UI", "1.3", 58),
-    ]
-
-
 class ModListModel(QAbstractItemModel):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._rows = _dummy_mods()
+        self._rows: list[ModRow] = []
         self._drop_in_progress = False
+
+    def clear(self) -> None:
+        """Remove all mods from the model."""
+        self.beginResetModel()
+        self._rows.clear()
+        self.endResetModel()
+
+    def set_mods(self, mods: list[ModRow]) -> None:
+        """Replace all mods with *mods*."""
+        self.beginResetModel()
+        self._rows = list(mods)
+        self.endResetModel()
 
     def rowCount(self, parent=QModelIndex()):
         if parent.isValid():

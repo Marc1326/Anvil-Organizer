@@ -49,7 +49,18 @@ def create_toolbar(parent=None):
     instances_btn.setIcon(_icon("instances.svg"))
     instances_btn.setToolTip("Instances/Game")
     instances_btn.setFixedSize(44, 44)
-    instances_btn.clicked.connect(lambda: InstanceManagerDialog(bar.window()).exec())
+    def _open_instance_manager():
+        win = bar.window()
+        dlg = InstanceManagerDialog(
+            win,
+            getattr(win, "instance_manager", None),
+            getattr(win, "plugin_loader", None),
+        )
+        dlg.exec()
+        if dlg.switched_to and hasattr(win, "switch_instance"):
+            win.switch_instance(dlg.switched_to)
+
+    instances_btn.clicked.connect(_open_instance_manager)
     bar.addWidget(instances_btn)
     folder_btn = QToolButton(bar)
     folder_btn.setIcon(_icon("archives.svg"))
@@ -91,7 +102,12 @@ def create_toolbar(parent=None):
     settings_btn.setIcon(_icon("settings.svg"))
     settings_btn.setToolTip("Einstellungen")
     settings_btn.setFixedSize(44, 44)
-    settings_btn.clicked.connect(lambda: SettingsDialog(bar.window()).exec())
+    settings_btn.clicked.connect(
+        lambda: SettingsDialog(
+            bar.window(),
+            getattr(bar.window(), "plugin_loader", None),
+        ).exec()
+    )
     bar.addWidget(settings_btn)
 
     # Spacer: rechte Icons bündig rechts
