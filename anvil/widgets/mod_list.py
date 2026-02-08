@@ -8,16 +8,73 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QAbstractItemView,
+    QStyledItemDelegate,
+    QHeaderView,
 )
-from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect
+from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 
-from anvil.models.mod_list_model import ModListModel, COL_NAME
+from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME
 
 
 def _todo(name):
     def _():
         print(f"TODO: {name}")
     return _
+
+
+class CheckboxDelegate(QStyledItemDelegate):
+    """Custom delegate for COL_CHECK: green circle+check (enabled), gray circle (disabled)."""
+
+    _COLOR_ON = QColor("#4CAF50")
+    _COLOR_OFF = QColor("#666666")
+
+    def paint(self, painter: QPainter, option, index):
+        # Draw background (selection, alternating rows)
+        self.initStyleOption(option, index)
+        style = option.widget.style() if option.widget else None
+        if style:
+            style.drawPrimitive(style.PrimitiveElement.PE_PanelItemViewItem, option, painter, option.widget)
+
+        check = index.data(Qt.ItemDataRole.CheckStateRole)
+        enabled = check == Qt.CheckState.Checked
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Center a 16x16 icon area in the cell
+        size = 16
+        x = option.rect.x() + (option.rect.width() - size) // 2
+        y = option.rect.y() + (option.rect.height() - size) // 2
+        rect = QRect(x, y, size, size)
+
+        if enabled:
+            # Filled green circle
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(self._COLOR_ON))
+            painter.drawEllipse(rect)
+            # White checkmark
+            painter.setPen(QPen(QColor("#FFFFFF"), 2.0))
+            painter.drawLine(x + 3, y + 8, x + 6, y + 12)
+            painter.drawLine(x + 6, y + 12, x + 12, y + 4)
+        else:
+            # Empty gray circle
+            painter.setPen(QPen(self._COLOR_OFF, 1.5))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(rect)
+
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        return QSize(36, 28)
+
+    def editorEvent(self, event, model, option, index):
+        if event.type() in (event.Type.MouseButtonRelease, event.Type.MouseButtonDblClick):
+            current = index.data(Qt.ItemDataRole.CheckStateRole)
+            new_val = Qt.CheckState.Unchecked if current == Qt.CheckState.Checked else Qt.CheckState.Checked
+            model.setData(index, new_val.value, Qt.ItemDataRole.CheckStateRole)
+            return True
+        return False
 
 
 class ModListProxyModel(QSortFilterProxyModel):
@@ -52,11 +109,18 @@ class ModListView(QWidget):
         self._tree.header().setSectionsClickable(True)
         self._tree.header().sortIndicatorChanged.connect(self._proxy_model.sort)
         self._model = self._proxy_model  # Für Kompatibilität
-        self._tree.setColumnWidth(0, 36)
-        self._tree.setColumnWidth(1, 200)
-        self._tree.setColumnWidth(2, 70)
+        # Custom delegate for checkbox column
+        self._check_delegate = CheckboxDelegate(self._tree)
+        self._tree.setItemDelegateForColumn(COL_CHECK, self._check_delegate)
+        # Column widths — Name stretches to fill
+        header = self._tree.header()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(COL_CHECK, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(COL_NAME, QHeaderView.ResizeMode.Stretch)
+        self._tree.setColumnWidth(COL_CHECK, 36)
+        self._tree.setColumnWidth(2, 80)
         self._tree.setColumnWidth(3, 80)
-        self._tree.setColumnWidth(4, 90)
+        self._tree.setColumnWidth(4, 100)
         self._tree.setColumnWidth(5, 80)
         self._tree.setColumnWidth(6, 60)
         layout.addWidget(self._tree)
@@ -74,6 +138,10 @@ class ModListView(QWidget):
         self._filter_right.textChanged.connect(lambda t: _todo("Filter")())
         filter_row.addWidget(self._filter_right)
         layout.addLayout(filter_row)
+
+    def source_model(self) -> ModListModel:
+        """Return the underlying ModListModel."""
+        return self._source_model
 
     def clear_mods(self) -> None:
         """Remove all mods from the list."""

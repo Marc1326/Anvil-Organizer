@@ -142,7 +142,7 @@ QAbstractItemView {{
   color: {d["text"]};
 }}
 QAbstractItemView::item {{
-  min-height: 24px;
+  min-height: 28px;
 }}
 QAbstractItemView::item:hover {{
   background: {d["hell"]};
@@ -159,7 +159,8 @@ QTreeView {{
 QHeaderView::section {{
   background: {d["dunkel"]};
   color: {d["text"]};
-  padding: 0 5px;
+  padding: 4px 6px;
+  min-height: 28px;
   border: 0;
   border-bottom: 2px solid {d["mittel"]};
   border-right: 2px solid {d["mittel"]};
