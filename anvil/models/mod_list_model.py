@@ -1,6 +1,6 @@
 """QAbstractItemModel für Mod-Liste."""
 
-from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, QMimeData, QByteArray, QDataStream, QIODevice, QSize
+from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, QMimeData, QByteArray, QDataStream, QIODevice, QSize, Signal
 from PySide6.QtGui import QColor, QBrush
 
 from anvil.core.mod_entry import ModEntry
@@ -43,6 +43,9 @@ def mod_entry_to_row(entry: ModEntry) -> ModRow:
 
 
 class ModListModel(QAbstractItemModel):
+    mod_toggled = Signal(int, bool)   # (source_row, enabled)
+    mods_reordered = Signal()         # after drag & drop
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._rows: list[ModRow] = []
@@ -113,8 +116,10 @@ class ModListModel(QAbstractItemModel):
         if not index.isValid() or index.row() >= len(self._rows):
             return False
         if role == Qt.ItemDataRole.CheckStateRole and index.column() == COL_CHECK:
-            self._rows[index.row()].enabled = value == Qt.CheckState.Checked.value
+            new_enabled = value == Qt.CheckState.Checked.value
+            self._rows[index.row()].enabled = new_enabled
             self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole])
+            self.mod_toggled.emit(index.row(), new_enabled)
             return True
         return False
 
@@ -199,6 +204,7 @@ class ModListModel(QAbstractItemModel):
         )
 
         self._drop_in_progress = True
+        self.mods_reordered.emit()
         return True
 
     def removeRows(self, row, count, parent=QModelIndex()):

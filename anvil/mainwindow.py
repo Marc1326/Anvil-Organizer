@@ -25,6 +25,7 @@ from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.instance_manager import InstanceManager
 from anvil.core.icon_manager import IconManager
 from anvil.core.mod_entry import scan_mods_directory
+from anvil.core.mod_list_io import write_modlist
 from anvil.models.mod_list_model import mod_entry_to_row
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 
@@ -71,7 +72,8 @@ class MainWindow(QMainWindow):
         left_pane = QWidget()
         left_layout = QVBoxLayout(left_pane)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(ProfileBar(self))
+        self._profile_bar = ProfileBar(self)
+        left_layout.addWidget(self._profile_bar)
         self._mod_list_view = ModListView()
         self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
         left_layout.addWidget(self._mod_list_view)
@@ -83,6 +85,15 @@ class MainWindow(QMainWindow):
 
         self._status_bar = StatusBarWidget(self)
         self.setStatusBar(self._status_bar)
+
+        # ── Mod state ─────────────────────────────────────────────────
+        self._current_mod_entries = []
+        self._current_profile_path: Path | None = None
+
+        # Connect model signals for persistence
+        model = self._mod_list_view.source_model()
+        model.mod_toggled.connect(self._on_mod_toggled)
+        model.mods_reordered.connect(self._on_mods_reordered)
 
         # ── Erster Start / Instanz laden ──────────────────────────────
         self._check_first_start()
@@ -132,6 +143,8 @@ class MainWindow(QMainWindow):
             self._game_panel.update_game("Kein Spiel ausgewählt", None)
             self._mod_list_view.clear_mods()
             self._current_mod_entries = []
+            self._current_profile_path = None
+            self._update_active_count()
             self._status_bar.clear_instance()
             return
 
@@ -165,10 +178,11 @@ class MainWindow(QMainWindow):
         # 3. Mod list — scan filesystem and populate
         instance_path = self.instance_manager.instances_path() / instance_name
         profile_name = data.get("selected_profile", "Default")
-        profile_path = instance_path / ".profiles" / profile_name
-        self._current_mod_entries = scan_mods_directory(instance_path, profile_path)
+        self._current_profile_path = instance_path / ".profiles" / profile_name
+        self._current_mod_entries = scan_mods_directory(instance_path, self._current_profile_path)
         mod_rows = [mod_entry_to_row(e) for e in self._current_mod_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
+        self._update_active_count()
 
         # 4. Status bar
         self._status_bar.update_instance(game_name, short_name, store)
@@ -177,6 +191,45 @@ class MainWindow(QMainWindow):
         """Handle an icon that was downloaded in the background."""
         self.icon_manager.store_pixmap(cache_key, pixmap)
         self._game_panel.on_icon_ready(cache_key, pixmap)
+
+    # ── Mod list persistence ─────────────────────────────────────────
+
+    def _write_current_modlist(self) -> None:
+        """Write the current mod entries to modlist.txt."""
+        if self._current_profile_path is None:
+            return
+        mods = [(e.name, e.enabled) for e in self._current_mod_entries]
+        write_modlist(self._current_profile_path, mods)
+
+    def _on_mod_toggled(self, row: int, enabled: bool) -> None:
+        """A mod checkbox was toggled — update entries and persist."""
+        if 0 <= row < len(self._current_mod_entries):
+            self._current_mod_entries[row].enabled = enabled
+        self._write_current_modlist()
+        self._update_active_count()
+
+    def _on_mods_reordered(self) -> None:
+        """Mods were reordered via drag & drop — sync entries and persist."""
+        model = self._mod_list_view.source_model()
+        # Rebuild _current_mod_entries from the model's new order
+        new_entries = []
+        for i in range(model.rowCount()):
+            row_data = model._rows[i]
+            # Find matching entry by display_name or folder name
+            for entry in self._current_mod_entries:
+                display = entry.display_name or entry.name
+                if display == row_data.name and entry not in new_entries:
+                    entry.priority = i
+                    new_entries.append(entry)
+                    break
+        self._current_mod_entries = new_entries
+        self._write_current_modlist()
+        self._update_active_count()
+
+    def _update_active_count(self) -> None:
+        """Update the active mod counter in the profile bar."""
+        count = sum(1 for e in self._current_mod_entries if e.enabled)
+        self._profile_bar.update_active_count(count)
 
     # ── Other slots ───────────────────────────────────────────────────
 
