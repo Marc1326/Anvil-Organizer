@@ -90,9 +90,10 @@ class _IntroPage(QWizardPage):
 
 
 class _GameSelectPage(QWizardPage):
-    def __init__(self, plugin_loader: PluginLoader, parent=None):
+    def __init__(self, plugin_loader: PluginLoader, instance_manager: InstanceManager, parent=None):
         super().__init__(parent)
         self._pl = plugin_loader
+        self._im = instance_manager
         self.setTitle("Wähle ein Spiel")
 
         layout = QVBoxLayout(self)
@@ -112,8 +113,16 @@ class _GameSelectPage(QWizardPage):
     def initializePage(self) -> None:
         self._list.clear()
 
-        # Installed games first
+        # Collect short names that already have an instance
+        existing = {
+            inst.get("game_short_name", "")
+            for inst in self._im.list_instances()
+        }
+
+        # Installed games first (skip those with existing instance)
         for plugin in self._pl.installed_games():
+            if plugin.GameShortName in existing:
+                continue
             gd = plugin.gameDirectory()
             store = plugin.detectedStore() or ""
             detail = f"{store}  —  {gd}" if gd else store
@@ -122,9 +131,11 @@ class _GameSelectPage(QWizardPage):
             item.setData(Qt.ItemDataRole.UserRole, plugin.GameShortName)
             self._list.addItem(item)
 
-        # Non-installed games
+        # Non-installed games (skip those with existing instance)
         for plugin in self._pl.all_plugins():
             if plugin.isInstalled():
+                continue
+            if plugin.GameShortName in existing:
                 continue
             text = f"{plugin.GameName}  —  nicht erkannt"
             item = QListWidgetItem(text)
@@ -133,9 +144,17 @@ class _GameSelectPage(QWizardPage):
             item.setForeground(Qt.GlobalColor.darkGray)
             self._list.addItem(item)
 
+        # Hint if all games already have an instance
+        if self._list.count() == 0:
+            item = QListWidgetItem("Alle erkannten Spiele haben bereits eine Instanz.")
+            item.setFont(self._italic_font)
+            item.setForeground(Qt.GlobalColor.darkGray)
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            self._list.addItem(item)
+            return
+
         # Pre-select first
-        if self._list.count() > 0:
-            self._list.setCurrentRow(0)
+        self._list.setCurrentRow(0)
 
     def isComplete(self) -> bool:
         return self._list.currentItem() is not None
@@ -357,7 +376,7 @@ class CreateInstanceWizard(QWizard):
         self._intro_page = _IntroPage()
         self.addPage(self._intro_page)
 
-        self._game_page = _GameSelectPage(self._pl)
+        self._game_page = _GameSelectPage(self._pl, self._im)
         self.addPage(self._game_page)
 
         self._config_page = _ConfigPage(self._pl, self._im, self._game_page)

@@ -165,18 +165,22 @@ class GamePanel(QWidget):
 
     # ── Public API ────────────────────────────────────────────────────
 
-    def update_game(self, game_name: str, game_path: Path | None) -> None:
+    def update_game(self, game_name: str, game_path: Path | None, game_plugin=None) -> None:
         """Update the panel to reflect the active game instance.
 
         Args:
             game_name: Display name of the game.
             game_path: Path to the game installation directory,
                        or None if not detected.
+            game_plugin: The BaseGame plugin instance, or None.
         """
         self._current_game_path = game_path
 
         # Update label
         self._game_label.setText(game_name or "Kein Spiel ausgewählt")
+
+        # Rebuild executables dropdown
+        self._rebuild_game_menu(game_plugin)
 
         # Update data tree with real directory contents
         self._populate_data_tree(game_path)
@@ -185,6 +189,21 @@ class GamePanel(QWidget):
         self._dl_table.setRowCount(0)
 
     # ── Internal helpers ──────────────────────────────────────────────
+
+    def _rebuild_game_menu(self, game_plugin) -> None:
+        """Rebuild the game button dropdown with executables from the plugin."""
+        self._game_menu.clear()
+        self._game_menu.addAction(QAction("<Bearbeiten...>", self, triggered=_todo("<Bearbeiten...>")))
+        self._game_menu.addSeparator()
+
+        if game_plugin is not None:
+            for exe in game_plugin.executables():
+                name = exe.get("name", "")
+                if name:
+                    self._game_menu.addAction(QAction(name, self, triggered=_todo(name)))
+            self._game_menu.addSeparator()
+
+        self._game_menu.addAction(QAction("Explore Virtual Folder", self, triggered=_todo("Explore Virtual Folder")))
 
     def _populate_data_tree(self, game_path: Path | None) -> None:
         """Scan game_path and show top-level entries in the data tree."""

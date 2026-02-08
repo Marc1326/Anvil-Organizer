@@ -134,18 +134,20 @@ class MainWindow(QMainWindow):
         store = data.get("detected_store", "")
         game_path_str = data.get("game_path", "")
 
-        # Find the game plugin for the path
+        # Find the game plugin and path
         game_path: Path | None = None
         if game_path_str:
             p = Path(game_path_str)
             if p.is_dir():
                 game_path = p
 
+        plugin = self.plugin_loader.get_game(short_name) if short_name else None
+
         # 1. Title
         self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v0.1.0")
 
-        # 2. Game panel — real directory contents
-        self._game_panel.update_game(game_name, game_path)
+        # 2. Game panel — real directory contents + executables
+        self._game_panel.update_game(game_name, game_path, plugin)
 
         # 3. Mod list — clear (real mods come in Phase 3)
         self._mod_list_view.clear_mods()
