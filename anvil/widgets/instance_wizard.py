@@ -16,10 +16,11 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QCheckBox,
 )
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtCore import Qt
 
 from anvil.core.instance_manager import InstanceManager
+from anvil.core.icon_manager import IconManager, placeholder_game_icon
 from anvil.plugins.plugin_loader import PluginLoader
 
 # ── Style ─────────────────────────────────────────────────────────────
@@ -90,10 +91,11 @@ class _IntroPage(QWizardPage):
 
 
 class _GameSelectPage(QWizardPage):
-    def __init__(self, plugin_loader: PluginLoader, instance_manager: InstanceManager, parent=None):
+    def __init__(self, plugin_loader: PluginLoader, instance_manager: InstanceManager, icon_manager: IconManager | None = None, parent=None):
         super().__init__(parent)
         self._pl = plugin_loader
         self._im = instance_manager
+        self._icons = icon_manager
         self.setTitle("Wähle ein Spiel")
 
         layout = QVBoxLayout(self)
@@ -129,6 +131,7 @@ class _GameSelectPage(QWizardPage):
             text = f"{plugin.GameName}  —  {detail}"
             item = QListWidgetItem(text)
             item.setData(Qt.ItemDataRole.UserRole, plugin.GameShortName)
+            item.setIcon(self._game_icon(plugin.GameShortName))
             self._list.addItem(item)
 
         # Non-installed games (skip those with existing instance)
@@ -140,6 +143,7 @@ class _GameSelectPage(QWizardPage):
             text = f"{plugin.GameName}  —  nicht erkannt"
             item = QListWidgetItem(text)
             item.setData(Qt.ItemDataRole.UserRole, plugin.GameShortName)
+            item.setIcon(self._game_icon(plugin.GameShortName))
             item.setFont(self._italic_font)
             item.setForeground(Qt.GlobalColor.darkGray)
             self._list.addItem(item)
@@ -164,6 +168,14 @@ class _GameSelectPage(QWizardPage):
         if item is None:
             return None
         return item.data(Qt.ItemDataRole.UserRole)
+
+    def _game_icon(self, game_short_name: str) -> QIcon:
+        """Return cached game icon or a placeholder."""
+        if self._icons:
+            pix = self._icons.get_game_icon(game_short_name)
+            if pix is not None:
+                return QIcon(pix)
+        return QIcon(placeholder_game_icon(32))
 
 
 # ── Page 3: Configure ─────────────────────────────────────────────────
@@ -354,10 +366,12 @@ class CreateInstanceWizard(QWizard):
         parent=None,
         instance_manager: InstanceManager | None = None,
         plugin_loader: PluginLoader | None = None,
+        icon_manager: IconManager | None = None,
     ):
         super().__init__(parent)
         self._im = instance_manager
         self._pl = plugin_loader
+        self._icons = icon_manager
         self.created_instance = None
 
         self.setWindowTitle("Neue Instanz erstellen")
@@ -376,7 +390,7 @@ class CreateInstanceWizard(QWizard):
         self._intro_page = _IntroPage()
         self.addPage(self._intro_page)
 
-        self._game_page = _GameSelectPage(self._pl, self._im)
+        self._game_page = _GameSelectPage(self._pl, self._im, self._icons)
         self.addPage(self._game_page)
 
         self._config_page = _ConfigPage(self._pl, self._im, self._game_page)

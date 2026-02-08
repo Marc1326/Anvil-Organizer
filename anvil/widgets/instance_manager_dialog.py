@@ -23,6 +23,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtCore import Qt
 
 from anvil.core.instance_manager import InstanceManager
+from anvil.core.icon_manager import IconManager, placeholder_game_icon
 from anvil.plugins.plugin_loader import PluginLoader
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 
@@ -64,12 +65,14 @@ class InstanceManagerDialog(QDialog):
         parent=None,
         instance_manager: InstanceManager | None = None,
         plugin_loader: PluginLoader | None = None,
+        icon_manager: IconManager | None = None,
         *,
         welcome: bool = False,
     ):
         super().__init__(parent)
         self._im = instance_manager
         self._pl = plugin_loader
+        self._icons = icon_manager
         self.switched_to = None
 
         self.setWindowTitle("Instanz Manager")
@@ -201,7 +204,13 @@ class InstanceManagerDialog(QDialog):
             if name == current:
                 label = f"{name}  (aktiv)"
             item = QListWidgetItem(label)
-            item.setIcon(_icon("instances.svg"))
+            # Game-specific icon from cache, fallback to placeholder
+            gsn = inst.get("game_short_name", "")
+            icon_pix = self._icons.get_game_icon(gsn) if self._icons and gsn else None
+            if icon_pix is not None:
+                item.setIcon(QIcon(icon_pix))
+            else:
+                item.setIcon(QIcon(placeholder_game_icon(32)))
             item.setData(Qt.ItemDataRole.UserRole, name)
             self._list.addItem(item)
 
@@ -256,7 +265,7 @@ class InstanceManagerDialog(QDialog):
             )
             return
 
-        wizard = CreateInstanceWizard(self, self._im, self._pl)
+        wizard = CreateInstanceWizard(self, self._im, self._pl, self._icons)
         if wizard.exec() == QDialog.DialogCode.Accepted and wizard.created_instance:
             self._refresh_list()
             # Auto-switch to the newly created instance

@@ -55,6 +55,7 @@ def create_toolbar(parent=None):
             win,
             getattr(win, "instance_manager", None),
             getattr(win, "plugin_loader", None),
+            getattr(win, "icon_manager", None),
         )
         dlg.exec()
         if dlg.switched_to and hasattr(win, "switch_instance"):
