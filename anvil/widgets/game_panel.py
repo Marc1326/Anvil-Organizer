@@ -25,7 +25,9 @@ from PySide6.QtWidgets import (
 )
 
 from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont
-from PySide6.QtCore import Qt, QSize, QPoint
+from PySide6.QtCore import Qt, QSize, QPoint, Signal
+
+from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 
 
 def _todo(name):
@@ -34,7 +36,19 @@ def _todo(name):
     return _
 
 
+class _NumericSortItem(QTableWidgetItem):
+    """QTableWidgetItem that sorts by UserRole data (numeric) instead of text."""
+    def __lt__(self, other):
+        val = self.data(Qt.ItemDataRole.UserRole)
+        other_val = other.data(Qt.ItemDataRole.UserRole)
+        if val is not None and other_val is not None:
+            return val < other_val
+        return super().__lt__(other)
+
+
 class GamePanel(QWidget):
+    install_requested = Signal(list)  # list of archive path strings
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("gamePanel")
@@ -99,6 +113,10 @@ class GamePanel(QWidget):
         layout.addWidget(top_frame)
 
         tabs = QTabWidget()
+        tabs.tabBar().setExpanding(False)
+        tabs.tabBar().setLayoutDirection(Qt.LayoutDirection.LeftToRight)
+        tabs.setStyleSheet("QTabBar { qproperty-alignment: AlignCenter; }"
+                           "QTabWidget::tab-bar { alignment: center; }")
 
         # ── Daten-Tab ─────────────────────────────────────────────────
         data = QWidget()
@@ -114,7 +132,16 @@ class GamePanel(QWidget):
         self._data_tree.setColumnCount(5)
         self._data_tree.setHeaderLabels(["Name", "Mod", "Type", "Größe", "Datum modifiziert"])
         self._data_tree.setAlternatingRowColors(True)
-        self._data_tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        data_header = self._data_tree.header()
+        data_header.setStretchLastSection(False)
+        data_header.setCascadingSectionResizes(True)
+        data_header.setMinimumSectionSize(40)
+        data_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self._data_tree.setColumnWidth(0, 200)
+        self._data_tree.setColumnWidth(1, 100)
+        self._data_tree.setColumnWidth(2, 70)
+        self._data_tree.setColumnWidth(3, 80)
+        self._data_tree.setColumnWidth(4, 130)
         data_layout.addWidget(self._data_tree)
         data_bar = QHBoxLayout()
         data_bar.addWidget(QCheckBox("Nur Konflikte"))
@@ -132,7 +159,10 @@ class GamePanel(QWidget):
         saves_tree = QTreeWidget()
         saves_tree.setColumnCount(2)
         saves_tree.setHeaderLabels(["Name", "Datei"])
-        saves_tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        saves_header = saves_tree.header()
+        saves_header.setStretchLastSection(False)
+        saves_header.setCascadingSectionResizes(True)
+        saves_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         saves_layout.addWidget(saves_tree)
         tabs.addTab(saves, "Spielstände")
 
@@ -140,14 +170,35 @@ class GamePanel(QWidget):
         downloads = QWidget()
         dl_layout = QVBoxLayout(downloads)
         reload_btn = QPushButton("Neu laden")
-        reload_btn.clicked.connect(_todo("Downloads neu laden"))
+        _refresh_icon2 = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "refresh.svg")
+        if os.path.exists(_refresh_icon2):
+            reload_btn.setIcon(QIcon(_refresh_icon2))
+        reload_btn.setIconSize(QSize(20, 20))
+        reload_btn.clicked.connect(self.refresh_downloads)
         dl_layout.addWidget(reload_btn)
         self._dl_table = QTableWidget()
         self._dl_table.setColumnCount(4)
         self._dl_table.setHorizontalHeaderLabels(["Name", "Größe", "Status", "Dateizeit"])
-        self._dl_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        dl_header = self._dl_table.horizontalHeader()
+        dl_header.setStretchLastSection(False)
+        dl_header.setCascadingSectionResizes(True)
+        dl_header.setMinimumSectionSize(40)
+        dl_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self._dl_table.setColumnWidth(0, 250)
+        self._dl_table.setColumnWidth(1, 90)
+        self._dl_table.setColumnWidth(2, 120)
+        self._dl_table.setColumnWidth(3, 140)
+        self._dl_table.verticalHeader().setDefaultSectionSize(46)
+        self._dl_table.verticalHeader().setVisible(False)
+        self._dl_table.setStyleSheet("QTableWidget { font-size: 14px; }")
+        self._dl_table.setSortingEnabled(True)
         self._dl_table.setAlternatingRowColors(True)
+        self._dl_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._dl_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._dl_table.setRowCount(0)
+        self._dl_table.cellDoubleClicked.connect(self._on_dl_double_click)
+        self._dl_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._dl_table.customContextMenuRequested.connect(self._on_dl_context_menu)
         dl_layout.addWidget(self._dl_table)
         cb = QCheckBox("versteckte Dateien")
         cb.stateChanged.connect(lambda s: _todo("versteckte Dateien")())
@@ -165,6 +216,10 @@ class GamePanel(QWidget):
         self._current_short_name: str = ""
         self._current_plugin = None
         self._icon_manager = None
+        self._downloads_path: Path | None = None
+        self._mods_path: Path | None = None
+        # Map row index → archive Path for installation
+        self._dl_archives: list[Path] = []
 
     # ── Public API ────────────────────────────────────────────────────
 
@@ -203,8 +258,7 @@ class GamePanel(QWidget):
         # Update data tree with real directory contents
         self._populate_data_tree(game_path)
 
-        # Clear downloads (real downloads come from instance .downloads/ in Phase 3)
-        self._dl_table.setRowCount(0)
+        # Downloads are populated via set_downloads_path() from MainWindow
 
     def on_icon_ready(self, cache_key: str, pixmap: QPixmap) -> None:
         """Called when a background icon download completes."""
@@ -333,3 +387,95 @@ class GamePanel(QWidget):
         if size_bytes < 1024 * 1024 * 1024:
             return f"{size_bytes / (1024 * 1024):.2f} MB"
         return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+
+    # ── Downloads-Tab ──────────────────────────────────────────────
+
+    def set_downloads_path(self, downloads_path: Path, mods_path: Path) -> None:
+        """Set paths and populate the downloads table."""
+        self._downloads_path = downloads_path
+        self._mods_path = mods_path
+        self.refresh_downloads()
+
+    def refresh_downloads(self) -> None:
+        """Scan .downloads/ and populate the table."""
+        self._dl_table.setRowCount(0)
+        self._dl_archives.clear()
+
+        if not self._downloads_path or not self._downloads_path.is_dir():
+            return
+
+        import re
+        from datetime import datetime
+
+        archives: list[tuple[str, int, float, Path]] = []
+        for entry in self._downloads_path.iterdir():
+            if entry.is_file() and entry.suffix.lower() in SUPPORTED_EXTENSIONS:
+                try:
+                    stat = entry.stat()
+                    archives.append((entry.name, stat.st_size, stat.st_mtime, entry))
+                except OSError:
+                    continue
+
+        archives.sort(key=lambda t: t[0].lower())
+
+        # Build set of installed mod folder names for status check
+        installed_names: set[str] = set()
+        if self._mods_path and self._mods_path.is_dir():
+            installed_names = {d.name.lower() for d in self._mods_path.iterdir() if d.is_dir()}
+
+        self._dl_table.setSortingEnabled(False)
+        self._dl_table.setRowCount(len(archives))
+        for row, (name, size, mtime, path) in enumerate(archives):
+            self._dl_archives.append(path)
+
+            # Name — store archive path in UserRole for install after sort
+            item_name = QTableWidgetItem(name)
+            item_name.setData(Qt.ItemDataRole.UserRole, str(path))
+            self._dl_table.setItem(row, 0, item_name)
+
+            # Size — numeric sort via _NumericSortItem
+            item_size = _NumericSortItem()
+            item_size.setText(self._format_size(size))
+            item_size.setData(Qt.ItemDataRole.UserRole, size)
+            item_size.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self._dl_table.setItem(row, 1, item_size)
+
+            # Status — check if a mod folder derived from this archive name exists
+            stem = path.stem
+            # Strip Nexus suffixes like "-12128-1-0-1704653004"
+            clean = re.sub(r"-\d+(-\d+)*$", "", stem).strip()
+            is_installed = clean.lower() in installed_names or stem.lower() in installed_names
+            status_text = "Installiert" if is_installed else "Nicht installiert"
+            item_status = QTableWidgetItem(status_text)
+            if is_installed:
+                item_status.setForeground(QColor("#4CAF50"))
+            self._dl_table.setItem(row, 2, item_status)
+
+            # Date
+            date_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+            self._dl_table.setItem(row, 3, QTableWidgetItem(date_str))
+
+        self._dl_table.setSortingEnabled(True)
+
+    def _get_dl_archive_path(self, row: int) -> str | None:
+        """Get archive path from the name column's UserRole data."""
+        item = self._dl_table.item(row, 0)
+        return item.data(Qt.ItemDataRole.UserRole) if item else None
+
+    def _on_dl_double_click(self, row: int, _col: int) -> None:
+        """Double-click on a download row → install it."""
+        path = self._get_dl_archive_path(row)
+        if path:
+            self.install_requested.emit([path])
+
+    def _on_dl_context_menu(self, pos) -> None:
+        """Right-click context menu on downloads table."""
+        row = self._dl_table.rowAt(pos.y())
+        path = self._get_dl_archive_path(row) if row >= 0 else None
+        if not path:
+            return
+        menu = QMenu(self)
+        act_install = menu.addAction("Installieren")
+        chosen = menu.exec(self._dl_table.viewport().mapToGlobal(pos))
+        if chosen == act_install:
+            self.install_requested.emit([path])

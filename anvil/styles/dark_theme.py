@@ -21,7 +21,6 @@ def get_stylesheet() -> str:
   background: {d["mittel"]};
   font-size: 13px;
   color: {d["text"]};
-  border: 0;
 }}
 *:disabled {{
   color: {d["text_dim"]};
@@ -156,17 +155,28 @@ QTreeView {{
   border-radius: 6px;
 }}
 
+QHeaderView {{
+  background: {d["dunkel"]};
+  border: none;
+}}
 QHeaderView::section {{
   background: {d["dunkel"]};
   color: {d["text"]};
-  padding: 4px 6px;
+  padding: 4px 8px;
   min-height: 28px;
-  border: 0;
+  border-top: none;
+  border-left: none;
   border-bottom: 2px solid {d["mittel"]};
-  border-right: 2px solid {d["mittel"]};
+  border-right: 2px solid {d["hell"]};
 }}
 QHeaderView::section:hover {{
   background: {d["hell"]};
+}}
+QHeaderView::section:first {{
+  border-left: none;
+}}
+QHeaderView::section:last {{
+  border-right: none;
 }}
 
 QScrollBar {{

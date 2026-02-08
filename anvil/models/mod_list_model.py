@@ -104,7 +104,7 @@ class ModListModel(QAbstractItemModel):
         if role == Qt.ItemDataRole.CheckStateRole and c == COL_CHECK:
             return Qt.CheckState.Checked if r.enabled else Qt.CheckState.Unchecked
         if role == Qt.ItemDataRole.TextAlignmentRole and c == COL_PRIORITY:
-            return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            return Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
         if role == Qt.ItemDataRole.BackgroundRole:
             if r.is_error:
                 return QBrush(QColor("#3a1414"))

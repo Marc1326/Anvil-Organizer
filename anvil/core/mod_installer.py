@@ -1,0 +1,210 @@
+"""Extract archives and install them as mods.
+
+Supported formats:
+
+- ZIP  — ``zipfile`` (stdlib, always available)
+- RAR  — ``unrar`` CLI tool
+- 7-Zip — ``7z`` CLI tool (p7zip)
+"""
+
+from __future__ import annotations
+
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import zipfile
+from pathlib import Path
+
+from anvil.core.mod_metadata import create_default_meta_ini
+
+SUPPORTED_EXTENSIONS = {".zip", ".rar", ".7z"}
+
+
+class ModInstaller:
+    """Extract archives and install them into an instance's ``.mods/`` folder."""
+
+    def __init__(self, instance_path: Path) -> None:
+        self.instance_path = instance_path
+        self.mods_path = instance_path / ".mods"
+
+    # ── Public API ─────────────────────────────────────────────────────
+
+    def install_from_archive(
+        self,
+        archive_path: Path,
+        mod_name: str | None = None,
+    ) -> Path | None:
+        """Extract *archive_path* and install as a mod.
+
+        Args:
+            archive_path: Path to a ``.zip``, ``.rar``, or ``.7z`` file.
+            mod_name: Display / folder name.  Derived from filename if *None*.
+
+        Returns:
+            Path to the installed mod folder, or *None* on failure.
+        """
+        if not archive_path.is_file():
+            print(
+                f"mod_installer: file not found: {archive_path}",
+                file=sys.stderr,
+            )
+            return None
+
+        # 1. Determine mod name
+        base = mod_name or self._sanitize_name(archive_path.stem)
+        folder_name = self._unique_name(base)
+
+        # 2. Extract into a temporary directory
+        tmp = Path(tempfile.mkdtemp(prefix="anvil_install_"))
+        try:
+            if not self._extract(archive_path, tmp):
+                return None
+
+            # 3. Flatten single-subfolder archives
+            self._flatten_single_subfolder(tmp)
+
+            # 4. Check that we actually got files
+            if not any(tmp.iterdir()):
+                print(
+                    f"mod_installer: archive is empty: {archive_path}",
+                    file=sys.stderr,
+                )
+                return None
+
+            # 5. Move to .mods/<folder_name>
+            self.mods_path.mkdir(parents=True, exist_ok=True)
+            dest = self.mods_path / folder_name
+            shutil.move(str(tmp), str(dest))
+
+            # 6. Create meta.ini
+            display = mod_name or base
+            create_default_meta_ini(dest, display)
+
+            return dest
+
+        except OSError as exc:
+            print(
+                f"mod_installer: failed to install {archive_path}: {exc}",
+                file=sys.stderr,
+            )
+            return None
+        finally:
+            # Clean up temp dir if it still exists (move failed)
+            if tmp.is_dir():
+                shutil.rmtree(tmp, ignore_errors=True)
+
+    # ── Extraction ─────────────────────────────────────────────────────
+
+    def _extract(self, archive: Path, dest: Path) -> bool:
+        """Dispatch extraction based on file extension."""
+        ext = archive.suffix.lower()
+        if ext == ".zip":
+            return self._extract_zip(archive, dest)
+        if ext == ".rar":
+            return self._extract_rar(archive, dest)
+        if ext == ".7z":
+            return self._extract_7z(archive, dest)
+        print(
+            f"mod_installer: unsupported format: {ext}",
+            file=sys.stderr,
+        )
+        return False
+
+    @staticmethod
+    def _extract_zip(archive: Path, dest: Path) -> bool:
+        try:
+            with zipfile.ZipFile(archive, "r") as zf:
+                zf.extractall(dest)
+            return True
+        except (zipfile.BadZipFile, OSError) as exc:
+            print(
+                f"mod_installer: failed to extract ZIP {archive}: {exc}",
+                file=sys.stderr,
+            )
+            return False
+
+    @staticmethod
+    def _extract_rar(archive: Path, dest: Path) -> bool:
+        if not shutil.which("unrar"):
+            print(
+                "mod_installer: 'unrar' not found — install it to extract RAR files",
+                file=sys.stderr,
+            )
+            return False
+        try:
+            subprocess.run(
+                ["unrar", "x", "-o+", "-y", str(archive), str(dest) + "/"],
+                check=True,
+                capture_output=True,
+            )
+            return True
+        except subprocess.CalledProcessError as exc:
+            print(
+                f"mod_installer: unrar failed: {exc.stderr.decode(errors='replace')}",
+                file=sys.stderr,
+            )
+            return False
+
+    @staticmethod
+    def _extract_7z(archive: Path, dest: Path) -> bool:
+        if not shutil.which("7z"):
+            print(
+                "mod_installer: '7z' not found — install p7zip to extract 7z files",
+                file=sys.stderr,
+            )
+            return False
+        try:
+            subprocess.run(
+                ["7z", "x", str(archive), f"-o{dest}", "-y"],
+                check=True,
+                capture_output=True,
+            )
+            return True
+        except subprocess.CalledProcessError as exc:
+            print(
+                f"mod_installer: 7z failed: {exc.stderr.decode(errors='replace')}",
+                file=sys.stderr,
+            )
+            return False
+
+    # ── Helpers ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _sanitize_name(name: str) -> str:
+        """Remove characters that are problematic in folder names."""
+        # Replace problematic chars with underscore
+        cleaned = re.sub(r'[<>:"/\\|?*]', "_", name)
+        # Collapse multiple underscores / strip
+        cleaned = re.sub(r"_+", "_", cleaned).strip(" _.")
+        return cleaned or "Unnamed Mod"
+
+    def _unique_name(self, base: str) -> str:
+        """Return *base* if available, otherwise ``base (2)``, ``(3)``, etc."""
+        if not (self.mods_path / base).exists():
+            return base
+        n = 2
+        while (self.mods_path / f"{base} ({n})").exists():
+            n += 1
+        return f"{base} ({n})"
+
+    @staticmethod
+    def _flatten_single_subfolder(extract_dir: Path) -> None:
+        """If *extract_dir* contains exactly one subfolder, move its contents up."""
+        children = list(extract_dir.iterdir())
+        if len(children) == 1 and children[0].is_dir():
+            single = children[0]
+            # Move everything from single/ up to extract_dir/
+            for item in single.iterdir():
+                shutil.move(str(item), str(extract_dir / item.name))
+            single.rmdir()
+
+    @staticmethod
+    def check_tools() -> dict[str, bool]:
+        """Check availability of extraction tools."""
+        return {
+            "zip": True,
+            "rar": shutil.which("unrar") is not None,
+            "7z": shutil.which("7z") is not None,
+        }
