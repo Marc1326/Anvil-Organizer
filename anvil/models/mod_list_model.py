@@ -1,12 +1,13 @@
 """QAbstractItemModel für Mod-Liste mit 20 Dummy-Mods."""
 
-from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt
+from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, QMimeData, QByteArray, QDataStream, QIODevice
 from PySide6.QtGui import QColor, QBrush
 
 
 COL_CHECK, COL_NAME, COL_CONFLICTS, COL_MARKERS, COL_CATEGORY, COL_VERSION, COL_PRIORITY = range(7)
 COL_COUNT = 7
 HEADERS = ["", "Mod Name", "Konflikte", "Markierungen", "Kategorie", "Version", "Priorität"]
+MIME_MOD_ROWS = "application/x-anvil-mod-rows"
 
 
 class ModRow:
@@ -53,6 +54,7 @@ class ModListModel(QAbstractItemModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._rows = _dummy_mods()
+        self._drop_in_progress = False
 
     def rowCount(self, parent=QModelIndex()):
         if parent.isValid():
@@ -112,11 +114,93 @@ class ModListModel(QAbstractItemModel):
 
     def flags(self, index):
         if not index.isValid():
-            return Qt.ItemFlag.NoItemFlags
-        f = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+            return Qt.ItemFlag.ItemIsDropEnabled
+        f = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled
         if index.column() == COL_CHECK:
             f |= Qt.ItemFlag.ItemIsUserCheckable
         return f
+
+    def supportedDropActions(self):
+        return Qt.DropAction.MoveAction
+
+    def supportedDragActions(self):
+        return Qt.DropAction.MoveAction
+
+    def mimeTypes(self):
+        return [MIME_MOD_ROWS]
+
+    def mimeData(self, indexes):
+        """Beim Drag: Mod-Indices serialisieren."""
+        mime = QMimeData()
+        rows = sorted(set(idx.row() for idx in indexes if idx.isValid()))
+        data = QByteArray()
+        stream = QDataStream(data, QIODevice.OpenModeFlag.WriteOnly)
+        for row in rows:
+            stream.writeInt32(row)
+        mime.setData(MIME_MOD_ROWS, data)
+        return mime
+
+    def canDropMimeData(self, data, action, row, column, parent):
+        return data.hasFormat(MIME_MOD_ROWS)
+
+    def dropMimeData(self, data, action, row, column, parent):
+        """Beim Drop: Zeile verschieben mit beginMoveRows/endMoveRows."""
+        if action == Qt.DropAction.IgnoreAction:
+            return True
+        if not data.hasFormat(MIME_MOD_ROWS):
+            return False
+
+        # Source-Rows dekodieren
+        raw = data.data(MIME_MOD_ROWS)
+        stream = QDataStream(raw, QIODevice.OpenModeFlag.ReadOnly)
+        source_rows = []
+        while not stream.atEnd():
+            source_rows.append(stream.readInt32())
+        if not source_rows:
+            return False
+
+        # Ziel-Position bestimmen
+        if row >= 0:
+            target = row
+        elif parent.isValid():
+            target = parent.row()
+        else:
+            target = self.rowCount()
+
+        source_row = source_rows[0]
+
+        # beginMoveRows gibt False zurück wenn Zeile bereits an der Stelle ist
+        p = QModelIndex()
+        if source_row < target:
+            if not self.beginMoveRows(p, source_row, source_row, p, target):
+                return False
+            row_data = self._rows.pop(source_row)
+            self._rows.insert(target - 1, row_data)
+        else:
+            if not self.beginMoveRows(p, source_row, source_row, p, target):
+                return False
+            row_data = self._rows.pop(source_row)
+            self._rows.insert(target, row_data)
+        self.endMoveRows()
+
+        # Prioritäten neu durchnummerieren
+        for i, mod in enumerate(self._rows):
+            mod.priority = i
+        self.dataChanged.emit(
+            self.index(0, COL_PRIORITY),
+            self.index(len(self._rows) - 1, COL_PRIORITY),
+            [Qt.ItemDataRole.DisplayRole],
+        )
+
+        self._drop_in_progress = True
+        return True
+
+    def removeRows(self, row, count, parent=QModelIndex()):
+        """No-Op nach DnD — beginMoveRows hat die Zeile bereits verschoben."""
+        if self._drop_in_progress:
+            self._drop_in_progress = False
+            return True
+        return False
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         if orientation != Qt.Orientation.Horizontal or role != Qt.ItemDataRole.DisplayRole:

@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QAbstractItemView,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex
 
 from anvil.models.mod_list_model import ModListModel, COL_NAME
 
@@ -18,6 +18,11 @@ def _todo(name):
     def _():
         print(f"TODO: {name}")
     return _
+
+
+class ModListProxyModel(QSortFilterProxyModel):
+    """Proxy-Model für Mod-Liste. Qt leitet DnD automatisch ans Source-Model weiter."""
+    pass
 
 
 class ModListView(QWidget):
@@ -31,10 +36,22 @@ class ModListView(QWidget):
         self._tree.setAlternatingRowColors(True)
         self._tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self._tree.setSortingEnabled(True)
         self._tree.setUniformRowHeights(True)
-        self._model = ModListModel(self)
-        self._tree.setModel(self._model)
+        self._tree.setDragEnabled(True)
+        self._tree.setAcceptDrops(True)
+        self._tree.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
+        self._tree.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self._tree.setDropIndicatorShown(True)
+        self._tree.setDragDropOverwriteMode(False)
+        # Source-Model und Proxy-Model für korrektes DnD
+        self._source_model = ModListModel(self)
+        self._proxy_model = ModListProxyModel(self)
+        self._proxy_model.setSourceModel(self._source_model)
+        self._tree.setModel(self._proxy_model)
+        self._tree.header().setSortIndicatorShown(True)
+        self._tree.header().setSectionsClickable(True)
+        self._tree.header().sortIndicatorChanged.connect(self._proxy_model.sort)
+        self._model = self._proxy_model  # Für Kompatibilität
         self._tree.setColumnWidth(0, 36)
         self._tree.setColumnWidth(1, 200)
         self._tree.setColumnWidth(2, 70)
@@ -43,8 +60,9 @@ class ModListView(QWidget):
         self._tree.setColumnWidth(5, 80)
         self._tree.setColumnWidth(6, 60)
         # MO2: BrowserExtensionFramework vorselektiert (Zeile 5)
-        idx = self._model.index(5, 0)
-        self._tree.setCurrentIndex(idx)
+        source_idx = self._source_model.index(5, 0)
+        proxy_idx = self._proxy_model.mapFromSource(source_idx)
+        self._tree.setCurrentIndex(proxy_idx)
         layout.addWidget(self._tree)
 
         filter_row = QHBoxLayout()
@@ -63,8 +81,9 @@ class ModListView(QWidget):
 
     def get_current_mod_name(self):
         """Liefert den Mod-Namen der aktuell gewählten Zeile oder None."""
-        idx = self._tree.currentIndex()
-        if not idx.isValid() or idx.row() < 0:
+        proxy_idx = self._tree.currentIndex()
+        if not proxy_idx.isValid() or proxy_idx.row() < 0:
             return None
-        name = self._model.data(self._model.index(idx.row(), COL_NAME), Qt.ItemDataRole.DisplayRole)
+        source_idx = self._proxy_model.mapToSource(proxy_idx)
+        name = self._source_model.data(self._source_model.index(source_idx.row(), COL_NAME), Qt.ItemDataRole.DisplayRole)
         return name if name is not None else None
