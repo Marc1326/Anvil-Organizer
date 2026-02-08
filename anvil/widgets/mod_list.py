@@ -59,10 +59,6 @@ class ModListView(QWidget):
         self._tree.setColumnWidth(4, 90)
         self._tree.setColumnWidth(5, 80)
         self._tree.setColumnWidth(6, 60)
-        # MO2: BrowserExtensionFramework vorselektiert (Zeile 5)
-        source_idx = self._source_model.index(5, 0)
-        proxy_idx = self._proxy_model.mapFromSource(source_idx)
-        self._tree.setCurrentIndex(proxy_idx)
         layout.addWidget(self._tree)
 
         filter_row = QHBoxLayout()
@@ -78,6 +74,10 @@ class ModListView(QWidget):
         self._filter_right.textChanged.connect(lambda t: _todo("Filter")())
         filter_row.addWidget(self._filter_right)
         layout.addLayout(filter_row)
+
+    def clear_mods(self) -> None:
+        """Remove all mods from the list."""
+        self._source_model.clear()
 
     def get_current_mod_name(self):
         """Liefert den Mod-Namen der aktuell gewählten Zeile oder None."""

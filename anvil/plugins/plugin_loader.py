@@ -31,6 +31,54 @@ from anvil.stores.store_manager import StoreManager
 _BUILTIN_GAMES_DIR = Path(__file__).parent / "games"
 _USER_GAMES_DIR = Path.home() / ".anvil-organizer" / "plugins" / "games"
 
+_USER_README = """\
+# Eigene Spiel-Plugins für Anvil Organizer
+
+Lege hier eigene Game-Plugin-Dateien ab (z.B. `game_meingame.py`).
+
+## Anleitung
+
+1. Erstelle eine Python-Datei `game_SPIELNAME.py`
+2. Importiere BaseGame und erbe davon:
+
+```python
+from anvil.plugins.base_game import BaseGame
+
+class MeinGamePlugin(BaseGame):
+    Name = "Mein Spiel Support Plugin"
+    Author = "Dein Name"
+    Version = "1.0.0"
+    GameName = "Mein Spiel"
+    GameShortName = "meinspiel"
+    GameBinary = "bin/game.exe"
+    GameDataPath = ""
+    GameSteamId = 123456       # Mindestens eine Store-ID setzen
+    # GameGogId = 0
+    # GameEpicId = ""
+```
+
+3. Starte Anvil Organizer neu — das Plugin wird automatisch geladen.
+
+## Beispiel
+
+Siehe das Cyberpunk-Plugin: `anvil/plugins/games/game_cyberpunk2077.py`
+"""
+
+
+def ensure_user_plugin_dir() -> Path:
+    """Create the user plugin directory and README if they don't exist.
+
+    Returns:
+        Path to ``~/.anvil-organizer/plugins/games/``.
+    """
+    _USER_GAMES_DIR.mkdir(parents=True, exist_ok=True)
+
+    readme = _USER_GAMES_DIR / "README.md"
+    if not readme.exists():
+        readme.write_text(_USER_README, encoding="utf-8")
+
+    return _USER_GAMES_DIR
+
 
 class PluginLoader:
     """Loads game plugins and runs store detection.
@@ -64,8 +112,8 @@ class PluginLoader:
 
         # Step 2+3: Load plugin files
         self._scan_directory(_BUILTIN_GAMES_DIR)
-        if _USER_GAMES_DIR.is_dir():
-            self._scan_directory(_USER_GAMES_DIR)
+        ensure_user_plugin_dir()
+        self._scan_directory(_USER_GAMES_DIR)
 
         # Step 4: Detect games — convert int keys to str for detectGame()
         steam_str = {str(k): v for k, v in self._store_manager.steam_games.items()}

@@ -1,5 +1,10 @@
 """Game-Panel — MO2-Kopie: großes Game-Icon, Tabs, Downloads mit Neu laden."""
 
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -18,7 +23,6 @@ from PySide6.QtWidgets import (
     QTreeWidget,
     QTreeWidgetItem,
 )
-import os
 
 from PySide6.QtGui import QPixmap, QIcon, QColor, QAction
 from PySide6.QtCore import Qt, QSize, QPoint
@@ -28,23 +32,6 @@ def _todo(name):
     def _():
         print(f"TODO: {name}")
     return _
-
-
-def _dummy_downloads():
-    return [
-        ("Peachu Casual Dress - Archive XL...", "177.29 MB", "Ins.", "1/18/2026 10:"),
-        ("Ruffles Outfit - Core...", "76.18 MB", "De.", "11/27/2025 1:"),
-        ("Mesh Replacer - EBBN...", "45.0 MB", "Ins.", "2/1/2026 14:"),
-        ("Microblend Resource...", "120 MB", "Ins.", "2/2/2026 09:"),
-        ("zz_NLD_Morph_and_AnimRig_Additions...", "88 MB", "Ins.", "2/3/2026 11:"),
-        ("CubxLeBronze Ruffle Crop...", "5.1 MB", "Wartend", "2/3/2026 12:"),
-        ("Chain Halter...", "3.0 MB", "Ins.", "2/3/2026 13:"),
-        ("Texture Pack A...", "22 MB", "Ins.", "2/4/2026 08:"),
-        ("Animation Fix...", "1.2 MB", "De.", "2/4/2026 08:"),
-        ("UI Overhaul...", "15 MB", "Ins.", "2/4/2026 09:"),
-        ("Sound Mod...", "32 MB", "Ins.", "2/4/2026 09:"),
-        ("Script Fix...", "0.5 MB", "Ins.", "2/4/2026 10:"),
-    ]
 
 
 class GamePanel(QWidget):
@@ -76,33 +63,28 @@ class GamePanel(QWidget):
 
         pix = QPixmap(140, 140)
         pix.fill(QColor("#242424"))
-        game_btn = QToolButton(self)
-        game_btn.setIcon(QIcon(pix))
-        game_btn.setIconSize(pix.size())
-        game_btn.setFixedSize(140, 140)
-        game_btn.setStyleSheet(
+        self._game_btn = QToolButton(self)
+        self._game_btn.setIcon(QIcon(pix))
+        self._game_btn.setIconSize(pix.size())
+        self._game_btn.setFixedSize(140, 140)
+        self._game_btn.setStyleSheet(
             "QToolButton { background: #242424; border: 2px solid #3D3D3D; border-radius: 4px; }"
             "QToolButton:hover { background: #2a2a2a; }"
         )
-        game_menu = QMenu(self)
-        game_menu.setStyleSheet("QMenu { min-width: 350px; padding: 6px; font-size: 14px; }")
-        game_menu.addAction(QAction("<Bearbeiten...>", self, triggered=_todo("<Bearbeiten...>")))
-        game_menu.addSeparator()
-        game_menu.addAction(QAction("Cyberpunk 2077", self, triggered=_todo("Cyberpunk 2077")))
-        game_menu.addAction(QAction("Cyberpunk 2077 - skip REDmod deploy", self, triggered=_todo("Cyberpunk 2077 - skip REDmod deploy")))
-        game_menu.addAction(QAction("Manually deploy REDmod", self, triggered=_todo("Manually deploy REDmod")))
-        game_menu.addAction(QAction("REDprelauncher", self, triggered=_todo("REDprelauncher")))
-        game_menu.addSeparator()
-        game_menu.addAction(QAction("Explore Virtual Folder", self, triggered=_todo("Explore Virtual Folder")))
-        game_btn.clicked.connect(
-            lambda: game_menu.exec(
-                game_btn.mapToGlobal(QPoint(game_btn.width() // 2 - game_menu.sizeHint().width() // 2, game_btn.height()))
+        self._game_menu = QMenu(self)
+        self._game_menu.setStyleSheet("QMenu { min-width: 350px; padding: 6px; font-size: 14px; }")
+        self._game_menu.addAction(QAction("<Bearbeiten...>", self, triggered=_todo("<Bearbeiten...>")))
+        self._game_menu.addSeparator()
+        self._game_menu.addAction(QAction("Explore Virtual Folder", self, triggered=_todo("Explore Virtual Folder")))
+        self._game_btn.clicked.connect(
+            lambda: self._game_menu.exec(
+                self._game_btn.mapToGlobal(QPoint(self._game_btn.width() // 2 - self._game_menu.sizeHint().width() // 2, self._game_btn.height()))
             )
         )
-        top_layout.addWidget(game_btn, 0, Qt.AlignmentFlag.AlignHCenter)
-        game_label = QLabel("Cyberpunk 2077")
-        game_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        top_layout.addWidget(game_label)
+        top_layout.addWidget(self._game_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        self._game_label = QLabel("Kein Spiel ausgewählt")
+        self._game_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        top_layout.addWidget(self._game_label)
         start_btn = QPushButton()
         start_btn.setObjectName("startButton")
         _play_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "files", "play.png")
@@ -117,7 +99,8 @@ class GamePanel(QWidget):
         layout.addWidget(top_frame)
 
         tabs = QTabWidget()
-        # Daten-Tab: Dateibrowser
+
+        # ── Daten-Tab ─────────────────────────────────────────────────
         data = QWidget()
         data_layout = QVBoxLayout(data)
         data_reload_btn = QPushButton("Neu laden")
@@ -125,24 +108,14 @@ class GamePanel(QWidget):
         if os.path.exists(_refresh_icon):
             data_reload_btn.setIcon(QIcon(_refresh_icon))
         data_reload_btn.setIconSize(QSize(20, 20))
-        data_reload_btn.clicked.connect(_todo("Daten neu laden"))
+        data_reload_btn.clicked.connect(self._on_reload_data)
         data_layout.addWidget(data_reload_btn)
-        data_tree = QTreeWidget()
-        data_tree.setColumnCount(5)
-        data_tree.setHeaderLabels(["Name", "Mod", "Type", "Größe", "Datum modifiziert"])
-        data_tree.setAlternatingRowColors(True)
-        data_tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        # Dummy: Ordner
-        for folder_name in ("archive", "bin", "engine", "mods", "r6", "red4ext", "root", "tools"):
-            folder_item = QTreeWidgetItem(data_tree, [folder_name, "", "Folder", "-", "-"])
-        # Dummy: Dateien
-        for file_name, size in (
-            ("launcher-configuration.json", "111 B"),
-            ("libcrypto-1_1-x64.dll", "3.11 MB"),
-            ("libssl-1_1-x64.dll", "647.57 KB"),
-        ):
-            file_item = QTreeWidgetItem(data_tree, [file_name, "<Unmanaged>", "", size, "2/4/2026 10:00"])
-        data_layout.addWidget(data_tree)
+        self._data_tree = QTreeWidget()
+        self._data_tree.setColumnCount(5)
+        self._data_tree.setHeaderLabels(["Name", "Mod", "Type", "Größe", "Datum modifiziert"])
+        self._data_tree.setAlternatingRowColors(True)
+        self._data_tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        data_layout.addWidget(self._data_tree)
         data_bar = QHBoxLayout()
         data_bar.addWidget(QCheckBox("Nur Konflikte"))
         data_bar.addWidget(QCheckBox("Archive"))
@@ -152,6 +125,8 @@ class GamePanel(QWidget):
         data_bar.addStretch()
         data_layout.addLayout(data_bar)
         tabs.addTab(data, "Daten")
+
+        # ── Spielstände-Tab ───────────────────────────────────────────
         saves = QWidget()
         saves_layout = QVBoxLayout(saves)
         saves_tree = QTreeWidget()
@@ -161,24 +136,19 @@ class GamePanel(QWidget):
         saves_layout.addWidget(saves_tree)
         tabs.addTab(saves, "Spielstände")
 
+        # ── Downloads-Tab ─────────────────────────────────────────────
         downloads = QWidget()
         dl_layout = QVBoxLayout(downloads)
         reload_btn = QPushButton("Neu laden")
         reload_btn.clicked.connect(_todo("Downloads neu laden"))
         dl_layout.addWidget(reload_btn)
-        table = QTableWidget()
-        table.setColumnCount(4)
-        table.setHorizontalHeaderLabels(["Name", "Größe", "Status", "Dateizeit"])
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        table.setAlternatingRowColors(True)
-        rows = _dummy_downloads()
-        table.setRowCount(len(rows))
-        for i, (name, size, status, date) in enumerate(rows):
-            table.setItem(i, 0, QTableWidgetItem(name))
-            table.setItem(i, 1, QTableWidgetItem(size))
-            table.setItem(i, 2, QTableWidgetItem(status))
-            table.setItem(i, 3, QTableWidgetItem(date))
-        dl_layout.addWidget(table)
+        self._dl_table = QTableWidget()
+        self._dl_table.setColumnCount(4)
+        self._dl_table.setHorizontalHeaderLabels(["Name", "Größe", "Status", "Dateizeit"])
+        self._dl_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self._dl_table.setAlternatingRowColors(True)
+        self._dl_table.setRowCount(0)
+        dl_layout.addWidget(self._dl_table)
         cb = QCheckBox("versteckte Dateien")
         cb.stateChanged.connect(lambda s: _todo("versteckte Dateien")())
         dl_layout.addWidget(cb)
@@ -189,3 +159,69 @@ class GamePanel(QWidget):
         tabs.addTab(downloads, "Downloads")
 
         layout.addWidget(tabs)
+
+        # Track current game path for reload
+        self._current_game_path: Path | None = None
+
+    # ── Public API ────────────────────────────────────────────────────
+
+    def update_game(self, game_name: str, game_path: Path | None) -> None:
+        """Update the panel to reflect the active game instance.
+
+        Args:
+            game_name: Display name of the game.
+            game_path: Path to the game installation directory,
+                       or None if not detected.
+        """
+        self._current_game_path = game_path
+
+        # Update label
+        self._game_label.setText(game_name or "Kein Spiel ausgewählt")
+
+        # Update data tree with real directory contents
+        self._populate_data_tree(game_path)
+
+        # Clear downloads (real downloads come from instance .downloads/ in Phase 3)
+        self._dl_table.setRowCount(0)
+
+    # ── Internal helpers ──────────────────────────────────────────────
+
+    def _populate_data_tree(self, game_path: Path | None) -> None:
+        """Scan game_path and show top-level entries in the data tree."""
+        self._data_tree.clear()
+
+        if game_path is None or not game_path.is_dir():
+            item = QTreeWidgetItem(self._data_tree, ["(Spielverzeichnis nicht verfügbar)", "", "", "", ""])
+            return
+
+        try:
+            entries = sorted(game_path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+        except OSError:
+            item = QTreeWidgetItem(self._data_tree, ["(Fehler beim Lesen)", "", "", "", ""])
+            return
+
+        for entry in entries:
+            try:
+                if entry.is_dir():
+                    QTreeWidgetItem(self._data_tree, [entry.name, "", "Folder", "-", "-"])
+                else:
+                    stat = entry.stat()
+                    size = self._format_size(stat.st_size)
+                    QTreeWidgetItem(self._data_tree, [entry.name, "<Unmanaged>", "", size, ""])
+            except OSError:
+                continue
+
+    def _on_reload_data(self) -> None:
+        """Reload the data tree from the current game path."""
+        self._populate_data_tree(self._current_game_path)
+
+    @staticmethod
+    def _format_size(size_bytes: int) -> str:
+        """Format file size in human-readable form."""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        if size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.2f} KB"
+        if size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.2f} MB"
+        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
