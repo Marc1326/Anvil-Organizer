@@ -1,7 +1,9 @@
 """QAbstractItemModel für Mod-Liste."""
 
-from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, QMimeData, QByteArray, QDataStream, QIODevice
+from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, QMimeData, QByteArray, QDataStream, QIODevice, QSize
 from PySide6.QtGui import QColor, QBrush
+
+from anvil.core.mod_entry import ModEntry
 
 
 COL_CHECK, COL_NAME, COL_CONFLICTS, COL_MARKERS, COL_CATEGORY, COL_VERSION, COL_PRIORITY = range(7)
@@ -23,6 +25,21 @@ class ModRow:
         self.priority = priority
         self.is_framework = is_framework
         self.is_error = is_error
+
+
+def mod_entry_to_row(entry: ModEntry) -> ModRow:
+    """Convert a ModEntry (data layer) to a ModRow (view layer)."""
+    return ModRow(
+        enabled=entry.enabled,
+        name=entry.display_name or entry.name,
+        conflicts="",
+        markers="",
+        category=entry.category,
+        version=entry.version,
+        priority=entry.priority,
+        is_framework=False,
+        is_error=False,
+    )
 
 
 class ModListModel(QAbstractItemModel):
@@ -78,7 +95,9 @@ class ModListModel(QAbstractItemModel):
             if c == COL_VERSION:
                 return r.version
             if c == COL_PRIORITY:
-                return str(r.priority) if r.priority else ""
+                return str(r.priority)
+        if role == Qt.ItemDataRole.SizeHintRole:
+            return QSize(0, 28)
         if role == Qt.ItemDataRole.CheckStateRole and c == COL_CHECK:
             return Qt.CheckState.Checked if r.enabled else Qt.CheckState.Unchecked
         if role == Qt.ItemDataRole.TextAlignmentRole and c == COL_PRIORITY:

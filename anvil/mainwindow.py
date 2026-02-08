@@ -24,6 +24,8 @@ from anvil.dialogs import ModDetailDialog
 from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.instance_manager import InstanceManager
 from anvil.core.icon_manager import IconManager
+from anvil.core.mod_entry import scan_mods_directory
+from anvil.models.mod_list_model import mod_entry_to_row
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 
 
@@ -129,6 +131,7 @@ class MainWindow(QMainWindow):
             self.setWindowTitle("Anvil Organizer v0.1.0")
             self._game_panel.update_game("Kein Spiel ausgewählt", None)
             self._mod_list_view.clear_mods()
+            self._current_mod_entries = []
             self._status_bar.clear_instance()
             return
 
@@ -159,8 +162,13 @@ class MainWindow(QMainWindow):
         # 2. Game panel — real directory contents + executables + icons
         self._game_panel.update_game(game_name, game_path, plugin, self.icon_manager, short_name)
 
-        # 3. Mod list — clear (real mods come in Phase 3)
-        self._mod_list_view.clear_mods()
+        # 3. Mod list — scan filesystem and populate
+        instance_path = self.instance_manager.instances_path() / instance_name
+        profile_name = data.get("selected_profile", "Default")
+        profile_path = instance_path / ".profiles" / profile_name
+        self._current_mod_entries = scan_mods_directory(instance_path, profile_path)
+        mod_rows = [mod_entry_to_row(e) for e in self._current_mod_entries]
+        self._mod_list_view.source_model().set_mods(mod_rows)
 
         # 4. Status bar
         self._status_bar.update_instance(game_name, short_name, store)
