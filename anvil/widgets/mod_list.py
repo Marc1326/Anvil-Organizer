@@ -11,9 +11,10 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate,
     QHeaderView,
 )
-from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect, Signal
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 
+from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME
 
 
@@ -82,13 +83,54 @@ class ModListProxyModel(QSortFilterProxyModel):
     pass
 
 
+class _DropTreeView(QTreeView):
+    """QTreeView that accepts external archive file drops in addition to internal DnD."""
+
+    archives_dropped = Signal(list)  # list of file path strings
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            # Check if any URL is a supported archive
+            for url in event.mimeData().urls():
+                if url.isLocalFile():
+                    path = url.toLocalFile()
+                    if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                        event.acceptProposedAction()
+                        return
+        # Fall through to internal DnD handling
+        super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            return
+        super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls():
+            paths = []
+            for url in event.mimeData().urls():
+                if url.isLocalFile():
+                    path = url.toLocalFile()
+                    if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                        paths.append(path)
+            if paths:
+                event.acceptProposedAction()
+                self.archives_dropped.emit(paths)
+                return
+        # Internal DnD (mod reorder)
+        super().dropEvent(event)
+
+
 class ModListView(QWidget):
+    archives_dropped = Signal(list)  # forwarded from _DropTreeView
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        self._tree = QTreeView()
+        self._tree = _DropTreeView()
+        self._tree.archives_dropped.connect(self.archives_dropped)
         self._tree.setRootIsDecorated(False)
         self._tree.setAlternatingRowColors(True)
         self._tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -112,12 +154,15 @@ class ModListView(QWidget):
         # Custom delegate for checkbox column
         self._check_delegate = CheckboxDelegate(self._tree)
         self._tree.setItemDelegateForColumn(COL_CHECK, self._check_delegate)
-        # Column widths — Name stretches to fill
+        # Column widths — all Interactive (resizable by mouse)
         header = self._tree.header()
         header.setStretchLastSection(False)
+        header.setCascadingSectionResizes(True)
+        header.setMinimumSectionSize(30)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(COL_CHECK, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(COL_NAME, QHeaderView.ResizeMode.Stretch)
         self._tree.setColumnWidth(COL_CHECK, 36)
+        self._tree.setColumnWidth(COL_NAME, 300)
         self._tree.setColumnWidth(2, 80)
         self._tree.setColumnWidth(3, 80)
         self._tree.setColumnWidth(4, 100)

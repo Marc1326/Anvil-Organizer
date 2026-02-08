@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QMessageBox,
     QSizePolicy,
+    QFileDialog,
 )
 from PySide6.QtCore import Qt
 
@@ -25,7 +26,8 @@ from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.instance_manager import InstanceManager
 from anvil.core.icon_manager import IconManager
 from anvil.core.mod_entry import scan_mods_directory
-from anvil.core.mod_list_io import write_modlist
+from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
+from anvil.core.mod_list_io import add_mod_to_modlist, write_modlist
 from anvil.models.mod_list_model import mod_entry_to_row
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 
@@ -54,7 +56,8 @@ class MainWindow(QMainWindow):
 
         menubar = self.menuBar()
         fm = menubar.addMenu("Datei")
-        fm.addAction("Öffnen").triggered.connect(_todo("Datei – Öffnen"))
+        fm.addAction("Mod installieren...").triggered.connect(self._on_install_mod)
+        fm.addSeparator()
         fm.addAction("Beenden").triggered.connect(self.close)
         menubar.addMenu("Ansicht").addAction("Ansicht").triggered.connect(_todo("Ansicht"))
         menubar.addMenu("Werkzeuge").addAction("Werkzeuge").triggered.connect(_todo("Werkzeuge"))
@@ -89,11 +92,14 @@ class MainWindow(QMainWindow):
         # ── Mod state ─────────────────────────────────────────────────
         self._current_mod_entries = []
         self._current_profile_path: Path | None = None
+        self._current_instance_path: Path | None = None
 
         # Connect model signals for persistence
         model = self._mod_list_view.source_model()
         model.mod_toggled.connect(self._on_mod_toggled)
         model.mods_reordered.connect(self._on_mods_reordered)
+        self._mod_list_view.archives_dropped.connect(self._on_archives_dropped)
+        self._game_panel.install_requested.connect(self._on_downloads_install)
 
         # ── Erster Start / Instanz laden ──────────────────────────────
         self._check_first_start()
@@ -144,6 +150,7 @@ class MainWindow(QMainWindow):
             self._mod_list_view.clear_mods()
             self._current_mod_entries = []
             self._current_profile_path = None
+            self._current_instance_path = None
             self._update_active_count()
             self._status_bar.clear_instance()
             return
@@ -176,7 +183,8 @@ class MainWindow(QMainWindow):
         self._game_panel.update_game(game_name, game_path, plugin, self.icon_manager, short_name)
 
         # 3. Mod list — scan filesystem and populate
-        instance_path = self.instance_manager.instances_path() / instance_name
+        self._current_instance_path = self.instance_manager.instances_path() / instance_name
+        instance_path = self._current_instance_path
         profile_name = data.get("selected_profile", "Default")
         self._current_profile_path = instance_path / ".profiles" / profile_name
         self._current_mod_entries = scan_mods_directory(instance_path, self._current_profile_path)
@@ -184,7 +192,12 @@ class MainWindow(QMainWindow):
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._update_active_count()
 
-        # 4. Status bar
+        # 4. Downloads tab
+        self._game_panel.set_downloads_path(
+            instance_path / ".downloads", instance_path / ".mods",
+        )
+
+        # 5. Status bar
         self._status_bar.update_instance(game_name, short_name, store)
 
     def _on_icon_ready(self, cache_key: str, pixmap) -> None:
@@ -230,6 +243,66 @@ class MainWindow(QMainWindow):
         """Update the active mod counter in the profile bar."""
         count = sum(1 for e in self._current_mod_entries if e.enabled)
         self._profile_bar.update_active_count(count)
+
+    # ── Mod installation ─────────────────────────────────────────────
+
+    def _on_install_mod(self) -> None:
+        """Menu: Datei → Mod installieren..."""
+        if not self._current_instance_path:
+            QMessageBox.warning(self, "Keine Instanz", "Bitte zuerst eine Instanz auswählen.")
+            return
+
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Mod-Archiv(e) auswählen",
+            str(Path.home()),
+            "Archive (*.zip *.rar *.7z);;Alle Dateien (*)",
+        )
+        if files:
+            self._install_archives([Path(f) for f in files])
+
+    def _on_archives_dropped(self, paths: list) -> None:
+        """Handle archives dropped onto the mod list."""
+        if not self._current_instance_path:
+            return
+        self._install_archives([Path(p) for p in paths])
+
+    def _on_downloads_install(self, paths: list) -> None:
+        """Handle install request from the Downloads tab."""
+        if not self._current_instance_path:
+            return
+        self._install_archives([Path(p) for p in paths])
+        self._game_panel.refresh_downloads()
+
+    def _install_archives(self, archives: list[Path]) -> None:
+        """Install one or more archives as mods."""
+        installer = ModInstaller(self._current_instance_path)
+        installed = []
+
+        for archive in archives:
+            mod_path = installer.install_from_archive(archive)
+            if mod_path:
+                add_mod_to_modlist(self._current_profile_path, mod_path.name)
+                installed.append(mod_path.name)
+
+        if not installed:
+            QMessageBox.warning(
+                self, "Installation fehlgeschlagen",
+                "Kein Mod konnte installiert werden.\n"
+                "Prüfe ob das Archiv gültig ist und die nötigen Tools installiert sind.",
+            )
+            return
+
+        # Reload mod list
+        self._current_mod_entries = scan_mods_directory(
+            self._current_instance_path, self._current_profile_path,
+        )
+        mod_rows = [mod_entry_to_row(e) for e in self._current_mod_entries]
+        self._mod_list_view.source_model().set_mods(mod_rows)
+        self._update_active_count()
+
+        names = ", ".join(installed)
+        self.statusBar().showMessage(f"Installiert: {names}", 5000)
 
     # ── Other slots ───────────────────────────────────────────────────
 

@@ -21,7 +21,9 @@
       "Bash(pip list:*)",
       "Bash(/usr/bin/python:*)",
       "Bash(python3.14:*)",
-      "Bash(PYTHONPATH=\".venv/lib/python3.14/site-packages:$PYTHONPATH\" python3:*)"
+      "Bash(PYTHONPATH=\".venv/lib/python3.14/site-packages:$PYTHONPATH\" python3:*)",
+      "Bash(done)",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []
