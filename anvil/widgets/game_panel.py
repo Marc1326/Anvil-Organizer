@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem,
 )
 
-from PySide6.QtGui import QPixmap, QIcon, QColor, QAction
+from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont
 from PySide6.QtCore import Qt, QSize, QPoint
 
 
@@ -160,12 +160,22 @@ class GamePanel(QWidget):
 
         layout.addWidget(tabs)
 
-        # Track current game path for reload
+        # Track current state for reload / icon updates
         self._current_game_path: Path | None = None
+        self._current_short_name: str = ""
+        self._current_plugin = None
+        self._icon_manager = None
 
     # ── Public API ────────────────────────────────────────────────────
 
-    def update_game(self, game_name: str, game_path: Path | None, game_plugin=None) -> None:
+    def update_game(
+        self,
+        game_name: str,
+        game_path: Path | None,
+        game_plugin=None,
+        icon_manager=None,
+        game_short_name: str = "",
+    ) -> None:
         """Update the panel to reflect the active game instance.
 
         Args:
@@ -173,13 +183,21 @@ class GamePanel(QWidget):
             game_path: Path to the game installation directory,
                        or None if not detected.
             game_plugin: The BaseGame plugin instance, or None.
+            icon_manager: IconManager for loading icons.
+            game_short_name: Short name for icon lookups.
         """
         self._current_game_path = game_path
+        self._current_short_name = game_short_name
+        self._current_plugin = game_plugin
+        self._icon_manager = icon_manager
 
         # Update label
         self._game_label.setText(game_name or "Kein Spiel ausgewählt")
 
-        # Rebuild executables dropdown
+        # Update game button icon (banner or placeholder)
+        self._update_game_button_icon(game_name)
+
+        # Rebuild executables dropdown (with icons)
         self._rebuild_game_menu(game_plugin)
 
         # Update data tree with real directory contents
@@ -188,7 +206,63 @@ class GamePanel(QWidget):
         # Clear downloads (real downloads come from instance .downloads/ in Phase 3)
         self._dl_table.setRowCount(0)
 
+    def on_icon_ready(self, cache_key: str, pixmap: QPixmap) -> None:
+        """Called when a background icon download completes."""
+        gsn = self._current_short_name
+        if not gsn:
+            return
+
+        if cache_key == f"{gsn}/banner":
+            scaled = pixmap.scaled(
+                QSize(140, 140),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self._game_btn.setIcon(QIcon(scaled))
+            self._game_btn.setIconSize(scaled.size())
+        elif cache_key.startswith(f"{gsn}/exe/"):
+            # Update matching menu action icon
+            exe_name = cache_key.split("/exe/", 1)[1]
+            for action in self._game_menu.actions():
+                binary = action.data()
+                if binary and Path(binary).name == exe_name:
+                    action.setIcon(QIcon(pixmap.scaled(
+                        QSize(24, 24),
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )))
+                    break
+
     # ── Internal helpers ──────────────────────────────────────────────
+
+    def _update_game_button_icon(self, game_name: str) -> None:
+        """Set the game button to the cached banner or a placeholder."""
+        banner = None
+        if self._icon_manager and self._current_short_name:
+            banner = self._icon_manager.get_game_banner(self._current_short_name)
+
+        if banner is not None:
+            scaled = banner.scaled(
+                QSize(140, 140),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self._game_btn.setIcon(QIcon(scaled))
+            self._game_btn.setIconSize(scaled.size())
+        else:
+            # Placeholder: grey box with game name
+            pix = QPixmap(140, 140)
+            pix.fill(QColor("#242424"))
+            if game_name:
+                p = QPainter(pix)
+                p.setPen(QColor("#808080"))
+                f = QFont()
+                f.setPixelSize(13)
+                p.setFont(f)
+                p.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, game_name)
+                p.end()
+            self._game_btn.setIcon(QIcon(pix))
+            self._game_btn.setIconSize(pix.size())
 
     def _rebuild_game_menu(self, game_plugin) -> None:
         """Rebuild the game button dropdown with executables from the plugin."""
@@ -199,8 +273,23 @@ class GamePanel(QWidget):
         if game_plugin is not None:
             for exe in game_plugin.executables():
                 name = exe.get("name", "")
-                if name:
-                    self._game_menu.addAction(QAction(name, self, triggered=_todo(name)))
+                binary = exe.get("binary", "")
+                if not name:
+                    continue
+                action = QAction(name, self, triggered=_todo(name))
+                action.setData(binary)  # store binary for icon matching
+                # Try cached exe icon
+                if self._icon_manager and self._current_short_name and binary:
+                    icon_pix = self._icon_manager.get_executable_icon(
+                        self._current_short_name, binary,
+                    )
+                    if icon_pix is not None:
+                        action.setIcon(QIcon(icon_pix.scaled(
+                            QSize(24, 24),
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation,
+                        )))
+                self._game_menu.addAction(action)
             self._game_menu.addSeparator()
 
         self._game_menu.addAction(QAction("Explore Virtual Folder", self, triggered=_todo("Explore Virtual Folder")))
