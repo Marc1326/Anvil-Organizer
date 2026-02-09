@@ -115,7 +115,9 @@ QPushButton:disabled {
 QMenu {
   background: transparent;
   border: 2px solid #242424;
-  border-radius: 6px; }
+  border-radius: 6px;
+  min-width: 280px;
+  font-size: 14px; }
   QMenu::separator {
     height: 2px;
     background: #242424; }
@@ -123,7 +125,7 @@ QMenu {
     padding-left: 20px; }
   QMenu::item {
     background: #141414;
-    padding: 5px 24px; }
+    padding: 8px 30px; }
     QMenu::item:disabled {
       background: #242424;
       color: #808080; }
@@ -165,7 +167,8 @@ QComboBox {
   padding-left: 5px;
   border: 2px solid #141414;
   border-radius: 6px;
-  margin: 4px 0; }
+  margin: 4px 0;
+  combobox-popup: 0; }
   QComboBox QAbstractItemView {
     background: #141414;
     border: 2px solid #242424;
@@ -181,6 +184,8 @@ QComboBox {
     subcontrol-origin: padding;
     subcontrol-position: top right;
     border: none; }
+  QComboBox::down-arrow {
+    image: url("./Paper/Dark/Arrows/down.svg"); }
 
 QGroupBox {
   padding: 24px 4px;
