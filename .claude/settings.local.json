@@ -23,7 +23,12 @@
       "Bash(python3.14:*)",
       "Bash(PYTHONPATH=\".venv/lib/python3.14/site-packages:$PYTHONPATH\" python3:*)",
       "Bash(done)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(PYTHONPATH=\".venv/lib/python3.14/site-packages:$PYTHONPATH\" timeout 8 python3:*)",
+      "Bash(PYTHONPATH=\".venv/lib/python3.14/site-packages:$PYTHONPATH\" QT_QPA_PLATFORM=offscreen python3:*)",
+      "Bash(grep:*)",
+      "Bash(.venv/bin/pip:*)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []
