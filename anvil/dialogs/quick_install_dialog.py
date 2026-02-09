@@ -13,39 +13,47 @@ from PySide6.QtWidgets import (
     QCompleter,
 )
 from PySide6.QtCore import Qt
+from pathlib import Path
 
-_STYLE = """
-QDialog { background: #1C1C1C; color: #D3D3D3; }
-QLabel { color: #D3D3D3; }
-QComboBox {
+_ARROW_SVG = str(Path(__file__).resolve().parent.parent / "resources" / "arrow_down.svg").replace("\\", "/")
+
+_STYLE = f"""
+QDialog {{ background: #1C1C1C; color: #D3D3D3; }}
+QLabel {{ color: #D3D3D3; }}
+QComboBox {{
     background: #242424;
     color: #D3D3D3;
     border: 1px solid #3D3D3D;
     border-radius: 2px;
     padding: 4px 6px;
     selection-background-color: #006868;
-}
-QComboBox::drop-down {
-    border-left: 1px solid #3D3D3D;
+}}
+QComboBox::drop-down {{
+    border: none;
     width: 20px;
-}
-QComboBox QAbstractItemView {
+}}
+QComboBox::down-arrow {{
+    image: url({_ARROW_SVG});
+    width: 10px;
+    height: 6px;
+}}
+QComboBox QAbstractItemView {{
     background: #242424;
     color: #D3D3D3;
     selection-background-color: #006868;
     border: 1px solid #3D3D3D;
-}
-QPushButton {
+}}
+QPushButton {{
     background: #1C1C1C;
     color: #D3D3D3;
     border: 1px solid #3D3D3D;
     border-radius: 2px;
     padding: 6px 16px;
     min-width: 70px;
-}
-QPushButton:hover { background: #3D3D3D; }
-QPushButton:pressed { background: #006868; }
-QPushButton:disabled { color: #666666; border-color: #2A2A2A; }
+}}
+QPushButton:hover {{ background: #3D3D3D; }}
+QPushButton:pressed {{ background: #006868; }}
+QPushButton:disabled {{ color: #666666; border-color: #2A2A2A; }}
 """
 
 
