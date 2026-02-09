@@ -630,13 +630,11 @@ class MainWindow(QMainWindow):
                 pass
 
         dlg = QDialog(self)
+        dlg.setObjectName("InfoDialog")
         dlg.setWindowTitle(f"Informationen: {entry.display_name or entry.name}")
-        dlg.setMinimumSize(700, 550)
-        dlg.resize(750, 600)
         layout = QVBoxLayout(dlg)
         text_edit = QTextEdit()
         text_edit.setReadOnly(True)
-        text_edit.setStyleSheet("QTextEdit { font-size: 15px; font-family: monospace; }")
         text_edit.setPlainText("\n".join(info_lines))
         layout.addWidget(text_edit)
         btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
