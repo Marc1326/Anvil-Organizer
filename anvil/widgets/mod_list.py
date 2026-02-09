@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate,
     QHeaderView,
 )
-from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect, Signal
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect, Signal, QPoint
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
@@ -121,6 +121,7 @@ class _DropTreeView(QTreeView):
 
 class ModListView(QWidget):
     archives_dropped = Signal(list)  # forwarded from _DropTreeView
+    context_menu_requested = Signal(QPoint)  # global pos for context menu
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -131,7 +132,7 @@ class ModListView(QWidget):
         self._tree.setRootIsDecorated(False)
         self._tree.setAlternatingRowColors(True)
         self._tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self._tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self._tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._tree.setUniformRowHeights(True)
         self._tree.setDragEnabled(True)
         self._tree.setAcceptDrops(True)
@@ -139,6 +140,10 @@ class ModListView(QWidget):
         self._tree.setDefaultDropAction(Qt.DropAction.MoveAction)
         self._tree.setDropIndicatorShown(True)
         self._tree.setDragDropOverwriteMode(False)
+        self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._tree.customContextMenuRequested.connect(
+            lambda pos: self.context_menu_requested.emit(self._tree.viewport().mapToGlobal(pos))
+        )
         # Source-Model und Proxy-Model für korrektes DnD
         self._source_model = ModListModel(self)
         self._proxy_model = ModListProxyModel(self)
@@ -201,3 +206,11 @@ class ModListView(QWidget):
         source_idx = self._proxy_model.mapToSource(proxy_idx)
         name = self._source_model.data(self._source_model.index(source_idx.row(), COL_NAME), Qt.ItemDataRole.DisplayRole)
         return name if name is not None else None
+
+    def get_selected_source_rows(self) -> list[int]:
+        """Return sorted list of selected source-model row indices."""
+        rows = set()
+        for proxy_idx in self._tree.selectionModel().selectedRows():
+            source_idx = self._proxy_model.mapToSource(proxy_idx)
+            rows.add(source_idx.row())
+        return sorted(rows)
