@@ -107,6 +107,10 @@ class MainWindow(QMainWindow):
         self._mod_list_view.archives_dropped.connect(self._on_archives_dropped)
         self._game_panel.install_requested.connect(self._on_downloads_install)
 
+        # ── Deferred tab header restore ──────────────────────────────
+        self._pending_tab_states: dict[int, tuple] = {}
+        self._game_panel._tabs.currentChanged.connect(self._on_tab_changed)
+
         # ── Erster Start / Instanz laden ──────────────────────────────
         self._check_first_start()
 
@@ -370,10 +374,19 @@ class MainWindow(QMainWindow):
         s.setValue("mod_list/header_state", self._mod_list_view.header().saveState())
         s.setValue("downloads/header_state",
                    self._game_panel._dl_table.horizontalHeader().saveState())
+        s.setValue("data/header_state",
+                   self._game_panel._data_tree.header().saveState())
+        s.setValue("saves/header_state",
+                   self._game_panel._saves_tree.header().saveState())
         s.sync()
 
     def _restore_ui_state(self) -> None:
-        """Restore splitter, mod-list and downloads column widths."""
+        """Restore splitter, mod-list and tab column widths.
+
+        Tab headers (Daten/Spielstände/Downloads) are restored deferred:
+        hidden tabs ignore restoreState(), so we store the bytes and
+        apply them when the tab becomes visible for the first time.
+        """
         s = self._settings()
         val = s.value("splitter/state")
         if val:
@@ -381,9 +394,30 @@ class MainWindow(QMainWindow):
         val = s.value("mod_list/header_state")
         if val:
             self._mod_list_view.header().restoreState(val)
-        val = s.value("downloads/header_state")
-        if val:
-            self._game_panel._dl_table.horizontalHeader().restoreState(val)
+
+        # Tab headers: deferred restore (hidden tabs ignore restoreState)
+        tab_map = {
+            0: ("data/header_state", lambda: self._game_panel._data_tree.header()),
+            1: ("saves/header_state", lambda: self._game_panel._saves_tree.header()),
+            2: ("downloads/header_state", lambda: self._game_panel._dl_table.horizontalHeader()),
+        }
+        self._pending_tab_states.clear()
+        for tab_idx, (key, header_fn) in tab_map.items():
+            val = s.value(key)
+            if val:
+                self._pending_tab_states[tab_idx] = (val, header_fn)
+
+        # Restore the currently active tab immediately (it's visible)
+        active = self._game_panel._tabs.currentIndex()
+        if active in self._pending_tab_states:
+            val, header_fn = self._pending_tab_states.pop(active)
+            header_fn().restoreState(val)
+
+    def _on_tab_changed(self, index: int) -> None:
+        """Restore header state when a tab becomes visible for the first time."""
+        if index in self._pending_tab_states:
+            val, header_fn = self._pending_tab_states.pop(index)
+            header_fn().restoreState(val)
 
     def closeEvent(self, event) -> None:
         self._save_ui_state()
