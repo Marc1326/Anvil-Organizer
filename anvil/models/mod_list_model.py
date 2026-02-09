@@ -132,7 +132,7 @@ class ModListModel(QAbstractItemModel):
         return f
 
     def supportedDropActions(self):
-        return Qt.DropAction.MoveAction
+        return Qt.DropAction.MoveAction | Qt.DropAction.CopyAction
 
     def supportedDragActions(self):
         return Qt.DropAction.MoveAction
