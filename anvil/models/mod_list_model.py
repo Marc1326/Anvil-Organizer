@@ -138,7 +138,7 @@ class ModListModel(QAbstractItemModel):
         return Qt.DropAction.MoveAction
 
     def mimeTypes(self):
-        return [MIME_MOD_ROWS]
+        return [MIME_MOD_ROWS, "text/uri-list"]
 
     def mimeData(self, indexes):
         """Beim Drag: Mod-Indices serialisieren."""
@@ -152,14 +152,22 @@ class ModListModel(QAbstractItemModel):
         return mime
 
     def canDropMimeData(self, data, action, row, column, parent):
-        return data.hasFormat(MIME_MOD_ROWS)
+        if data.hasFormat(MIME_MOD_ROWS):
+            return True
+        if data.hasUrls():
+            from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
+            return any(
+                url.toLocalFile().lower().endswith(tuple(SUPPORTED_EXTENSIONS))
+                for url in data.urls() if url.isLocalFile()
+            )
+        return False
 
     def dropMimeData(self, data, action, row, column, parent):
         """Beim Drop: Zeile verschieben mit beginMoveRows/endMoveRows."""
         if action == Qt.DropAction.IgnoreAction:
             return True
         if not data.hasFormat(MIME_MOD_ROWS):
-            return False
+            return False  # URL-Drops werden von _DropTreeView.dropEvent() behandelt
 
         # Source-Rows dekodieren
         raw = data.data(MIME_MOD_ROWS)

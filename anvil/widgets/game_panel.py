@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont, QDesktopServices
-from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl
+from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl, QMimeData
 
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 
@@ -48,6 +48,33 @@ class _NumericSortItem(QTableWidgetItem):
         if val is not None and other_val is not None:
             return val < other_val
         return super().__lt__(other)
+
+
+class _DraggableDownloadTable(QTableWidget):
+    """QTableWidget that supports dragging archive rows as file URIs."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDragEnabled(True)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
+
+    def mimeData(self, items):
+        mime = QMimeData()
+        urls = []
+        rows_seen = set()
+        for item in items:
+            r = item.row()
+            if r in rows_seen:
+                continue
+            rows_seen.add(r)
+            name_item = self.item(r, 0)
+            if name_item:
+                path = name_item.data(Qt.ItemDataRole.UserRole)
+                if path:
+                    urls.append(QUrl.fromLocalFile(str(path)))
+        if urls:
+            mime.setUrls(urls)
+        return mime
 
 
 class GamePanel(QWidget):
@@ -181,7 +208,7 @@ class GamePanel(QWidget):
         reload_btn.setIconSize(QSize(20, 20))
         reload_btn.clicked.connect(self.refresh_downloads)
         dl_layout.addWidget(reload_btn)
-        self._dl_table = QTableWidget()
+        self._dl_table = _DraggableDownloadTable()
         self._dl_table.setColumnCount(4)
         self._dl_table.setHorizontalHeaderLabels(["Name", "Größe", "Status", "Dateizeit"])
         dl_header = self._dl_table.horizontalHeader()

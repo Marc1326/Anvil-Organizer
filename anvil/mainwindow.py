@@ -104,7 +104,9 @@ class MainWindow(QMainWindow):
         model = self._mod_list_view.source_model()
         model.mod_toggled.connect(self._on_mod_toggled)
         model.mods_reordered.connect(self._on_mods_reordered)
-        self._mod_list_view.archives_dropped.connect(self._on_archives_dropped)
+        self._mod_list_view.archives_dropped.connect(
+            self._on_archives_dropped, Qt.ConnectionType.QueuedConnection,
+        )
         self._game_panel.install_requested.connect(self._on_downloads_install)
 
         # ── Deferred tab header restore ──────────────────────────────
@@ -290,53 +292,59 @@ class MainWindow(QMainWindow):
     def _install_archives(self, archives: list[Path]) -> None:
         """Install one or more archives as mods.
 
-        For each archive:
-        1. Show QuickInstallDialog (user confirms/edits name)
-        2. If name exists → QueryOverwriteDialog (Merge/Replace/Rename/Cancel)
-        3. Install
+        MO2-Pattern (testOverwrite):
+        - Name berechnen, prüfen ob .mods/{name} existiert
+        - NEIN → direkt installieren, kein Dialog
+        - JA  → QuickInstallDialog → QueryOverwriteDialog falls nötig
         """
         installer = ModInstaller(self._current_instance_path)
         installed = []
 
         for archive in archives:
             best, variants = installer.suggest_names(archive)
+            mod_name = best
+            dest = installer.mods_path / mod_name
 
-            while True:
-                # 1. Quick-Install dialog (MO2-style with ComboBox)
-                dlg = QuickInstallDialog(variants, best, self)
-                if dlg.exec() != QDialog.DialogCode.Accepted:
-                    break  # user cancelled → skip this archive
-                mod_name = dlg.mod_name()
-                if not mod_name:
-                    continue  # empty name → show dialog again
-
-                dest = installer.mods_path / mod_name
-
-                # 2. Duplicate check (MO2-style while loop)
-                if dest.exists():
+            # Nur bei Duplikat: Dialog zeigen (MO2 testOverwrite-Pattern)
+            if dest.exists():
+                while True:
+                    dlg = QuickInstallDialog(variants, mod_name, self)
+                    if dlg.exec() != QDialog.DialogCode.Accepted:
+                        mod_name = None
+                        break
+                    mod_name = dlg.mod_name()
+                    if not mod_name:
+                        continue  # empty name → show dialog again
+                    dest = installer.mods_path / mod_name
+                    if not dest.exists():
+                        break  # neuer Name, kein Konflikt mehr
+                    # Immer noch Duplikat → QueryOverwriteDialog
                     ovr = QueryOverwriteDialog(mod_name, self)
                     if ovr.exec() != QDialog.DialogCode.Accepted:
-                        break  # cancelled
+                        mod_name = None
+                        break
                     action = ovr.action()
                     if action == OverwriteAction.RENAME:
-                        best = mod_name  # back to dialog with current name
-                        continue
+                        continue  # zurück zum QuickInstallDialog
                     elif action == OverwriteAction.REPLACE:
                         shutil.rmtree(dest)
-                    # MERGE: leave dest as-is, installer will add files into it
+                    # MERGE: dest bleibt, Dateien werden reingeschrieben
+                    break
 
-                # 3. Install
-                mod_path = installer.install_from_archive(archive, mod_name)
-                if mod_path:
-                    add_mod_to_modlist(self._current_profile_path, mod_path.name)
-                    installed.append(mod_path.name)
-                else:
-                    QMessageBox.warning(
-                        self, "Installation fehlgeschlagen",
-                        f"Mod \"{mod_name}\" konnte nicht installiert werden.\n"
-                        "Prüfe ob das Archiv gültig ist und die nötigen Tools installiert sind.",
-                    )
-                break
+            if not mod_name:
+                continue  # user cancelled
+
+            # Install
+            mod_path = installer.install_from_archive(archive, mod_name)
+            if mod_path:
+                add_mod_to_modlist(self._current_profile_path, mod_path.name)
+                installed.append(mod_path.name)
+            else:
+                QMessageBox.warning(
+                    self, "Installation fehlgeschlagen",
+                    f"Mod \"{mod_name}\" konnte nicht installiert werden.\n"
+                    "Prüfe ob das Archiv gültig ist und die nötigen Tools installiert sind.",
+                )
 
         if not installed:
             return
