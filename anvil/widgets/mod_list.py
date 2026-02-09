@@ -89,16 +89,14 @@ class _DropTreeView(QTreeView):
     archives_dropped = Signal(list)  # list of file path strings
 
     def dragEnterEvent(self, event):
+        super().dragEnterEvent(event)
         if event.mimeData().hasUrls():
-            # Check if any URL is a supported archive
             for url in event.mimeData().urls():
                 if url.isLocalFile():
                     path = url.toLocalFile()
                     if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
                         event.acceptProposedAction()
                         return
-        # Fall through to internal DnD handling
-        super().dragEnterEvent(event)
 
     def dragMoveEvent(self, event):
         super().dragMoveEvent(event)
