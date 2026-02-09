@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QAction
 
-from anvil.styles import get_stylesheet
+from anvil.styles.dark_theme import load_theme, default_theme
 from anvil.widgets.toolbar import create_toolbar
 from anvil.widgets.profile_bar import ProfileBar
 from anvil.widgets.mod_list import ModListView
@@ -57,7 +57,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Anvil Organizer v0.1.0")
         self.setMinimumSize(1000, 650)
         self.resize(1200, 750)
-        self.setStyleSheet(get_stylesheet())
+        # Theme aus QSettings laden
+        saved_theme = self._settings().value("style/theme", default_theme())
+        self.setStyleSheet(load_theme(saved_theme))
 
         # ── Plugin-System ─────────────────────────────────────────────
         self.plugin_loader = PluginLoader()
@@ -391,61 +393,73 @@ class MainWindow(QMainWindow):
 
         # ── Alle Mods (Submenu) ────────────────────────────────────
         all_mods_menu = menu.addMenu("Alle Mods")
-        all_mods_menu.setEnabled(False)
+        act = all_mods_menu.addAction("Installiere Mod über...")
+        act.setEnabled(False)
+        act = all_mods_menu.addAction("Erstelle leere Mod über...")
+        act.setEnabled(False)
+        act = all_mods_menu.addAction("Erstelle Trenner über...")
+        act.setEnabled(False)
+        all_mods_menu.addSeparator()
+        act = all_mods_menu.addAction("Alle einklappen")
+        act.setEnabled(False)
+        act = all_mods_menu.addAction("Alle ausklappen")
+        act.setEnabled(False)
+        all_mods_menu.addSeparator()
+        act = all_mods_menu.addAction("Aktiviere alle")
+        act.setEnabled(False)
+        act = all_mods_menu.addAction("Deaktiviere alle")
+        act.setEnabled(False)
+        act = all_mods_menu.addAction("Auf Updates prüfen")
+        act.setEnabled(False)
+        act = all_mods_menu.addAction("Kategorien automatisch zuweisen")
+        act.setEnabled(False)
+        act = all_mods_menu.addAction("Neu laden")
+        act.setEnabled(False)
+        act = all_mods_menu.addAction("Als CSV exportieren...")
+        act.setEnabled(False)
+
+        # ── Kategorien (Submenus) ─────────────────────────────────
+        andere_kat_menu = menu.addMenu("Andere Kategorien")
+        andere_kat_menu.setEnabled(False)
+        primaere_kat_menu = menu.addMenu("Primäre Kategorie")
+        primaere_kat_menu.setEnabled(False)
         menu.addSeparator()
 
-        # ── Kategorie ─────────────────────────────────────────────
-        act = menu.addAction("Kategorie ändern")
-        act.setEnabled(False)
-        act = menu.addAction("Primäre Kategorie")
-        act.setEnabled(False)
-        menu.addSeparator()
-
-        # ── Updates ───────────────────────────────────────────────
-        act = menu.addAction("Versionsschema ändern")
-        act.setEnabled(False)
+        # ── Updates / Aktivieren ──────────────────────────────────
         act = menu.addAction("Update-Prüfung erzwingen")
         act.setEnabled(False)
-        act = menu.addAction("Update ignorieren")
+        act = menu.addAction("Ignoriere Update")
         act.setEnabled(False)
-        menu.addSeparator()
-
-        # ── Aktivieren / Deaktivieren ─────────────────────────────
         act_enable = menu.addAction("Aktiviere Ausgewählte")
         act_enable.setEnabled(has_selection)
         act_disable = menu.addAction("Deaktiviere Ausgewählte")
         act_disable.setEnabled(has_selection)
         menu.addSeparator()
 
-        # ── Senden an (Submenu) ───────────────────────────────────
-        send_to_menu = menu.addMenu("Senden an...")
+        # ── Senden / Mod-Aktionen ────────────────────────────────
+        send_to_menu = menu.addMenu("Sende zu...")
         send_to_menu.setEnabled(False)
-        menu.addSeparator()
-
-        # ── Mod-Aktionen ──────────────────────────────────────────
         act_rename = menu.addAction("Mod umbenennen...")
         act_rename.setEnabled(single)
         act_reinstall = menu.addAction("Mod neu installieren")
         act_reinstall.setEnabled(single)
         act_remove = menu.addAction("Mod entfernen...")
         act_remove.setEnabled(has_selection)
-        act = menu.addAction("Backup erstellen")
-        act.setEnabled(False)
         menu.addSeparator()
 
-        # ── Farbe ─────────────────────────────────────────────────
-        act = menu.addAction("Farbe wählen...")
+        # ── Sicherung / Nexus / Explorer ─────────────────────────
+        act = menu.addAction("Erstelle eine Sicherung")
         act.setEnabled(False)
-        menu.addSeparator()
-
-        # ── Nexus / Explorer ──────────────────────────────────────
-        act = menu.addAction("Auf Nexus besuchen")
+        act = menu.addAction("Endorsement entfernen")
         act.setEnabled(False)
-        act_explorer = menu.addAction("Im Explorer öffnen")
+        act = menu.addAction("Kategorie neu zuordnen (von Nexus)")
+        act.setEnabled(False)
+        act = menu.addAction("Beginne Beobachtung")
+        act.setEnabled(False)
+        act = menu.addAction("Besuche auf NexusMods")
+        act.setEnabled(False)
+        act_explorer = menu.addAction("Öffne im Explorer")
         act_explorer.setEnabled(single)
-        menu.addSeparator()
-
-        # ── Informationen ─────────────────────────────────────────
         act_info = menu.addAction("Informationen...")
         act_info.setEnabled(single)
 
@@ -640,6 +654,9 @@ class MainWindow(QMainWindow):
         btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         btn_box.accepted.connect(dlg.accept)
         layout.addWidget(btn_box)
+        # Größe NACH Layout setzen — Wayland braucht das vor exec()
+        dlg.setMinimumSize(750, 600)
+        dlg.resize(750, 600)
         dlg.exec()
 
     def _reload_mod_list(self) -> None:

@@ -1,4 +1,4 @@
-"""Einstellungen — QDialog (Platzhalter)."""
+"""Einstellungen — QDialog."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog,
     QVBoxLayout,
     QHBoxLayout,
@@ -30,52 +31,18 @@ from PySide6.QtWidgets import (
     QSpinBox,
 )
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 
 from anvil.plugins.plugin_loader import PluginLoader, ensure_user_plugin_dir
-
-_SETTINGS_DIALOG_STYLE = """
-QDialog, QWidget { background: #1C1C1C; color: #D3D3D3; border: none; }
-QTabWidget::pane {
-    background: #1C1C1C;
-    border: 1px solid #3D3D3D;
-    border-radius: 2px;
-}
-QTabBar::tab { background: #242424; color: #D3D3D3; padding: 8px 16px; margin-right: 2px; }
-QTabBar::tab:selected { background: #3D3D3D; }
-QGroupBox {
-    background: #1C1C1C;
-    color: #D3D3D3;
-    border: 1px solid #3D3D3D;
-    border-radius: 4px;
-    margin-top: 8px;
-    padding-top: 8px;
-    font-weight: bold;
-}
-QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }
-QComboBox, QPushButton {
-    background: #1C1C1C;
-    color: #D3D3D3;
-    border: 1px solid #3D3D3D;
-    border-radius: 2px;
-    padding: 4px;
-}
-QTableWidget {
-    background: #1C1C1C;
-    color: #D3D3D3;
-    gridline-color: #3D3D3D;
-}
-QTableWidget::item { padding: 4px; }
-"""
-
+from anvil.styles.dark_theme import list_themes, load_theme, get_styles_dir, default_theme
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, plugin_loader: PluginLoader | None = None):
         super().__init__(parent)
         self._plugin_loader = plugin_loader
         self.setWindowTitle("Einstellungen")
-        self.setMinimumSize(560, 520)
-        self.setStyleSheet(_SETTINGS_DIALOG_STYLE)
+        self.setMinimumSize(960, 600)
+        self.resize(960, 600)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
@@ -89,7 +56,6 @@ class SettingsDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet("QScrollArea { border: none; background: #1C1C1C; }")
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
 
@@ -144,6 +110,12 @@ class SettingsDialog(QDialog):
         misc_layout.addWidget(cb_preview)
         scroll_layout.addWidget(misc_grp)
 
+        misc_btn_row = QHBoxLayout()
+        misc_btn_row.addWidget(QPushButton("Dialogoptionen zurücksetzen"))
+        misc_btn_row.addWidget(QPushButton("Mod Kategorien anpassen"))
+        misc_btn_row.addStretch()
+        scroll_layout.addLayout(misc_btn_row)
+
         scroll_layout.addStretch()
         scroll.setWidget(scroll_content)
         ag_layout.addWidget(scroll)
@@ -154,10 +126,22 @@ class SettingsDialog(QDialog):
         style_layout = QVBoxLayout(style_tab)
         stil_grp = QGroupBox("Stil")
         stil_layout = QHBoxLayout(stil_grp)
-        stil_combo = QComboBox()
-        stil_combo.addItem("1809 Dark Mode")
-        stil_layout.addWidget(stil_combo)
-        stil_layout.addWidget(QPushButton("Erkunden"))
+        self._stil_combo = QComboBox()
+        # Available themes from anvil/styles/*.qss
+        themes = list_themes()
+        self._stil_combo.addItems(themes)
+        # Load saved theme from QSettings
+        settings = self._settings()
+        saved = settings.value("style/theme", default_theme())
+        idx = self._stil_combo.findText(saved)
+        if idx >= 0:
+            self._stil_combo.setCurrentIndex(idx)
+        self._previous_theme = self._stil_combo.currentText()
+        self._stil_combo.currentTextChanged.connect(self._on_theme_changed)
+        stil_layout.addWidget(self._stil_combo)
+        erkunden_btn = QPushButton("Erkunden")
+        erkunden_btn.clicked.connect(self._open_styles_folder)
+        stil_layout.addWidget(erkunden_btn)
         style_layout.addWidget(stil_grp)
         farben_grp = QGroupBox("Farben")
         farben_layout = QVBoxLayout(farben_grp)
@@ -251,7 +235,6 @@ class SettingsDialog(QDialog):
         pf_scroll = QScrollArea()
         pf_scroll.setWidgetResizable(True)
         pf_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        pf_scroll.setStyleSheet("QScrollArea { border: none; background: #1C1C1C; }")
         pf_content = QWidget()
         pf_content_layout = QVBoxLayout(pf_content)
 
@@ -291,7 +274,6 @@ class SettingsDialog(QDialog):
         nx_scroll = QScrollArea()
         nx_scroll.setWidgetResizable(True)
         nx_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        nx_scroll.setStyleSheet("QScrollArea { border: none; background: #1C1C1C; }")
         nx_content = QWidget()
         nx_content_layout = QVBoxLayout(nx_content)
 
@@ -482,7 +464,6 @@ class SettingsDialog(QDialog):
         wa_scroll = QScrollArea()
         wa_scroll.setWidgetResizable(True)
         wa_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        wa_scroll.setStyleSheet("QScrollArea { border: none; background: #1C1C1C; }")
         wa_content = QWidget()
         wa_content_layout = QVBoxLayout(wa_content)
         opt_wa_grp = QGroupBox("Optionen")
@@ -534,7 +515,6 @@ class SettingsDialog(QDialog):
         diag_scroll = QScrollArea()
         diag_scroll.setWidgetResizable(True)
         diag_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        diag_scroll.setStyleSheet("QScrollArea { border: none; background: #1C1C1C; }")
         diag_content = QWidget()
         diag_content_layout = QVBoxLayout(diag_content)
         logs_grp = QGroupBox("Logs und Abstürze")
@@ -568,13 +548,6 @@ class SettingsDialog(QDialog):
         tabs.addTab(diagnose_tab, "Diagnose")
 
         layout.addWidget(tabs)
-
-        # Unten: Buttons
-        bottom_row = QHBoxLayout()
-        bottom_row.addWidget(QPushButton("Dialogoptionen zurücksetzen"))
-        bottom_row.addWidget(QPushButton("Mod Kategorien anpassen"))
-        bottom_row.addStretch()
-        layout.addLayout(bottom_row)
 
         # Unten rechts: OK, Abbrechen
         btn_row = QHBoxLayout()
@@ -639,3 +612,36 @@ class SettingsDialog(QDialog):
         """Open the user plugin directory in the file manager."""
         path = ensure_user_plugin_dir()
         subprocess.Popen(["xdg-open", str(path)])
+
+    # ── Style-Tab helpers ─────────────────────────────────────────────
+
+    @staticmethod
+    def _settings() -> QSettings:
+        path = str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf")
+        return QSettings(path, QSettings.Format.IniFormat)
+
+    def _on_theme_changed(self, theme_name: str):
+        """Apply selected theme live as preview."""
+        qss = load_theme(theme_name)
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(qss)
+
+    def _open_styles_folder(self):
+        """Open the styles directory in the file manager."""
+        subprocess.Popen(["xdg-open", str(get_styles_dir())])
+
+    def accept(self):
+        """Save theme selection to QSettings and close."""
+        settings = self._settings()
+        settings.setValue("style/theme", self._stil_combo.currentText())
+        super().accept()
+
+    def reject(self):
+        """Revert theme to previous selection and close."""
+        if self._stil_combo.currentText() != self._previous_theme:
+            qss = load_theme(self._previous_theme)
+            app = QApplication.instance()
+            if app:
+                app.setStyleSheet(qss)
+        super().reject()

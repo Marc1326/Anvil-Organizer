@@ -10,7 +10,7 @@ def main():
     app.setApplicationName("Anvil Organizer")
     app.setApplicationVersion("0.1.0")
     w = MainWindow()
-    w.show()
+    w.showMaximized()
     sys.exit(app.exec())
 
 
