@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
     QDialog,
     QMenu,
     QInputDialog,
+    QTextEdit,
+    QDialogButtonBox,
 )
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QAction
@@ -627,10 +629,20 @@ class MainWindow(QMainWindow):
             except OSError:
                 pass
 
-        QMessageBox.information(
-            self, f"Informationen: {entry.display_name or entry.name}",
-            "\n".join(info_lines),
-        )
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Informationen: {entry.display_name or entry.name}")
+        dlg.setMinimumSize(600, 500)
+        dlg.resize(650, 550)
+        layout = QVBoxLayout(dlg)
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setStyleSheet("QTextEdit { font-size: 13px; }")
+        text_edit.setPlainText("\n".join(info_lines))
+        layout.addWidget(text_edit)
+        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        btn_box.accepted.connect(dlg.accept)
+        layout.addWidget(btn_box)
+        dlg.exec()
 
     def _reload_mod_list(self) -> None:
         """Reload mod list from disk and update UI."""
