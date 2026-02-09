@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import shutil
+
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -12,6 +14,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QSizePolicy,
     QFileDialog,
+    QDialog,
 )
 from PySide6.QtCore import Qt, QSettings
 
@@ -22,6 +25,8 @@ from anvil.widgets.mod_list import ModListView
 from anvil.widgets.game_panel import GamePanel
 from anvil.widgets.status_bar import StatusBarWidget
 from anvil.dialogs import ModDetailDialog
+from anvil.dialogs.quick_install_dialog import QuickInstallDialog
+from anvil.dialogs.query_overwrite_dialog import QueryOverwriteDialog, OverwriteAction
 from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.instance_manager import InstanceManager
 from anvil.core.icon_manager import IconManager
@@ -279,22 +284,57 @@ class MainWindow(QMainWindow):
         self._game_panel.refresh_downloads()
 
     def _install_archives(self, archives: list[Path]) -> None:
-        """Install one or more archives as mods."""
+        """Install one or more archives as mods.
+
+        For each archive:
+        1. Show QuickInstallDialog (user confirms/edits name)
+        2. If name exists → QueryOverwriteDialog (Merge/Replace/Rename/Cancel)
+        3. Install
+        """
         installer = ModInstaller(self._current_instance_path)
         installed = []
 
         for archive in archives:
-            mod_path = installer.install_from_archive(archive)
-            if mod_path:
-                add_mod_to_modlist(self._current_profile_path, mod_path.name)
-                installed.append(mod_path.name)
+            best, variants = installer.suggest_names(archive)
+
+            while True:
+                # 1. Quick-Install dialog (MO2-style with ComboBox)
+                dlg = QuickInstallDialog(variants, best, self)
+                if dlg.exec() != QDialog.DialogCode.Accepted:
+                    break  # user cancelled → skip this archive
+                mod_name = dlg.mod_name()
+                if not mod_name:
+                    continue  # empty name → show dialog again
+
+                dest = installer.mods_path / mod_name
+
+                # 2. Duplicate check (MO2-style while loop)
+                if dest.exists():
+                    ovr = QueryOverwriteDialog(mod_name, self)
+                    if ovr.exec() != QDialog.DialogCode.Accepted:
+                        break  # cancelled
+                    action = ovr.action()
+                    if action == OverwriteAction.RENAME:
+                        best = mod_name  # back to dialog with current name
+                        continue
+                    elif action == OverwriteAction.REPLACE:
+                        shutil.rmtree(dest)
+                    # MERGE: leave dest as-is, installer will add files into it
+
+                # 3. Install
+                mod_path = installer.install_from_archive(archive, mod_name)
+                if mod_path:
+                    add_mod_to_modlist(self._current_profile_path, mod_path.name)
+                    installed.append(mod_path.name)
+                else:
+                    QMessageBox.warning(
+                        self, "Installation fehlgeschlagen",
+                        f"Mod \"{mod_name}\" konnte nicht installiert werden.\n"
+                        "Prüfe ob das Archiv gültig ist und die nötigen Tools installiert sind.",
+                    )
+                break
 
         if not installed:
-            QMessageBox.warning(
-                self, "Installation fehlgeschlagen",
-                "Kein Mod konnte installiert werden.\n"
-                "Prüfe ob das Archiv gültig ist und die nötigen Tools installiert sind.",
-            )
             return
 
         # Reload mod list

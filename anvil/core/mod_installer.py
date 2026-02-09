@@ -31,6 +31,87 @@ class ModInstaller:
 
     # ── Public API ─────────────────────────────────────────────────────
 
+    # MO2-style regex for Nexus filenames (ported from nexusinterface.cpp:332)
+    # Group 1: mod name, Group 2: optional version, Group 3: Nexus mod ID
+    _NEXUS_RE = re.compile(
+        r'^([a-zA-Z0-9_\'".\-() ]*?)'       # mod name
+        r'(?:[-_ ][VvRr]+[0-9]+(?:[._\-][0-9]+){0,2}[ab]?)?'  # optional version
+        r'-([1-9][0-9]+)?-.*'                 # Nexus ID + rest
+        r'\.(zip|rar|7z)$',
+        re.IGNORECASE,
+    )
+    _SIMPLE_RE = re.compile(r'^[^a-zA-Z]*([a-zA-Z_ ]+)')
+
+    @staticmethod
+    def suggest_name(archive_path: Path) -> str:
+        """Derive a clean mod name from a Nexus-style archive filename.
+
+        Ported from MO2's ``NexusInterface::interpretNexusFileName()``.
+        """
+        filename = archive_path.name
+        m = ModInstaller._NEXUS_RE.match(filename)
+        if m:
+            name = m.group(1)
+        else:
+            m2 = ModInstaller._SIMPLE_RE.match(archive_path.stem)
+            name = m2.group(1) if m2 else archive_path.stem
+        name = name.replace("_", " ").strip(" -.")
+        return ModInstaller._sanitize_name(name) if name else "Unnamed Mod"
+
+    def suggest_names(self, archive_path: Path) -> tuple[str, list[str]]:
+        """Collect name variants for the Quick-Install combo box.
+
+        Mirrors MO2's ``GuessedValue<QString>`` — collects multiple guesses
+        at different quality levels, returns the best + all variants.
+
+        Returns:
+            ``(best_name, [variant, ...])`` — *best_name* is pre-selected,
+            *variants* populates the combo box dropdown.
+        """
+        import configparser
+
+        variants: list[str] = []
+        seen: set[str] = set()
+
+        def _add(name: str) -> None:
+            if name and name not in seen:
+                variants.append(name)
+                seen.add(name)
+
+        # GUESS_GOOD: cleaned Nexus name (highest auto-guess quality)
+        best = self.suggest_name(archive_path)
+        _add(best)
+
+        # GUESS_META: name from .meta file if available
+        meta_path = Path(str(archive_path) + ".meta")
+        if meta_path.is_file():
+            cp = configparser.ConfigParser()
+            try:
+                cp.read(str(meta_path), encoding="utf-8")
+                meta_name = cp.get("General", "modName", fallback="")
+                if meta_name.strip():
+                    _add(meta_name.strip())
+                # Also the HTML-stripped "name" field
+                raw_name = cp.get("General", "name", fallback="")
+                if raw_name.strip():
+                    _add(raw_name.strip())
+            except Exception:
+                pass
+
+        # Similar mods already installed (same base prefix)
+        if self.mods_path.is_dir():
+            # Extract base prefix: e.g. "Zenitex Core Dependency" from
+            # "Zenitex Core Dependency - Verdant Set"
+            base = best.split(" - ")[0].strip() if " - " in best else best
+            for mod_dir in sorted(self.mods_path.iterdir()):
+                if mod_dir.is_dir() and mod_dir.name.startswith(base):
+                    _add(mod_dir.name)
+
+        # GUESS_FALLBACK: full archive stem (with Nexus IDs)
+        _add(archive_path.stem)
+
+        return best, variants
+
     def install_from_archive(
         self,
         archive_path: Path,
@@ -40,7 +121,9 @@ class ModInstaller:
 
         Args:
             archive_path: Path to a ``.zip``, ``.rar``, or ``.7z`` file.
-            mod_name: Display / folder name.  Derived from filename if *None*.
+            mod_name: Display / folder name.  When given explicitly (from the
+                      Quick-Install dialog), no auto-numbering is applied.
+                      Derived from filename if *None*.
 
         Returns:
             Path to the installed mod folder, or *None* on failure.
@@ -53,8 +136,11 @@ class ModInstaller:
             return None
 
         # 1. Determine mod name
-        base = mod_name or self._sanitize_name(archive_path.stem)
-        folder_name = self._unique_name(base)
+        if mod_name:
+            folder_name = mod_name  # caller handled duplicates
+        else:
+            base = self._sanitize_name(archive_path.stem)
+            folder_name = self._unique_name(base)
 
         # 2. Extract into a temporary directory
         tmp = Path(tempfile.mkdtemp(prefix="anvil_install_"))
@@ -79,7 +165,7 @@ class ModInstaller:
             shutil.move(str(tmp), str(dest))
 
             # 6. Create meta.ini
-            display = mod_name or base
+            display = mod_name or folder_name
             create_default_meta_ini(dest, display)
 
             return dest
