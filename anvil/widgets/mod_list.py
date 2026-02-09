@@ -15,7 +15,7 @@ from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect,
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
-from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME
+from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME
 
 
 def _todo(name):
@@ -25,10 +25,12 @@ def _todo(name):
 
 
 class CheckboxDelegate(QStyledItemDelegate):
-    """Custom delegate for COL_CHECK: green circle+check (enabled), gray circle (disabled)."""
+    """Custom delegate for COL_CHECK: green circle+check (enabled), gray circle (disabled).
+    Separators get a collapse/expand triangle (▾/▸) instead."""
 
     _COLOR_ON = QColor("#4CAF50")
     _COLOR_OFF = QColor("#666666")
+    _COLOR_SEP = QColor("#D3D3D3")
 
     def paint(self, painter: QPainter, option, index):
         # Draw background (selection, alternating rows)
@@ -37,32 +39,64 @@ class CheckboxDelegate(QStyledItemDelegate):
         if style:
             style.drawPrimitive(style.PrimitiveElement.PE_PanelItemViewItem, option, painter, option.widget)
 
-        check = index.data(Qt.ItemDataRole.CheckStateRole)
-        enabled = check == Qt.CheckState.Checked
+        is_sep = index.data(ROLE_IS_SEPARATOR)
 
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Center a 16x16 icon area in the cell
-        size = 16
-        x = option.rect.x() + (option.rect.width() - size) // 2
-        y = option.rect.y() + (option.rect.height() - size) // 2
-        rect = QRect(x, y, size, size)
+        if is_sep:
+            # Draw collapse/expand triangle for separators
+            folder = index.data(ROLE_FOLDER_NAME) or ""
+            view = option.widget
+            collapsed = False
+            if view and hasattr(view, '_collapsed_separators'):
+                collapsed = folder in view._collapsed_separators
 
-        if enabled:
-            # Filled green circle
+            size = 10
+            cx = option.rect.x() + option.rect.width() // 2
+            cy = option.rect.y() + option.rect.height() // 2
+
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(self._COLOR_ON))
-            painter.drawEllipse(rect)
-            # White checkmark
-            painter.setPen(QPen(QColor("#FFFFFF"), 2.0))
-            painter.drawLine(x + 3, y + 8, x + 6, y + 12)
-            painter.drawLine(x + 6, y + 12, x + 12, y + 4)
+            painter.setBrush(QBrush(self._COLOR_SEP))
+
+            from PySide6.QtGui import QPolygonF
+            from PySide6.QtCore import QPointF
+            if collapsed:
+                # ▸ pointing right
+                tri = QPolygonF([
+                    QPointF(cx - 3, cy - size // 2),
+                    QPointF(cx - 3, cy + size // 2),
+                    QPointF(cx + size // 2 - 1, cy),
+                ])
+            else:
+                # ▾ pointing down
+                tri = QPolygonF([
+                    QPointF(cx - size // 2, cy - 3),
+                    QPointF(cx + size // 2, cy - 3),
+                    QPointF(cx, cy + size // 2 - 1),
+                ])
+            painter.drawPolygon(tri)
         else:
-            # Empty gray circle
-            painter.setPen(QPen(self._COLOR_OFF, 1.5))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawEllipse(rect)
+            # Normal mod: circle + check
+            check = index.data(Qt.ItemDataRole.CheckStateRole)
+            enabled = check == Qt.CheckState.Checked
+
+            size = 16
+            x = option.rect.x() + (option.rect.width() - size) // 2
+            y = option.rect.y() + (option.rect.height() - size) // 2
+            rect = QRect(x, y, size, size)
+
+            if enabled:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(self._COLOR_ON))
+                painter.drawEllipse(rect)
+                painter.setPen(QPen(QColor("#FFFFFF"), 2.0))
+                painter.drawLine(x + 3, y + 8, x + 6, y + 12)
+                painter.drawLine(x + 6, y + 12, x + 12, y + 4)
+            else:
+                painter.setPen(QPen(self._COLOR_OFF, 1.5))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawEllipse(rect)
 
         painter.restore()
 
@@ -71,22 +105,77 @@ class CheckboxDelegate(QStyledItemDelegate):
 
     def editorEvent(self, event, model, option, index):
         if event.type() in (event.Type.MouseButtonRelease, event.Type.MouseButtonDblClick):
-            current = index.data(Qt.ItemDataRole.CheckStateRole)
-            new_val = Qt.CheckState.Unchecked if current == Qt.CheckState.Checked else Qt.CheckState.Checked
-            model.setData(index, new_val.value, Qt.ItemDataRole.CheckStateRole)
-            return True
+            is_sep = index.data(ROLE_IS_SEPARATOR)
+            if is_sep:
+                # Toggle collapse/expand
+                folder = index.data(ROLE_FOLDER_NAME) or ""
+                view = option.widget
+                if view and hasattr(view, '_collapsed_separators'):
+                    if folder in view._collapsed_separators:
+                        view._collapsed_separators.discard(folder)
+                    else:
+                        view._collapsed_separators.add(folder)
+                    view._apply_separator_filter()
+                return True
+            else:
+                current = index.data(Qt.ItemDataRole.CheckStateRole)
+                new_val = Qt.CheckState.Unchecked if current == Qt.CheckState.Checked else Qt.CheckState.Checked
+                model.setData(index, new_val.value, Qt.ItemDataRole.CheckStateRole)
+                return True
         return False
 
 
 class ModListProxyModel(QSortFilterProxyModel):
-    """Proxy-Model für Mod-Liste. Qt leitet DnD automatisch ans Source-Model weiter."""
-    pass
+    """Proxy-Model für Mod-Liste. Qt leitet DnD automatisch ans Source-Model weiter.
+    Supports hiding mods under collapsed separators."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._hidden_rows: set[int] = set()
+
+    def set_hidden_rows(self, rows: set[int]):
+        """Set which source rows should be hidden (collapsed under a separator)."""
+        self._hidden_rows = rows
+        self.invalidateFilter()
+
+    def filterAcceptsRow(self, source_row, source_parent):
+        if source_row in self._hidden_rows:
+            return False
+        return True
 
 
 class _DropTreeView(QTreeView):
     """QTreeView that accepts external archive file drops in addition to internal DnD."""
 
     archives_dropped = Signal(list)  # list of file path strings
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._collapsed_separators: set[str] = set()
+
+    def _apply_separator_filter(self):
+        """Recalculate which rows to hide based on collapsed separators."""
+        proxy = self.model()
+        if not isinstance(proxy, ModListProxyModel):
+            return
+        source = proxy.sourceModel()
+        if not source:
+            return
+
+        hidden: set[int] = set()
+        current_sep_collapsed = False
+
+        for row in range(source.rowCount()):
+            idx = source.index(row, 0)
+            is_sep = source.data(idx, ROLE_IS_SEPARATOR)
+            folder = source.data(idx, ROLE_FOLDER_NAME) or ""
+
+            if is_sep:
+                current_sep_collapsed = folder in self._collapsed_separators
+            elif current_sep_collapsed:
+                hidden.add(row)
+
+        proxy.set_hidden_rows(hidden)
 
     def dragEnterEvent(self, event):
         super().dragEnterEvent(event)

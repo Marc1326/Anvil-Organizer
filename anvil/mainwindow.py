@@ -397,8 +397,7 @@ class MainWindow(QMainWindow):
         act.setEnabled(False)
         act = all_mods_menu.addAction("Erstelle leere Mod über...")
         act.setEnabled(False)
-        act = all_mods_menu.addAction("Erstelle Trenner über...")
-        act.setEnabled(False)
+        act_create_sep = all_mods_menu.addAction("Erstelle Trenner über...")
         all_mods_menu.addSeparator()
         act = all_mods_menu.addAction("Alle einklappen")
         act.setEnabled(False)
@@ -468,7 +467,9 @@ class MainWindow(QMainWindow):
         if not chosen:
             return
 
-        if chosen == act_enable:
+        if chosen == act_create_sep:
+            self._ctx_create_separator()
+        elif chosen == act_enable:
             self._ctx_enable_selected(selected_rows, True)
         elif chosen == act_disable:
             self._ctx_enable_selected(selected_rows, False)
@@ -484,6 +485,38 @@ class MainWindow(QMainWindow):
             self._ctx_show_info(selected_rows[0])
 
     # ── Context menu actions ───────────────────────────────────────
+
+    def _ctx_create_separator(self) -> None:
+        """Create a new separator in the mod list."""
+        name, ok = QInputDialog.getText(
+            self, "Trenner erstellen", "Name des Trenners:",
+        )
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+        folder_name = f"{name}_separator"
+
+        mods_dir = self._current_instance_path / ".mods"
+        sep_path = mods_dir / folder_name
+
+        if sep_path.exists():
+            QMessageBox.warning(
+                self, "Trenner erstellen",
+                f"Ein Trenner mit dem Namen \"{name}\" existiert bereits.",
+            )
+            return
+
+        try:
+            sep_path.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            QMessageBox.warning(
+                self, "Trenner erstellen", str(exc),
+            )
+            return
+
+        add_mod_to_modlist(self._current_profile_path, folder_name, True)
+        self._reload_mod_list()
+        self.statusBar().showMessage(f"Trenner erstellt: {name}", 5000)
 
     def _ctx_enable_selected(self, rows: list[int], enabled: bool) -> None:
         """Enable or disable selected mods."""

@@ -1,7 +1,7 @@
 """QAbstractItemModel für Mod-Liste."""
 
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, QMimeData, QByteArray, QDataStream, QIODevice, QSize, Signal
-from PySide6.QtGui import QColor, QBrush
+from PySide6.QtGui import QColor, QBrush, QFont
 
 from anvil.core.mod_entry import ModEntry
 
@@ -11,11 +11,15 @@ COL_COUNT = 7
 HEADERS = ["", "Mod Name", "Konflikte", "Markierungen", "Kategorie", "Version", "Priorität"]
 MIME_MOD_ROWS = "application/x-anvil-mod-rows"
 
+# Custom roles
+ROLE_IS_SEPARATOR = Qt.ItemDataRole.UserRole + 1
+ROLE_FOLDER_NAME = Qt.ItemDataRole.UserRole + 2
+
 
 class ModRow:
-    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error")
+    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name")
 
-    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False):
+    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name=""):
         self.enabled = enabled
         self.name = name
         self.conflicts = conflicts
@@ -25,6 +29,8 @@ class ModRow:
         self.priority = priority
         self.is_framework = is_framework
         self.is_error = is_error
+        self.is_separator = is_separator
+        self.folder_name = folder_name
 
 
 def mod_entry_to_row(entry: ModEntry) -> ModRow:
@@ -39,6 +45,8 @@ def mod_entry_to_row(entry: ModEntry) -> ModRow:
         priority=entry.priority,
         is_framework=False,
         is_error=False,
+        is_separator=entry.is_separator,
+        folder_name=entry.name,
     )
 
 
@@ -102,14 +110,29 @@ class ModListModel(QAbstractItemModel):
         if role == Qt.ItemDataRole.SizeHintRole:
             return QSize(0, 28)
         if role == Qt.ItemDataRole.CheckStateRole and c == COL_CHECK:
+            if r.is_separator:
+                return None  # No checkbox for separators
             return Qt.CheckState.Checked if r.enabled else Qt.CheckState.Unchecked
-        if role == Qt.ItemDataRole.TextAlignmentRole and c == COL_PRIORITY:
-            return Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
+        if role == Qt.ItemDataRole.TextAlignmentRole:
+            if r.is_separator and c == COL_NAME:
+                return Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
+            if c == COL_PRIORITY:
+                return Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
+        if role == Qt.ItemDataRole.FontRole:
+            if r.is_separator and c == COL_NAME:
+                font = QFont()
+                font.setBold(True)
+                font.setItalic(True)
+                return font
         if role == Qt.ItemDataRole.BackgroundRole:
             if r.is_error:
                 return QBrush(QColor("#3a1414"))
             if r.is_framework:
                 return QBrush(QColor("#143a14"))
+        if role == ROLE_IS_SEPARATOR:
+            return r.is_separator
+        if role == ROLE_FOLDER_NAME:
+            return r.folder_name
         return None
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
@@ -127,7 +150,8 @@ class ModListModel(QAbstractItemModel):
         if not index.isValid():
             return Qt.ItemFlag.ItemIsDropEnabled
         f = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled
-        if index.column() == COL_CHECK:
+        r = self._rows[index.row()]
+        if index.column() == COL_CHECK and not r.is_separator:
             f |= Qt.ItemFlag.ItemIsUserCheckable
         return f
 
