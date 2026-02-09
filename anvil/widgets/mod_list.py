@@ -101,10 +101,9 @@ class _DropTreeView(QTreeView):
         super().dragEnterEvent(event)
 
     def dragMoveEvent(self, event):
+        super().dragMoveEvent(event)
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
-            return
-        super().dragMoveEvent(event)
 
     def dropEvent(self, event):
         if event.mimeData().hasUrls():
