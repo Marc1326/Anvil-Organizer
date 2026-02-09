@@ -116,7 +116,8 @@ class GamePanel(QWidget):
         top_layout.addWidget(start_btn, 0, Qt.AlignmentFlag.AlignHCenter)
         layout.addWidget(top_frame)
 
-        tabs = QTabWidget()
+        self._tabs = QTabWidget()
+        tabs = self._tabs  # local alias for existing code
         tabs.tabBar().setExpanding(False)
         tabs.tabBar().setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         tabs.setStyleSheet("QTabBar { qproperty-alignment: AlignCenter; }"
@@ -160,14 +161,14 @@ class GamePanel(QWidget):
         # ── Spielstände-Tab ───────────────────────────────────────────
         saves = QWidget()
         saves_layout = QVBoxLayout(saves)
-        saves_tree = QTreeWidget()
-        saves_tree.setColumnCount(2)
-        saves_tree.setHeaderLabels(["Name", "Datei"])
-        saves_header = saves_tree.header()
+        self._saves_tree = QTreeWidget()
+        self._saves_tree.setColumnCount(2)
+        self._saves_tree.setHeaderLabels(["Name", "Datei"])
+        saves_header = self._saves_tree.header()
         saves_header.setStretchLastSection(False)
         saves_header.setCascadingSectionResizes(True)
         saves_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        saves_layout.addWidget(saves_tree)
+        saves_layout.addWidget(self._saves_tree)
         tabs.addTab(saves, "Spielstände")
 
         # ── Downloads-Tab ─────────────────────────────────────────────
