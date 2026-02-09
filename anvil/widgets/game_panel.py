@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QCheckBox,
     QLineEdit,
+    QComboBox,
     QMenu,
     QFrame,
     QTreeWidget,
@@ -79,6 +80,7 @@ class _DraggableDownloadTable(QTableWidget):
 
 class GamePanel(QWidget):
     install_requested = Signal(list)  # list of archive path strings
+    start_requested = Signal(str, str)  # (binary_path, working_dir)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -92,20 +94,7 @@ class GamePanel(QWidget):
         top_layout = QVBoxLayout(top_frame)
         top_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Verknüpfung-Button oben rechts
-        link_btn = QPushButton()
-        link_btn.setObjectName("linkButton")
-        _exec_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "executables.svg")
-        if os.path.exists(_exec_icon):
-            link_btn.setIcon(QIcon(_exec_icon))
-        link_btn.setIconSize(QSize(24, 24))
-        link_btn.setToolTip("Verknüpfung")
-        link_btn.clicked.connect(_todo("Verknüpfung"))
-        link_btn_row = QHBoxLayout()
-        link_btn_row.addStretch()
-        link_btn_row.addWidget(link_btn)
-        top_layout.addLayout(link_btn_row)
-
+        # Game-Icon (Banner)
         pix = QPixmap(140, 140)
         pix.fill(QColor("#242424"))
         self._game_btn = QToolButton(self)
@@ -116,31 +105,46 @@ class GamePanel(QWidget):
             "QToolButton { background: #242424; border: 2px solid #3D3D3D; border-radius: 4px; }"
             "QToolButton:hover { background: #2a2a2a; }"
         )
-        self._game_menu = QMenu(self)
-        self._game_menu.setStyleSheet("QMenu { min-width: 350px; padding: 6px; font-size: 14px; }")
-        self._game_menu.addAction(QAction("<Bearbeiten...>", self, triggered=_todo("<Bearbeiten...>")))
-        self._game_menu.addSeparator()
-        self._game_menu.addAction(QAction("Explore Virtual Folder", self, triggered=_todo("Explore Virtual Folder")))
-        self._game_btn.clicked.connect(
-            lambda: self._game_menu.exec(
-                self._game_btn.mapToGlobal(QPoint(self._game_btn.width() // 2 - self._game_menu.sizeHint().width() // 2, self._game_btn.height()))
-            )
-        )
         top_layout.addWidget(self._game_btn, 0, Qt.AlignmentFlag.AlignHCenter)
         self._game_label = QLabel("Kein Spiel ausgewählt")
         self._game_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         top_layout.addWidget(self._game_label)
-        start_btn = QPushButton()
-        start_btn.setObjectName("startButton")
+
+        # Start-Button
+        self._start_btn = QPushButton()
+        self._start_btn.setObjectName("startButton")
         _play_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "files", "play.png")
         if os.path.exists(_play_icon):
-            start_btn.setIcon(QIcon(_play_icon))
-            start_btn.setIconSize(QSize(24, 24))
-        start_btn.setMinimumWidth(140)
-        start_btn.setFixedHeight(36)
-        start_btn.setToolTip("Starten")
-        start_btn.clicked.connect(_todo("Starten"))
-        top_layout.addWidget(start_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+            self._start_btn.setIcon(QIcon(_play_icon))
+            self._start_btn.setIconSize(QSize(24, 24))
+        self._start_btn.setMinimumWidth(140)
+        self._start_btn.setFixedHeight(36)
+        self._start_btn.setToolTip("Starten")
+        self._start_btn.clicked.connect(self._on_start_clicked)
+        top_layout.addWidget(self._start_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+
+        # Executable-ComboBox (wie MO2: executablesListBox)
+        self._exe_combo = QComboBox()
+        self._exe_combo.setMinimumWidth(180)
+        self._exe_combo.currentIndexChanged.connect(self._on_exe_changed)
+        # Verknüpfung-Button rechts neben ComboBox
+        link_btn = QPushButton()
+        link_btn.setObjectName("linkButton")
+        _exec_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "executables.svg")
+        if os.path.exists(_exec_icon):
+            link_btn.setIcon(QIcon(_exec_icon))
+        link_btn.setIconSize(QSize(20, 20))
+        link_btn.setToolTip("Verknüpfung")
+        link_btn.setFixedWidth(32)
+        link_btn.clicked.connect(_todo("Verknüpfung"))
+        combo_row = QHBoxLayout()
+        combo_row.addWidget(self._exe_combo)
+        combo_row.addWidget(link_btn)
+        top_layout.addLayout(combo_row)
+
+        # Executables data: list of {"name", "binary"} dicts
+        self._executables: list[dict[str, str]] = []
+
         layout.addWidget(top_frame)
 
         self._tabs = QTabWidget()
@@ -285,8 +289,8 @@ class GamePanel(QWidget):
         # Update game button icon (banner or placeholder)
         self._update_game_button_icon(game_name)
 
-        # Rebuild executables dropdown (with icons)
-        self._rebuild_game_menu(game_plugin)
+        # Rebuild executables ComboBox (with icons)
+        self._rebuild_executables_combo(game_plugin)
 
         # Update data tree with real directory contents
         self._populate_data_tree(game_path)
@@ -308,12 +312,12 @@ class GamePanel(QWidget):
             self._game_btn.setIcon(QIcon(scaled))
             self._game_btn.setIconSize(scaled.size())
         elif cache_key.startswith(f"{gsn}/exe/"):
-            # Update matching menu action icon
+            # Update matching ComboBox icon
             exe_name = cache_key.split("/exe/", 1)[1]
-            for action in self._game_menu.actions():
-                binary = action.data()
+            for i, exe in enumerate(self._executables):
+                binary = exe.get("binary", "")
                 if binary and Path(binary).name == exe_name:
-                    action.setIcon(QIcon(pixmap.scaled(
+                    self._exe_combo.setItemIcon(i, QIcon(pixmap.scaled(
                         QSize(24, 24),
                         Qt.AspectRatioMode.KeepAspectRatio,
                         Qt.TransformationMode.SmoothTransformation,
@@ -351,11 +355,15 @@ class GamePanel(QWidget):
             self._game_btn.setIcon(QIcon(pix))
             self._game_btn.setIconSize(pix.size())
 
-    def _rebuild_game_menu(self, game_plugin) -> None:
-        """Rebuild the game button dropdown with executables from the plugin."""
-        self._game_menu.clear()
-        self._game_menu.addAction(QAction("<Bearbeiten...>", self, triggered=_todo("<Bearbeiten...>")))
-        self._game_menu.addSeparator()
+    def _rebuild_executables_combo(self, game_plugin) -> None:
+        """Rebuild the executable ComboBox with entries from the game plugin."""
+        self._exe_combo.blockSignals(True)
+        self._exe_combo.clear()
+        self._executables.clear()
+
+        # First entry: <Bearbeiten...> (opens Executables dialog)
+        self._exe_combo.addItem("<Bearbeiten...>")
+        self._executables.append({"name": "<Bearbeiten...>", "binary": ""})
 
         if game_plugin is not None:
             for exe in game_plugin.executables():
@@ -363,23 +371,65 @@ class GamePanel(QWidget):
                 binary = exe.get("binary", "")
                 if not name:
                     continue
-                action = QAction(name, self, triggered=_todo(name))
-                action.setData(binary)  # store binary for icon matching
-                # Try cached exe icon
+                # Try to get icon for this executable
+                icon = QIcon()
                 if self._icon_manager and self._current_short_name and binary:
                     icon_pix = self._icon_manager.get_executable_icon(
                         self._current_short_name, binary,
                     )
                     if icon_pix is not None:
-                        action.setIcon(QIcon(icon_pix.scaled(
+                        icon = QIcon(icon_pix.scaled(
                             QSize(24, 24),
                             Qt.AspectRatioMode.KeepAspectRatio,
                             Qt.TransformationMode.SmoothTransformation,
-                        )))
-                self._game_menu.addAction(action)
-            self._game_menu.addSeparator()
+                        ))
+                self._exe_combo.addItem(icon, name)
+                self._executables.append({"name": name, "binary": binary})
 
-        self._game_menu.addAction(QAction("Explore Virtual Folder", self, triggered=_todo("Explore Virtual Folder")))
+        # Select first real executable (index 1) if available
+        if self._exe_combo.count() > 1:
+            self._exe_combo.setCurrentIndex(1)
+        self._exe_combo.blockSignals(False)
+
+    def _on_exe_changed(self, index: int) -> None:
+        """Handle executable ComboBox selection change."""
+        if index == 0 and self._exe_combo.count() > 1:
+            # "<Bearbeiten...>" selected → open Executables dialog, revert selection
+            from anvil.widgets.executables_dialog import ExecutablesDialog
+            ExecutablesDialog(self.window()).exec()
+            self._exe_combo.blockSignals(True)
+            self._exe_combo.setCurrentIndex(1)
+            self._exe_combo.blockSignals(False)
+
+    def _on_start_clicked(self) -> None:
+        """Start the currently selected executable."""
+        idx = self._exe_combo.currentIndex()
+        if idx <= 0 or idx >= len(self._executables):
+            return
+
+        exe = self._executables[idx]
+        binary = exe.get("binary", "")
+        if not binary:
+            return
+
+        game_path = self._current_game_path
+        if game_path is None:
+            QMessageBox.warning(
+                self, "Starten",
+                "Spielverzeichnis nicht gefunden.",
+            )
+            return
+
+        binary_path = game_path / binary
+        if not binary_path.exists():
+            QMessageBox.warning(
+                self, "Starten",
+                f"Executable nicht gefunden:\n{binary_path}",
+            )
+            return
+
+        working_dir = str(binary_path.parent)
+        self.start_requested.emit(str(binary_path), working_dir)
 
     def _populate_data_tree(self, game_path: Path | None) -> None:
         """Scan game_path and show top-level entries in the data tree."""

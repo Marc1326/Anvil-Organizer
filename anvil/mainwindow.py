@@ -119,6 +119,7 @@ class MainWindow(QMainWindow):
             self._on_archives_dropped, Qt.ConnectionType.QueuedConnection,
         )
         self._game_panel.install_requested.connect(self._on_downloads_install)
+        self._game_panel.start_requested.connect(self._on_start_game)
 
         # ── Deferred tab header restore ──────────────────────────────
         self._pending_tab_states: dict[int, tuple] = {}
@@ -292,6 +293,20 @@ class MainWindow(QMainWindow):
         if not self._current_instance_path:
             return
         self._install_archives([Path(p) for p in paths])
+
+    def _on_start_game(self, binary_path: str, working_dir: str) -> None:
+        """Launch the selected game executable."""
+        from PySide6.QtCore import QProcess
+        success = QProcess.startDetached(binary_path, [], working_dir)
+        if success:
+            self.statusBar().showMessage(
+                f"Gestartet: {Path(binary_path).name}", 5000,
+            )
+        else:
+            QMessageBox.warning(
+                self, "Starten fehlgeschlagen",
+                f"Konnte nicht gestartet werden:\n{binary_path}",
+            )
 
     def _on_downloads_install(self, paths: list) -> None:
         """Handle install request from the Downloads tab."""
