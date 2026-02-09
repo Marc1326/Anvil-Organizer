@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QFileDialog,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 
 from anvil.styles import get_stylesheet
 from anvil.widgets.toolbar import create_toolbar
@@ -71,7 +71,8 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         # MO2: Profil-Leiste NUR über der linken Seite, nicht über die ganze Breite
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter = self._splitter
         left_pane = QWidget()
         left_layout = QVBoxLayout(left_pane)
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -200,6 +201,9 @@ class MainWindow(QMainWindow):
         # 5. Status bar
         self._status_bar.update_instance(game_name, short_name, store)
 
+        # 6. Restore saved column widths / splitter (after data is populated)
+        self._restore_ui_state()
+
     def _on_icon_ready(self, cache_key: str, pixmap) -> None:
         """Handle an icon that was downloaded in the background."""
         self.icon_manager.store_pixmap(cache_key, pixmap)
@@ -310,6 +314,42 @@ class MainWindow(QMainWindow):
         mod_name = self._mod_list_view.get_current_mod_name()
         if mod_name:
             ModDetailDialog(self, mod_name=mod_name).exec()
+
+    # ── UI state persistence ───────────────────────────────────────
+
+    @staticmethod
+    def _settings() -> QSettings:
+        """Return QSettings with a fixed path independent of Flatpak sandbox."""
+        path = str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf")
+        return QSettings(path, QSettings.Format.IniFormat)
+
+    def _save_ui_state(self) -> None:
+        """Persist splitter, mod-list and downloads column widths."""
+        s = self._settings()
+        s.setValue("splitter/state", self._splitter.saveState())
+        s.setValue("mod_list/header_state", self._mod_list_view.header().saveState())
+        s.setValue("downloads/header_state",
+                   self._game_panel._dl_table.horizontalHeader().saveState())
+        s.sync()
+
+    def _restore_ui_state(self) -> None:
+        """Restore splitter, mod-list and downloads column widths."""
+        s = self._settings()
+        val = s.value("splitter/state")
+        if val:
+            self._splitter.restoreState(val)
+        val = s.value("mod_list/header_state")
+        if val:
+            self._mod_list_view.header().restoreState(val)
+        val = s.value("downloads/header_state")
+        if val:
+            self._game_panel._dl_table.horizontalHeader().restoreState(val)
+
+    def closeEvent(self, event) -> None:
+        self._save_ui_state()
+        super().closeEvent(event)
+
+    # ── Other slots ───────────────────────────────────────────────────
 
     def _on_about(self):
         QMessageBox.about(self, "Über Anvil Organizer", "Anvil Organizer v0.1.0\n\nPlatzhalter-GUI.")

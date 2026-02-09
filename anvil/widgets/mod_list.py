@@ -192,6 +192,10 @@ class ModListView(QWidget):
         """Remove all mods from the list."""
         self._source_model.clear()
 
+    def header(self) -> QHeaderView:
+        """Return the tree header for state save/restore."""
+        return self._tree.header()
+
     def get_current_mod_name(self):
         """Liefert den Mod-Namen der aktuell gewählten Zeile oder None."""
         proxy_idx = self._tree.currentIndex()

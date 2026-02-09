@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import configparser
 import os
+import subprocess
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -22,10 +24,12 @@ from PySide6.QtWidgets import (
     QFrame,
     QTreeWidget,
     QTreeWidgetItem,
+    QMessageBox,
+    QAbstractItemView,
 )
 
-from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont
-from PySide6.QtCore import Qt, QSize, QPoint, Signal
+from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont, QDesktopServices
+from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl
 
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 
@@ -194,6 +198,7 @@ class GamePanel(QWidget):
         self._dl_table.setSortingEnabled(True)
         self._dl_table.setAlternatingRowColors(True)
         self._dl_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._dl_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._dl_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._dl_table.setRowCount(0)
         self._dl_table.cellDoubleClicked.connect(self._on_dl_double_click)
@@ -468,14 +473,153 @@ class GamePanel(QWidget):
         if path:
             self.install_requested.emit([path])
 
-    def _on_dl_context_menu(self, pos) -> None:
-        """Right-click context menu on downloads table."""
-        row = self._dl_table.rowAt(pos.y())
-        path = self._get_dl_archive_path(row) if row >= 0 else None
-        if not path:
+    def _read_meta_mod_id(self, archive_path: str) -> str | None:
+        """Read modID from the .meta file next to an archive."""
+        meta = Path(archive_path + ".meta")
+        if not meta.is_file():
+            return None
+        cp = configparser.ConfigParser()
+        try:
+            cp.read(str(meta), encoding="utf-8")
+        except Exception:
+            return None
+        mod_id = cp.get("General", "modID", fallback=None)
+        if mod_id and mod_id.strip():
+            return mod_id.strip()
+        return None
+
+    def _get_meta_path(self, archive_path: str) -> Path | None:
+        """Return the .meta file path if it exists."""
+        meta = Path(archive_path + ".meta")
+        return meta if meta.is_file() else None
+
+    def _bulk_delete_by_status(self, filter_status: str | None) -> None:
+        """Delete archives filtered by status column. None = all."""
+        paths: list[str] = []
+        for row in range(self._dl_table.rowCount()):
+            if filter_status is not None:
+                status_item = self._dl_table.item(row, 2)
+                if not status_item or status_item.text() != filter_status:
+                    continue
+            p = self._get_dl_archive_path(row)
+            if p:
+                paths.append(p)
+        if not paths:
             return
+        count = len(paths)
+        if filter_status == "Installiert":
+            msg = f"{count} installierte(s) Archiv(e) wirklich löschen?"
+        elif filter_status == "Nicht installiert":
+            msg = f"{count} deinstallierte(s) Archiv(e) wirklich löschen?"
+        else:
+            msg = f"Alle {count} Archive wirklich löschen?"
+        answer = QMessageBox.question(
+            self, "Löschen bestätigen", msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            for p in paths:
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+            self.refresh_downloads()
+
+    def _on_dl_context_menu(self, pos) -> None:
+        """Right-click context menu on downloads table (MO2 style)."""
+        # Collect all selected archive paths
+        selected_rows = sorted({idx.row() for idx in self._dl_table.selectedIndexes()})
+        paths: list[str] = []
+        for r in selected_rows:
+            p = self._get_dl_archive_path(r)
+            if p:
+                paths.append(p)
+        if not paths:
+            return
+
+        first = paths[0]
+        meta_path = self._get_meta_path(first)
+        mod_id = self._read_meta_mod_id(first)
+
         menu = QMenu(self)
+
+        # ── Group 1: Install ──
         act_install = menu.addAction("Installieren")
+
+        menu.addSeparator()
+
+        # ── Group 2: Open / Nexus ──
+        act_nexus = menu.addAction("Auf Nexus besuchen")
+        act_nexus.setEnabled(mod_id is not None)
+        act_open = menu.addAction("Öffne Datei")
+        act_meta = menu.addAction("Öffne Meta Datei")
+        act_meta.setEnabled(meta_path is not None)
+
+        menu.addSeparator()
+
+        # ── Group 3: Show in folder ──
+        act_show = menu.addAction("Zeige im Downloadverzeichnis")
+
+        menu.addSeparator()
+
+        # ── Group 4: Delete / Hide ──
+        act_delete = menu.addAction("Löschen...")
+        act_hide = menu.addAction("Verstecken")
+        act_hide.setEnabled(False)
+
+        menu.addSeparator()
+
+        # ── Group 5: Bulk delete ──
+        act_del_installed = menu.addAction("Lösche installierte Downloads...")
+        act_del_uninstalled = menu.addAction("Lösche deinstallierte Downloads")
+        act_del_all = menu.addAction("Lösche alle Downloads")
+
+        menu.addSeparator()
+
+        # ── Group 6: Bulk hide (placeholder) ──
+        act_hide_installed = menu.addAction("Verstecke Installierte")
+        act_hide_installed.setEnabled(False)
+        act_hide_uninstalled = menu.addAction("Verstecke Deinstallierte")
+        act_hide_uninstalled.setEnabled(False)
+        act_hide_all = menu.addAction("Verstecke Alle")
+        act_hide_all.setEnabled(False)
+
         chosen = menu.exec(self._dl_table.viewport().mapToGlobal(pos))
+        if chosen is None:
+            return
+
         if chosen == act_install:
-            self.install_requested.emit([path])
+            self.install_requested.emit(paths)
+        elif chosen == act_nexus:
+            game = self._current_short_name or "site"
+            QDesktopServices.openUrl(
+                QUrl(f"https://www.nexusmods.com/{game}/mods/{mod_id}"))
+        elif chosen == act_open:
+            subprocess.Popen(["xdg-open", first])
+        elif chosen == act_meta:
+            subprocess.Popen(["xdg-open", str(meta_path)])
+        elif chosen == act_show:
+            subprocess.Popen(["xdg-open", str(Path(first).parent)])
+        elif chosen == act_delete:
+            count = len(paths)
+            if count == 1:
+                msg = f"Archiv \"{Path(first).name}\" wirklich löschen?"
+            else:
+                msg = f"{count} Archive wirklich löschen?"
+            answer = QMessageBox.question(
+                self, "Löschen bestätigen", msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if answer == QMessageBox.StandardButton.Yes:
+                for p in paths:
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
+                self.refresh_downloads()
+        elif chosen == act_del_installed:
+            self._bulk_delete_by_status("Installiert")
+        elif chosen == act_del_uninstalled:
+            self._bulk_delete_by_status("Nicht installiert")
+        elif chosen == act_del_all:
+            self._bulk_delete_by_status(None)
