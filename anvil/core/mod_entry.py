@@ -38,6 +38,9 @@ class ModEntry:
     url: str = ""
     install_date: str = ""                 # ISO format
 
+    # Separator
+    is_separator: bool = False             # True for _separator dirs
+
     # Computed from filesystem
     file_count: int = 0
     total_size: int = 0                    # Bytes
@@ -83,12 +86,17 @@ def _build_entry(
     except (ValueError, TypeError):
         pass
 
+    is_sep = name.endswith("_separator")
+    display = meta.get("name", "")
+    if is_sep and not display:
+        display = name[:-len("_separator")]
+
     return ModEntry(
         name=name,
         enabled=enabled,
         priority=priority,
         install_path=mod_path,
-        display_name=meta.get("name", ""),
+        display_name=display,
         version=meta.get("version", ""),
         category=meta.get("category", ""),
         nexus_id=nexus_id,
@@ -96,6 +104,7 @@ def _build_entry(
         description=meta.get("description", ""),
         url=meta.get("url", ""),
         install_date=meta.get("installDate", ""),
+        is_separator=is_sep,
         file_count=file_count,
         total_size=total_size,
     )
