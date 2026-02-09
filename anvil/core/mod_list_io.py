@@ -128,3 +128,20 @@ def remove_mod_from_modlist(profile_path: Path, mod_name: str) -> None:
 
     if len(filtered) != len(existing):
         write_modlist(profile_path, filtered)
+
+
+def rename_mod_in_modlist(
+    profile_path: Path, old_name: str, new_name: str,
+) -> None:
+    """Rename a mod in ``modlist.txt``.
+
+    Args:
+        profile_path: Path to a profile folder.
+        old_name: Current mod name.
+        new_name: New mod name.
+    """
+    existing = read_modlist(profile_path)
+    updated = [
+        (new_name if n == old_name else n, e) for n, e in existing
+    ]
+    write_modlist(profile_path, updated)

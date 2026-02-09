@@ -15,8 +15,11 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QFileDialog,
     QDialog,
+    QMenu,
+    QInputDialog,
 )
 from PySide6.QtCore import Qt, QSettings
+from PySide6.QtGui import QAction
 
 from anvil.styles import get_stylesheet
 from anvil.widgets.toolbar import create_toolbar
@@ -32,7 +35,10 @@ from anvil.core.instance_manager import InstanceManager
 from anvil.core.icon_manager import IconManager
 from anvil.core.mod_entry import scan_mods_directory
 from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
-from anvil.core.mod_list_io import add_mod_to_modlist, write_modlist
+from anvil.core.mod_list_io import (
+    add_mod_to_modlist, write_modlist, remove_mod_from_modlist,
+    rename_mod_in_modlist,
+)
 from anvil.models.mod_list_model import mod_entry_to_row
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 
@@ -85,6 +91,7 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self._profile_bar)
         self._mod_list_view = ModListView()
         self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
+        self._mod_list_view.context_menu_requested.connect(self._on_mod_context_menu)
         left_layout.addWidget(self._mod_list_view)
         splitter.addWidget(left_pane)
         self._game_panel = GamePanel()
@@ -366,6 +373,273 @@ class MainWindow(QMainWindow):
         mod_name = self._mod_list_view.get_current_mod_name()
         if mod_name:
             ModDetailDialog(self, mod_name=mod_name).exec()
+
+    # ── Mod list context menu ──────────────────────────────────────
+
+    def _on_mod_context_menu(self, global_pos) -> None:
+        """Build and show the mod list context menu (MO2 structure)."""
+        if not self._current_instance_path:
+            return
+
+        selected_rows = self._mod_list_view.get_selected_source_rows()
+        has_selection = len(selected_rows) > 0
+        single = len(selected_rows) == 1
+
+        menu = QMenu(self)
+
+        # ── Alle Mods (Submenu) ────────────────────────────────────
+        all_mods_menu = menu.addMenu("Alle Mods")
+        all_mods_menu.setEnabled(False)
+        menu.addSeparator()
+
+        # ── Kategorie ─────────────────────────────────────────────
+        act = menu.addAction("Kategorie ändern")
+        act.setEnabled(False)
+        act = menu.addAction("Primäre Kategorie")
+        act.setEnabled(False)
+        menu.addSeparator()
+
+        # ── Updates ───────────────────────────────────────────────
+        act = menu.addAction("Versionsschema ändern")
+        act.setEnabled(False)
+        act = menu.addAction("Update-Prüfung erzwingen")
+        act.setEnabled(False)
+        act = menu.addAction("Update ignorieren")
+        act.setEnabled(False)
+        menu.addSeparator()
+
+        # ── Aktivieren / Deaktivieren ─────────────────────────────
+        act_enable = menu.addAction("Aktiviere Ausgewählte")
+        act_enable.setEnabled(has_selection)
+        act_disable = menu.addAction("Deaktiviere Ausgewählte")
+        act_disable.setEnabled(has_selection)
+        menu.addSeparator()
+
+        # ── Senden an (Submenu) ───────────────────────────────────
+        send_to_menu = menu.addMenu("Senden an...")
+        send_to_menu.setEnabled(False)
+        menu.addSeparator()
+
+        # ── Mod-Aktionen ──────────────────────────────────────────
+        act_rename = menu.addAction("Mod umbenennen...")
+        act_rename.setEnabled(single)
+        act_reinstall = menu.addAction("Mod neu installieren")
+        act_reinstall.setEnabled(single)
+        act_remove = menu.addAction("Mod entfernen...")
+        act_remove.setEnabled(has_selection)
+        act = menu.addAction("Backup erstellen")
+        act.setEnabled(False)
+        menu.addSeparator()
+
+        # ── Farbe ─────────────────────────────────────────────────
+        act = menu.addAction("Farbe wählen...")
+        act.setEnabled(False)
+        menu.addSeparator()
+
+        # ── Nexus / Explorer ──────────────────────────────────────
+        act = menu.addAction("Auf Nexus besuchen")
+        act.setEnabled(False)
+        act_explorer = menu.addAction("Im Explorer öffnen")
+        act_explorer.setEnabled(single)
+        menu.addSeparator()
+
+        # ── Informationen ─────────────────────────────────────────
+        act_info = menu.addAction("Informationen...")
+        act_info.setEnabled(single)
+
+        # ── Execute ───────────────────────────────────────────────
+        chosen = menu.exec(global_pos)
+        if not chosen:
+            return
+
+        if chosen == act_enable:
+            self._ctx_enable_selected(selected_rows, True)
+        elif chosen == act_disable:
+            self._ctx_enable_selected(selected_rows, False)
+        elif chosen == act_rename:
+            self._ctx_rename_mod(selected_rows[0])
+        elif chosen == act_reinstall:
+            self._ctx_reinstall_mod(selected_rows[0])
+        elif chosen == act_remove:
+            self._ctx_remove_mods(selected_rows)
+        elif chosen == act_explorer:
+            self._ctx_open_explorer(selected_rows[0])
+        elif chosen == act_info:
+            self._ctx_show_info(selected_rows[0])
+
+    # ── Context menu actions ───────────────────────────────────────
+
+    def _ctx_enable_selected(self, rows: list[int], enabled: bool) -> None:
+        """Enable or disable selected mods."""
+        model = self._mod_list_view.source_model()
+        for row in rows:
+            if 0 <= row < len(self._current_mod_entries):
+                self._current_mod_entries[row].enabled = enabled
+                model._rows[row].enabled = enabled
+        model.dataChanged.emit(
+            model.index(0, 0),
+            model.index(model.rowCount() - 1, 0),
+            [Qt.ItemDataRole.CheckStateRole],
+        )
+        self._write_current_modlist()
+        self._update_active_count()
+
+    def _ctx_rename_mod(self, row: int) -> None:
+        """Rename a mod (folder + modlist.txt)."""
+        if row >= len(self._current_mod_entries):
+            return
+        entry = self._current_mod_entries[row]
+        old_name = entry.name
+
+        new_name, ok = QInputDialog.getText(
+            self, "Mod umbenennen", "Neuer Name:", text=old_name,
+        )
+        if not ok or not new_name.strip() or new_name.strip() == old_name:
+            return
+        new_name = new_name.strip()
+
+        old_path = self._current_instance_path / ".mods" / old_name
+        new_path = self._current_instance_path / ".mods" / new_name
+
+        if new_path.exists():
+            QMessageBox.warning(
+                self, "Umbenennen fehlgeschlagen",
+                f"Ein Mod mit dem Namen \"{new_name}\" existiert bereits.",
+            )
+            return
+
+        try:
+            old_path.rename(new_path)
+        except OSError as exc:
+            QMessageBox.warning(
+                self, "Umbenennen fehlgeschlagen", str(exc),
+            )
+            return
+
+        rename_mod_in_modlist(self._current_profile_path, old_name, new_name)
+        self._reload_mod_list()
+        self.statusBar().showMessage(f"Umbenannt: {old_name} → {new_name}", 5000)
+
+    def _ctx_reinstall_mod(self, row: int) -> None:
+        """Reinstall a mod from its archive in .downloads/."""
+        if row >= len(self._current_mod_entries):
+            return
+        entry = self._current_mod_entries[row]
+        downloads_path = self._current_instance_path / ".downloads"
+
+        if not downloads_path.is_dir():
+            QMessageBox.warning(
+                self, "Neu installieren",
+                "Kein Downloads-Ordner gefunden.",
+            )
+            return
+
+        # Find matching archive by mod name
+        archive = None
+        mod_lower = entry.name.lower()
+        for f in downloads_path.iterdir():
+            if f.is_file() and f.suffix.lower() in ('.zip', '.rar', '.7z'):
+                if mod_lower in f.stem.lower():
+                    archive = f
+                    break
+
+        if not archive:
+            QMessageBox.information(
+                self, "Neu installieren",
+                f"Kein passendes Archiv für \"{entry.name}\" in .downloads/ gefunden.",
+            )
+            return
+
+        self._install_archives([archive])
+
+    def _ctx_remove_mods(self, rows: list[int]) -> None:
+        """Remove selected mods (folder + modlist.txt entry)."""
+        names = []
+        for row in rows:
+            if row < len(self._current_mod_entries):
+                names.append(self._current_mod_entries[row].name)
+        if not names:
+            return
+
+        if len(names) == 1:
+            msg = f"Mod \"{names[0]}\" wirklich löschen?\n\nDer Mod-Ordner wird unwiderruflich gelöscht."
+        else:
+            msg = f"{len(names)} Mods wirklich löschen?\n\n" + "\n".join(f"  • {n}" for n in names) + "\n\nDie Mod-Ordner werden unwiderruflich gelöscht."
+
+        reply = QMessageBox.question(
+            self, "Mod entfernen", msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        for name in names:
+            mod_path = self._current_instance_path / ".mods" / name
+            if mod_path.is_dir():
+                shutil.rmtree(mod_path)
+            remove_mod_from_modlist(self._current_profile_path, name)
+
+        self._reload_mod_list()
+        self.statusBar().showMessage(f"Entfernt: {', '.join(names)}", 5000)
+
+    def _ctx_open_explorer(self, row: int) -> None:
+        """Open the mod folder in the file manager."""
+        import subprocess
+        if row >= len(self._current_mod_entries):
+            return
+        mod_path = self._current_instance_path / ".mods" / self._current_mod_entries[row].name
+        if mod_path.is_dir():
+            subprocess.Popen(["xdg-open", str(mod_path)])
+
+    def _ctx_show_info(self, row: int) -> None:
+        """Show mod information dialog."""
+        if row >= len(self._current_mod_entries):
+            return
+        entry = self._current_mod_entries[row]
+        mod_path = self._current_instance_path / ".mods" / entry.name
+
+        # Collect info
+        info_lines = [
+            f"Name: {entry.display_name or entry.name}",
+            f"Ordner: {entry.name}",
+            f"Pfad: {mod_path}",
+            f"Aktiviert: {'Ja' if entry.enabled else 'Nein'}",
+            f"Version: {entry.version or '—'}",
+            f"Kategorie: {entry.category or '—'}",
+            f"Priorität: {entry.priority}",
+        ]
+
+        # Folder size
+        if mod_path.is_dir():
+            total = sum(f.stat().st_size for f in mod_path.rglob("*") if f.is_file())
+            if total < 1024 * 1024:
+                size_str = f"{total / 1024:.1f} KB"
+            else:
+                size_str = f"{total / (1024 * 1024):.1f} MB"
+            info_lines.append(f"Größe: {size_str}")
+
+        # meta.ini content
+        meta_ini = mod_path / "meta.ini"
+        if meta_ini.is_file():
+            try:
+                meta_text = meta_ini.read_text(encoding="utf-8")
+                info_lines.append(f"\n── meta.ini ──\n{meta_text}")
+            except OSError:
+                pass
+
+        QMessageBox.information(
+            self, f"Informationen: {entry.display_name or entry.name}",
+            "\n".join(info_lines),
+        )
+
+    def _reload_mod_list(self) -> None:
+        """Reload mod list from disk and update UI."""
+        self._current_mod_entries = scan_mods_directory(
+            self._current_instance_path, self._current_profile_path,
+        )
+        mod_rows = [mod_entry_to_row(e) for e in self._current_mod_entries]
+        self._mod_list_view.source_model().set_mods(mod_rows)
+        self._update_active_count()
 
     # ── UI state persistence ───────────────────────────────────────
 
