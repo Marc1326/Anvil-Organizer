@@ -19,8 +19,12 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QScrollArea,
     QLineEdit,
+    QTreeView,
+    QAbstractItemView,
+    QHeaderView,
+    QFileSystemModel,
 )
-from PySide6.QtCore import Qt, QRect, QSize, QTimer
+from PySide6.QtCore import Qt, QRect, QSize, QTimer, QDir
 from PySide6.QtGui import QPainter, QColor, QFont, QFontDatabase, QIcon
 
 _MOD_DETAIL_DIALOG_STYLE = """
@@ -83,6 +87,26 @@ QLabel { color: #D3D3D3; }
 /* Toolbar-Icon-Buttons: Icons weiss auf transparent, nicht einfärben/invertieren */
 #textFileToolbar #toolbarIconBtn:hover { background: #3D3D3D; }
 #textFileToolbar #toolbarIconBtn:pressed { background: #006868; }
+
+/* Verzeichnisbaum-Tab */
+#filetreeView {
+    background: #1C1C1C;
+    color: #D3D3D3;
+    border: 1px solid #3D3D3D;
+    border-radius: 2px;
+    alternate-background-color: #222222;
+}
+#filetreeView::item { padding: 2px 0; }
+#filetreeView::item:selected { background: #3D3D3D; }
+#filetreeView::item:hover:!selected { background: #2A2A2A; }
+#filetreeView::branch:has-children:closed { image: none; }
+#filetreeView::branch:has-children:open { image: none; }
+#filetreeView QHeaderView::section {
+    background: #242424;
+    color: #D3D3D3;
+    border: 1px solid #3D3D3D;
+    padding: 4px 8px;
+}
 """
 
 
@@ -329,8 +353,75 @@ def _build_textfiles_tab():
     return page
 
 
+def _build_filetree_tab(mod_path: str):
+    """Verzeichnisbaum-Tab wie MO2: QFileSystemModel + QTreeView.
+
+    Shows the mod's directory structure with Name, Size, Type, Date columns.
+    Based on MO2's modinfodialogfiletree.cpp implementation.
+    """
+    page = QWidget()
+    page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(6)
+
+    # "Mod im Explorer öffnen" Button (wie MO2: openInExplorer)
+    btn_row = QHBoxLayout()
+    btn_explore = QPushButton("Mod im Explorer öffnen")
+    btn_explore.clicked.connect(
+        lambda: subprocess.Popen(["xdg-open", mod_path]) if os.path.isdir(mod_path) else None
+    )
+    btn_row.addWidget(btn_explore)
+    btn_row.addStretch()
+    layout.addLayout(btn_row)
+
+    if not mod_path or not os.path.isdir(mod_path):
+        layout.addWidget(QLabel("Mod-Verzeichnis nicht gefunden."))
+        layout.addStretch()
+        return page
+
+    # QFileSystemModel (wie MO2: m_fs = new QFileSystemModel)
+    fs_model = QFileSystemModel()
+    fs_model.setRootPath(mod_path)
+    fs_model.setReadOnly(True)  # MO2 uses false, we start read-only
+
+    # QTreeView (wie MO2: ui->filetree)
+    tree = QTreeView()
+    tree.setObjectName("filetreeView")
+    tree.setModel(fs_model)
+    tree.setRootIndex(fs_model.index(mod_path))
+
+    # Spalten-Breite (MO2: setColumnWidth(0, 300))
+    tree.setColumnWidth(0, 300)  # Name
+
+    # MO2-Einstellungen aus modinfodialog.ui
+    tree.setSortingEnabled(True)
+    tree.setAlternatingRowColors(True)
+    tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+    tree.setUniformRowHeights(True)
+    tree.setAnimated(True)
+    tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+
+    # Header
+    header = tree.header()
+    header.setSortIndicatorShown(True)
+    header.setStretchLastSection(True)
+    header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+
+    # Keep model alive (prevent garbage collection)
+    tree._fs_model = fs_model
+
+    layout.addWidget(tree, 1)
+
+    # TODO: Kontextmenü (Open, Rename, Delete, Hide/Unhide) wie MO2
+    # TODO: Drag & Drop InternalMove
+    # TODO: Header-State Persistenz
+
+    return page
+
+
 class ModDetailDialog(QDialog):
-    def __init__(self, parent=None, mod_name=""):
+    def __init__(self, parent=None, mod_name="", mod_path=""):
         super().__init__(parent)
         self.setWindowTitle(mod_name or "Mod-Details")
         self.setMinimumSize(1280, 720)
@@ -352,13 +443,15 @@ class ModDetailDialog(QDialog):
             ("Konflikte", "Platzhalter – Konflikte"),
             ("Kategorien", "Platzhalter – Kategorien"),
             ("Nexus Info", "Platzhalter – Nexus Info"),
-            ("Verzeichnisbaum", "Platzhalter – Verzeichnisbaum"),
         ]
         for tab_name, placeholder_text in tab_labels:
             page = QWidget()
             page_layout = QVBoxLayout(page)
             page_layout.addWidget(QLabel(placeholder_text))
             self.tab_widget.addTab(page, tab_name)
+
+        # Verzeichnisbaum-Tab (wie MO2: FileTreeTab)
+        self.tab_widget.addTab(_build_filetree_tab(mod_path), "Verzeichnisbaum")
 
         tab_bar = self.tab_widget.tabBar()
         tab_bar.setExpanding(False)

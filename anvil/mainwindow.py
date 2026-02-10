@@ -785,7 +785,8 @@ class MainWindow(QMainWindow):
     def _on_mod_double_click(self):
         mod_name = self._mod_list_view.get_current_mod_name()
         if mod_name:
-            ModDetailDialog(self, mod_name=mod_name).exec()
+            mod_path = str(self._current_instance_path / ".mods" / mod_name)
+            ModDetailDialog(self, mod_name=mod_name, mod_path=mod_path).exec()
 
     # ── Mod list context menu ──────────────────────────────────────
 
