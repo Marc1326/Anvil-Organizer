@@ -109,20 +109,25 @@ class GamePanel(QWidget):
         top_layout.addLayout(link_btn_row)
 
         # Game-Icon (Banner) mit Executable-Dropdown
-        pix = QPixmap(140, 140)
+        pix = QPixmap(200, 200)
         pix.fill(QColor("#242424"))
         self._game_btn = QToolButton(self)
         self._game_btn.setIcon(QIcon(pix))
-        self._game_btn.setIconSize(QSize(140, 140))
-        self._game_btn.setFixedSize(140, 140)
+        self._game_btn.setIconSize(QSize(200, 200))
+        self._game_btn.setFixedSize(200, 200)
         self._game_btn.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
         self._exe_menu = QMenu(self)
+        self._exe_menu.addAction("(Kein Spiel geladen)")
         self._game_btn.setMenu(self._exe_menu)
         self._game_btn.setStyleSheet(
-            "QToolButton { background: #242424; border: 2px solid #3D3D3D; border-radius: 4px; }"
+            "QToolButton { background: #242424; border: 2px solid #3D3D3D; border-radius: 4px;"
+            "             padding: 0; margin: 0; }"
             "QToolButton:hover { background: #2a2a2a; }"
-            "QToolButton::menu-button { width: 20px; border: none; }"
-            "QToolButton::menu-arrow { image: none; }"
+            "QToolButton::menu-button { background: #3D3D3D; border: none;"
+            "                           border-top-right-radius: 4px; border-bottom-right-radius: 4px;"
+            "                           width: 20px; }"
+            "QToolButton::menu-button:hover { background: #006868; }"
+            "QToolButton::menu-arrow { subcontrol-position: center; }"
         )
         top_layout.addWidget(self._game_btn, 0, Qt.AlignmentFlag.AlignHCenter)
         self._game_label = QLabel("Kein Spiel ausgewählt")
@@ -302,32 +307,33 @@ class GamePanel(QWidget):
 
     def _update_game_button_icon(self, game_name: str) -> None:
         """Set the game button to the cached banner or a placeholder."""
+        size = 200
         banner = None
         if self._icon_manager and self._current_short_name:
             banner = self._icon_manager.get_game_banner(self._current_short_name)
 
         if banner is not None:
             scaled = banner.scaled(
-                QSize(140, 140),
+                QSize(size, size),
                 Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
             self._game_btn.setIcon(QIcon(scaled))
-            self._game_btn.setIconSize(QSize(140, 140))
+            self._game_btn.setIconSize(QSize(size, size))
         else:
             # Placeholder: grey box with game name
-            pix = QPixmap(140, 140)
+            pix = QPixmap(size, size)
             pix.fill(QColor("#242424"))
             if game_name:
                 p = QPainter(pix)
                 p.setPen(QColor("#808080"))
                 f = QFont()
-                f.setPixelSize(13)
+                f.setPixelSize(14)
                 p.setFont(f)
                 p.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, game_name)
                 p.end()
             self._game_btn.setIcon(QIcon(pix))
-            self._game_btn.setIconSize(QSize(140, 140))
+            self._game_btn.setIconSize(QSize(size, size))
 
     def _rebuild_executables_menu(self, game_plugin) -> None:
         """Rebuild the executable menu in the game button dropdown."""
