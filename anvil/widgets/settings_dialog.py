@@ -36,6 +36,7 @@ from PySide6.QtCore import Qt, QSettings
 from anvil.plugins.plugin_loader import PluginLoader, ensure_user_plugin_dir
 from anvil.styles.dark_theme import list_themes, load_theme, get_styles_dir, default_theme
 from anvil.core.nexus_api import NexusAPI
+from anvil.core.nexus_sso import NexusSSOLogin
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, plugin_loader: PluginLoader | None = None):
@@ -308,23 +309,34 @@ class SettingsDialog(QDialog):
         konto_layout.addLayout(stats)
         nx_content_layout.addWidget(konto_grp)
 
-        # ── Nexus-Verbindung ─────────────────────────────────────────
+        # ── Nexus-Verbindung (MO2 layout: log + 3 buttons) ────────
         verb_grp = QGroupBox("Nexus-Verbindung")
-        verb_layout = QVBoxLayout(verb_grp)
-        self._nx_status_label = QLabel("Nicht verbunden.")
-        verb_layout.addWidget(self._nx_status_label)
-        verb_row = QHBoxLayout()
+        verb_layout = QHBoxLayout(verb_grp)
+
+        # Left: buttons
+        btn_col = QVBoxLayout()
         self._btn_connect = QPushButton("Verbinde zu Nexus")
-        self._btn_connect.clicked.connect(self._nx_validate_key)
-        verb_row.addWidget(self._btn_connect)
+        self._btn_connect.clicked.connect(self._nx_connect_sso)
+        btn_col.addWidget(self._btn_connect)
         self._btn_api_key = QPushButton("Gebe API-Schlüssel manuell ein")
         self._btn_api_key.clicked.connect(self._nx_enter_api_key)
-        verb_row.addWidget(self._btn_api_key)
-        self._btn_disconnect = QPushButton("Verbindung trennen")
+        btn_col.addWidget(self._btn_api_key)
+        self._btn_disconnect = QPushButton("Trennen Sie die Verbindung zum Nexus")
         self._btn_disconnect.clicked.connect(self._nx_disconnect)
-        verb_row.addWidget(self._btn_disconnect)
-        verb_row.addStretch()
-        verb_layout.addLayout(verb_row)
+        btn_col.addWidget(self._btn_disconnect)
+        btn_col.addStretch()
+        verb_layout.addLayout(btn_col)
+
+        # Right: status label + log list
+        log_col = QVBoxLayout()
+        self._nx_status_label = QLabel("Nicht verbunden.")
+        log_col.addWidget(self._nx_status_label)
+        self._nx_log = QListWidget()
+        self._nx_log.setMaximumHeight(80)
+        self._nx_log.setStyleSheet("QListWidget { font-size: 11px; }")
+        log_col.addWidget(self._nx_log)
+        verb_layout.addLayout(log_col, 1)
+
         nx_content_layout.addWidget(verb_grp)
 
         # ── Optionen ─────────────────────────────────────────────────
@@ -375,16 +387,19 @@ class SettingsDialog(QDialog):
         nx_layout.addWidget(nx_scroll)
         tabs.addTab(nexus_tab, "Nexus")
 
-        # ── Init Nexus API and load saved key ────────────────────────
+        # ── Init Nexus API, SSO, and load saved key ─────────────────
         self._nexus_api = NexusAPI(self)
         self._nexus_api.user_validated.connect(self._nx_on_validated)
         self._nexus_api.request_error.connect(self._nx_on_error)
         self._nexus_api.rate_limit_updated.connect(self._nx_on_rate_limit)
+        self._sso_login: NexusSSOLogin | None = None
         saved_key = settings.value("nexus/api_key", "")
         if saved_key:
             self._nexus_api.set_api_key(saved_key)
-            self._nx_status_label.setText("Validiere API-Schlüssel...")
+            self._nx_log_add("API-Schlüssel überprüfen...")
             self._nexus_api.validate_key()
+        else:
+            self._nx_log_add("Nicht verbunden.")
 
         # Tab Plugins
         plugins_tab = QWidget()
@@ -670,6 +685,49 @@ class SettingsDialog(QDialog):
 
     # ── Nexus-Tab helpers ─────────────────────────────────────────────
 
+    def _nx_log_add(self, text: str) -> None:
+        """Add a line to the Nexus connection log (MO2 style)."""
+        for line in text.split("\n"):
+            if line.strip():
+                self._nx_log.addItem(line.strip())
+        self._nx_log.scrollToBottom()
+
+    def _nx_connect_sso(self) -> None:
+        """Start the SSO login flow via browser (MO2 style)."""
+        # Cancel existing SSO if active
+        if self._sso_login and self._sso_login.is_active():
+            self._sso_login.cancel()
+            self._btn_connect.setText("Verbinde zu Nexus")
+            return
+
+        self._nx_log.clear()
+        self._sso_login = NexusSSOLogin(self)
+        self._sso_login.state_changed.connect(self._nx_on_sso_state)
+        self._sso_login.key_changed.connect(self._nx_on_sso_key)
+        self._btn_connect.setText("Abbrechen")
+        self._sso_login.start()
+
+    def _nx_on_sso_state(self, state: int, detail: str) -> None:
+        """Handle SSO state changes — show progress in log."""
+        text = NexusSSOLogin.state_to_string(state, detail)
+        self._nx_log_add(text)
+
+        if state in (NexusSSOLogin.State.FINISHED,
+                     NexusSSOLogin.State.TIMEOUT,
+                     NexusSSOLogin.State.CLOSED_BY_REMOTE,
+                     NexusSSOLogin.State.CANCELLED,
+                     NexusSSOLogin.State.ERROR):
+            self._btn_connect.setText("Verbinde zu Nexus")
+
+    def _nx_on_sso_key(self, api_key: str) -> None:
+        """Handle API key received from SSO."""
+        self._nx_log_add("API-Schlüssel erhalten.")
+        self._nexus_api.set_api_key(api_key)
+        settings = self._settings()
+        settings.setValue("nexus/api_key", api_key)
+        self._nx_log_add("API-Schlüssel überprüfen...")
+        self._nexus_api.validate_key()
+
     def _nx_enter_api_key(self) -> None:
         """Prompt the user to enter their Nexus API key manually."""
         from PySide6.QtWidgets import QInputDialog
@@ -680,24 +738,22 @@ class SettingsDialog(QDialog):
             "https://www.nexusmods.com/users/myaccount?tab=api+access",
         )
         if ok and key.strip():
+            self._nx_log.clear()
+            self._nx_log_add("Manueller API-Schlüssel eingegeben.")
             self._nexus_api.set_api_key(key.strip())
             settings = self._settings()
             settings.setValue("nexus/api_key", key.strip())
-            self._nx_status_label.setText("Validiere API-Schlüssel...")
+            self._nx_log_add("API-Schlüssel überprüfen...")
             self._nx_status_label.setStyleSheet("")
             self._nexus_api.validate_key()
 
-    def _nx_validate_key(self) -> None:
-        """Validate the currently stored API key."""
-        if not self._nexus_api.has_api_key():
-            self._nx_enter_api_key()
-            return
-        self._nx_status_label.setText("Validiere API-Schlüssel...")
-        self._nx_status_label.setStyleSheet("")
-        self._nexus_api.validate_key()
-
     def _nx_disconnect(self) -> None:
         """Clear the API key and reset all Nexus fields."""
+        # Cancel active SSO
+        if self._sso_login and self._sso_login.is_active():
+            self._sso_login.cancel()
+            self._btn_connect.setText("Verbinde zu Nexus")
+
         settings = self._settings()
         settings.remove("nexus/api_key")
         self._nexus_api.set_api_key("")
@@ -706,7 +762,9 @@ class SettingsDialog(QDialog):
         self._nx_account.clear()
         self._nx_daily.clear()
         self._nx_hourly.clear()
-        self._nx_status_label.setText("Nicht verbunden.")
+        self._nx_log.clear()
+        self._nx_log_add("Getrennt.")
+        self._nx_status_label.setText("Getrennt.")
         self._nx_status_label.setStyleSheet("")
 
     def _nx_on_validated(self, user_info: dict) -> None:
@@ -722,12 +780,15 @@ class SettingsDialog(QDialog):
         else:
             account_type = "Standard"
         self._nx_account.setText(account_type)
+        self._nx_log_add("Benutzerkontoinformationen erhalten.")
+        self._nx_log_add("Erfolgreich mit Nexus verknüpft.")
         self._nx_status_label.setText("Verbunden.")
         self._nx_status_label.setStyleSheet("color: #4CAF50;")
 
     def _nx_on_error(self, tag: str, message: str) -> None:
         """Handle API request error."""
         if tag == "validate":
+            self._nx_log_add(f"Fehler: {message}")
             self._nx_status_label.setText(f"Fehler: {message}")
             self._nx_status_label.setStyleSheet("color: #F44336;")
 
@@ -737,6 +798,10 @@ class SettingsDialog(QDialog):
             self._nx_daily.setText(f"{daily}")
         if hourly >= 0:
             self._nx_hourly.setText(f"{hourly}")
+        # Notify parent (MainWindow) via signal if available
+        parent = self.parent()
+        if parent and hasattr(parent, "_update_api_status"):
+            parent._update_api_status(daily, hourly)
 
     def _nx_register_nxm_handler(self) -> None:
         """Register Anvil Organizer as nxm:// URL handler on Linux."""
