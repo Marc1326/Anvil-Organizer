@@ -31,7 +31,9 @@ class ModEntry:
     # From meta.ini
     display_name: str = ""                 # May differ from folder name
     version: str = ""
-    category: str = ""
+    category: str = ""                     # Comma-separated IDs (primary first)
+    primary_category: int = 0              # First ID in category list
+    category_ids: list[int] = field(default_factory=list)  # Parsed IDs
     nexus_id: int = 0
     author: str = ""
     description: str = ""
@@ -91,6 +93,21 @@ def _build_entry(
     if is_sep and not display:
         display = name[:-len("_separator")]
 
+    # Parse comma-separated category IDs (primary first, like MO2)
+    raw_cat = meta.get("category", "")
+    cat_ids: list[int] = []
+    if raw_cat:
+        for part in raw_cat.split(","):
+            part = part.strip()
+            if part:
+                try:
+                    cid = int(part)
+                    if cid > 0:
+                        cat_ids.append(cid)
+                except ValueError:
+                    pass
+    primary_cat = cat_ids[0] if cat_ids else 0
+
     return ModEntry(
         name=name,
         enabled=enabled,
@@ -98,7 +115,9 @@ def _build_entry(
         install_path=mod_path,
         display_name=display,
         version=meta.get("version", ""),
-        category=meta.get("category", ""),
+        category=raw_cat,
+        primary_category=primary_cat,
+        category_ids=cat_ids,
         nexus_id=nexus_id,
         author=meta.get("author", ""),
         description=meta.get("description", ""),

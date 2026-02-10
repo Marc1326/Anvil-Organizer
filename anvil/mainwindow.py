@@ -41,6 +41,7 @@ from anvil.core.mod_list_io import (
     add_mod_to_modlist, write_modlist, remove_mod_from_modlist,
     rename_mod_in_modlist,
 )
+from anvil.core.categories import CategoryManager
 from anvil.models.mod_list_model import mod_entry_to_row
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 
@@ -116,6 +117,9 @@ class MainWindow(QMainWindow):
         # ── Right-click recovery for hidden menu bar ──────────────────
         # Install event filter on toolbar so right-click there also works
         self._toolbar.installEventFilter(self)
+
+        # ── Category manager ────────────────────────────────────────────
+        self._category_manager = CategoryManager()
 
         # ── Mod state ─────────────────────────────────────────────────
         self._current_mod_entries = []
@@ -557,6 +561,11 @@ class MainWindow(QMainWindow):
         # 3. Mod list — scan filesystem and populate
         self._current_instance_path = self.instance_manager.instances_path() / instance_name
         instance_path = self._current_instance_path
+
+        # Load categories for this instance
+        self._category_manager.load(instance_path)
+        self._mod_list_view.source_model().set_category_manager(self._category_manager)
+
         profile_name = data.get("selected_profile", "Default")
         self._current_profile_path = instance_path / ".profiles" / profile_name
         self._current_mod_entries = scan_mods_directory(instance_path, self._current_profile_path)
@@ -766,24 +775,55 @@ class MainWindow(QMainWindow):
         act = all_mods_menu.addAction("Alle ausklappen")
         act.setEnabled(False)
         all_mods_menu.addSeparator()
-        act = all_mods_menu.addAction("Aktiviere alle")
-        act.setEnabled(False)
-        act = all_mods_menu.addAction("Deaktiviere alle")
-        act.setEnabled(False)
+        act_enable_all = all_mods_menu.addAction("Aktiviere alle")
+        act_disable_all = all_mods_menu.addAction("Deaktiviere alle")
         act = all_mods_menu.addAction("Auf Updates prüfen")
         act.setEnabled(False)
         act = all_mods_menu.addAction("Kategorien automatisch zuweisen")
         act.setEnabled(False)
-        act = all_mods_menu.addAction("Neu laden")
-        act.setEnabled(False)
+        act_reload = all_mods_menu.addAction("Neu laden")
         act = all_mods_menu.addAction("Als CSV exportieren...")
         act.setEnabled(False)
 
-        # ── Kategorien (Submenus) ─────────────────────────────────
+        # ── Kategorien (Submenus, MO2-Pattern) ────────────────────
         andere_kat_menu = menu.addMenu("Andere Kategorien")
-        andere_kat_menu.setEnabled(False)
         primaere_kat_menu = menu.addMenu("Primäre Kategorie")
-        primaere_kat_menu.setEnabled(False)
+        _cat_checkboxes = []  # keep refs: (cat_id, QCheckBox)
+        _primary_radios = []  # keep refs: (cat_id, QRadioButton)
+
+        if single and selected_rows[0] < len(self._current_mod_entries):
+            entry = self._current_mod_entries[selected_rows[0]]
+            assigned_ids = set(entry.category_ids)
+
+            # "Andere Kategorien" — checkboxes for all categories
+            from PySide6.QtWidgets import QCheckBox, QWidgetAction, QRadioButton
+            for cat in self._category_manager.all_categories():
+                cb = QCheckBox(cat["name"], andere_kat_menu)
+                cb.setChecked(cat["id"] in assigned_ids)
+                wa = QWidgetAction(andere_kat_menu)
+                wa.setDefaultWidget(cb)
+                wa.setData(cat["id"])
+                andere_kat_menu.addAction(wa)
+                _cat_checkboxes.append((cat["id"], cb))
+
+            # "Primäre Kategorie" — radio buttons (only assigned categories)
+            if assigned_ids:
+                for cat_id in entry.category_ids:
+                    name = self._category_manager.get_name(cat_id)
+                    if not name:
+                        continue
+                    rb = QRadioButton(name, primaere_kat_menu)
+                    rb.setChecked(cat_id == entry.primary_category)
+                    wa = QWidgetAction(primaere_kat_menu)
+                    wa.setDefaultWidget(rb)
+                    wa.setData(cat_id)
+                    primaere_kat_menu.addAction(wa)
+                    _primary_radios.append((cat_id, rb))
+            else:
+                primaere_kat_menu.setEnabled(False)
+        else:
+            andere_kat_menu.setEnabled(False)
+            primaere_kat_menu.setEnabled(False)
         menu.addSeparator()
 
         # ── Updates / Aktivieren ──────────────────────────────────
@@ -809,16 +849,18 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
 
         # ── Sicherung / Nexus / Explorer ─────────────────────────
-        act = menu.addAction("Erstelle eine Sicherung")
-        act.setEnabled(False)
+        act_backup = menu.addAction("Erstelle eine Sicherung")
+        act_backup.setEnabled(single)
         act = menu.addAction("Endorsement entfernen")
         act.setEnabled(False)
         act = menu.addAction("Kategorie neu zuordnen (von Nexus)")
         act.setEnabled(False)
         act = menu.addAction("Beginne Beobachtung")
         act.setEnabled(False)
-        act = menu.addAction("Besuche auf NexusMods")
-        act.setEnabled(False)
+        # Nexus: nur aktiviert wenn Mod eine Nexus-ID hat
+        act_nexus = menu.addAction("Besuche auf NexusMods")
+        has_nexus = single and selected_rows[0] < len(self._current_mod_entries) and self._current_mod_entries[selected_rows[0]].nexus_id > 0
+        act_nexus.setEnabled(has_nexus)
         act_explorer = menu.addAction("Öffne im Explorer")
         act_explorer.setEnabled(single)
         act_info = menu.addAction("Informationen...")
@@ -826,11 +868,24 @@ class MainWindow(QMainWindow):
 
         # ── Execute ───────────────────────────────────────────────
         chosen = menu.exec(global_pos)
+
+        # Apply category changes (MO2 aboutToHide pattern)
+        if single and _cat_checkboxes and selected_rows[0] < len(self._current_mod_entries):
+            self._apply_category_changes(
+                selected_rows[0], _cat_checkboxes, _primary_radios,
+            )
+
         if not chosen:
             return
 
         if chosen == act_create_sep:
             self._ctx_create_separator()
+        elif chosen == act_enable_all:
+            self._ctx_enable_all(True)
+        elif chosen == act_disable_all:
+            self._ctx_enable_all(False)
+        elif chosen == act_reload:
+            self._on_menu_refresh()
         elif chosen == act_enable:
             self._ctx_enable_selected(selected_rows, True)
         elif chosen == act_disable:
@@ -841,6 +896,10 @@ class MainWindow(QMainWindow):
             self._ctx_reinstall_mod(selected_rows[0])
         elif chosen == act_remove:
             self._ctx_remove_mods(selected_rows)
+        elif chosen == act_backup:
+            self._ctx_create_backup(selected_rows[0])
+        elif chosen == act_nexus:
+            self._ctx_visit_nexus(selected_rows[0])
         elif chosen == act_explorer:
             self._ctx_open_explorer(selected_rows[0])
         elif chosen == act_info:
@@ -894,6 +953,130 @@ class MainWindow(QMainWindow):
         )
         self._write_current_modlist()
         self._update_active_count()
+
+    def _ctx_enable_all(self, enabled: bool) -> None:
+        """Enable or disable ALL mods."""
+        all_rows = list(range(len(self._current_mod_entries)))
+        self._ctx_enable_selected(all_rows, enabled)
+        label = "aktiviert" if enabled else "deaktiviert"
+        self.statusBar().showMessage(f"Alle Mods {label}", 3000)
+
+    def _apply_category_changes(
+        self,
+        row: int,
+        cat_checkboxes: list[tuple[int, object]],
+        primary_radios: list[tuple[int, object]],
+    ) -> None:
+        """Read checkbox/radio state from the closed menu and persist changes."""
+        from anvil.core.mod_metadata import write_meta_ini
+
+        entry = self._current_mod_entries[row]
+
+        # Collect checked category IDs
+        new_ids = [cid for cid, cb in cat_checkboxes if cb.isChecked()]
+
+        # Determine primary: check radio buttons, fall back to first
+        new_primary = 0
+        for cid, rb in primary_radios:
+            if rb.isChecked():
+                new_primary = cid
+                break
+        # If primary not in new_ids, pick first (or 0)
+        if new_primary not in new_ids:
+            new_primary = new_ids[0] if new_ids else 0
+
+        # Build category string (primary first, like MO2)
+        old_ids = set(entry.category_ids)
+        old_primary = entry.primary_category
+        if set(new_ids) == old_ids and new_primary == old_primary:
+            return  # nothing changed
+
+        # Primary first, then rest
+        ordered = []
+        if new_primary:
+            ordered.append(new_primary)
+        for cid in new_ids:
+            if cid != new_primary:
+                ordered.append(cid)
+
+        cat_str = ",".join(str(i) for i in ordered)
+
+        # Update in-memory
+        entry.category = cat_str
+        entry.category_ids = ordered
+        entry.primary_category = new_primary
+
+        # Persist to meta.ini
+        if entry.install_path:
+            write_meta_ini(entry.install_path, {"category": cat_str})
+
+        # Update model row
+        model = self._mod_list_view.source_model()
+        if row < len(model._rows):
+            model._rows[row].category = cat_str
+            idx = model.index(row, 4)  # COL_CATEGORY
+            model.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DisplayRole])
+
+        self.statusBar().showMessage(
+            f"Kategorien aktualisiert: {entry.display_name or entry.name}", 3000,
+        )
+
+    def _ctx_create_backup(self, row: int) -> None:
+        """Create a ZIP backup of the mod folder in .backups/."""
+        import zipfile
+        if row >= len(self._current_mod_entries):
+            return
+        entry = self._current_mod_entries[row]
+        mod_path = self._current_instance_path / ".mods" / entry.name
+
+        if not mod_path.is_dir():
+            return
+
+        backups_dir = self._current_instance_path / ".backups"
+        backups_dir.mkdir(parents=True, exist_ok=True)
+
+        zip_name = f"{entry.name}.zip"
+        zip_path = backups_dir / zip_name
+
+        # Avoid overwriting existing backup
+        counter = 1
+        while zip_path.exists():
+            zip_name = f"{entry.name}_{counter}.zip"
+            zip_path = backups_dir / zip_name
+            counter += 1
+
+        try:
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for file in mod_path.rglob("*"):
+                    if file.is_file():
+                        zf.write(file, file.relative_to(mod_path))
+            self.statusBar().showMessage(
+                f"Sicherung erstellt: {zip_name}", 5000,
+            )
+        except OSError as exc:
+            QMessageBox.warning(
+                self, "Sicherung fehlgeschlagen", str(exc),
+            )
+
+    def _ctx_visit_nexus(self, row: int) -> None:
+        """Open the mod's Nexus Mods page in the browser."""
+        if row >= len(self._current_mod_entries):
+            return
+        entry = self._current_mod_entries[row]
+        if entry.nexus_id <= 0:
+            return
+
+        # Get Nexus game slug from plugin
+        nexus_slug = ""
+        if hasattr(self, '_game_panel') and hasattr(self._game_panel, '_current_plugin'):
+            plugin = self._game_panel._current_plugin
+            if plugin:
+                nexus_slug = getattr(plugin, "GameNexusName", "") or getattr(plugin, "GameShortName", "")
+        if not nexus_slug:
+            nexus_slug = "site"  # fallback: generic Nexus URL
+
+        url = f"https://www.nexusmods.com/{nexus_slug}/mods/{entry.nexus_id}"
+        QDesktopServices.openUrl(QUrl(url))
 
     def _ctx_rename_mod(self, row: int) -> None:
         """Rename a mod (folder + modlist.txt)."""
