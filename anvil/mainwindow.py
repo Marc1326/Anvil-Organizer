@@ -20,8 +20,8 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QDialogButtonBox,
 )
-from PySide6.QtCore import Qt, QSettings
-from PySide6.QtGui import QAction
+from PySide6.QtCore import Qt, QSettings, QUrl, QSize
+from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QKeySequence
 
 from anvil.styles.dark_theme import load_theme, default_theme
 from anvil.widgets.toolbar import create_toolbar
@@ -69,16 +69,9 @@ class MainWindow(QMainWindow):
         self.instance_manager = InstanceManager()
         self.icon_manager = IconManager()
 
-        menubar = self.menuBar()
-        fm = menubar.addMenu("Datei")
-        fm.addAction("Mod installieren...").triggered.connect(self._on_install_mod)
-        fm.addSeparator()
-        fm.addAction("Beenden").triggered.connect(self.close)
-        menubar.addMenu("Ansicht").addAction("Ansicht").triggered.connect(_todo("Ansicht"))
-        menubar.addMenu("Werkzeuge").addAction("Werkzeuge").triggered.connect(_todo("Werkzeuge"))
-        menubar.addMenu("Hilfe").addAction("Über Anvil Organizer").triggered.connect(self._on_about)
-
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, create_toolbar(self))
+        self._toolbar = create_toolbar(self)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._toolbar)
+        self._build_menu_bar()
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -103,8 +96,26 @@ class MainWindow(QMainWindow):
         splitter.setSizes([780, 420])
         main_layout.addWidget(splitter)
 
+        # ── Log-Panel (toggleable via Ansicht → Log) ──────────────────
+        self._log_panel = QTextEdit()
+        self._log_panel.setReadOnly(True)
+        self._log_panel.setMaximumHeight(150)
+        self._log_panel.setPlaceholderText("Log-Ausgabe...")
+        self._log_panel.setStyleSheet(
+            "QTextEdit { font-family: monospace; font-size: 12px; }"
+        )
+        self._log_panel.setVisible(False)
+        main_layout.addWidget(self._log_panel)
+
         self._status_bar = StatusBarWidget(self)
         self.setStatusBar(self._status_bar)
+
+        # ── Restore view settings (toolbar size, visibility, etc.) ────
+        self._restore_view_settings()
+
+        # ── Right-click recovery for hidden menu bar ──────────────────
+        # Install event filter on toolbar so right-click there also works
+        self._toolbar.installEventFilter(self)
 
         # ── Mod state ─────────────────────────────────────────────────
         self._current_mod_entries = []
@@ -127,6 +138,312 @@ class MainWindow(QMainWindow):
 
         # ── Erster Start / Instanz laden ──────────────────────────────
         self._check_first_start()
+
+    # ── Menu bar (MO2-Struktur) ─────────────────────────────────────
+
+    def _build_menu_bar(self) -> None:
+        """Build the full MO2-style menu bar."""
+        menubar = self.menuBar()
+
+        # ════════════════════════════════════════════════════════════════
+        # 1. DATEI
+        # ════════════════════════════════════════════════════════════════
+        fm = menubar.addMenu("Datei")
+
+        act = fm.addAction("Instanzen verwalten...")
+        act.triggered.connect(self._on_manage_instances)
+
+        act = fm.addAction("Mod installieren...")
+        act.setShortcut(QKeySequence("Ctrl+M"))
+        act.triggered.connect(self._on_install_mod)
+
+        act = fm.addAction("Nexus besuchen")
+        act.setShortcut(QKeySequence("Ctrl+N"))
+        act.setEnabled(False)
+
+        fm.addSeparator()
+
+        act = fm.addAction("Beenden")
+        act.triggered.connect(self.close)
+
+        # ════════════════════════════════════════════════════════════════
+        # 2. ANSICHT
+        # ════════════════════════════════════════════════════════════════
+        vm = menubar.addMenu("Ansicht")
+
+        act = vm.addAction("Neu laden")
+        act.setShortcut(QKeySequence("F5"))
+        act.triggered.connect(self._on_menu_refresh)
+
+        # ── Toolbars (Submenu) ─────────────────────────────────────
+        self._tb_menu = vm.addMenu("Toolbars")
+
+        # Visibility toggles
+        self._act_menubar = self._tb_menu.addAction("Menüleiste")
+        self._act_menubar.setCheckable(True)
+        self._act_menubar.triggered.connect(self._on_toggle_menubar)
+
+        self._act_toolbar = self._tb_menu.addAction("Hauptleiste")
+        self._act_toolbar.setCheckable(True)
+        self._act_toolbar.triggered.connect(self._on_toggle_toolbar)
+
+        self._act_statusbar = self._tb_menu.addAction("Statusleiste")
+        self._act_statusbar.setCheckable(True)
+        self._act_statusbar.triggered.connect(self._on_toggle_statusbar)
+
+        self._tb_menu.addSeparator()
+
+        # Icon size (radio group)
+        size_group = QActionGroup(self)
+        self._act_small_icons = self._tb_menu.addAction("Kleine Icons")
+        self._act_small_icons.setCheckable(True)
+        self._act_small_icons.setActionGroup(size_group)
+        self._act_small_icons.triggered.connect(lambda: self._set_toolbar_icon_size(0))
+
+        self._act_medium_icons = self._tb_menu.addAction("Mittlere Icons")
+        self._act_medium_icons.setCheckable(True)
+        self._act_medium_icons.setActionGroup(size_group)
+        self._act_medium_icons.triggered.connect(lambda: self._set_toolbar_icon_size(1))
+
+        self._act_large_icons = self._tb_menu.addAction("Große Icons")
+        self._act_large_icons.setCheckable(True)
+        self._act_large_icons.setActionGroup(size_group)
+        self._act_large_icons.triggered.connect(lambda: self._set_toolbar_icon_size(2))
+
+        self._tb_menu.addSeparator()
+
+        # Button style (radio group)
+        style_group = QActionGroup(self)
+        self._act_icons_only = self._tb_menu.addAction("Nur Icons")
+        self._act_icons_only.setCheckable(True)
+        self._act_icons_only.setActionGroup(style_group)
+        self._act_icons_only.triggered.connect(
+            lambda: self._set_toolbar_button_style(Qt.ToolButtonStyle.ToolButtonIconOnly))
+
+        self._act_text_only = self._tb_menu.addAction("Nur Text")
+        self._act_text_only.setCheckable(True)
+        self._act_text_only.setActionGroup(style_group)
+        self._act_text_only.triggered.connect(
+            lambda: self._set_toolbar_button_style(Qt.ToolButtonStyle.ToolButtonTextOnly))
+
+        self._act_icons_text = self._tb_menu.addAction("Icons und Text")
+        self._act_icons_text.setCheckable(True)
+        self._act_icons_text.setActionGroup(style_group)
+        self._act_icons_text.triggered.connect(
+            lambda: self._set_toolbar_button_style(Qt.ToolButtonStyle.ToolButtonTextUnderIcon))
+
+        # Sync checkmarks when menu is about to show
+        self._tb_menu.aboutToShow.connect(self._update_toolbar_menu)
+
+        # ── Log (Toggle) ──────────────────────────────────────────
+        self._act_log = vm.addAction("Log")
+        self._act_log.setCheckable(True)
+        self._act_log.setChecked(False)
+        self._act_log.triggered.connect(self._on_toggle_log)
+
+        vm.addSeparator()
+
+        act = vm.addAction("Benachrichtigungen...")
+        act.setEnabled(False)
+
+        # ════════════════════════════════════════════════════════════════
+        # 3. WERKZEUGE
+        # ════════════════════════════════════════════════════════════════
+        tm = menubar.addMenu("Werkzeuge")
+
+        act = tm.addAction("Profile...")
+        act.setShortcut(QKeySequence("Ctrl+P"))
+        act.triggered.connect(self._on_menu_profiles)
+
+        act = tm.addAction("Executables...")
+        act.setShortcut(QKeySequence("Ctrl+E"))
+        act.triggered.connect(self._on_menu_executables)
+
+        tm.addSeparator()
+
+        act = tm.addAction("Tool-Plugins")
+        act.setShortcut(QKeySequence("Ctrl+I"))
+        act.setEnabled(False)
+
+        tm.addSeparator()
+
+        act = tm.addAction("Einstellungen...")
+        act.setShortcut(QKeySequence("Ctrl+S"))
+        act.triggered.connect(self._on_menu_settings)
+
+        # ════════════════════════════════════════════════════════════════
+        # 4. HILFE
+        # ════════════════════════════════════════════════════════════════
+        hm = menubar.addMenu("Hilfe")
+
+        act = hm.addAction("Hilfe")
+        act.setShortcut(QKeySequence("Ctrl+H"))
+        act.triggered.connect(self._on_menu_help)
+
+        act = hm.addAction("UI-Hilfe")
+        act.setEnabled(False)
+
+        act = hm.addAction("Dokumentation")
+        act.setEnabled(False)
+
+        act = hm.addAction("Chat auf Discord")
+        act.setEnabled(False)
+
+        act = hm.addAction("Problem melden")
+        act.setEnabled(False)
+
+        tutorials_menu = hm.addMenu("Tutorials")
+        tutorials_menu.setEnabled(False)
+
+        hm.addSeparator()
+
+        act = hm.addAction("Über Anvil Organizer")
+        act.triggered.connect(self._on_about)
+
+        act = hm.addAction("Über Qt")
+        act.setEnabled(False)
+
+    # ── MO2 icon size constants ─────────────────────────────────────
+
+    _ICON_SIZES = [QSize(24, 24), QSize(32, 32), QSize(42, 36)]
+
+    # ── Menu action handlers ──────────────────────────────────────────
+
+    def _on_manage_instances(self) -> None:
+        """Datei → Instanzen verwalten..."""
+        from anvil.widgets.instance_manager_dialog import InstanceManagerDialog
+        dlg = InstanceManagerDialog(
+            self, self.instance_manager, self.plugin_loader,
+            self.icon_manager,
+        )
+        dlg.exec()
+        if dlg.switched_to:
+            self.switch_instance(dlg.switched_to)
+
+    def _on_menu_refresh(self) -> None:
+        """Ansicht → Neu laden (F5)."""
+        self._reload_mod_list()
+        self.statusBar().showMessage("Mod-Liste neu geladen", 3000)
+
+    def _on_toggle_log(self, checked: bool) -> None:
+        """Ansicht → Log (Toggle)."""
+        self._log_panel.setVisible(checked)
+
+    def _on_toggle_menubar(self, checked: bool) -> None:
+        """Ansicht → Toolbars → Menüleiste (Toggle)."""
+        self.menuBar().setVisible(checked)
+
+    def _on_toggle_toolbar(self, checked: bool) -> None:
+        """Ansicht → Toolbars → Hauptleiste (Toggle)."""
+        self._toolbar.setVisible(checked)
+
+    def _on_toggle_statusbar(self, checked: bool) -> None:
+        """Ansicht → Toolbars → Statusleiste (Toggle)."""
+        self._status_bar.setVisible(checked)
+
+    def _set_toolbar_icon_size(self, idx: int) -> None:
+        """Set toolbar icon size: 0=small, 1=medium, 2=large."""
+        size = self._ICON_SIZES[idx]
+        self._toolbar.setIconSize(size)
+
+    def _set_toolbar_button_style(self, style: Qt.ToolButtonStyle) -> None:
+        """Set toolbar button style."""
+        self._toolbar.setToolButtonStyle(style)
+
+    def _update_toolbar_menu(self) -> None:
+        """Sync checkmarks with actual widget state (MO2 pattern)."""
+        self._act_menubar.setChecked(self.menuBar().isVisible())
+        self._act_toolbar.setChecked(self._toolbar.isVisible())
+        self._act_statusbar.setChecked(self._status_bar.isVisible())
+
+        cur_size = self._toolbar.iconSize()
+        self._act_small_icons.setChecked(cur_size == self._ICON_SIZES[0])
+        self._act_medium_icons.setChecked(cur_size == self._ICON_SIZES[1])
+        self._act_large_icons.setChecked(cur_size == self._ICON_SIZES[2])
+
+        cur_style = self._toolbar.toolButtonStyle()
+        self._act_icons_only.setChecked(cur_style == Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self._act_text_only.setChecked(cur_style == Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self._act_icons_text.setChecked(cur_style == Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+
+    def _on_menu_profiles(self) -> None:
+        """Werkzeuge → Profile... (Strg+P)."""
+        from anvil.widgets.profile_dialog import ProfileDialog
+        ProfileDialog(self).exec()
+
+    def _on_menu_executables(self) -> None:
+        """Werkzeuge → Executables... (Strg+E)."""
+        from anvil.widgets.executables_dialog import ExecutablesDialog
+        ExecutablesDialog(self).exec()
+
+    def _on_menu_settings(self) -> None:
+        """Werkzeuge → Einstellungen... (Strg+S)."""
+        from anvil.widgets.settings_dialog import SettingsDialog
+        SettingsDialog(self, self.plugin_loader).exec()
+
+    def _on_menu_help(self) -> None:
+        """Hilfe → Hilfe (Strg+H)."""
+        QDesktopServices.openUrl(
+            QUrl("https://github.com/Marc1326/Anvil-Organizer")
+        )
+
+    # ── View settings persistence ────────────────────────────────────
+
+    def _restore_view_settings(self) -> None:
+        """Restore toolbar icon size, button style, and visibility from QSettings."""
+        s = self._settings()
+
+        # Icon size (default: 1 = medium = 32x32)
+        size_idx = int(s.value("view/toolbar_icon_size", 1))
+        if 0 <= size_idx < len(self._ICON_SIZES):
+            self._toolbar.setIconSize(self._ICON_SIZES[size_idx])
+        else:
+            self._toolbar.setIconSize(self._ICON_SIZES[1])
+
+        # Button style (default: ToolButtonIconOnly = 0)
+        style_val = int(s.value("view/toolbar_button_style", 0))
+        self._toolbar.setToolButtonStyle(Qt.ToolButtonStyle(style_val))
+
+        # Visibility (default: all visible except log)
+        if s.value("view/menubar_visible") is not None:
+            self.menuBar().setVisible(s.value("view/menubar_visible", True, type=bool))
+        if s.value("view/toolbar_visible") is not None:
+            self._toolbar.setVisible(s.value("view/toolbar_visible", True, type=bool))
+        if s.value("view/statusbar_visible") is not None:
+            self._status_bar.setVisible(s.value("view/statusbar_visible", True, type=bool))
+
+        log_vis = s.value("view/log_visible", False, type=bool)
+        self._log_panel.setVisible(log_vis)
+        self._act_log.setChecked(log_vis)
+
+    def _show_view_recovery_menu(self, global_pos) -> None:
+        """Show the view/toolbar recovery context menu at *global_pos*.
+
+        This allows recovering the menu bar when it's hidden.
+        """
+        menu = QMenu(self)
+        for action in self._tb_menu.actions():
+            menu.addAction(action)
+        menu.addSeparator()
+        menu.addAction(self._act_log)
+        self._update_toolbar_menu()
+        menu.exec(global_pos)
+
+    def contextMenuEvent(self, event) -> None:
+        """MainWindow-level right-click: show view recovery menu.
+
+        This catches right-clicks that aren't consumed by child widgets,
+        e.g. on empty areas of the central widget or margins.
+        """
+        self._show_view_recovery_menu(event.globalPos())
+
+    def eventFilter(self, obj, event) -> bool:
+        """Catch right-clicks on the toolbar for view recovery menu."""
+        from PySide6.QtCore import QEvent
+        if obj is self._toolbar and event.type() == QEvent.Type.ContextMenu:
+            self._show_view_recovery_menu(event.globalPos())
+            return True
+        return super().eventFilter(obj, event)
 
     # ── Instance switching ────────────────────────────────────────────
 
@@ -755,7 +1072,7 @@ class MainWindow(QMainWindow):
         return QSettings(path, QSettings.Format.IniFormat)
 
     def _save_ui_state(self) -> None:
-        """Persist splitter, mod-list and downloads column widths."""
+        """Persist splitter, mod-list, downloads column widths and view settings."""
         s = self._settings()
         s.setValue("splitter/state", self._splitter.saveState())
         s.setValue("mod_list/header_state", self._mod_list_view.header().saveState())
@@ -765,6 +1082,20 @@ class MainWindow(QMainWindow):
                    self._game_panel._data_tree.header().saveState())
         s.setValue("saves/header_state",
                    self._game_panel._saves_tree.header().saveState())
+        # View settings
+        s.setValue("view/menubar_visible", self.menuBar().isVisible())
+        s.setValue("view/toolbar_visible", self._toolbar.isVisible())
+        s.setValue("view/statusbar_visible", self._status_bar.isVisible())
+        s.setValue("view/log_visible", self._log_panel.isVisible())
+        # Icon size → index (0=small, 1=medium, 2=large)
+        cur_size = self._toolbar.iconSize()
+        size_idx = 1  # default medium
+        for i, sz in enumerate(self._ICON_SIZES):
+            if cur_size == sz:
+                size_idx = i
+                break
+        s.setValue("view/toolbar_icon_size", size_idx)
+        s.setValue("view/toolbar_button_style", self._toolbar.toolButtonStyle().value)
         s.sync()
 
     def _restore_ui_state(self) -> None:
