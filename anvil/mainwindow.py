@@ -786,7 +786,14 @@ class MainWindow(QMainWindow):
         mod_name = self._mod_list_view.get_current_mod_name()
         if mod_name:
             mod_path = str(self._current_instance_path / ".mods" / mod_name)
-            ModDetailDialog(self, mod_name=mod_name, mod_path=mod_path).exec()
+            all_mods = [
+                {"name": e.name, "path": str(self._current_instance_path / ".mods" / e.name)}
+                for e in self._current_mod_entries if e.enabled
+            ]
+            ModDetailDialog(
+                self, mod_name=mod_name, mod_path=mod_path,
+                all_mods=all_mods, game_plugin=self._current_plugin,
+            ).exec()
 
     # ── Mod list context menu ──────────────────────────────────────
 
