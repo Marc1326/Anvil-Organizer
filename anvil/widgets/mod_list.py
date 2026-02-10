@@ -104,10 +104,10 @@ class CheckboxDelegate(QStyledItemDelegate):
         return QSize(36, 28)
 
     def editorEvent(self, event, model, option, index):
-        if event.type() in (event.Type.MouseButtonRelease, event.Type.MouseButtonDblClick):
-            is_sep = index.data(ROLE_IS_SEPARATOR)
-            if is_sep:
-                # Toggle collapse/expand
+        is_sep = index.data(ROLE_IS_SEPARATOR)
+        if is_sep:
+            # Separator: toggle on Press, consume Release/DblClick
+            if event.type() == event.Type.MouseButtonPress:
                 folder = index.data(ROLE_FOLDER_NAME) or ""
                 view = option.widget
                 if view and hasattr(view, '_collapsed_separators'):
@@ -117,11 +117,17 @@ class CheckboxDelegate(QStyledItemDelegate):
                         view._collapsed_separators.add(folder)
                     view._apply_separator_filter()
                 return True
-            else:
-                current = index.data(Qt.ItemDataRole.CheckStateRole)
-                new_val = Qt.CheckState.Unchecked if current == Qt.CheckState.Checked else Qt.CheckState.Checked
-                model.setData(index, new_val.value, Qt.ItemDataRole.CheckStateRole)
+            if event.type() in (event.Type.MouseButtonRelease, event.Type.MouseButtonDblClick):
                 return True
+            return False
+        # Normal mod: toggle checkbox on Release, consume DblClick
+        if event.type() == event.Type.MouseButtonRelease:
+            current = index.data(Qt.ItemDataRole.CheckStateRole)
+            new_val = Qt.CheckState.Unchecked if current == Qt.CheckState.Checked else Qt.CheckState.Checked
+            model.setData(index, new_val.value, Qt.ItemDataRole.CheckStateRole)
+            return True
+        if event.type() == event.Type.MouseButtonDblClick:
+            return True
         return False
 
 
@@ -135,8 +141,9 @@ class ModListProxyModel(QSortFilterProxyModel):
 
     def set_hidden_rows(self, rows: set[int]):
         """Set which source rows should be hidden (collapsed under a separator)."""
+        self.beginResetModel()
         self._hidden_rows = rows
-        self.invalidateFilter()
+        self.endResetModel()
 
     def filterAcceptsRow(self, source_row, source_parent):
         if source_row in self._hidden_rows:
