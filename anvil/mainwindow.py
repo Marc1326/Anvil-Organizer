@@ -131,7 +131,15 @@ class MainWindow(QMainWindow):
     # ── Instance switching ────────────────────────────────────────────
 
     def _check_first_start(self) -> None:
-        """Open wizard on first start or load current instance."""
+        """Open wizard on first start or load current instance.
+
+        Also performs crash-recovery: if a stale deploy manifest
+        exists from a previous session that didn't shut down cleanly,
+        purge it before loading.
+        """
+        # Crash-recovery: purge stale deployments from previous sessions
+        self._crash_recovery_purge()
+
         if not self.instance_manager.list_instances():
             # No instances yet — open wizard directly
             wizard = CreateInstanceWizard(
@@ -150,6 +158,30 @@ class MainWindow(QMainWindow):
         else:
             self._status_bar.clear_instance()
 
+    def _crash_recovery_purge(self) -> None:
+        """Purge stale deploy manifests from all instances.
+
+        If the app crashed or was killed, symlinks may still exist in
+        the game directory.  Scan all instances for leftover manifests
+        and purge them.
+        """
+        from anvil.core.mod_deployer import ModDeployer
+
+        for entry in self.instance_manager.list_instances():
+            name = entry.get("name", "") if isinstance(entry, dict) else str(entry)
+            if not name:
+                continue
+            instance_path = self.instance_manager.instances_path() / name
+            manifest = instance_path / ModDeployer.MANIFEST_NAME
+            if manifest.is_file():
+                data = self.instance_manager.load_instance(name)
+                game_path_str = data.get("game_path", "") if data else ""
+                if game_path_str:
+                    game_path = Path(game_path_str)
+                    if game_path.is_dir():
+                        deployer = ModDeployer(instance_path, game_path)
+                        deployer.purge()
+
     def switch_instance(self, instance_name: str) -> None:
         """Switch to a different instance and update all UI components.
 
@@ -164,9 +196,15 @@ class MainWindow(QMainWindow):
     def _apply_instance(self, instance_name: str) -> None:
         """Load instance data and update all widgets.
 
+        Purges any previous deployment before switching, then
+        auto-deploys after the new instance is fully loaded.
+
         Args:
             instance_name: Name of the instance to apply.
         """
+        # Purge old deployment before switching
+        self._game_panel.silent_purge()
+
         data = self.instance_manager.load_instance(instance_name)
         if not data:
             self.setWindowTitle("Anvil Organizer v0.1.0")
@@ -214,8 +252,9 @@ class MainWindow(QMainWindow):
             instance_path / ".downloads", instance_path / ".mods",
         )
 
-        # 5. Mod deployer
+        # 5. Mod deployer + auto-deploy
         self._game_panel.set_instance_path(instance_path)
+        self._game_panel.silent_deploy()
 
         # 6. Status bar
         self._status_bar.update_instance(game_name, short_name, store)
@@ -768,6 +807,8 @@ class MainWindow(QMainWindow):
             header_fn().restoreState(val)
 
     def closeEvent(self, event) -> None:
+        # Purge deployed mods before closing
+        self._game_panel.silent_purge()
         self._save_ui_state()
         super().closeEvent(event)
 
