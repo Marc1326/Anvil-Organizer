@@ -124,6 +124,15 @@ class GamePanel(QWidget):
             "QToolButton:hover { background: #2a2a2a; }"
             "QToolButton::menu-indicator { image: none; width: 0; height: 0; }"
         )
+        # ▾ Dropdown-Pfeil unten rechts als Overlay
+        arrow_label = QLabel("▾", self._game_btn)
+        arrow_label.setStyleSheet(
+            "background: rgba(0,0,0,150); color: #FFF; font-size: 16px;"
+            "padding: 1px 4px; border-radius: 3px; border: none;"
+        )
+        arrow_label.adjustSize()
+        arrow_label.move(140 - arrow_label.width() - 4, 140 - arrow_label.height() - 4)
+        arrow_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         top_layout.addWidget(self._game_btn, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self._game_label = QLabel("Kein Spiel ausgewählt")
@@ -342,42 +351,88 @@ class GamePanel(QWidget):
         edit_action.triggered.connect(self._on_exe_edit)
         self._exe_menu.addSeparator()
 
+        # Game icon (small, for main game entries)
+        game_icon = self._get_small_game_icon()
+
         if game_plugin is not None:
-            for exe in game_plugin.executables():
+            plugin_exes = game_plugin.executables()
+            game_name = game_plugin.GameName if hasattr(game_plugin, "GameName") else ""
+
+            for exe in plugin_exes:
                 name = exe.get("name", "")
                 binary = exe.get("binary", "")
                 if not name:
                     continue
                 idx = len(self._executables)
-                # Try to get icon for this executable
-                icon = QIcon()
-                if self._icon_manager and self._current_short_name and binary:
-                    icon_pix = self._icon_manager.get_executable_icon(
-                        self._current_short_name, binary,
-                    )
-                    if icon_pix is not None:
-                        icon = QIcon(icon_pix.scaled(
-                            QSize(24, 24),
-                            Qt.AspectRatioMode.KeepAspectRatio,
-                            Qt.TransformationMode.SmoothTransformation,
-                        ))
-                if icon.isNull():
-                    icon = QIcon(self._exe_placeholder_icon())
+                icon = self._get_exe_icon(binary, game_icon)
                 action = self._exe_menu.addAction(icon, name)
                 action.triggered.connect(lambda checked, i=idx: self._on_exe_selected(i))
                 self._executables.append({"name": name, "binary": binary})
+
+            # Static MO2 entries: "skip REDmod deploy", "Manually deploy REDmod"
+            if game_name and any("redmod" in e.get("binary", "").lower() for e in plugin_exes):
+                idx = len(self._executables)
+                action = self._exe_menu.addAction(game_icon, f"{game_name} - skip REDmod deploy")
+                action.triggered.connect(lambda checked, i=idx: self._on_exe_selected(i))
+                # Same binary as main game, but flag for skip
+                main_binary = plugin_exes[0].get("binary", "") if plugin_exes else ""
+                self._executables.append({"name": f"{game_name} - skip REDmod deploy", "binary": main_binary})
+
+                idx = len(self._executables)
+                action = self._exe_menu.addAction(self._placeholder_icon(), "Manually deploy REDmod")
+                action.setEnabled(False)  # Platzhalter, noch nicht implementiert
+                self._executables.append({"name": "Manually deploy REDmod", "binary": ""})
+
+            # Explore Virtual Folder
+            self._exe_menu.addSeparator()
+            explore_action = self._exe_menu.addAction(
+                self.style().standardIcon(self.style().StandardPixmap.SP_DirOpenIcon),
+                "Explore Virtual Folder",
+            )
+            explore_action.triggered.connect(self._on_explore_virtual_folder)
 
         # Select first executable by default
         if self._executables:
             self._selected_exe_index = 0
             self._start_btn.setToolTip(f"Starten: {self._executables[0]['name']}")
 
+    def _get_small_game_icon(self) -> QIcon:
+        """Return small (24x24) game icon, or placeholder."""
+        if self._icon_manager and self._current_short_name:
+            pix = self._icon_manager.get_game_icon(self._current_short_name)
+            if pix is not None:
+                return QIcon(pix.scaled(
+                    QSize(24, 24),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                ))
+        return self._placeholder_icon()
+
+    def _get_exe_icon(self, binary: str, fallback: QIcon) -> QIcon:
+        """Return executable icon from IconManager, or fallback."""
+        if self._icon_manager and self._current_short_name and binary:
+            icon_pix = self._icon_manager.get_executable_icon(
+                self._current_short_name, binary,
+            )
+            if icon_pix is not None:
+                return QIcon(icon_pix.scaled(
+                    QSize(24, 24),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                ))
+        return fallback
+
     @staticmethod
-    def _exe_placeholder_icon() -> QPixmap:
-        """Small grey placeholder for executables without icon."""
+    def _placeholder_icon() -> QIcon:
+        """Small grey placeholder icon."""
         pix = QPixmap(24, 24)
         pix.fill(QColor("#3D3D3D"))
-        return pix
+        return QIcon(pix)
+
+    def _on_explore_virtual_folder(self) -> None:
+        """Open the game directory in the file manager."""
+        if self._current_game_path and self._current_game_path.is_dir():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._current_game_path)))
 
     def _on_exe_selected(self, index: int) -> None:
         """Handle executable selection from the menu."""
