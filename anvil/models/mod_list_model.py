@@ -1,9 +1,28 @@
 """QAbstractItemModel für Mod-Liste."""
 
+import os
+
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, QMimeData, QByteArray, QDataStream, QIODevice, QSize, Signal
-from PySide6.QtGui import QColor, QBrush, QFont
+from PySide6.QtGui import QColor, QBrush, QFont, QIcon
 
 from anvil.core.mod_entry import ModEntry
+
+# Conflict icon paths (resolved once)
+_ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "conflicts")
+_CONFLICT_ICONS: dict[str, QIcon] = {}
+
+
+def _get_conflict_icon(conflict_type: str) -> QIcon | None:
+    """Return cached QIcon for conflict type ('win', 'lose', 'both')."""
+    if conflict_type not in ("win", "lose", "both"):
+        return None
+    if conflict_type not in _CONFLICT_ICONS:
+        path = os.path.join(_ICON_DIR, f"conflict_{conflict_type}.svg")
+        if os.path.isfile(path):
+            _CONFLICT_ICONS[conflict_type] = QIcon(path)
+        else:
+            return None
+    return _CONFLICT_ICONS.get(conflict_type)
 
 
 COL_CHECK, COL_NAME, COL_CONFLICTS, COL_MARKERS, COL_CATEGORY, COL_VERSION, COL_PRIORITY = range(7)
@@ -33,12 +52,21 @@ class ModRow:
         self.folder_name = folder_name
 
 
-def mod_entry_to_row(entry: ModEntry) -> ModRow:
-    """Convert a ModEntry (data layer) to a ModRow (view layer)."""
+def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None) -> ModRow:
+    """Convert a ModEntry (data layer) to a ModRow (view layer).
+
+    Args:
+        entry: The mod entry from the data layer.
+        conflict_data: Optional dict mapping mod folder names to conflict
+            info dicts with keys: type, wins, losses, win_mods, lose_mods.
+    """
+    conflicts = ""
+    if conflict_data and entry.name in conflict_data:
+        conflicts = conflict_data[entry.name]
     return ModRow(
         enabled=entry.enabled,
         name=entry.display_name or entry.name,
-        conflicts="",
+        conflicts=conflicts,
         markers="",
         category=entry.category,
         version=entry.version,
@@ -103,7 +131,7 @@ class ModListModel(QAbstractItemModel):
             if c == COL_NAME:
                 return r.name
             if c == COL_CONFLICTS:
-                return r.conflicts
+                return ""  # Icon only, no text
             if c == COL_MARKERS:
                 return r.markers
             if c == COL_CATEGORY:
@@ -112,6 +140,9 @@ class ModListModel(QAbstractItemModel):
                 return r.version
             if c == COL_PRIORITY:
                 return str(r.priority)
+        if role == Qt.ItemDataRole.DecorationRole and c == COL_CONFLICTS:
+            if isinstance(r.conflicts, dict):
+                return _get_conflict_icon(r.conflicts.get("type", ""))
         if role == Qt.ItemDataRole.SizeHintRole:
             return QSize(0, 28)
         if role == Qt.ItemDataRole.CheckStateRole and c == COL_CHECK:
@@ -130,6 +161,18 @@ class ModListModel(QAbstractItemModel):
                 font.setItalic(True)
                 return font
         if role == Qt.ItemDataRole.ToolTipRole:
+            if c == COL_CONFLICTS and isinstance(r.conflicts, dict):
+                ctype = r.conflicts.get("type", "")
+                wins = r.conflicts.get("wins", 0)
+                losses = r.conflicts.get("losses", 0)
+                win_mods = r.conflicts.get("win_mods", 0)
+                lose_mods = r.conflicts.get("lose_mods", 0)
+                if ctype == "win":
+                    return f"Überschreibt {wins} Datei(en) in {win_mods} Mod(s)"
+                if ctype == "lose":
+                    return f"Wird überschrieben von {lose_mods} Mod(s) bei {losses} Datei(en)"
+                if ctype == "both":
+                    return f"Gewinnt {wins}, verliert {losses} Konflikte"
             if r.is_framework and c == COL_NAME:
                 return "Direkt-Install: Wird ins Spielverzeichnis kopiert"
         if role == Qt.ItemDataRole.BackgroundRole:
