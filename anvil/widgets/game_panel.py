@@ -94,6 +94,21 @@ class GamePanel(QWidget):
         top_layout = QVBoxLayout(top_frame)
         top_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        # Verknüpfung-Button oben rechts
+        link_btn = QPushButton()
+        link_btn.setObjectName("linkButton")
+        _exec_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "executables.svg")
+        if os.path.exists(_exec_icon):
+            link_btn.setIcon(QIcon(_exec_icon))
+        link_btn.setIconSize(QSize(20, 20))
+        link_btn.setToolTip("Verknüpfung")
+        link_btn.setFixedWidth(32)
+        link_btn.clicked.connect(_todo("Verknüpfung"))
+        link_btn_row = QHBoxLayout()
+        link_btn_row.addStretch()
+        link_btn_row.addWidget(link_btn)
+        top_layout.addLayout(link_btn_row)
+
         # Game-Icon (Banner)
         pix = QPixmap(140, 140)
         pix.fill(QColor("#242424"))
@@ -127,19 +142,8 @@ class GamePanel(QWidget):
         self._exe_combo = QComboBox()
         self._exe_combo.setMinimumWidth(180)
         self._exe_combo.currentIndexChanged.connect(self._on_exe_changed)
-        # Verknüpfung-Button rechts neben ComboBox
-        link_btn = QPushButton()
-        link_btn.setObjectName("linkButton")
-        _exec_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "executables.svg")
-        if os.path.exists(_exec_icon):
-            link_btn.setIcon(QIcon(_exec_icon))
-        link_btn.setIconSize(QSize(20, 20))
-        link_btn.setToolTip("Verknüpfung")
-        link_btn.setFixedWidth(32)
-        link_btn.clicked.connect(_todo("Verknüpfung"))
         combo_row = QHBoxLayout()
         combo_row.addWidget(self._exe_combo)
-        combo_row.addWidget(link_btn)
         top_layout.addLayout(combo_row)
 
         # Executables data: list of {"name", "binary"} dicts
@@ -296,33 +300,6 @@ class GamePanel(QWidget):
         self._populate_data_tree(game_path)
 
         # Downloads are populated via set_downloads_path() from MainWindow
-
-    def on_icon_ready(self, cache_key: str, pixmap: QPixmap) -> None:
-        """Called when a background icon download completes."""
-        gsn = self._current_short_name
-        if not gsn:
-            return
-
-        if cache_key == f"{gsn}/banner":
-            scaled = pixmap.scaled(
-                QSize(140, 140),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            self._game_btn.setIcon(QIcon(scaled))
-            self._game_btn.setIconSize(scaled.size())
-        elif cache_key.startswith(f"{gsn}/exe/"):
-            # Update matching ComboBox icon
-            exe_name = cache_key.split("/exe/", 1)[1]
-            for i, exe in enumerate(self._executables):
-                binary = exe.get("binary", "")
-                if binary and Path(binary).name == exe_name:
-                    self._exe_combo.setItemIcon(i, QIcon(pixmap.scaled(
-                        QSize(24, 24),
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )))
-                    break
 
     # ── Internal helpers ──────────────────────────────────────────────
 
