@@ -346,47 +346,34 @@ class GamePanel(QWidget):
         self._executables.clear()
         self._selected_exe_index = 0
 
-        # First entry: <Bearbeiten...>
+        # 1. <Bearbeiten...> — kein Icon, disabled
         edit_action = self._exe_menu.addAction("<Bearbeiten...>")
-        edit_action.triggered.connect(self._on_exe_edit)
+        edit_action.setEnabled(False)
         self._exe_menu.addSeparator()
 
-        # Game icon (small, for main game entries)
+        # Game icon (24x24) for main entries
         game_icon = self._get_small_game_icon()
 
         if game_plugin is not None:
-            plugin_exes = game_plugin.executables()
-            game_name = game_plugin.GameName if hasattr(game_plugin, "GameName") else ""
-
-            for exe in plugin_exes:
+            for exe in game_plugin.executables():
                 name = exe.get("name", "")
                 binary = exe.get("binary", "")
                 if not name:
                     continue
                 idx = len(self._executables)
-                icon = self._get_exe_icon(binary, game_icon)
+                # REDmod bekommt Platzhalter, alle anderen das Game-Icon
+                if "redmod" in binary.lower() and "prelauncher" not in binary.lower():
+                    icon = self._placeholder_icon()
+                else:
+                    icon = game_icon
                 action = self._exe_menu.addAction(icon, name)
                 action.triggered.connect(lambda checked, i=idx: self._on_exe_selected(i))
                 self._executables.append({"name": name, "binary": binary})
 
-            # Static MO2 entries: "skip REDmod deploy", "Manually deploy REDmod"
-            if game_name and any("redmod" in e.get("binary", "").lower() for e in plugin_exes):
-                idx = len(self._executables)
-                action = self._exe_menu.addAction(game_icon, f"{game_name} - skip REDmod deploy")
-                action.triggered.connect(lambda checked, i=idx: self._on_exe_selected(i))
-                # Same binary as main game, but flag for skip
-                main_binary = plugin_exes[0].get("binary", "") if plugin_exes else ""
-                self._executables.append({"name": f"{game_name} - skip REDmod deploy", "binary": main_binary})
-
-                idx = len(self._executables)
-                action = self._exe_menu.addAction(self._placeholder_icon(), "Manually deploy REDmod")
-                action.setEnabled(False)  # Platzhalter, noch nicht implementiert
-                self._executables.append({"name": "Manually deploy REDmod", "binary": ""})
-
             # Explore Virtual Folder
             self._exe_menu.addSeparator()
             explore_action = self._exe_menu.addAction(
-                self.style().standardIcon(self.style().StandardPixmap.SP_DirOpenIcon),
+                self.style().standardIcon(self.style().StandardPixmap.SP_DirIcon),
                 "Explore Virtual Folder",
             )
             explore_action.triggered.connect(self._on_explore_virtual_folder)
@@ -408,20 +395,6 @@ class GamePanel(QWidget):
                 ))
         return self._placeholder_icon()
 
-    def _get_exe_icon(self, binary: str, fallback: QIcon) -> QIcon:
-        """Return executable icon from IconManager, or fallback."""
-        if self._icon_manager and self._current_short_name and binary:
-            icon_pix = self._icon_manager.get_executable_icon(
-                self._current_short_name, binary,
-            )
-            if icon_pix is not None:
-                return QIcon(icon_pix.scaled(
-                    QSize(24, 24),
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                ))
-        return fallback
-
     @staticmethod
     def _placeholder_icon() -> QIcon:
         """Small grey placeholder icon."""
@@ -430,20 +403,16 @@ class GamePanel(QWidget):
         return QIcon(pix)
 
     def _on_explore_virtual_folder(self) -> None:
-        """Open the game directory in the file manager."""
-        if self._current_game_path and self._current_game_path.is_dir():
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._current_game_path)))
+        """Open the .mods/ directory in the file manager."""
+        mods_path = getattr(self, "_mods_path", None)
+        if mods_path and mods_path.is_dir():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(mods_path)))
 
     def _on_exe_selected(self, index: int) -> None:
         """Handle executable selection from the menu."""
         self._selected_exe_index = index
         name = self._executables[index]["name"]
         self._start_btn.setToolTip(f"Starten: {name}")
-
-    def _on_exe_edit(self) -> None:
-        """Open the Executables dialog."""
-        from anvil.widgets.executables_dialog import ExecutablesDialog
-        ExecutablesDialog(self.window()).exec()
 
     def _on_start_clicked(self) -> None:
         """Start the currently selected executable."""
@@ -456,6 +425,16 @@ class GamePanel(QWidget):
         if not binary:
             return
 
+        # Steam-Launch für das Hauptspiel (erster Eintrag mit SteamId)
+        plugin = self._current_plugin
+        if plugin and hasattr(plugin, "GameSteamId") and plugin.GameSteamId:
+            # Hauptspiel (GameBinary) → über Steam starten
+            if hasattr(plugin, "GameBinary") and binary == plugin.GameBinary:
+                steam_url = f"steam://rungameid/{plugin.GameSteamId}"
+                QDesktopServices.openUrl(QUrl(steam_url))
+                return
+
+        # Direkter Start für alle anderen Executables
         game_path = self._current_game_path
         if game_path is None:
             QMessageBox.warning(
