@@ -1,4 +1,4 @@
-"""Statusbar — MO2-Kopie: #3D3D3D, Instanz-Info links, ▲ Benachrichtigungen | API rechts."""
+"""Statusbar — MO2-Kopie: Instanz-Info links, Benachrichtigungen + API rechts."""
 
 from __future__ import annotations
 
@@ -10,10 +10,15 @@ class StatusBarWidget(QStatusBar):
         super().__init__(parent)
         self._left_label = QLabel("")
         self.addWidget(self._left_label, 1)
-        self._right_label = QLabel(
-            "\u25b2 Benachrichtigungen | API: Queued: 0 | Daily: 20000 | Hourly: 500"
+
+        self._notifications_label = QLabel("\u25b2 Benachrichtigungen")
+        self.addPermanentWidget(self._notifications_label)
+
+        self._api_label = QLabel("API: not logged in")
+        self._api_label.setStyleSheet(
+            "QLabel { padding: 2px 6px; }"
         )
-        self.addPermanentWidget(self._right_label)
+        self.addPermanentWidget(self._api_label)
 
     def update_instance(
         self,
@@ -30,3 +35,39 @@ class StatusBarWidget(QStatusBar):
     def clear_instance(self) -> None:
         """Clear the instance info."""
         self._left_label.setText("Keine Instanz ausgewählt")
+
+    def update_api_status(
+        self,
+        daily_remaining: int = -1,
+        hourly_remaining: int = -1,
+        queued: int = 0,
+        logged_in: bool = True,
+    ) -> None:
+        """Update the API rate limit display (MO2 style with color coding).
+
+        Color scheme (from MO2 statusbar.cpp):
+        - Green: remaining > 500
+        - Yellow: 200..500
+        - Red: < 200
+        """
+        if not logged_in or (daily_remaining < 0 and hourly_remaining < 0):
+            self._api_label.setText("API: not logged in")
+            self._api_label.setStyleSheet("QLabel { padding: 2px 6px; }")
+            return
+
+        text = f"API  Queued: {queued} | Daily: {daily_remaining} | Hourly: {hourly_remaining}"
+        self._api_label.setText(text)
+
+        remaining = min(
+            daily_remaining if daily_remaining >= 0 else 999999,
+            hourly_remaining if hourly_remaining >= 0 else 999999,
+        )
+
+        if remaining >= 500:
+            style = "QLabel { padding: 2px 6px; background-color: darkgreen; color: white; }"
+        elif remaining > 200:
+            style = "QLabel { padding: 2px 6px; background-color: rgb(226, 192, 0); color: black; }"
+        else:
+            style = "QLabel { padding: 2px 6px; background-color: darkred; color: white; }"
+
+        self._api_label.setStyleSheet(style)

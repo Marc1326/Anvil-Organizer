@@ -128,8 +128,10 @@ class MainWindow(QMainWindow):
         saved_key = self._settings().value("nexus/api_key", "")
         if saved_key:
             self._nexus_api.set_api_key(saved_key)
+            self._status_bar.update_api_status(logged_in=True)
         self._nexus_api.request_finished.connect(self._on_nexus_response)
         self._nexus_api.request_error.connect(self._on_nexus_error)
+        self._nexus_api.rate_limit_updated.connect(self._update_api_status)
 
         # ── Mod state ─────────────────────────────────────────────────
         self._current_mod_entries = []
@@ -1362,6 +1364,15 @@ class MainWindow(QMainWindow):
     def _on_nexus_error(self, tag: str, message: str) -> None:
         """Handle Nexus API errors."""
         self.statusBar().showMessage(f"Nexus Fehler: {message}", 5000)
+
+    def _update_api_status(self, daily: int, hourly: int) -> None:
+        """Update status bar API rate limit display (MO2 style)."""
+        self._status_bar.update_api_status(
+            daily_remaining=daily,
+            hourly_remaining=hourly,
+            queued=0,
+            logged_in=self._nexus_api.has_api_key(),
+        )
 
     def handle_nxm_url(self, url: str) -> None:
         """Public method to handle an nxm:// URL string.
