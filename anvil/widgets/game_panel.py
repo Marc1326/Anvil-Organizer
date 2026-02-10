@@ -33,6 +33,7 @@ from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl, QMimeData
 
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.mod_deployer import ModDeployer
+from anvil.core.download_manager import DownloadManager
 
 
 def _todo(name):
@@ -273,6 +274,15 @@ class GamePanel(QWidget):
         self._deployer: ModDeployer | None = None
         # Map row index → archive Path for installation
         self._dl_archives: list[Path] = []
+
+        # Download manager for active Nexus downloads
+        self._download_manager = DownloadManager(self)
+        self._download_manager.download_started.connect(self._on_dm_started)
+        self._download_manager.download_progress.connect(self._on_dm_progress)
+        self._download_manager.download_finished.connect(self._on_dm_finished)
+        self._download_manager.download_error.connect(self._on_dm_error)
+        # Track active download rows: download_id → dl_table row
+        self._active_dl_rows: dict[int, int] = {}
 
     # ── Public API ────────────────────────────────────────────────────
 
@@ -789,3 +799,82 @@ class GamePanel(QWidget):
             self._bulk_delete_by_status("Nicht installiert")
         elif chosen == act_del_all:
             self._bulk_delete_by_status(None)
+
+    # ── Download manager integration ──────────────────────────────────
+
+    def download_manager(self) -> DownloadManager:
+        """Return the DownloadManager instance."""
+        return self._download_manager
+
+    def _on_dm_started(self, download_id: int) -> None:
+        """Insert a new row at the top of the downloads table for an active download."""
+        task = self._download_manager.get_task(download_id)
+        if not task:
+            return
+
+        self._dl_table.setSortingEnabled(False)
+        row = 0
+        self._dl_table.insertRow(row)
+
+        item_name = QTableWidgetItem(task.file_name)
+        item_name.setData(Qt.ItemDataRole.UserRole, str(task.save_path))
+        self._dl_table.setItem(row, 0, item_name)
+
+        item_size = QTableWidgetItem("—")
+        item_size.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._dl_table.setItem(row, 1, item_size)
+
+        item_status = QTableWidgetItem("Downloading...")
+        item_status.setForeground(QColor("#42A5F5"))
+        self._dl_table.setItem(row, 2, item_status)
+
+        self._dl_table.setItem(row, 3, QTableWidgetItem("—"))
+
+        # Shift existing active row mappings down
+        new_map = {}
+        for did, r in self._active_dl_rows.items():
+            new_map[did] = r + 1
+        self._active_dl_rows = new_map
+        self._active_dl_rows[download_id] = row
+        self._dl_table.setSortingEnabled(True)
+
+    def _on_dm_progress(self, download_id: int, percent: float, speed_str: str) -> None:
+        """Update progress for an active download row."""
+        row = self._active_dl_rows.get(download_id)
+        if row is None:
+            return
+        task = self._download_manager.get_task(download_id)
+        if not task:
+            return
+
+        status_item = self._dl_table.item(row, 2)
+        if status_item:
+            status_item.setText(f"{percent:.0f}% — {speed_str}")
+
+        size_item = self._dl_table.item(row, 1)
+        if size_item and task.bytes_total > 0:
+            size_item.setText(self._format_size(task.bytes_total))
+
+    def _on_dm_finished(self, download_id: int, save_path: str) -> None:
+        """Mark a download as finished and refresh the downloads table."""
+        row = self._active_dl_rows.pop(download_id, None)
+        if row is not None:
+            status_item = self._dl_table.item(row, 2)
+            if status_item:
+                status_item.setText("Nicht installiert")
+                status_item.setForeground(QColor("#FFFFFF"))
+
+            # Update date column
+            from datetime import datetime
+            date_item = self._dl_table.item(row, 3)
+            if date_item:
+                date_item.setText(datetime.now().strftime("%Y-%m-%d %H:%M"))
+
+    def _on_dm_error(self, download_id: int, message: str) -> None:
+        """Mark a download as failed."""
+        row = self._active_dl_rows.pop(download_id, None)
+        if row is not None:
+            status_item = self._dl_table.item(row, 2)
+            if status_item:
+                status_item.setText(f"Fehler: {message}")
+                status_item.setForeground(QColor("#F44336"))
