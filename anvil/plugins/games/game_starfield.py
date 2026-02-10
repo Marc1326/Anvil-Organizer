@@ -28,6 +28,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from anvil.plugins.base_game import BaseGame
+from anvil.plugins.framework_mod import FrameworkMod
 
 
 class StarfieldGame(BaseGame):
@@ -176,6 +177,19 @@ class StarfieldGame(BaseGame):
         if self._game_path is None:
             return False
         return (self._game_path / self._SFSE_BINARY).exists()
+
+    def get_framework_mods(self) -> list[FrameworkMod]:
+        """Return known framework mods for Starfield."""
+        return [
+            FrameworkMod(
+                name="SFSE",
+                pattern=["sfse_loader.exe", "sfse_1_0_0.dll"],
+                target="",
+                description="Starfield Script Extender — erweitert die Scripting-Engine",
+                detect_installed=["sfse_loader.exe"],
+                required_by=["SFSE-Plugins"],
+            ),
+        ]
 
     # TODO: plugins.txt Parser/Writer -- Load-Order verwalten
     # TODO: .esp/.esm Scanner -- Mod-Dateien erkennen

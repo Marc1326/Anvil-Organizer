@@ -24,6 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from anvil.plugins.base_game import BaseGame
+from anvil.plugins.framework_mod import FrameworkMod
 from anvil.plugins.games.bg3_mod_handler import (
     BG3ScriptExtender,
     ModsettingsParser,
@@ -222,6 +223,19 @@ class BaldursGate3Game(BaseGame):
         pak_mods = self.scan_mods()
         mod_list = self.read_mod_list()
         return find_unregistered_mods(pak_mods, mod_list["mods"])
+
+    def get_framework_mods(self) -> list[FrameworkMod]:
+        """Return known framework mods for Baldur's Gate 3."""
+        return [
+            FrameworkMod(
+                name="BG3 Script Extender",
+                pattern=["DWrite.dll"],
+                target="bin/",
+                description="Script Extender fuer BG3 (Native Mod Support)",
+                detect_installed=["bin/DWrite.dll"],
+                required_by=["SE-Mods", "Native Mods"],
+            ),
+        ]
 
     def executables(self) -> list[dict[str, str]]:
         """Return executable definitions for Baldur's Gate 3.

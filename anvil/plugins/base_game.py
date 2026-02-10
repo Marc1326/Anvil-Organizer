@@ -13,6 +13,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from anvil.plugins.framework_mod import FrameworkMod
+
 
 def _as_list(value: Any) -> list:
     """Normalize a scalar or list value into a list.
@@ -218,6 +220,53 @@ class BaseGame:
         Subclasses can override this to provide a custom icon.
         """
         return None
+
+    # ── Framework-Mod-Erkennung ──────────────────────────────────────
+
+    def get_framework_mods(self) -> list[FrameworkMod]:
+        """Return the list of known framework mods for this game.
+
+        Subclasses override this to declare their framework mods.
+        Default: empty list.
+        """
+        return []
+
+    def is_framework_mod(self, archive_contents: list[str]) -> FrameworkMod | None:
+        """Check if an archive contains a known framework mod.
+
+        Compares the file paths in *archive_contents* against the
+        patterns declared by ``get_framework_mods()``.  Returns the
+        first matching FrameworkMod, or None.
+
+        Args:
+            archive_contents: List of file paths inside the archive
+                              (e.g. from zipfile.namelist()).
+        """
+        lower_contents = [f.lower().replace("\\", "/") for f in archive_contents]
+        for fw in self.get_framework_mods():
+            for pattern in fw.pattern:
+                pat = pattern.lower().replace("\\", "/")
+                if any(pat in entry for entry in lower_contents):
+                    return fw
+        return None
+
+    def get_installed_frameworks(self) -> list[tuple[FrameworkMod, bool]]:
+        """Check which framework mods are installed in the game directory.
+
+        Returns a list of (FrameworkMod, is_installed) tuples.
+        A framework is considered installed if *any* of its
+        ``detect_installed`` paths exist in the game directory.
+        """
+        result: list[tuple[FrameworkMod, bool]] = []
+        for fw in self.get_framework_mods():
+            installed = False
+            if self._game_path is not None:
+                for det_path in fw.detect_installed:
+                    if (self._game_path / det_path).exists():
+                        installed = True
+                        break
+            result.append((fw, installed))
+        return result
 
     # ── Override-Punkte (Subklassen können diese überschreiben) ───────
 

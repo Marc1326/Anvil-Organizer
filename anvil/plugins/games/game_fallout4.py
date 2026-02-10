@@ -27,6 +27,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from anvil.plugins.base_game import BaseGame
+from anvil.plugins.framework_mod import FrameworkMod
 
 
 class Fallout4Game(BaseGame):
@@ -165,6 +166,19 @@ class Fallout4Game(BaseGame):
         if self._game_path is None:
             return False
         return (self._game_path / self._F4SE_BINARY).exists()
+
+    def get_framework_mods(self) -> list[FrameworkMod]:
+        """Return known framework mods for Fallout 4."""
+        return [
+            FrameworkMod(
+                name="F4SE",
+                pattern=["f4se_loader.exe", "f4se_1_10_163.dll"],
+                target="",
+                description="Fallout 4 Script Extender — erweitert die Scripting-Engine",
+                detect_installed=["f4se_loader.exe"],
+                required_by=["F4SE-Plugins", "MCM", "Looksmenu"],
+            ),
+        ]
 
     # TODO: plugins.txt Parser/Writer -- Load-Order verwalten
     # TODO: .esp/.esm Scanner -- Mod-Dateien erkennen
