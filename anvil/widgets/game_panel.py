@@ -351,8 +351,9 @@ class GamePanel(QWidget):
         edit_action.setEnabled(False)
         self._exe_menu.addSeparator()
 
-        # Game icon (24x24) for main entries
-        game_icon = self._get_small_game_icon()
+        # Cover Art (game_wide.jpg) für Spiel-Einträge, Red Bird (game.png) für REDmod/REDprelauncher
+        cover_icon = self._get_small_game_icon()
+        redmod_icon = self._get_small_redmod_icon()
 
         if game_plugin is not None:
             game_name = game_plugin.GameName if hasattr(game_plugin, "GameName") else ""
@@ -363,18 +364,18 @@ class GamePanel(QWidget):
                 if not name:
                     continue
                 idx = len(self._executables)
-                # REDmod → Platzhalter, alle anderen → Game-Icon
-                if "redmod" in binary.lower() and "prelauncher" not in binary.lower():
-                    icon = self._placeholder_icon()
+                # REDprelauncher / REDmod → Red Bird (game.png), Spiel → Cover Art
+                if "prelauncher" in binary.lower() or "redmod" in binary.lower():
+                    icon = redmod_icon
                 else:
-                    icon = game_icon
+                    icon = cover_icon
                 action = self._exe_menu.addAction(icon, name)
                 action.triggered.connect(lambda checked, i=idx: self._on_exe_selected(i))
                 self._executables.append({"name": name, "binary": binary})
 
             # Disabled-Platzhalter: "skip REDmod deploy", "Manually deploy REDmod"
             if game_name:
-                skip_action = self._exe_menu.addAction(game_icon, f"{game_name} - skip REDmod deploy")
+                skip_action = self._exe_menu.addAction(cover_icon, f"{game_name} - skip REDmod deploy")
                 skip_action.setEnabled(False)
                 deploy_action = self._exe_menu.addAction("Manually deploy REDmod")
                 deploy_action.setEnabled(False)
@@ -393,7 +394,19 @@ class GamePanel(QWidget):
             self._start_btn.setToolTip(f"Starten: {self._executables[0]['name']}")
 
     def _get_small_game_icon(self) -> QIcon:
-        """Return small (24x24) game icon, or placeholder."""
+        """Return small (24x24) game banner icon (cover art), or placeholder."""
+        if self._icon_manager and self._current_short_name:
+            pix = self._icon_manager.get_game_banner(self._current_short_name)
+            if pix is not None:
+                return QIcon(pix.scaled(
+                    QSize(24, 24),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                ))
+        return self._placeholder_icon()
+
+    def _get_small_redmod_icon(self) -> QIcon:
+        """Return small (24x24) game icon (game.png / Red Bird), or placeholder."""
         if self._icon_manager and self._current_short_name:
             pix = self._icon_manager.get_game_icon(self._current_short_name)
             if pix is not None:
