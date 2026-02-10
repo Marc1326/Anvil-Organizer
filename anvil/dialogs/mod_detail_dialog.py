@@ -20,12 +20,16 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QLineEdit,
     QTreeView,
+    QTreeWidget,
+    QTreeWidgetItem,
     QAbstractItemView,
     QHeaderView,
     QFileSystemModel,
 )
 from PySide6.QtCore import Qt, QRect, QSize, QTimer, QDir
 from PySide6.QtGui import QPainter, QColor, QFont, QFontDatabase, QIcon
+
+from anvil.core.conflict_scanner import ConflictScanner
 
 _MOD_DETAIL_DIALOG_STYLE = """
 QDialog, QWidget { background: #1C1C1C; color: #D3D3D3; border: none; }
@@ -102,6 +106,24 @@ QLabel { color: #D3D3D3; }
 #filetreeView::branch:has-children:closed { image: none; }
 #filetreeView::branch:has-children:open { image: none; }
 #filetreeView QHeaderView::section {
+    background: #242424;
+    color: #D3D3D3;
+    border: 1px solid #3D3D3D;
+    padding: 4px 8px;
+}
+
+/* Konflikte-Tab */
+#conflictTree {
+    background: #1C1C1C;
+    color: #D3D3D3;
+    border: 1px solid #3D3D3D;
+    border-radius: 2px;
+    alternate-background-color: #222222;
+}
+#conflictTree::item { padding: 2px 0; }
+#conflictTree::item:selected { background: #3D3D3D; }
+#conflictTree::item:hover:!selected { background: #2A2A2A; }
+#conflictTree QHeaderView::section {
     background: #242424;
     color: #D3D3D3;
     border: 1px solid #3D3D3D;
@@ -420,8 +442,119 @@ def _build_filetree_tab(mod_path: str):
     return page
 
 
+def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
+    """Konflikte-Tab wie MO2: Gewinnt/Verliert-Bereiche mit ConflictScanner.
+
+    Based on MO2's modinfodialogconflicts.cpp — two QTreeWidgets
+    (Overwrite / Overwritten) with file path and competing mod name.
+    """
+    page = QWidget()
+    page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(6)
+
+    # Fallback: keine Mod-Daten verfügbar
+    if not all_mods or not mod_name:
+        layout.addWidget(QLabel("Konflikterkennung nicht verfügbar."))
+        layout.addStretch()
+        return page
+
+    # ConflictScanner ausführen
+    scanner = ConflictScanner()
+    result = scanner.scan_conflicts(all_mods, game_plugin)
+
+    # Konflikte filtern die DIESE Mod betreffen
+    wins = []   # Dateien die diese Mod gewinnt
+    losses = []  # Dateien die diese Mod verliert
+    for conflict in result["conflicts"]:
+        if mod_name not in conflict["mods"]:
+            continue
+        if conflict["winner"] == mod_name:
+            # Diese Mod gewinnt — zeige welche Mods überschrieben werden
+            losers = [m for m in conflict["mods"] if m != mod_name]
+            wins.append({"file": conflict["file"], "mods": losers})
+        else:
+            # Diese Mod verliert — zeige wer gewinnt
+            losses.append({"file": conflict["file"], "winner": conflict["winner"]})
+
+    # Keine Konflikte
+    if not wins and not losses:
+        no_conflict = QLabel("Keine Konflikte gefunden")
+        no_conflict.setStyleSheet("color: #4CAF50; font-size: 14px; padding: 20px;")
+        no_conflict.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(no_conflict)
+        layout.addStretch()
+        ignored_count = len(result["ignored"])
+        if ignored_count > 0:
+            info = QLabel(f"{ignored_count} harmlose Übereinstimmungen ignoriert")
+            info.setStyleSheet("color: #808080; font-size: 11px;")
+            info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(info)
+        return page
+
+    # --- Gewinnt Konflikte (oben) ---
+    win_label = QLabel(f"Gewinnt Konflikte: ({len(wins)})")
+    win_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 12px;")
+    layout.addWidget(win_label)
+
+    win_tree = QTreeWidget()
+    win_tree.setObjectName("conflictTree")
+    win_tree.setHeaderLabels(["Datei", "Überschreibt Mod"])
+    win_tree.setColumnCount(2)
+    win_tree.setAlternatingRowColors(True)
+    win_tree.setRootIsDecorated(False)
+    win_tree.setSortingEnabled(True)
+    win_tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+    for entry in wins:
+        item = QTreeWidgetItem([entry["file"], ", ".join(entry["mods"])])
+        item.setForeground(0, QColor("#4CAF50"))
+        win_tree.addTopLevelItem(item)
+    header = win_tree.header()
+    header.setStretchLastSection(True)
+    header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+    win_tree.setColumnWidth(0, 500)
+    layout.addWidget(win_tree, 1)
+
+    # --- Verliert Konflikte (unten) ---
+    lose_label = QLabel(f"Verliert Konflikte: ({len(losses)})")
+    lose_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12px;")
+    layout.addWidget(lose_label)
+
+    lose_tree = QTreeWidget()
+    lose_tree.setObjectName("conflictTree")
+    lose_tree.setHeaderLabels(["Datei", "Überschrieben von Mod"])
+    lose_tree.setColumnCount(2)
+    lose_tree.setAlternatingRowColors(True)
+    lose_tree.setRootIsDecorated(False)
+    lose_tree.setSortingEnabled(True)
+    lose_tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+    for entry in losses:
+        item = QTreeWidgetItem([entry["file"], entry["winner"]])
+        item.setForeground(0, QColor("#F44336"))
+        lose_tree.addTopLevelItem(item)
+    header = lose_tree.header()
+    header.setStretchLastSection(True)
+    header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+    lose_tree.setColumnWidth(0, 500)
+    layout.addWidget(lose_tree, 1)
+
+    # --- Info-Zeile ---
+    total = len(wins) + len(losses)
+    ignored = len(result["ignored"])
+    info_text = f"{total} Konflikte"
+    if ignored > 0:
+        info_text += f", {ignored} ignoriert"
+    info = QLabel(info_text)
+    info.setStyleSheet("color: #808080; font-size: 11px;")
+    layout.addWidget(info)
+
+    return page
+
+
 class ModDetailDialog(QDialog):
-    def __init__(self, parent=None, mod_name="", mod_path=""):
+    def __init__(self, parent=None, mod_name="", mod_path="",
+                 all_mods=None, game_plugin=None):
         super().__init__(parent)
         self.setWindowTitle(mod_name or "Mod-Details")
         self.setMinimumSize(1280, 720)
@@ -436,15 +569,27 @@ class ModDetailDialog(QDialog):
 
         self.tab_widget.addTab(_build_textfiles_tab(), "Textdateien")
 
-        tab_labels = [
+        pre_conflict_tabs = [
             ("INI Dateien", "Platzhalter – INI Dateien"),
             ("Bilder", "Platzhalter – Bilder"),
             ("Optionale ESPs", "Platzhalter – Optionale ESPs"),
-            ("Konflikte", "Platzhalter – Konflikte"),
+        ]
+        for tab_name, placeholder_text in pre_conflict_tabs:
+            page = QWidget()
+            page_layout = QVBoxLayout(page)
+            page_layout.addWidget(QLabel(placeholder_text))
+            self.tab_widget.addTab(page, tab_name)
+
+        # Konflikte-Tab (wie MO2: ConflictsTab)
+        self.tab_widget.addTab(
+            _build_conflicts_tab(mod_name, all_mods, game_plugin), "Konflikte",
+        )
+
+        post_conflict_tabs = [
             ("Kategorien", "Platzhalter – Kategorien"),
             ("Nexus Info", "Platzhalter – Nexus Info"),
         ]
-        for tab_name, placeholder_text in tab_labels:
+        for tab_name, placeholder_text in post_conflict_tabs:
             page = QWidget()
             page_layout = QVBoxLayout(page)
             page_layout.addWidget(QLabel(placeholder_text))
