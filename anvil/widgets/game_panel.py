@@ -13,13 +13,13 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QToolButton,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
     QCheckBox,
     QLineEdit,
+    QComboBox,
     QMenu,
     QFrame,
     QTreeWidget,
@@ -108,31 +108,27 @@ class GamePanel(QWidget):
         link_btn_row.addWidget(link_btn)
         top_layout.addLayout(link_btn_row)
 
-        # Game-Icon (Banner) mit Executable-Dropdown
-        pix = QPixmap(200, 200)
-        pix.fill(QColor("#242424"))
-        self._game_btn = QToolButton(self)
-        self._game_btn.setIcon(QIcon(pix))
-        self._game_btn.setIconSize(QSize(200, 200))
-        self._game_btn.setFixedSize(200, 200)
-        self._game_btn.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
-        self._exe_menu = QMenu(self)
-        self._exe_menu.addAction("(Kein Spiel geladen)")
-        self._game_btn.setMenu(self._exe_menu)
-        self._game_btn.setStyleSheet(
-            "QToolButton { background: #242424; border: 2px solid #3D3D3D; border-radius: 4px;"
-            "             padding: 0; margin: 0; }"
-            "QToolButton:hover { background: #2a2a2a; }"
-            "QToolButton::menu-button { background: #3D3D3D; border: none;"
-            "                           border-top-right-radius: 4px; border-bottom-right-radius: 4px;"
-            "                           width: 20px; }"
-            "QToolButton::menu-button:hover { background: #006868; }"
-            "QToolButton::menu-arrow { subcontrol-position: center; }"
+        # Game-Icon (Banner) — reines Anzeige-Element
+        self._game_icon = QLabel()
+        self._game_icon.setFixedSize(140, 140)
+        self._game_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._game_icon.setStyleSheet(
+            "background: #242424; border: 2px solid #3D3D3D; border-radius: 4px;"
         )
-        top_layout.addWidget(self._game_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        pix = QPixmap(140, 140)
+        pix.fill(QColor("#242424"))
+        self._game_icon.setPixmap(pix)
+        top_layout.addWidget(self._game_icon, 0, Qt.AlignmentFlag.AlignHCenter)
+
         self._game_label = QLabel("Kein Spiel ausgewählt")
         self._game_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         top_layout.addWidget(self._game_label)
+
+        # Executable-ComboBox (wie MO2: executablesListBox)
+        self._exe_combo = QComboBox()
+        self._exe_combo.setMinimumWidth(180)
+        self._exe_combo.currentIndexChanged.connect(self._on_exe_changed)
+        top_layout.addWidget(self._exe_combo)
 
         # Start-Button
         self._start_btn = QPushButton()
@@ -149,7 +145,6 @@ class GamePanel(QWidget):
 
         # Executables data: list of {"name", "binary"} dicts
         self._executables: list[dict[str, str]] = []
-        self._selected_exe_index: int = 0
 
         layout.addWidget(top_frame)
 
@@ -295,8 +290,8 @@ class GamePanel(QWidget):
         # Update game button icon (banner or placeholder)
         self._update_game_button_icon(game_name)
 
-        # Rebuild executables menu (in game button dropdown)
-        self._rebuild_executables_menu(game_plugin)
+        # Rebuild executables ComboBox (with icons)
+        self._rebuild_executables_combo(game_plugin)
 
         # Update data tree with real directory contents
         self._populate_data_tree(game_path)
@@ -306,8 +301,8 @@ class GamePanel(QWidget):
     # ── Internal helpers ──────────────────────────────────────────────
 
     def _update_game_button_icon(self, game_name: str) -> None:
-        """Set the game button to the cached banner or a placeholder."""
-        size = 200
+        """Set the game icon label to the cached banner or a placeholder."""
+        size = 140
         banner = None
         if self._icon_manager and self._current_short_name:
             banner = self._icon_manager.get_game_banner(self._current_short_name)
@@ -318,8 +313,7 @@ class GamePanel(QWidget):
                 Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
-            self._game_btn.setIcon(QIcon(scaled))
-            self._game_btn.setIconSize(QSize(size, size))
+            self._game_icon.setPixmap(scaled)
         else:
             # Placeholder: grey box with game name
             pix = QPixmap(size, size)
@@ -332,14 +326,17 @@ class GamePanel(QWidget):
                 p.setFont(f)
                 p.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, game_name)
                 p.end()
-            self._game_btn.setIcon(QIcon(pix))
-            self._game_btn.setIconSize(QSize(size, size))
+            self._game_icon.setPixmap(pix)
 
-    def _rebuild_executables_menu(self, game_plugin) -> None:
-        """Rebuild the executable menu in the game button dropdown."""
-        self._exe_menu.clear()
+    def _rebuild_executables_combo(self, game_plugin) -> None:
+        """Rebuild the executable ComboBox with entries from the game plugin."""
+        self._exe_combo.blockSignals(True)
+        self._exe_combo.clear()
         self._executables.clear()
-        self._selected_exe_index = 0
+
+        # First entry: <Bearbeiten...> (opens Executables dialog)
+        self._exe_combo.addItem("<Bearbeiten...>")
+        self._executables.append({"name": "<Bearbeiten...>", "binary": ""})
 
         if game_plugin is not None:
             for exe in game_plugin.executables():
@@ -347,7 +344,6 @@ class GamePanel(QWidget):
                 binary = exe.get("binary", "")
                 if not name:
                     continue
-                idx = len(self._executables)
                 # Try to get icon for this executable
                 icon = QIcon()
                 if self._icon_manager and self._current_short_name and binary:
@@ -360,35 +356,28 @@ class GamePanel(QWidget):
                             Qt.AspectRatioMode.KeepAspectRatio,
                             Qt.TransformationMode.SmoothTransformation,
                         ))
-                action = self._exe_menu.addAction(icon, name)
-                action.triggered.connect(lambda checked, i=idx: self._on_exe_selected(i))
+                self._exe_combo.addItem(icon, name)
                 self._executables.append({"name": name, "binary": binary})
 
-            self._exe_menu.addSeparator()
+        # Select first real executable (index 1) if available
+        if self._exe_combo.count() > 1:
+            self._exe_combo.setCurrentIndex(1)
+        self._exe_combo.blockSignals(False)
 
-        edit_action = self._exe_menu.addAction("<Bearbeiten...>")
-        edit_action.triggered.connect(self._on_exe_edit)
-
-        # Select first executable by default
-        if self._executables:
-            self._selected_exe_index = 0
-            self._start_btn.setToolTip(f"Starten: {self._executables[0]['name']}")
-
-    def _on_exe_selected(self, index: int) -> None:
-        """Handle executable selection from the dropdown menu."""
-        self._selected_exe_index = index
-        name = self._executables[index]["name"]
-        self._start_btn.setToolTip(f"Starten: {name}")
-
-    def _on_exe_edit(self) -> None:
-        """Open the Executables dialog."""
-        from anvil.widgets.executables_dialog import ExecutablesDialog
-        ExecutablesDialog(self.window()).exec()
+    def _on_exe_changed(self, index: int) -> None:
+        """Handle executable ComboBox selection change."""
+        if index == 0 and self._exe_combo.count() > 1:
+            # "<Bearbeiten...>" selected → open Executables dialog, revert selection
+            from anvil.widgets.executables_dialog import ExecutablesDialog
+            ExecutablesDialog(self.window()).exec()
+            self._exe_combo.blockSignals(True)
+            self._exe_combo.setCurrentIndex(1)
+            self._exe_combo.blockSignals(False)
 
     def _on_start_clicked(self) -> None:
         """Start the currently selected executable."""
-        idx = self._selected_exe_index
-        if idx < 0 or idx >= len(self._executables):
+        idx = self._exe_combo.currentIndex()
+        if idx <= 0 or idx >= len(self._executables):
             return
 
         exe = self._executables[idx]
