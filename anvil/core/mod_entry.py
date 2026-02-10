@@ -40,8 +40,9 @@ class ModEntry:
     url: str = ""
     install_date: str = ""                 # ISO format
 
-    # Separator
+    # Special types
     is_separator: bool = False             # True for _separator dirs
+    is_direct_install: bool = False        # True for framework mods (copy, not symlink)
 
     # Computed from filesystem
     file_count: int = 0

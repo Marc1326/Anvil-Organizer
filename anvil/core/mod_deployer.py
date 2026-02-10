@@ -21,6 +21,7 @@ Safety rules:
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -39,6 +40,7 @@ class DeployResult:
     success: bool = True
     links_created: int = 0
     links_removed: int = 0
+    files_copied: int = 0
     dirs_created: int = 0
     dirs_removed: int = 0
     skipped_real_files: list[str] = field(default_factory=list)
@@ -57,12 +59,26 @@ class ModDeployer:
 
     MANIFEST_NAME = ".deploy_manifest.json"
 
-    def __init__(self, instance_path: Path, game_path: Path) -> None:
+    def __init__(
+        self,
+        instance_path: Path,
+        game_path: Path,
+        direct_install_patterns: list[str] | None = None,
+    ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
         self._mods_path = instance_path / ".mods"
         self._profile_path = instance_path / ".profiles" / "Default"
         self._manifest_path = instance_path / self.MANIFEST_NAME
+        self._direct_patterns = [p.lower() for p in (direct_install_patterns or [])]
+
+    def is_direct_install(self, mod_name: str) -> bool:
+        """Return True if *mod_name* matches a direct-install pattern.
+
+        Matching is case-insensitive and uses 'contains' logic.
+        """
+        lower = mod_name.lower()
+        return any(pat in lower for pat in self._direct_patterns)
 
     # ── Public API ─────────────────────────────────────────────────────
 
@@ -178,19 +194,37 @@ class ModDeployer:
                         )
                         continue
 
-                # Create symlink
-                try:
-                    target.symlink_to(src_file)
-                    result.links_created += 1
-                    symlinks.append({
-                        "link": str(rel),
-                        "target": str(src_file),
-                        "mod": mod_name,
-                    })
-                except OSError as exc:
-                    result.errors.append(
-                        f"symlink {rel} -> {src_file}: {exc}"
-                    )
+                # Direct-install mods: COPY instead of symlink
+                is_direct = self.is_direct_install(mod_name)
+
+                if is_direct:
+                    try:
+                        shutil.copy2(src_file, target)
+                        result.files_copied += 1
+                        symlinks.append({
+                            "link": str(rel),
+                            "target": str(src_file),
+                            "mod": mod_name,
+                            "type": "copy",
+                        })
+                    except OSError as exc:
+                        result.errors.append(
+                            f"copy {rel}: {exc}"
+                        )
+                else:
+                    try:
+                        target.symlink_to(src_file)
+                        result.links_created += 1
+                        symlinks.append({
+                            "link": str(rel),
+                            "target": str(src_file),
+                            "mod": mod_name,
+                            "type": "symlink",
+                        })
+                    except OSError as exc:
+                        result.errors.append(
+                            f"symlink {rel} -> {src_file}: {exc}"
+                        )
 
         # Save manifest
         manifest = {
@@ -240,10 +274,15 @@ class ModDeployer:
 
         game_path = Path(manifest.get("game_path", str(self._game_path)))
 
-        # Remove symlinks
+        # Remove symlinks (but NOT copied files from direct-install mods)
         for entry in manifest.get("symlinks", []):
             link_rel = entry.get("link", "")
             link_path = game_path / link_rel
+            deploy_type = entry.get("type", "symlink")
+
+            # Direct-install copies are intentionally left in place
+            if deploy_type == "copy":
+                continue
 
             if not link_path.is_symlink():
                 # Already gone or replaced by a real file — skip

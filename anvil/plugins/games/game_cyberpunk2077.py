@@ -50,6 +50,21 @@ class Cyberpunk2077Game(BaseGame):
     GameLauncher = "REDprelauncher.exe"
     GameLaunchArgs = ["--launcher-skip"]
 
+    GameDirectInstallMods = [
+        "TweakXL",
+        "ArchiveXL",
+        "CET",
+        "Cyber Engine Tweaks",
+        "CET 1.37.1 - Scripting fixes",
+        "Codeware",
+        "RED4ext",
+        "RedData",
+        "RedFileSystem",
+        "redscript",
+        "Native Settings UI",
+        "mod_settings",
+    ]
+
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()
     GameSavesDirectory = ""     # resolved dynamically via gameSavesDirectory()
     GameSaveExtension = "dat"
