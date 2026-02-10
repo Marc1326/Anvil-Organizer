@@ -44,6 +44,7 @@ from anvil.core.mod_list_io import (
 from anvil.core.categories import CategoryManager
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nxm_handler import parse_nxm_url, check_cli_for_nxm
+from anvil.core.conflict_scanner import ConflictScanner
 from anvil.models.mod_list_model import mod_entry_to_row
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 
@@ -606,7 +607,8 @@ class MainWindow(QMainWindow):
                 name_lower = (entry.display_name or entry.name).lower()
                 if any(pat in name_lower for pat in lp):
                     entry.is_direct_install = True
-        mod_rows = [mod_entry_to_row(e) for e in self._current_mod_entries]
+        conflict_data = self._compute_conflict_data()
+        mod_rows = [mod_entry_to_row(e, conflict_data) for e in self._current_mod_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._update_active_count()
 
@@ -659,11 +661,71 @@ class MainWindow(QMainWindow):
         self._current_mod_entries = new_entries
         self._write_current_modlist()
         self._update_active_count()
+        # Recompute conflict icons (priorities changed → winner may differ)
+        conflict_data = self._compute_conflict_data()
+        for row_data in model._rows:
+            folder = row_data.folder_name
+            row_data.conflicts = conflict_data.get(folder, "")
+        model.dataChanged.emit(
+            model.index(0, 0),
+            model.index(model.rowCount() - 1, model.columnCount() - 1),
+        )
 
     def _update_active_count(self) -> None:
         """Update the active mod counter in the profile bar."""
         count = sum(1 for e in self._current_mod_entries if e.enabled)
         self._profile_bar.update_active_count(count)
+
+    def _compute_conflict_data(self) -> dict:
+        """Run ConflictScanner and return per-mod conflict info.
+
+        Returns a dict mapping mod folder name to a conflict info dict:
+        ``{"type": "win"|"lose"|"both", "wins": N, "losses": N,
+           "win_mods": N, "lose_mods": N}``
+        """
+        if not self._current_instance_path or not self._current_mod_entries:
+            return {}
+        all_mods = [
+            {"name": e.name, "path": str(self._current_instance_path / ".mods" / e.name)}
+            for e in self._current_mod_entries if e.enabled
+        ]
+        if not all_mods:
+            return {}
+        result = ConflictScanner().scan_conflicts(all_mods, self._current_plugin)
+        # Build per-mod conflict counts
+        per_mod: dict[str, dict] = {}
+        for conflict in result["conflicts"]:
+            winner = conflict["winner"]
+            for mod_name in conflict["mods"]:
+                if mod_name not in per_mod:
+                    per_mod[mod_name] = {"wins": 0, "losses": 0, "win_mods": set(), "lose_mods": set()}
+                if mod_name == winner:
+                    per_mod[mod_name]["wins"] += 1
+                    for other in conflict["mods"]:
+                        if other != mod_name:
+                            per_mod[mod_name]["win_mods"].add(other)
+                else:
+                    per_mod[mod_name]["losses"] += 1
+                    per_mod[mod_name]["lose_mods"].add(winner)
+        # Convert sets to counts and determine type
+        result_data: dict[str, dict] = {}
+        for mod_name, info in per_mod.items():
+            wins = info["wins"]
+            losses = info["losses"]
+            if wins > 0 and losses > 0:
+                ctype = "both"
+            elif wins > 0:
+                ctype = "win"
+            else:
+                ctype = "lose"
+            result_data[mod_name] = {
+                "type": ctype,
+                "wins": wins,
+                "losses": losses,
+                "win_mods": len(info["win_mods"]),
+                "lose_mods": len(info["lose_mods"]),
+            }
+        return result_data
 
     # ── Mod installation ─────────────────────────────────────────────
 
@@ -773,7 +835,8 @@ class MainWindow(QMainWindow):
         self._current_mod_entries = scan_mods_directory(
             self._current_instance_path, self._current_profile_path,
         )
-        mod_rows = [mod_entry_to_row(e) for e in self._current_mod_entries]
+        conflict_data = self._compute_conflict_data()
+        mod_rows = [mod_entry_to_row(e, conflict_data) for e in self._current_mod_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._update_active_count()
 
@@ -1288,7 +1351,8 @@ class MainWindow(QMainWindow):
         self._current_mod_entries = scan_mods_directory(
             self._current_instance_path, self._current_profile_path,
         )
-        mod_rows = [mod_entry_to_row(e) for e in self._current_mod_entries]
+        conflict_data = self._compute_conflict_data()
+        mod_rows = [mod_entry_to_row(e, conflict_data) for e in self._current_mod_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._update_active_count()
 
