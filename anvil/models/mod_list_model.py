@@ -58,6 +58,11 @@ class ModListModel(QAbstractItemModel):
         super().__init__(parent)
         self._rows: list[ModRow] = []
         self._drop_in_progress = False
+        self._category_manager = None  # Set by MainWindow
+
+    def set_category_manager(self, manager) -> None:
+        """Set CategoryManager reference for resolving category names."""
+        self._category_manager = manager
 
     def clear(self) -> None:
         """Remove all mods from the model."""
@@ -102,7 +107,7 @@ class ModListModel(QAbstractItemModel):
             if c == COL_MARKERS:
                 return r.markers
             if c == COL_CATEGORY:
-                return r.category
+                return self._resolve_category_name(r.category)
             if c == COL_VERSION:
                 return r.version
             if c == COL_PRIORITY:
@@ -253,6 +258,22 @@ class ModListModel(QAbstractItemModel):
             return HEADERS[section]
         return None
 
+    def _resolve_category_name(self, raw_category: str) -> str:
+        """Resolve comma-separated category IDs to primary category name."""
+        if not raw_category or not self._category_manager:
+            return raw_category
+        # Primary category = first ID in list
+        first = raw_category.split(",")[0].strip()
+        try:
+            cat_id = int(first)
+            if cat_id > 0:
+                name = self._category_manager.get_name(cat_id)
+                if name:
+                    return name
+        except ValueError:
+            pass
+        return raw_category
+
     def sort(self, column, order=Qt.SortOrder.AscendingOrder):
         self.layoutAboutToBeChanged.emit()
         rev = order == Qt.SortOrder.DescendingOrder
@@ -263,5 +284,5 @@ class ModListModel(QAbstractItemModel):
         elif column == COL_VERSION:
             self._rows.sort(key=lambda x: x.version, reverse=rev)
         elif column == COL_CATEGORY:
-            self._rows.sort(key=lambda x: x.category.lower(), reverse=rev)
+            self._rows.sort(key=lambda x: self._resolve_category_name(x.category).lower(), reverse=rev)
         self.layoutChanged.emit()
