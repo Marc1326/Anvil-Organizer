@@ -355,13 +355,15 @@ class GamePanel(QWidget):
         game_icon = self._get_small_game_icon()
 
         if game_plugin is not None:
+            game_name = game_plugin.GameName if hasattr(game_plugin, "GameName") else ""
+
             for exe in game_plugin.executables():
                 name = exe.get("name", "")
                 binary = exe.get("binary", "")
                 if not name:
                     continue
                 idx = len(self._executables)
-                # REDmod bekommt Platzhalter, alle anderen das Game-Icon
+                # REDmod → Platzhalter, alle anderen → Game-Icon
                 if "redmod" in binary.lower() and "prelauncher" not in binary.lower():
                     icon = self._placeholder_icon()
                 else:
@@ -369,6 +371,13 @@ class GamePanel(QWidget):
                 action = self._exe_menu.addAction(icon, name)
                 action.triggered.connect(lambda checked, i=idx: self._on_exe_selected(i))
                 self._executables.append({"name": name, "binary": binary})
+
+            # Disabled-Platzhalter: "skip REDmod deploy", "Manually deploy REDmod"
+            if game_name:
+                skip_action = self._exe_menu.addAction(game_icon, f"{game_name} - skip REDmod deploy")
+                skip_action.setEnabled(False)
+                deploy_action = self._exe_menu.addAction("Manually deploy REDmod")
+                deploy_action.setEnabled(False)
 
             # Explore Virtual Folder
             self._exe_menu.addSeparator()
