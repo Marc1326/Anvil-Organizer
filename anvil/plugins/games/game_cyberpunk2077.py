@@ -25,6 +25,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from anvil.plugins.base_game import BaseGame
+from anvil.plugins.framework_mod import FrameworkMod
 
 
 class Cyberpunk2077Game(BaseGame):
@@ -145,6 +146,58 @@ class Cyberpunk2077Game(BaseGame):
                 result.append({"name": "REDmod", "binary": self._REDMOD_BINARY})
 
         return result
+
+    def get_framework_mods(self) -> list[FrameworkMod]:
+        """Return known framework mods for Cyberpunk 2077."""
+        return [
+            FrameworkMod(
+                name="Cyber Engine Tweaks",
+                pattern=["bin/x64/version.dll", "bin/x64/plugins/cyber_engine_tweaks.asi"],
+                target="",
+                description="Scripting-Framework, In-Game-Konsole und Mod-Loader",
+                detect_installed=["bin/x64/version.dll"],
+                required_by=["CET-Mods", "Lua-Scripts"],
+            ),
+            FrameworkMod(
+                name="RED4ext",
+                pattern=["red4ext/RED4ext.dll", "bin/x64/winmm.dll"],
+                target="",
+                description="Native Plugin-Loader fuer REDengine 4",
+                detect_installed=["bin/x64/winmm.dll", "red4ext/RED4ext.dll"],
+                required_by=["ArchiveXL", "TweakXL", "Codeware"],
+            ),
+            FrameworkMod(
+                name="redscript",
+                pattern=["engine/tools/scc.exe", "engine/config/base/scripts.ini"],
+                target="",
+                description="Script-Compiler fuer REDscript-Mods",
+                detect_installed=["engine/tools/scc.exe"],
+                required_by=["REDscript-Mods"],
+            ),
+            FrameworkMod(
+                name="ArchiveXL",
+                pattern=["red4ext/plugins/ArchiveXL/"],
+                target="",
+                description="Ermoeglicht Laden zusaetzlicher .archive-Dateien",
+                detect_installed=["red4ext/plugins/ArchiveXL/ArchiveXL.dll"],
+                required_by=["Custom-Items", "Custom-Appearances"],
+            ),
+            FrameworkMod(
+                name="TweakXL",
+                pattern=["red4ext/plugins/TweakXL/"],
+                target="",
+                description="Ermoeglicht Laden zusaetzlicher TweakDB-Eintraege",
+                detect_installed=["red4ext/plugins/TweakXL/TweakXL.dll"],
+                required_by=["Custom-Items", "Gameplay-Tweaks"],
+            ),
+            FrameworkMod(
+                name="Codeware",
+                pattern=["red4ext/plugins/Codeware/"],
+                target="",
+                description="Shared Library fuer RED4ext-Plugins",
+                detect_installed=["red4ext/plugins/Codeware/Codeware.dll"],
+            ),
+        ]
 
     def iniFiles(self) -> list[str]:
         """Return config files managed by Cyberpunk 2077."""
