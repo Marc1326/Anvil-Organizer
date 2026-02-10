@@ -42,6 +42,8 @@ from anvil.core.mod_list_io import (
     rename_mod_in_modlist,
 )
 from anvil.core.categories import CategoryManager
+from anvil.core.nexus_api import NexusAPI
+from anvil.core.nxm_handler import parse_nxm_url, check_cli_for_nxm
 from anvil.models.mod_list_model import mod_entry_to_row
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 
@@ -121,10 +123,19 @@ class MainWindow(QMainWindow):
         # ── Category manager ────────────────────────────────────────────
         self._category_manager = CategoryManager()
 
+        # ── Nexus API ────────────────────────────────────────────────
+        self._nexus_api = NexusAPI(self)
+        saved_key = self._settings().value("nexus/api_key", "")
+        if saved_key:
+            self._nexus_api.set_api_key(saved_key)
+        self._nexus_api.request_finished.connect(self._on_nexus_response)
+        self._nexus_api.request_error.connect(self._on_nexus_error)
+
         # ── Mod state ─────────────────────────────────────────────────
         self._current_mod_entries = []
         self._current_profile_path: Path | None = None
         self._current_instance_path: Path | None = None
+        self._current_plugin = None  # Active game plugin
 
         # Connect model signals for persistence
         model = self._mod_list_view.source_model()
@@ -163,7 +174,7 @@ class MainWindow(QMainWindow):
 
         act = fm.addAction("Nexus besuchen")
         act.setShortcut(QKeySequence("Ctrl+N"))
-        act.setEnabled(False)
+        act.triggered.connect(self._on_menu_visit_nexus)
 
         fm.addSeparator()
 
@@ -324,6 +335,16 @@ class MainWindow(QMainWindow):
         if dlg.switched_to:
             self.switch_instance(dlg.switched_to)
 
+    def _on_menu_visit_nexus(self) -> None:
+        """Datei → Nexus besuchen."""
+        nexus_slug = ""
+        if self._current_plugin:
+            nexus_slug = getattr(self._current_plugin, "GameNexusName", "") or getattr(self._current_plugin, "GameShortName", "")
+        if nexus_slug:
+            QDesktopServices.openUrl(QUrl(f"https://www.nexusmods.com/{nexus_slug}"))
+        else:
+            QDesktopServices.openUrl(QUrl("https://www.nexusmods.com"))
+
     def _on_menu_refresh(self) -> None:
         """Ansicht → Neu laden (F5)."""
         self._reload_mod_list()
@@ -479,6 +500,11 @@ class MainWindow(QMainWindow):
         else:
             self._status_bar.clear_instance()
 
+        # Check for nxm:// URL passed via command line
+        nxm_link = check_cli_for_nxm()
+        if nxm_link:
+            self._handle_nxm_link(nxm_link)
+
     def _crash_recovery_purge(self) -> None:
         """Purge stale deploy manifests from all instances.
 
@@ -551,6 +577,7 @@ class MainWindow(QMainWindow):
                 game_path = p
 
         plugin = self.plugin_loader.get_game(short_name) if short_name else None
+        self._current_plugin = plugin
 
         # 1. Title
         self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v0.1.0")
@@ -585,6 +612,7 @@ class MainWindow(QMainWindow):
         self._game_panel.set_downloads_path(
             instance_path / ".downloads", instance_path / ".mods",
         )
+        self._game_panel.download_manager().set_downloads_dir(instance_path / ".downloads")
 
         # 5. Mod deployer + auto-deploy
         self._game_panel.set_instance_path(instance_path)
@@ -1253,6 +1281,97 @@ class MainWindow(QMainWindow):
         mod_rows = [mod_entry_to_row(e) for e in self._current_mod_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._update_active_count()
+
+    # ── Nexus API integration ─────────────────────────────────────────
+
+    def _handle_nxm_link(self, nxm_link) -> None:
+        """Process an nxm:// link: request download URLs from Nexus API."""
+        if not self._nexus_api.has_api_key():
+            QMessageBox.warning(
+                self, "Nexus API",
+                "Kein Nexus API-Schlüssel konfiguriert.\n"
+                "Bitte unter Werkzeuge → Einstellungen → Nexus einen API-Schlüssel eingeben.",
+            )
+            return
+
+        self.statusBar().showMessage(
+            f"Nexus: Lade Download-Links für Mod {nxm_link.mod_id}...", 5000,
+        )
+
+        # First get mod info (for name/version), then download links
+        self._nexus_api.get_mod_info(nxm_link.game, nxm_link.mod_id)
+        self._nexus_api.get_download_links(
+            nxm_link.game,
+            nxm_link.mod_id,
+            nxm_link.file_id,
+            key=nxm_link.key or None,
+            expires=nxm_link.expires or None,
+        )
+
+        # Store nxm link for when download links arrive
+        self._pending_nxm = nxm_link
+
+    def _on_nexus_response(self, tag: str, data: object) -> None:
+        """Handle Nexus API responses."""
+        if tag.startswith("download_link:") and isinstance(data, list) and data:
+            # Download link response — start download
+            nxm = getattr(self, "_pending_nxm", None)
+            if not nxm:
+                return
+
+            # Use first available download URL
+            url = data[0].get("URI", "")
+            if not url:
+                self.statusBar().showMessage("Nexus: Kein Download-Link erhalten.", 5000)
+                return
+
+            # Determine filename from URL
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            file_name = Path(parsed.path).name or f"mod_{nxm.mod_id}_{nxm.file_id}.zip"
+
+            # Get mod info from cache if available
+            mod_name = getattr(self, "_pending_nxm_mod_name", "")
+            mod_version = getattr(self, "_pending_nxm_mod_version", "")
+
+            dm = self._game_panel.download_manager()
+            dl_id = dm.enqueue(
+                url=url,
+                file_name=file_name,
+                game=nxm.game,
+                mod_id=nxm.mod_id,
+                file_id=nxm.file_id,
+                mod_name=mod_name,
+                mod_version=mod_version,
+            )
+            self.statusBar().showMessage(
+                f"Nexus: Download gestartet — {file_name}", 5000,
+            )
+
+            # Switch to Downloads tab
+            self._game_panel._tabs.setCurrentIndex(2)
+            self._pending_nxm = None
+            self._pending_nxm_mod_name = ""
+            self._pending_nxm_mod_version = ""
+
+        elif tag.startswith("mod_info:") and isinstance(data, dict):
+            # Store mod name/version for when download starts
+            self._pending_nxm_mod_name = data.get("name", "")
+            self._pending_nxm_mod_version = data.get("version", "")
+
+    def _on_nexus_error(self, tag: str, message: str) -> None:
+        """Handle Nexus API errors."""
+        self.statusBar().showMessage(f"Nexus Fehler: {message}", 5000)
+
+    def handle_nxm_url(self, url: str) -> None:
+        """Public method to handle an nxm:// URL string.
+
+        Can be called from external IPC when a second instance
+        receives an nxm:// link.
+        """
+        nxm_link = parse_nxm_url(url)
+        if nxm_link:
+            self._handle_nxm_link(nxm_link)
 
     # ── UI state persistence ───────────────────────────────────────
 

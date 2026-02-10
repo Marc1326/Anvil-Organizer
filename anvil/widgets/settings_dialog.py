@@ -35,6 +35,7 @@ from PySide6.QtCore import Qt, QSettings
 
 from anvil.plugins.plugin_loader import PluginLoader, ensure_user_plugin_dir
 from anvil.styles.dark_theme import list_themes, load_theme, get_styles_dir, default_theme
+from anvil.core.nexus_api import NexusAPI
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, plugin_loader: PluginLoader | None = None):
@@ -277,49 +278,56 @@ class SettingsDialog(QDialog):
         nx_content = QWidget()
         nx_content_layout = QVBoxLayout(nx_content)
 
+        # ── Nexus-Konto (read-only, populated after validation) ──────
         konto_grp = QGroupBox("Nexus-Konto")
         konto_layout = QHBoxLayout(konto_grp)
         konto_left = QFormLayout()
-        uid = QLineEdit("195810152")
-        uid.setReadOnly(True)
-        konto_left.addRow("User ID:", uid)
-        name_edit = QLineEdit("Platzhalter")
-        name_edit.setReadOnly(True)
-        konto_left.addRow("Name:", name_edit)
-        konto_edit = QLineEdit("Premium")
-        konto_edit.setReadOnly(True)
-        konto_left.addRow("Konto:", konto_edit)
+        self._nx_uid = QLineEdit()
+        self._nx_uid.setReadOnly(True)
+        self._nx_uid.setPlaceholderText("—")
+        konto_left.addRow("User ID:", self._nx_uid)
+        self._nx_name = QLineEdit()
+        self._nx_name.setReadOnly(True)
+        self._nx_name.setPlaceholderText("—")
+        konto_left.addRow("Name:", self._nx_name)
+        self._nx_account = QLineEdit()
+        self._nx_account.setReadOnly(True)
+        self._nx_account.setPlaceholderText("—")
+        konto_left.addRow("Konto:", self._nx_account)
         konto_layout.addLayout(konto_left)
         konto_layout.addSpacing(24)
         stats = QFormLayout()
-        daily = QLineEdit("20000/20000")
-        daily.setReadOnly(True)
-        stats.addRow("Tägliche Anfragen:", daily)
-        hourly = QLineEdit("500/500")
-        hourly.setReadOnly(True)
-        stats.addRow("Stündliche Anfragen:", hourly)
+        self._nx_daily = QLineEdit()
+        self._nx_daily.setReadOnly(True)
+        self._nx_daily.setPlaceholderText("—")
+        stats.addRow("Tägliche Anfragen:", self._nx_daily)
+        self._nx_hourly = QLineEdit()
+        self._nx_hourly.setReadOnly(True)
+        self._nx_hourly.setPlaceholderText("—")
+        stats.addRow("Stündliche Anfragen:", self._nx_hourly)
         konto_layout.addLayout(stats)
         nx_content_layout.addWidget(konto_grp)
 
+        # ── Nexus-Verbindung ─────────────────────────────────────────
         verb_grp = QGroupBox("Nexus-Verbindung")
         verb_layout = QVBoxLayout(verb_grp)
-        verb_row1 = QHBoxLayout()
-        btn_connect = QPushButton("Verbinde zu Nexus")
-        btn_connect.setEnabled(False)
-        verb_row1.addWidget(btn_connect)
-        verb_row1.addWidget(QLabel("Verbunden."))
-        verb_row1.addStretch()
-        verb_layout.addLayout(verb_row1)
-        verb_row2 = QHBoxLayout()
-        btn_api = QPushButton("Gebe API-Schlüssel manuell ein")
-        btn_api.setEnabled(False)
-        verb_row2.addWidget(btn_api)
-        btn_disconnect = QPushButton("Trennen Sie die Verbindung zum Nexus 🤝")
-        verb_row2.addWidget(btn_disconnect)
-        verb_row2.addStretch()
-        verb_layout.addLayout(verb_row2)
+        self._nx_status_label = QLabel("Nicht verbunden.")
+        verb_layout.addWidget(self._nx_status_label)
+        verb_row = QHBoxLayout()
+        self._btn_connect = QPushButton("Verbinde zu Nexus")
+        self._btn_connect.clicked.connect(self._nx_validate_key)
+        verb_row.addWidget(self._btn_connect)
+        self._btn_api_key = QPushButton("Gebe API-Schlüssel manuell ein")
+        self._btn_api_key.clicked.connect(self._nx_enter_api_key)
+        verb_row.addWidget(self._btn_api_key)
+        self._btn_disconnect = QPushButton("Verbindung trennen")
+        self._btn_disconnect.clicked.connect(self._nx_disconnect)
+        verb_row.addWidget(self._btn_disconnect)
+        verb_row.addStretch()
+        verb_layout.addLayout(verb_row)
         nx_content_layout.addWidget(verb_grp)
 
+        # ── Optionen ─────────────────────────────────────────────────
         opt_grp = QGroupBox("Optionen")
         opt_layout = QHBoxLayout(opt_grp)
         opt_left = QVBoxLayout()
@@ -334,12 +342,15 @@ class SettingsDialog(QDialog):
             opt_left.addWidget(cb)
         opt_layout.addLayout(opt_left)
         opt_right = QVBoxLayout()
-        opt_right.addWidget(QPushButton("Mit MOD MANAGER DOWNLOAD-Links verknüpfen"))
+        btn_link = QPushButton("Mit MOD MANAGER DOWNLOAD-Links verknüpfen")
+        btn_link.clicked.connect(self._nx_register_nxm_handler)
+        opt_right.addWidget(btn_link)
         opt_right.addWidget(QPushButton("Cache leeren"))
         opt_right.addStretch()
         opt_layout.addLayout(opt_right)
         nx_content_layout.addWidget(opt_grp)
 
+        # ── Server ───────────────────────────────────────────────────
         server_grp = QGroupBox("Server")
         server_layout = QHBoxLayout(server_grp)
         known_lbl = QLabel("Bekannte Server (aktualisiert bei Download)")
@@ -363,6 +374,17 @@ class SettingsDialog(QDialog):
         nx_scroll.setWidget(nx_content)
         nx_layout.addWidget(nx_scroll)
         tabs.addTab(nexus_tab, "Nexus")
+
+        # ── Init Nexus API and load saved key ────────────────────────
+        self._nexus_api = NexusAPI(self)
+        self._nexus_api.user_validated.connect(self._nx_on_validated)
+        self._nexus_api.request_error.connect(self._nx_on_error)
+        self._nexus_api.rate_limit_updated.connect(self._nx_on_rate_limit)
+        saved_key = settings.value("nexus/api_key", "")
+        if saved_key:
+            self._nexus_api.set_api_key(saved_key)
+            self._nx_status_label.setText("Validiere API-Schlüssel...")
+            self._nexus_api.validate_key()
 
         # Tab Plugins
         plugins_tab = QWidget()
@@ -645,3 +667,92 @@ class SettingsDialog(QDialog):
             if app:
                 app.setStyleSheet(qss)
         super().reject()
+
+    # ── Nexus-Tab helpers ─────────────────────────────────────────────
+
+    def _nx_enter_api_key(self) -> None:
+        """Prompt the user to enter their Nexus API key manually."""
+        from PySide6.QtWidgets import QInputDialog
+        key, ok = QInputDialog.getText(
+            self, "API-Schlüssel eingeben",
+            "Nexus Mods API-Schlüssel:\n\n"
+            "Den Schlüssel findest du unter:\n"
+            "https://www.nexusmods.com/users/myaccount?tab=api+access",
+        )
+        if ok and key.strip():
+            self._nexus_api.set_api_key(key.strip())
+            settings = self._settings()
+            settings.setValue("nexus/api_key", key.strip())
+            self._nx_status_label.setText("Validiere API-Schlüssel...")
+            self._nx_status_label.setStyleSheet("")
+            self._nexus_api.validate_key()
+
+    def _nx_validate_key(self) -> None:
+        """Validate the currently stored API key."""
+        if not self._nexus_api.has_api_key():
+            self._nx_enter_api_key()
+            return
+        self._nx_status_label.setText("Validiere API-Schlüssel...")
+        self._nx_status_label.setStyleSheet("")
+        self._nexus_api.validate_key()
+
+    def _nx_disconnect(self) -> None:
+        """Clear the API key and reset all Nexus fields."""
+        settings = self._settings()
+        settings.remove("nexus/api_key")
+        self._nexus_api.set_api_key("")
+        self._nx_uid.clear()
+        self._nx_name.clear()
+        self._nx_account.clear()
+        self._nx_daily.clear()
+        self._nx_hourly.clear()
+        self._nx_status_label.setText("Nicht verbunden.")
+        self._nx_status_label.setStyleSheet("")
+
+    def _nx_on_validated(self, user_info: dict) -> None:
+        """Handle successful API key validation."""
+        self._nx_uid.setText(str(user_info.get("user_id", "")))
+        self._nx_name.setText(user_info.get("name", ""))
+        is_premium = user_info.get("is_premium", False)
+        is_supporter = user_info.get("is_supporter", False)
+        if is_premium:
+            account_type = "Premium"
+        elif is_supporter:
+            account_type = "Supporter"
+        else:
+            account_type = "Standard"
+        self._nx_account.setText(account_type)
+        self._nx_status_label.setText("Verbunden.")
+        self._nx_status_label.setStyleSheet("color: #4CAF50;")
+
+    def _nx_on_error(self, tag: str, message: str) -> None:
+        """Handle API request error."""
+        if tag == "validate":
+            self._nx_status_label.setText(f"Fehler: {message}")
+            self._nx_status_label.setStyleSheet("color: #F44336;")
+
+    def _nx_on_rate_limit(self, daily: int, hourly: int) -> None:
+        """Update rate limit display."""
+        if daily >= 0:
+            self._nx_daily.setText(f"{daily}")
+        if hourly >= 0:
+            self._nx_hourly.setText(f"{hourly}")
+
+    def _nx_register_nxm_handler(self) -> None:
+        """Register Anvil Organizer as nxm:// URL handler on Linux."""
+        from anvil.core.nxm_handler import register_nxm_handler
+        success = register_nxm_handler()
+        if success:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self, "nxm:// Handler",
+                "Anvil Organizer wurde als nxm:// Handler registriert.\n"
+                "Nexus Mods Download-Links werden jetzt von Anvil verarbeitet.",
+            )
+        else:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, "nxm:// Handler",
+                "Registrierung fehlgeschlagen.\n"
+                "Bitte manuell die .desktop-Datei konfigurieren.",
+            )
