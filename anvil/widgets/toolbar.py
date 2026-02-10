@@ -31,24 +31,20 @@ def _icon(name: str) -> QIcon:
 
 def create_toolbar(parent=None):
     bar = QToolBar(parent)
+    bar.setObjectName("mainToolBar")
     bar.setMovable(False)
-    bar.setIconSize(QSize(48, 48))
-    bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-    bar.setFixedHeight(68)
+    # Icon size and button style are set by MainWindow._restore_view_settings()
 
-    def add_icon(icon_name: str, tooltip: str):
+    def _add_btn(icon_name: str, tooltip: str) -> QToolButton:
         btn = QToolButton(bar)
         btn.setIcon(_icon(icon_name))
         btn.setToolTip(tooltip)
-        btn.setFixedSize(56, 56)
-        btn.clicked.connect(_todo(tooltip))
+        btn.setText(tooltip)
         bar.addWidget(btn)
+        return btn
 
     # Links: MO2-Reihenfolge mit Separatoren (Paper Dark SVGs)
-    instances_btn = QToolButton(bar)
-    instances_btn.setIcon(_icon("instances.svg"))
-    instances_btn.setToolTip("Instances/Game")
-    instances_btn.setFixedSize(56, 56)
+    instances_btn = _add_btn("instances.svg", "Instances/Game")
     def _open_instance_manager():
         win = bar.window()
         dlg = InstanceManagerDialog(
@@ -62,54 +58,40 @@ def create_toolbar(parent=None):
             win.switch_instance(dlg.switched_to)
 
     instances_btn.clicked.connect(_open_instance_manager)
-    bar.addWidget(instances_btn)
-    folder_btn = QToolButton(bar)
-    folder_btn.setIcon(_icon("archives.svg"))
-    folder_btn.setToolTip("Ordner")
-    folder_btn.setFixedSize(56, 56)
+
+    folder_btn = _add_btn("archives.svg", "Ordner")
     folder_btn.clicked.connect(
         lambda: subprocess.Popen(["xdg-open", os.path.expanduser("~")])
     )
-    bar.addWidget(folder_btn)
-    bar.addSeparator()
-    profile_btn = QToolButton(bar)
-    profile_btn.setIcon(_icon("profiles.svg"))
-    profile_btn.setToolTip("Profil/Person")
-    profile_btn.setFixedSize(56, 56)
-    profile_btn.clicked.connect(lambda: ProfileDialog(bar.window()).exec())
-    bar.addWidget(profile_btn)
-    bar.addSeparator()
-    refresh_btn = QToolButton(bar)
-    refresh_btn.setIcon(_icon("refresh.svg"))
-    refresh_btn.setToolTip("Refresh / Neu laden")
-    refresh_btn.setFixedSize(56, 56)
 
+    bar.addSeparator()
+
+    profile_btn = _add_btn("profiles.svg", "Profile")
+    profile_btn.clicked.connect(lambda: ProfileDialog(bar.window()).exec())
+
+    bar.addSeparator()
+
+    refresh_btn = _add_btn("refresh.svg", "Neu laden")
     def _on_refresh():
-        print("Mod-Liste wird neu geladen...")
         win = bar.window()
-        if win and hasattr(win, "statusBar") and win.statusBar():
-            win.statusBar().showMessage("Mod-Liste aktualisiert", 3000)
+        if win and hasattr(win, "_on_menu_refresh"):
+            win._on_menu_refresh()
 
     refresh_btn.clicked.connect(_on_refresh)
-    bar.addWidget(refresh_btn)
-    exec_btn = QToolButton(bar)
-    exec_btn.setIcon(_icon("executables.svg"))
-    exec_btn.setToolTip("Executables")
-    exec_btn.setFixedSize(56, 56)
+
+    exec_btn = _add_btn("executables.svg", "Executables")
     exec_btn.clicked.connect(lambda: ExecutablesDialog(bar.window()).exec())
-    bar.addWidget(exec_btn)
-    add_icon("tools.svg", "Tools")
-    settings_btn = QToolButton(bar)
-    settings_btn.setIcon(_icon("settings.svg"))
-    settings_btn.setToolTip("Einstellungen")
-    settings_btn.setFixedSize(56, 56)
+
+    tools_btn = _add_btn("tools.svg", "Tools")
+    tools_btn.clicked.connect(_todo("Tools"))
+
+    settings_btn = _add_btn("settings.svg", "Einstellungen")
     settings_btn.clicked.connect(
         lambda: SettingsDialog(
             bar.window(),
             getattr(bar.window(), "plugin_loader", None),
         ).exec()
     )
-    bar.addWidget(settings_btn)
 
     # Spacer: rechte Icons bündig rechts
     spacer = QWidget()
@@ -117,9 +99,9 @@ def create_toolbar(parent=None):
     bar.addWidget(spacer)
 
     # Rechts: 4 Status-Icons
-    add_icon("endorse.svg", "Endorse")
-    add_icon("problems.svg", "Benachrichtigungen")
-    add_icon("update.svg", "Update")
-    add_icon("help.svg", "Info")
+    _add_btn("endorse.svg", "Endorse").clicked.connect(_todo("Endorse"))
+    _add_btn("problems.svg", "Benachrichtigungen").clicked.connect(_todo("Benachrichtigungen"))
+    _add_btn("update.svg", "Update").clicked.connect(_todo("Update"))
+    _add_btn("help.svg", "Info").clicked.connect(_todo("Info"))
 
     return bar
