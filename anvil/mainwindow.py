@@ -569,6 +569,14 @@ class MainWindow(QMainWindow):
         profile_name = data.get("selected_profile", "Default")
         self._current_profile_path = instance_path / ".profiles" / profile_name
         self._current_mod_entries = scan_mods_directory(instance_path, self._current_profile_path)
+        # Mark direct-install (framework) mods
+        direct_patterns = getattr(plugin, "GameDirectInstallMods", []) if plugin else []
+        if direct_patterns:
+            lp = [p.lower() for p in direct_patterns]
+            for entry in self._current_mod_entries:
+                name_lower = (entry.display_name or entry.name).lower()
+                if any(pat in name_lower for pat in lp):
+                    entry.is_direct_install = True
         mod_rows = [mod_entry_to_row(e) for e in self._current_mod_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._update_active_count()

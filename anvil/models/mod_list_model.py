@@ -43,7 +43,7 @@ def mod_entry_to_row(entry: ModEntry) -> ModRow:
         category=entry.category,
         version=entry.version,
         priority=entry.priority,
-        is_framework=False,
+        is_framework=entry.is_direct_install,
         is_error=False,
         is_separator=entry.is_separator,
         folder_name=entry.name,
@@ -129,6 +129,9 @@ class ModListModel(QAbstractItemModel):
                 font.setBold(True)
                 font.setItalic(True)
                 return font
+        if role == Qt.ItemDataRole.ToolTipRole:
+            if r.is_framework and c == COL_NAME:
+                return "Direkt-Install: Wird ins Spielverzeichnis kopiert"
         if role == Qt.ItemDataRole.BackgroundRole:
             if r.is_error:
                 return QBrush(QColor("#3a1414"))

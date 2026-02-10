@@ -300,8 +300,9 @@ class GamePanel(QWidget):
         self._icon_manager = icon_manager
 
         # Re-init deployer if instance_path already set
+        direct_patterns = getattr(game_plugin, "GameDirectInstallMods", []) if game_plugin else []
         if self._instance_path and game_path:
-            self._deployer = ModDeployer(self._instance_path, game_path)
+            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns)
 
         # Update label
         self._game_label.setText(game_name or "Kein Spiel ausgewählt")
@@ -554,8 +555,9 @@ class GamePanel(QWidget):
     def set_instance_path(self, instance_path: Path) -> None:
         """Set instance path and initialize the deployer."""
         self._instance_path = instance_path
+        direct_patterns = getattr(self._current_plugin, "GameDirectInstallMods", []) if self._current_plugin else []
         if self._current_game_path and instance_path:
-            self._deployer = ModDeployer(instance_path, self._current_game_path)
+            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns)
         else:
             self._deployer = None
 

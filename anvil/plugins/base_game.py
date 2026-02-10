@@ -92,6 +92,13 @@ class BaseGame:
     GameLaunchArgs: list[str] = []
     """Extra arguments passed to the game binary on launch (e.g. ['--launcher-skip'])."""
 
+    GameDirectInstallMods: list[str] = []
+    """Mod name patterns for framework mods that must be copied (not symlinked) into the game directory.
+
+    Matching is case-insensitive and uses 'contains' logic.
+    These mods are NOT removed during purge.
+    """
+
     # ── Interner State ────────────────────────────────────────────────
 
     def __init__(self) -> None:
