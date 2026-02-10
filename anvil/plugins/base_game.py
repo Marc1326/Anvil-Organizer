@@ -268,6 +268,22 @@ class BaseGame:
             result.append((fw, installed))
         return result
 
+    # ── Konflikterkennung ───────────────────────────────────────────────
+
+    def get_conflict_ignores(self) -> list[str]:
+        """Return glob patterns for files to ignore during conflict detection.
+
+        Subclasses override this to declare game-specific patterns for
+        files that commonly share names across mods but are harmless
+        (e.g. readme files, per-mod metadata).
+
+        Patterns use fnmatch syntax with ``**`` for directory wildcards.
+        Matching is case-insensitive.
+
+        Default: empty list (nothing ignored).
+        """
+        return []
+
     # ── Override-Punkte (Subklassen können diese überschreiben) ───────
 
     def executables(self) -> list[dict[str, str]]:

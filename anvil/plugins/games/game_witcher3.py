@@ -164,6 +164,12 @@ class Witcher3Game(BaseGame):
     # TODO: Menu-XML Mod-Erkennung
     # TODO: Save-Game Screenshot-Zuordnung (.sav -> .png)
 
+    def get_conflict_ignores(self) -> list[str]:
+        """Return patterns for harmless files in Witcher 3 mods."""
+        return [
+            "**/readme*.txt",  # readme files
+        ]
+
     def executables(self) -> list[dict[str, str]]:
         """Return executable definitions for The Witcher 3.
 
