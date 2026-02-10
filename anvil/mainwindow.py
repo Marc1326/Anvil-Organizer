@@ -193,13 +193,6 @@ class MainWindow(QMainWindow):
 
         plugin = self.plugin_loader.get_game(short_name) if short_name else None
 
-        # 0. Preload icons in background
-        exe_binaries = [e["binary"] for e in plugin.executables()] if plugin else []
-        worker = self.icon_manager.preload_icons(short_name, exe_binaries) if short_name else None
-        if worker is not None:
-            worker.icon_ready.connect(self._on_icon_ready)
-            worker.start()
-
         # 1. Title
         self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v0.1.0")
 
@@ -226,11 +219,6 @@ class MainWindow(QMainWindow):
 
         # 6. Restore saved column widths / splitter (after data is populated)
         self._restore_ui_state()
-
-    def _on_icon_ready(self, cache_key: str, pixmap) -> None:
-        """Handle an icon that was downloaded in the background."""
-        self.icon_manager.store_pixmap(cache_key, pixmap)
-        self._game_panel.on_icon_ready(cache_key, pixmap)
 
     # ── Mod list persistence ─────────────────────────────────────────
 
