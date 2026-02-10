@@ -89,6 +89,9 @@ class BaseGame:
     GameSupportURL: str = ""
     """Wiki or support URL for modding instructions."""
 
+    GameLaunchArgs: list[str] = []
+    """Extra arguments passed to the game binary on launch (e.g. ['--launcher-skip'])."""
+
     # ── Interner State ────────────────────────────────────────────────
 
     def __init__(self) -> None:

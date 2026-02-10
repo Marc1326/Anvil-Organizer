@@ -48,6 +48,7 @@ class Cyberpunk2077Game(BaseGame):
     GameEpicId = "77f2b98e2cef40c8a7437518bf420e47"
 
     GameLauncher = "REDprelauncher.exe"
+    GameLaunchArgs = ["--launcher-skip"]
 
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()
     GameSavesDirectory = ""     # resolved dynamically via gameSavesDirectory()

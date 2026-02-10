@@ -153,21 +153,7 @@ class GamePanel(QWidget):
         self._start_btn.clicked.connect(self._on_start_clicked)
         top_layout.addWidget(self._start_btn, 0, Qt.AlignmentFlag.AlignHCenter)
 
-        # Deploy-Status
-        self._deploy_label = QLabel("")
-        self._deploy_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._deploy_label.setStyleSheet("font-size: 11px; color: #888;")
-        top_layout.addWidget(self._deploy_label)
-
-        # Purge-Button (nur sichtbar wenn deployed)
-        self._purge_btn = QPushButton("Mods entfernen (Purge)")
-        self._purge_btn.setObjectName("purgeButton")
-        self._purge_btn.setFixedHeight(28)
-        self._purge_btn.setMinimumWidth(140)
-        self._purge_btn.setToolTip("Alle Mod-Symlinks aus dem Spielverzeichnis entfernen")
-        self._purge_btn.clicked.connect(self._on_purge_clicked)
-        self._purge_btn.setVisible(False)
-        top_layout.addWidget(self._purge_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        # (Deploy-UI entfernt — Deploy/Purge läuft jetzt automatisch)
 
         # Executables data: list of {"name", "binary"} dicts
         self._executables: list[dict[str, str]] = []
@@ -316,7 +302,6 @@ class GamePanel(QWidget):
         # Re-init deployer if instance_path already set
         if self._instance_path and game_path:
             self._deployer = ModDeployer(self._instance_path, game_path)
-        self._update_deploy_status()
 
         # Update label
         self._game_label.setText(game_name or "Kein Spiel ausgewählt")
@@ -454,50 +439,17 @@ class GamePanel(QWidget):
         if mods_path and mods_path.is_dir():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(mods_path)))
 
-    def _on_purge_clicked(self) -> None:
-        """Remove all deployed mod symlinks from the game directory."""
-        if not self._deployer:
-            return
+    # ── Silent deploy / purge (called from MainWindow) ──────────────
 
-        reply = QMessageBox.question(
-            self, "Mods entfernen",
-            "Alle Mod-Symlinks aus dem Spielverzeichnis entfernen?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
+    def silent_deploy(self) -> None:
+        """Deploy mods silently.  Called automatically by MainWindow."""
+        if self._deployer:
+            self._deployer.deploy()
 
-        result = self._deployer.purge()
-        self._update_deploy_status()
-
-        if result.errors:
-            QMessageBox.warning(
-                self, "Purge",
-                f"{result.links_removed} Symlinks entfernt.\n\n"
-                f"Fehler:\n" + "\n".join(result.errors[:5]),
-            )
-        else:
-            QMessageBox.information(
-                self, "Purge",
-                f"{result.links_removed} Symlinks entfernt, "
-                f"{result.dirs_removed} leere Ordner aufgeräumt.",
-            )
-
-    def _update_deploy_status(self) -> None:
-        """Update the deploy status label and purge button visibility."""
-        if self._deployer and self._deployer.is_deployed():
-            mod_count = self._deployer.deployed_mod_count()
-            link_count = self._deployer.deployed_link_count()
-            self._deploy_label.setText(
-                f"Deployed: {mod_count} Mods, {link_count} Symlinks"
-            )
-            self._deploy_label.setStyleSheet("font-size: 11px; color: #4CAF50;")
-            self._purge_btn.setVisible(True)
-        else:
-            self._deploy_label.setText("Nicht deployed")
-            self._deploy_label.setStyleSheet("font-size: 11px; color: #888;")
-            self._purge_btn.setVisible(False)
+    def silent_purge(self) -> None:
+        """Purge deployed mods silently.  Called automatically by MainWindow."""
+        if self._deployer:
+            self._deployer.purge()
 
     def _on_exe_selected(self, index: int) -> None:
         """Handle executable selection from the menu."""
@@ -506,7 +458,7 @@ class GamePanel(QWidget):
         self._start_btn.setToolTip(f"Starten: {name}")
 
     def _on_start_clicked(self) -> None:
-        """Deploy mods, then start the currently selected executable."""
+        """Start the currently selected executable (deploy already happened)."""
         idx = self._selected_exe_index
         if idx < 0 or idx >= len(self._executables):
             return
@@ -516,32 +468,25 @@ class GamePanel(QWidget):
         if not binary:
             return
 
-        # Deploy mods before starting
-        if self._deployer:
-            result = self._deployer.deploy()
-            if not result.success:
-                QMessageBox.warning(
-                    self, "Deploy fehlgeschlagen",
-                    "Mods konnten nicht deployed werden:\n"
-                    + "\n".join(result.errors[:5]),
-                )
-                return
-            self._update_deploy_status()
-            if result.skipped_real_files:
-                skipped = "\n".join(result.skipped_real_files[:10])
-                QMessageBox.information(
-                    self, "Deploy",
-                    f"{result.links_created} Symlinks erstellt.\n\n"
-                    f"Übersprungen (echte Dateien):\n{skipped}",
-                )
-
         # Steam-Launch für das Hauptspiel (erster Eintrag mit SteamId)
         plugin = self._current_plugin
         if plugin and hasattr(plugin, "GameSteamId") and plugin.GameSteamId:
-            # Hauptspiel (GameBinary) → über Steam starten
+            # Hauptspiel (GameBinary) → über Steam CLI starten
             if hasattr(plugin, "GameBinary") and binary == plugin.GameBinary:
-                steam_url = f"steam://rungameid/{plugin.GameSteamId}"
-                QDesktopServices.openUrl(QUrl(steam_url))
+                import shutil
+                steam_bin = shutil.which("steam")
+                if steam_bin:
+                    from PySide6.QtCore import QProcess
+                    args = ["-applaunch", str(plugin.GameSteamId)]
+                    if hasattr(plugin, "GameLaunchArgs"):
+                        args.extend(plugin.GameLaunchArgs)
+                    QProcess.startDetached(steam_bin, args)
+                else:
+                    QMessageBox.warning(
+                        self, "Starten",
+                        "Steam wurde nicht im PATH gefunden.\n"
+                        "Bitte Steam installieren oder den PATH anpassen.",
+                    )
                 return
 
         # Direkter Start für alle anderen Executables
@@ -613,7 +558,6 @@ class GamePanel(QWidget):
             self._deployer = ModDeployer(instance_path, self._current_game_path)
         else:
             self._deployer = None
-        self._update_deploy_status()
 
     def set_downloads_path(self, downloads_path: Path, mods_path: Path) -> None:
         """Set paths and populate the downloads table."""
