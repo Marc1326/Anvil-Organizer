@@ -237,6 +237,13 @@ class BaldursGate3Game(BaseGame):
             ),
         ]
 
+    def get_conflict_ignores(self) -> list[str]:
+        """Return patterns for harmless files in BG3 mods."""
+        return [
+            "**/info.json",    # mod metadata, each mod has own
+            "**/readme*.txt",  # readme files
+        ]
+
     def executables(self) -> list[dict[str, str]]:
         """Return executable definitions for Baldur's Gate 3.
 

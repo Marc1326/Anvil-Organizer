@@ -189,6 +189,13 @@ class Fallout4Game(BaseGame):
     # TODO: Creation Club / Fallout4.ccc Parser
     # TODO: Save-Game Metadata Parsing (.fos/.f4se)
 
+    def get_conflict_ignores(self) -> list[str]:
+        """Return patterns for harmless files in Fallout 4 mods."""
+        return [
+            "**/readme*.txt",  # readme files
+            "**/docs/**",      # documentation folders
+        ]
+
     def executables(self) -> list[dict[str, str]]:
         """Return executable definitions for Fallout 4.
 

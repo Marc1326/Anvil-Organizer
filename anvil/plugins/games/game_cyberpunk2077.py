@@ -199,6 +199,16 @@ class Cyberpunk2077Game(BaseGame):
             ),
         ]
 
+    def get_conflict_ignores(self) -> list[str]:
+        """Return patterns for harmless files in Cyberpunk 2077 mods."""
+        return [
+            "**/Item codes*.txt",   # CET spawn codes, each mod has own
+            "**/readme*.txt",       # readme files
+            "**/changelog*.txt",    # changelogs
+            "**/*.md",              # markdown documentation
+            "**/credits*.txt",      # credits files
+        ]
+
     def iniFiles(self) -> list[str]:
         """Return config files managed by Cyberpunk 2077."""
         return ["UserSettings.json"]

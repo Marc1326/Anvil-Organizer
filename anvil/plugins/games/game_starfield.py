@@ -201,6 +201,13 @@ class StarfieldGame(BaseGame):
     # TODO: sTestFile-Diagnostik (StarfieldCustom.ini)
     # TODO: Save-Game Metadata Parsing (.sfs/.sfse)
 
+    def get_conflict_ignores(self) -> list[str]:
+        """Return patterns for harmless files in Starfield mods."""
+        return [
+            "**/readme*.txt",  # readme files
+            "**/docs/**",      # documentation folders
+        ]
+
     def executables(self) -> list[dict[str, str]]:
         """Return executable definitions for Starfield.
 

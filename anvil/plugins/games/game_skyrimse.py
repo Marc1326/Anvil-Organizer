@@ -189,6 +189,13 @@ class SkyrimSEGame(BaseGame):
     # TODO: Creation Club / Skyrim.ccc Parser
     # TODO: Save-Game Metadata Parsing (.ess/.skse)
 
+    def get_conflict_ignores(self) -> list[str]:
+        """Return patterns for harmless files in Skyrim SE mods."""
+        return [
+            "**/readme*.txt",  # readme files
+            "**/docs/**",      # documentation folders
+        ]
+
     def executables(self) -> list[dict[str, str]]:
         """Return executable definitions for Skyrim Special Edition.
 
