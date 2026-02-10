@@ -214,10 +214,13 @@ class MainWindow(QMainWindow):
             instance_path / ".downloads", instance_path / ".mods",
         )
 
-        # 5. Status bar
+        # 5. Mod deployer
+        self._game_panel.set_instance_path(instance_path)
+
+        # 6. Status bar
         self._status_bar.update_instance(game_name, short_name, store)
 
-        # 6. Restore saved column widths / splitter (after data is populated)
+        # 7. Restore saved column widths / splitter (after data is populated)
         self._restore_ui_state()
 
     # ── Mod list persistence ─────────────────────────────────────────
