@@ -1619,6 +1619,15 @@ class MainWindow(QMainWindow):
             )
             return
 
+        # Ensure plugin knows its store + path (may not be auto-detected
+        # if the game drive is not mounted during startup)
+        if not plugin.isInstalled():
+            store = data.get("detected_store", "")
+            if game_path and store:
+                plugin.setGamePath(game_path, store=store)
+            elif store:
+                plugin.setGamePath(Path("/"), store=store)
+
         self._bg3_installer = plugin.get_mod_installer()
 
         # Check if Proton prefix exists
