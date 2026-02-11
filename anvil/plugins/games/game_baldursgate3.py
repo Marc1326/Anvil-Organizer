@@ -51,7 +51,7 @@ class BaldursGate3Game(BaseGame):
     GameBinary = "bin/bg3.exe"
     GameDataPath = ""  # Mods go to various locations depending on type
 
-    GameSteamId = 1086940
+    GameSteamId = [1086940, 2626479850]
     GameGogId = 1456460669
 
     GameLauncher = "Launcher/LariLauncher.exe"

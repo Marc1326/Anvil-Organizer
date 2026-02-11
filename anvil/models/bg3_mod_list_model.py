@@ -38,9 +38,9 @@ def _get_conflict_icon(conflict_type: str) -> QIcon | None:
 
 # ── Column definitions ───────────────────────────────────────────────
 
-COL_CHECK, COL_CONFLICTS, COL_NAME, COL_VERSION, COL_AUTHOR = range(5)
+COL_CHECK, COL_NAME, COL_CONFLICTS, COL_VERSION, COL_AUTHOR = range(5)
 COL_COUNT = 5
-HEADERS = ["", "Konflikte", "Mod Name", "Version", "Author"]
+HEADERS = [" ", "Mod Name", "Konflikte", "Version", "Author"]
 MIME_BG3_MOD_ROWS = "application/x-anvil-bg3-mod-rows"
 
 # Custom roles
