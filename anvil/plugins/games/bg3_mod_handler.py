@@ -1,12 +1,14 @@
 """BG3-specific mod handling: modsettings.lsx, Script Extender, pak scanning.
 
 Ported from the Rust implementation in ~/Projekte/.bg3-mod-manager/
-(src-tauri/src/lib.rs).  Uses only stdlib (xml.etree.ElementTree, json).
+(src-tauri/src/lib.rs).  Uses only stdlib (xml.etree.ElementTree, json)
+plus lz4 for LSPK pak parsing.
 
-TODO (Part 3):
-  - pak metadata extraction (LSPK format, needs LSLib or custom parser)
-  - Dependency resolution from meta.lsx inside .pak files
-  - Version64 encoding/decoding utilities
+Features:
+  - modsettings.lsx reading and writing (load order)
+  - Script Extender detection
+  - pak mod scanning with LSPK metadata extraction
+  - Unregistered mod detection (by UUID + filename)
 """
 
 from __future__ import annotations
@@ -398,17 +400,34 @@ class BG3ScriptExtender:
 
 # ── Pak Mod Scanner ───────────────────────────────────────────────────
 
-def scan_pak_mods(mods_path: Path) -> list[dict]:
-    """Scan the Mods directory for .pak files.
+def read_pak_info(pak_path: Path) -> dict | None:
+    """Read mod metadata from a .pak file via LSPK parser.
 
-    Returns basic file info only.  Metadata extraction from inside
-    the .pak (UUID, author, dependencies) requires Part 3 (LSPK parser).
+    Args:
+        pak_path: Path to a BG3 .pak file.
+
+    Returns:
+        Dict with uuid, name, folder, author, version, description,
+        dependencies — or None if parsing fails.
+    """
+    from anvil.core.lspk_parser import LSPKReader
+    reader = LSPKReader()
+    return reader.read_pak_metadata(pak_path)
+
+
+def scan_pak_mods(mods_path: Path) -> list[dict]:
+    """Scan the Mods directory for .pak files with metadata extraction.
+
+    For each .pak, attempts to read LSPK metadata (UUID, name, folder,
+    author, version, dependencies) from info.json or meta.lsx inside
+    the archive.
 
     Args:
         mods_path: Path to the BG3 Mods directory.
 
     Returns:
-        Sorted list of dicts with filename, path, size, last_modified.
+        Sorted list of dicts with filename, path, size, last_modified,
+        and metadata (dict or None).
     """
     if not mods_path.is_dir():
         return []
@@ -418,12 +437,14 @@ def scan_pak_mods(mods_path: Path) -> list[dict]:
     for pak in sorted(mods_path.glob("*.pak"), key=lambda p: p.name.lower()):
         try:
             stat = pak.stat()
-            result.append({
+            entry = {
                 "filename": pak.name,
                 "path": pak,
                 "size": stat.st_size,
                 "last_modified": int(stat.st_mtime),
-            })
+                "metadata": read_pak_info(pak),
+            }
+            result.append(entry)
         except OSError:
             continue
 
@@ -436,10 +457,8 @@ def find_unregistered_mods(
 ) -> list[dict]:
     """Find .pak files that are not registered in modsettings.lsx.
 
-    Compares pak filenames (without .pak extension) against the
-    ``folder`` field of modsettings entries.  Unregistered mods are
-    those that were manually copied into the Mods folder but not
-    yet added to the load order.
+    Uses UUID from pak metadata (if available) for accurate matching,
+    with filename-based fallback.
 
     Args:
         pak_mods: Result from :func:`scan_pak_mods`.
@@ -448,13 +467,17 @@ def find_unregistered_mods(
     Returns:
         List of pak_mod dicts that have no matching modsettings entry.
     """
-    # Build set of known folder names (lowercase for comparison)
+    # Build sets of known identifiers (lowercase for comparison)
+    known_uuids = {
+        mod.get("uuid", "").strip().lower()
+        for mod in modsettings_mods
+        if mod.get("uuid")
+    }
     known_folders = {
         mod.get("folder", "").lower()
         for mod in modsettings_mods
         if mod.get("folder")
     }
-    # Also add known mod names
     known_names = {
         mod.get("name", "").lower()
         for mod in modsettings_mods
@@ -463,8 +486,19 @@ def find_unregistered_mods(
 
     unregistered: list[dict] = []
     for pak in pak_mods:
+        # Try UUID match first (most reliable)
+        meta = pak.get("metadata")
+        if meta and meta.get("uuid"):
+            if meta["uuid"].strip().lower() in known_uuids:
+                continue
+            if meta.get("folder", "").lower() in known_folders:
+                continue
+
+        # Fallback: filename stem
         stem = Path(pak["filename"]).stem.lower()
-        if stem not in known_folders and stem not in known_names:
-            unregistered.append(pak)
+        if stem in known_folders or stem in known_names:
+            continue
+
+        unregistered.append(pak)
 
     return unregistered

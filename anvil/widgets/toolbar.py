@@ -93,6 +93,20 @@ def create_toolbar(parent=None):
         ).exec()
     )
 
+    bar.addSeparator()
+
+    # Deploy-Button (BG3-spezifisch, standardmäßig unsichtbar)
+    deploy_btn = _add_btn("check.svg", "Deploy")
+    deploy_btn.setVisible(False)
+
+    def _on_deploy():
+        win = bar.window()
+        if win and hasattr(win, "_on_bg3_deploy"):
+            win._on_bg3_deploy()
+
+    deploy_btn.clicked.connect(_on_deploy)
+    bar.deploy_btn = deploy_btn  # Accessible from MainWindow
+
     # Spacer: rechte Icons bündig rechts
     spacer = QWidget()
     spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)

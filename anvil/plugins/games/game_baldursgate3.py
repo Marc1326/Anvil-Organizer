@@ -10,11 +10,10 @@ Features implemented:
   - BG3-specific path helpers for mod management
   - modsettings.lsx reading and writing (load order)
   - Script Extender detection
-  - pak mod scanning (file-level, no metadata extraction)
-  - Unregistered mod detection
+  - pak mod scanning with LSPK metadata extraction (UUID, Name, Dependencies)
+  - Unregistered mod detection (by UUID + filename)
 
 TODO (future):
-  - pak metadata extraction — LSPK parser to read UUID, Name, Dependencies from .pak
   - Dependency-Resolver — sort mods by dependencies from meta.lsx
   - Post-update cache cleanup
 """
@@ -23,6 +22,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from anvil.core.bg3_mod_installer import BG3ModInstaller
 from anvil.plugins.base_game import BaseGame
 from anvil.plugins.framework_mod import FrameworkMod
 from anvil.plugins.games.bg3_mod_handler import (
@@ -30,6 +30,7 @@ from anvil.plugins.games.bg3_mod_handler import (
     ModsettingsParser,
     ModsettingsWriter,
     find_unregistered_mods,
+    read_pak_info,
     scan_pak_mods,
 )
 
@@ -204,10 +205,11 @@ class BaldursGate3Game(BaseGame):
         return BG3ScriptExtender.detect(self._game_path)
 
     def scan_mods(self) -> list[dict]:
-        """Scan the Mods directory for .pak files.
+        """Scan the Mods directory for .pak files with metadata.
 
-        Returns file-level info only (filename, path, size).
-        Metadata extraction from inside .pak comes in Part 3.
+        Returns file info (filename, path, size) plus LSPK metadata
+        (uuid, name, folder, author, version, dependencies) extracted
+        from info.json or meta.lsx inside each .pak.
         """
         path = self.pak_mods_path()
         if path is None:
@@ -267,6 +269,16 @@ class BaldursGate3Game(BaseGame):
         )
 
         return result
+
+    # ── Mod Installer ────────────────────────────────────────────────
+
+    _mod_installer: BG3ModInstaller | None = None
+
+    def get_mod_installer(self) -> BG3ModInstaller:
+        """Return a cached BG3ModInstaller instance."""
+        if self._mod_installer is None:
+            self._mod_installer = BG3ModInstaller(self)
+        return self._mod_installer
 
     def iniFiles(self) -> list[str]:
         """Return config files managed by Baldur's Gate 3."""
