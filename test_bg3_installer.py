@@ -21,11 +21,21 @@ MODS_PATH = PROTON_PREFIX / (
     "drive_c/users/steamuser/AppData/Local"
     "/Larian Studios/Baldur's Gate 3/Mods"
 )
-MODSETTINGS_PATH = PROTON_PREFIX / (
+PROFILES_DIR = PROTON_PREFIX / (
     "drive_c/users/steamuser/AppData/Local"
-    "/Larian Studios/Baldur's Gate 3"
-    "/PlayerProfiles/Public/modsettings.lsx"
+    "/Larian Studios/Baldur's Gate 3/PlayerProfiles"
 )
+
+
+def _find_active_modsettings() -> Path:
+    """Find the most recently modified modsettings.lsx across all profiles."""
+    candidates = list(PROFILES_DIR.glob("*/modsettings.lsx"))
+    if not candidates:
+        return PROFILES_DIR / "Public" / "modsettings.lsx"
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+MODSETTINGS_PATH = _find_active_modsettings()
 
 # ── Minimal game plugin stub ──────────────────────────────────────────
 
@@ -39,6 +49,15 @@ class _FakeGamePlugin:
 
     def modsettings_path(self) -> Path | None:
         return MODSETTINGS_PATH
+
+    def get_framework_mods(self):
+        return []
+
+    def is_framework_mod(self, _file_list):
+        return None
+
+    def get_installed_frameworks(self):
+        return []
 
 
 # ── Helpers ───────────────────────────────────────────────────────────

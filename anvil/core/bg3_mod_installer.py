@@ -18,7 +18,7 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from anvil.core.lspk_parser import LSPKReader
@@ -187,6 +187,86 @@ class BG3ModInstaller:
         shutil.copy2(self._modsettings_path, backup)
         print(f"bg3_installer: deploy OK — backup at {backup}")
         return True
+
+    def repair_modsettings(self) -> dict:
+        """Repair a broken modsettings.lsx file.
+
+        Reads the current file, creates a timestamped backup, then
+        rewrites it with:
+          - A proper ModOrder node (reconstructed from Mods entries)
+          - GustavX/Gustav at position 0
+          - No duplicate UUIDs
+          - All existing mods preserved
+
+        Returns:
+            Dict with 'backup_path', 'mod_count', 'had_mod_order',
+            'gustav_uuid' — or empty dict on error.
+        """
+        if self._modsettings_path is None or not self._modsettings_path.is_file():
+            print("bg3_installer: repair — modsettings.lsx not found", file=sys.stderr)
+            return {}
+
+        path = self._modsettings_path
+
+        # ── Read current state ────────────────────────────────────
+        data = ModsettingsParser.read(path)
+        mod_order = data["mod_order"]
+        mods = data["mods"]
+
+        # Check if ModOrder was actually present in the file
+        import xml.etree.ElementTree as ET2
+        try:
+            tree = ET2.parse(path)
+            root = tree.getroot()
+            had_mod_order = any(
+                elem.get("id") == "ModOrder"
+                for elem in root.iter("node")
+            )
+        except ET2.ParseError:
+            had_mod_order = False
+
+        # ── Timestamped backup ────────────────────────────────────
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup = path.parent / f"modsettings.lsx.repair_backup_{ts}"
+        shutil.copy2(path, backup)
+        print(f"bg3_installer: repair backup → {backup}")
+
+        # ── Deduplicate mods ──────────────────────────────────────
+        unique_mods: list[dict] = []
+        seen: set[str] = set()
+        for m in mods:
+            key = m["uuid"].lower()
+            if key not in seen:
+                seen.add(key)
+                unique_mods.append(m)
+
+        # ── Build ModOrder: Gustav first, then all others ─────────
+        gustav_uuid = None
+        other_uuids: list[str] = []
+
+        for m in unique_mods:
+            if is_base_game_mod(m["uuid"]):
+                gustav_uuid = m["uuid"]
+            else:
+                other_uuids.append(m["uuid"])
+
+        if gustav_uuid is None:
+            gustav_uuid = GUSTAVX_UUID
+
+        final_order = [gustav_uuid] + other_uuids
+
+        # ── Write repaired file ───────────────────────────────────
+        self._write_modsettings(final_order, unique_mods)
+
+        print(f"bg3_installer: repair done — {len(unique_mods)} mods, "
+              f"ModOrder {'reconstructed' if not had_mod_order else 'deduplicated'}")
+
+        return {
+            "backup_path": str(backup),
+            "mod_count": len(unique_mods),
+            "had_mod_order": had_mod_order,
+            "gustav_uuid": gustav_uuid,
+        }
 
     def get_mod_list(self) -> dict:
         """Return active, inactive, data_overrides, and frameworks.
@@ -688,21 +768,32 @@ class BG3ModInstaller:
             # No Gustav in order — prepend default
             mod_order = [GUSTAVX_UUID] + list(mod_order)
 
-        final_order = list(mod_order)
+        # ── Deduplicate ModOrder ──────────────────────────────────
+        final_order: list[str] = []
+        seen_order: set[str] = set()
+        for uuid in mod_order:
+            key = uuid.strip().lower()
+            if key not in seen_order:
+                seen_order.add(key)
+                final_order.append(uuid.strip())
 
         # ── Ensure Gustav is in all_mods ──────────────────────────
-        all_mods_by_uuid = {m["uuid"].lower(): m for m in all_mods}
+        all_mods_by_uuid: dict[str, dict] = {}
+        for m in all_mods:
+            key = m["uuid"].lower()
+            if key not in all_mods_by_uuid:  # first wins, no dupes
+                all_mods_by_uuid[key] = m
         for uuid in final_order:
             if is_base_game_mod(uuid) and uuid.lower() not in all_mods_by_uuid:
-                all_mods.insert(0, {
+                entry = {
                     "uuid": uuid,
                     "name": "Gustav",
                     "folder": "GustavDev",
                     "md5": "",
                     "version64": "144115207403209032",
                     "publish_handle": "0",
-                })
-                all_mods_by_uuid[uuid.lower()] = all_mods[0]
+                }
+                all_mods_by_uuid[uuid.lower()] = entry
 
         # ── Build ModOrder XML ────────────────────────────────────
         mod_order_lines: list[str] = []
@@ -720,20 +811,24 @@ class BG3ModInstaller:
 
         # Active mods first (in load order)
         for uuid in final_order:
-            attrs = all_mods_by_uuid.get(uuid.lower())
+            key = uuid.lower()
+            if key in written_uuids:
+                continue
+            attrs = all_mods_by_uuid.get(key)
             if attrs is None:
                 attrs = {
                     "uuid": uuid, "name": uuid, "folder": "",
                     "md5": "", "version64": "0", "publish_handle": "0",
                 }
             mods_lines.append(self._mod_xml(attrs))
-            written_uuids.add(uuid.lower())
+            written_uuids.add(key)
 
         # Inactive mods (in Mods node but not in ModOrder)
         for mod in all_mods:
-            if mod["uuid"].lower() not in written_uuids:
+            key = mod["uuid"].lower()
+            if key not in written_uuids:
                 mods_lines.append(self._mod_xml(mod))
-                written_uuids.add(mod["uuid"].lower())
+                written_uuids.add(key)
 
         # ── Assemble full XML ─────────────────────────────────────
         xml = (

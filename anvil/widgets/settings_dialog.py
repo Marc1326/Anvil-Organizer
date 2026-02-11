@@ -39,9 +39,11 @@ from anvil.core.nexus_api import NexusAPI
 from anvil.core.nexus_sso import NexusSSOLogin
 
 class SettingsDialog(QDialog):
-    def __init__(self, parent=None, plugin_loader: PluginLoader | None = None):
+    def __init__(self, parent=None, plugin_loader: PluginLoader | None = None,
+                 instance_manager=None):
         super().__init__(parent)
         self._plugin_loader = plugin_loader
+        self._instance_manager = instance_manager
         self.setWindowTitle("Einstellungen")
         self.setMinimumSize(960, 600)
         self.resize(960, 600)
@@ -251,18 +253,45 @@ class SettingsDialog(QDialog):
             row.addWidget(QPushButton("..."))
             form.addRow(label, row)
 
+        # ── Resolve paths from the active instance ──────────────
+        _base_dir = ""
+        _downloads = ""
+        _mods = ""
+        _caches = ""
+        _profiles = ""
+        _overwrite = ""
+        _game_path = ""
+
+        if self._instance_manager is not None:
+            cur = self._instance_manager.current_instance()
+            if cur:
+                idata = self._instance_manager.load_instance(cur)
+                ipath = self._instance_manager.instances_path() / cur
+                _base_dir = str(ipath)
+
+                # Resolve %INSTANCE_DIR% in stored paths
+                def _resolve(val: str) -> str:
+                    return val.replace("%INSTANCE_DIR%", str(ipath))
+
+                _downloads = _resolve(idata.get("path_downloads_directory", ""))
+                _mods = _resolve(idata.get("path_mods_directory", ""))
+                _profiles = _resolve(idata.get("path_profiles_directory", ""))
+                _overwrite = _resolve(idata.get("path_overwrite_directory", ""))
+                _caches = str(ipath / ".webcache")
+                _game_path = idata.get("game_path", "")
+
         pf_form = QFormLayout()
-        add_path_row(pf_form, "Basisverzeichnis:", "~/.local/share/AnvilOrganizer/Cyberpunk 2077", False)
-        add_path_row(pf_form, "Downloads:", "~/Downloads/Mods", False)
-        add_path_row(pf_form, "Mods:", "%BASE_DIR%/mods", False)
-        add_path_row(pf_form, "Caches:", "%BASE_DIR%/webcache", False)
-        add_path_row(pf_form, "Profile:", "%BASE_DIR%/profiles", False)
-        add_path_row(pf_form, "Overwrite:", "%BASE_DIR%/overwrite", False)
+        add_path_row(pf_form, "Basisverzeichnis:", _base_dir, False)
+        add_path_row(pf_form, "Downloads:", _downloads, False)
+        add_path_row(pf_form, "Mods:", _mods, False)
+        add_path_row(pf_form, "Caches:", _caches, False)
+        add_path_row(pf_form, "Profile:", _profiles, False)
+        add_path_row(pf_form, "Overwrite:", _overwrite, False)
         pf_content_layout.addLayout(pf_form)
         pf_content_layout.addWidget(QLabel("Verwenden Sie %BASE_DIR%, um auf das Basisverzeichnis zu verweisen."))
         pf_content_layout.addSpacing(16)
         pf_game_form = QFormLayout()
-        add_path_row(pf_game_form, "Verwaltetes Spiel:", "~/.local/share/Steam/steamapps/common/Cyberpunk 2077/bin/x64/Cyberpunk2077", False)
+        add_path_row(pf_game_form, "Verwaltetes Spiel:", _game_path, False)
         pf_content_layout.addLayout(pf_game_form)
         pf_content_layout.addStretch()
         pf_content_layout.addWidget(QLabel("Alle Verzeichnisse müssen beschreibbar sein."))

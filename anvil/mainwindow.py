@@ -416,7 +416,11 @@ class MainWindow(QMainWindow):
     def _on_menu_settings(self) -> None:
         """Werkzeuge → Einstellungen... (Strg+S)."""
         from anvil.widgets.settings_dialog import SettingsDialog
-        SettingsDialog(self, self.plugin_loader).exec()
+        SettingsDialog(
+            self,
+            self.plugin_loader,
+            self.instance_manager,
+        ).exec()
 
     def _on_menu_help(self) -> None:
         """Hilfe → Hilfe (Strg+H)."""

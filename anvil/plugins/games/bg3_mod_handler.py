@@ -173,8 +173,15 @@ class ModsettingsParser:
             mod_order = list(by_uuid.keys())
 
         # ── Mods: build ordered list with full metadata ────────────
+        # Active mods first (from ModOrder), then remaining inactive mods
         mods: list[dict[str, str]] = []
+        seen_uuids: set[str] = set()
+
         for uuid in mod_order:
+            key = uuid.lower()
+            if key in seen_uuids:
+                continue  # skip duplicates
+            seen_uuids.add(key)
             if uuid in by_uuid:
                 mods.append(by_uuid[uuid])
             else:
@@ -188,6 +195,12 @@ class ModsettingsParser:
                     "version64": "0",
                     "publish_handle": "0",
                 })
+
+        # Append mods NOT in ModOrder (inactive) so they aren't lost
+        for uuid, attrs in by_uuid.items():
+            if uuid.lower() not in seen_uuids:
+                mods.append(attrs)
+                seen_uuids.add(uuid.lower())
 
         return {
             "version": version,
@@ -232,8 +245,13 @@ class ModsettingsWriter:
         # ── Ensure Gustav is first ─────────────────────────────────
         gustav_entry: dict[str, str] | None = None
         filtered_order: list[str] = []
+        seen: set[str] = set()
 
         for uuid in mod_order:
+            key = uuid.strip().lower()
+            if key in seen:
+                continue  # skip duplicates
+            seen.add(key)
             if is_base_game_mod(uuid):
                 # Use provided data, fall back to existing, then defaults
                 gustav_entry = (
@@ -252,9 +270,14 @@ class ModsettingsWriter:
 
         final_order = [gustav_entry["uuid"]] + filtered_order
 
-        # ── Build ModOrder XML ─────────────────────────────────────
+        # ── Build ModOrder XML (deduplicated) ──────────────────────
         mod_order_lines: list[str] = []
+        written_order: set[str] = set()
         for uuid in final_order:
+            key = uuid.strip().lower()
+            if key in written_order:
+                continue
+            written_order.add(key)
             mod_order_lines.append(
                 f'            <node id="Module">\n'
                 f'              <attribute id="UUID" type="FixedString" '
@@ -262,9 +285,15 @@ class ModsettingsWriter:
                 f'            </node>'
             )
 
-        # ── Build Mods XML ─────────────────────────────────────────
+        # ── Build Mods XML (deduplicated) ──────────────────────────
         mods_lines: list[str] = []
+        written_mods: set[str] = set()
         for uuid in final_order:
+            key = uuid.strip().lower()
+            if key in written_mods:
+                continue
+            written_mods.add(key)
+
             # Priority: provided mods → existing file → defaults
             attrs = (
                 mods_by_uuid.get(uuid)

@@ -20,6 +20,7 @@ TODO (future):
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from anvil.core.bg3_mod_installer import BG3ModInstaller
@@ -74,15 +75,10 @@ class BaldursGate3Game(BaseGame):
         "drive_c/users/steamuser/AppData/Local"
         "/Larian Studios/Baldur's Gate 3"
     )
-    _WIN_SAVES = (
+    _WIN_SAVES_SUBDIR = "Savegames/Story"
+    _WIN_PROFILES = (
         "drive_c/users/steamuser/AppData/Local"
-        "/Larian Studios/Baldur's Gate 3"
-        "/PlayerProfiles/Public/Savegames/Story"
-    )
-    _WIN_MODSETTINGS = (
-        "drive_c/users/steamuser/AppData/Local"
-        "/Larian Studios/Baldur's Gate 3"
-        "/PlayerProfiles/Public/modsettings.lsx"
+        "/Larian Studios/Baldur's Gate 3/PlayerProfiles"
     )
     _WIN_PAK_MODS = (
         "drive_c/users/steamuser/AppData/Local"
@@ -110,34 +106,55 @@ class BaldursGate3Game(BaseGame):
         return None
 
     def gameSavesDirectory(self) -> Path | None:
-        """Return the save game directory.
+        """Return the save game directory of the active profile.
 
-        For Steam (Proton): derived from the Proton prefix.
+        Uses the same profile as modsettings_path() (newest mtime).
         Returns None if no prefix is found.
         """
-        prefix = self.protonPrefix()
-        if prefix is not None:
-            path = prefix / self._WIN_SAVES
+        ms = self.modsettings_path()
+        if ms is not None:
+            path = ms.parent / self._WIN_SAVES_SUBDIR
             if path.is_dir():
                 return path
         return None
 
     # ── BG3-spezifische Pfade (Grundlage für Teil 2) ──────────────────
 
-    def modsettings_path(self) -> Path | None:
-        """Return the path to modsettings.lsx.
+    def _profiles_dir(self) -> Path | None:
+        """Return the PlayerProfiles directory inside the Proton prefix."""
+        prefix = self.protonPrefix()
+        if prefix is not None:
+            d = prefix / self._WIN_PROFILES
+            if d.is_dir():
+                return d
+        return None
 
-        This file controls the mod load order in BG3.  Located at
-        ``<prefix>/.../PlayerProfiles/Public/modsettings.lsx``.
+    def modsettings_path(self) -> Path | None:
+        """Return the path to modsettings.lsx of the **active** profile.
+
+        BG3 may use different profile directories (Public,
+        Debug_Client_Profile_1, etc.).  The active profile is
+        detected by finding the most recently modified
+        ``PlayerProfiles/*/modsettings.lsx`` file.
 
         Returns:
             Absolute path to modsettings.lsx, or None if the
             Proton prefix is not available.
         """
-        prefix = self.protonPrefix()
-        if prefix is not None:
-            return prefix / self._WIN_MODSETTINGS
-        return None
+        profiles = self._profiles_dir()
+        if profiles is None:
+            return None
+
+        candidates = list(profiles.glob("*/modsettings.lsx"))
+        if not candidates:
+            # No profile yet — fall back to Public
+            return profiles / "Public" / "modsettings.lsx"
+
+        # Most recently modified = active profile
+        best = max(candidates, key=lambda p: p.stat().st_mtime)
+        print(f"bg3: active profile → {best.parent.name}/modsettings.lsx",
+              file=sys.stderr)
+        return best
 
     def pak_mods_path(self) -> Path | None:
         """Return the directory where .pak mod files are stored.
