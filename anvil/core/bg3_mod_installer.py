@@ -1,11 +1,9 @@
 """BG3 Mod Installer — install, activate, deactivate, reorder, uninstall.
 
-Manages the full lifecycle of BG3 pak mods:
-  - Install from archive (ZIP/RAR/7z) or single .pak
-  - Activate / deactivate (ModOrder management)
-  - Reorder load order
-  - Uninstall (remove from modsettings.lsx + delete .pak)
-  - Deploy with validation
+Manages the full lifecycle of BG3 mods across three types:
+  - STANDARD (pak): .pak files → Mods folder + modsettings.lsx
+  - FRAMEWORK: Script Extender etc. → game directory (bin/, root)
+  - DATA_OVERRIDE: Loose files → Data/ directory
 
 Uses ModsettingsParser for reading and a custom XML writer that
 supports inactive mods (in Mods node but not in ModOrder).
@@ -13,12 +11,14 @@ supports inactive mods (in Mods node but not in ModOrder).
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
+from datetime import date
 from pathlib import Path
 
 from anvil.core.lspk_parser import LSPKReader
@@ -35,14 +35,21 @@ from anvil.plugins.games.bg3_mod_handler import (
 # UUIDs to hide from the user
 _HIDDEN_UUIDS = {GUSTAV_UUID.lower(), GUSTAVX_UUID.lower()}
 
+# Mod types
+MOD_TYPE_PAK = "pak"
+MOD_TYPE_FRAMEWORK = "framework"
+MOD_TYPE_DATA_OVERRIDE = "data_override"
+
 
 class BG3ModInstaller:
     """Full mod lifecycle manager for Baldur's Gate 3."""
 
-    def __init__(self, game_plugin) -> None:
+    def __init__(self, game_plugin, instance_path: Path | None = None) -> None:
         self._plugin = game_plugin
         self._mods_path: Path | None = game_plugin.pak_mods_path()
         self._modsettings_path: Path | None = game_plugin.modsettings_path()
+        self._game_path: Path | None = getattr(game_plugin, "_game_path", None)
+        self._instance_path = instance_path
         self._lspk = LSPKReader()
 
     # ── Public API ─────────────────────────────────────────────────────
@@ -50,83 +57,27 @@ class BG3ModInstaller:
     def install_mod(self, archive_path: Path) -> dict | None:
         """Install a mod from an archive (ZIP/RAR/7z) or a single .pak.
 
-        The mod is added to modsettings.lsx as INACTIVE (Mods node only,
-        not in ModOrder).
+        Detects mod type automatically:
+          - Framework (BG3SE etc.): files copied to game directory
+          - Standard (pak): .pak to Mods folder + modsettings.lsx entry
+          - Data-Override: loose files to Data/ directory
 
         Returns:
-            Dict with name, uuid, pak_files, status — or None on error.
+            Dict with name, type, status — or None on error.
         """
-        if self._mods_path is None or self._modsettings_path is None:
-            print("bg3_installer: Proton prefix not found", file=sys.stderr)
-            return None
-
-        self._mods_path.mkdir(parents=True, exist_ok=True)
-
-        # ── Collect .pak files ────────────────────────────────────
-        pak_files: list[Path] = []
-
+        # Single .pak — always standard pak type
         if archive_path.suffix.lower() == ".pak":
-            # Single .pak — copy directly
-            dest = self._mods_path / archive_path.name
-            shutil.copy2(archive_path, dest)
-            pak_files.append(dest)
-        else:
-            # Archive — extract, find .pak files, copy them
-            extracted = self._extract_archive(archive_path)
-            if extracted is None:
-                return None
-            try:
-                for pak in Path(extracted).rglob("*.pak"):
-                    dest = self._mods_path / pak.name
-                    shutil.copy2(pak, dest)
-                    pak_files.append(dest)
-            finally:
-                shutil.rmtree(extracted, ignore_errors=True)
+            return self._install_pak_single(archive_path)
 
-        if not pak_files:
-            print("bg3_installer: no .pak files found in archive", file=sys.stderr)
+        # Archive — extract first, then detect type
+        extracted = self._extract_archive(archive_path)
+        if extracted is None:
             return None
 
-        # ── Read metadata + register in modsettings.lsx ───────────
-        result_name = ""
-        result_uuid = ""
-        pak_names: list[str] = []
-
-        data = self._read_modsettings()
-        mod_order = data["mod_order"]
-        mods = data["mods"]
-        existing_uuids = {m["uuid"].lower() for m in mods}
-
-        for pak in pak_files:
-            pak_names.append(pak.name)
-            meta = self._lspk.read_pak_metadata(pak)
-            if meta is None or not meta.get("uuid"):
-                continue
-
-            result_name = result_name or meta.get("name", "")
-            result_uuid = result_uuid or meta.get("uuid", "")
-
-            # Add to Mods node if not already there
-            if meta["uuid"].lower() not in existing_uuids:
-                mods.append({
-                    "uuid": meta["uuid"],
-                    "name": meta.get("name", ""),
-                    "folder": meta.get("folder", ""),
-                    "md5": "",
-                    "version64": meta.get("version", "0") or "0",
-                    "publish_handle": "0",
-                })
-                existing_uuids.add(meta["uuid"].lower())
-
-        # Write back — mod is in Mods but NOT in ModOrder (inactive)
-        self._write_modsettings(mod_order, mods)
-
-        return {
-            "name": result_name or pak_names[0],
-            "uuid": result_uuid,
-            "pak_files": pak_names,
-            "status": "inactive",
-        }
+        try:
+            return self._install_from_extracted(Path(extracted), archive_path.stem)
+        finally:
+            shutil.rmtree(extracted, ignore_errors=True)
 
     def activate_mod(self, uuid: str) -> bool:
         """Move a mod from inactive to active (add to ModOrder)."""
@@ -238,13 +189,10 @@ class BG3ModInstaller:
         return True
 
     def get_mod_list(self) -> dict:
-        """Return active and inactive mods.
-
-        Active = in ModOrder. Inactive = .pak in Mods folder but not
-        in ModOrder. Gustav/GustavDev are filtered out.
+        """Return active, inactive, data_overrides, and frameworks.
 
         Returns:
-            Dict with 'active' and 'inactive' lists.
+            Dict with 'active', 'inactive', 'data_overrides', 'frameworks'.
         """
         data = self._read_modsettings()
         mod_order = data["mod_order"]
@@ -253,7 +201,7 @@ class BG3ModInstaller:
         # Build set of active UUIDs (from ModOrder)
         active_uuids = {u.lower() for u in mod_order}
 
-        # Build UUID→mod-info map from modsettings
+        # Build UUID->mod-info map from modsettings
         mods_by_uuid: dict[str, dict] = {}
         for m in mods:
             mods_by_uuid[m["uuid"].lower()] = m
@@ -292,10 +240,6 @@ class BG3ModInstaller:
                 if pak_uuid in active_uuids:
                     continue
 
-                # Also skip if registered in Mods node and active
-                if pak_uuid in mods_by_uuid and pak_uuid in active_uuids:
-                    continue
-
                 inactive.append({
                     "uuid": meta["uuid"],
                     "name": meta.get("name", pak.stem),
@@ -323,7 +267,16 @@ class BG3ModInstaller:
                 "source": "modsettings_only",
             })
 
-        return {"active": active, "inactive": inactive}
+        # Data overrides and frameworks
+        data_overrides = self.get_data_overrides()
+        frameworks = self._get_frameworks()
+
+        return {
+            "active": active,
+            "inactive": inactive,
+            "data_overrides": data_overrides,
+            "frameworks": frameworks,
+        }
 
     def uninstall_mod(self, uuid: str, pak_filename: str) -> bool:
         """Uninstall a mod completely.
@@ -357,6 +310,339 @@ class BG3ModInstaller:
                 print(f"bg3_installer: deleted {pak_path}")
 
         return True
+
+    # ── Data-Override Management ───────────────────────────────────────
+
+    def get_data_overrides(self) -> list[dict]:
+        """Return list of installed data-override mods from manifests."""
+        manifest_dir = self._override_manifest_dir()
+        if manifest_dir is None or not manifest_dir.is_dir():
+            return []
+        result: list[dict] = []
+        for json_file in sorted(manifest_dir.glob("*.json")):
+            manifest = self._load_override_manifest(json_file.stem)
+            if manifest:
+                result.append(manifest)
+        return result
+
+    def uninstall_data_override(self, mod_name: str) -> bool:
+        """Remove a data-override mod: delete files from Data/ + manifest."""
+        manifest = self._load_override_manifest(mod_name)
+        if manifest is None:
+            print(f"bg3_installer: no manifest for '{mod_name}'", file=sys.stderr)
+            return False
+
+        if self._game_path is None:
+            print("bg3_installer: game path not set", file=sys.stderr)
+            return False
+
+        # Delete each file
+        for rel_path in manifest.get("files", []):
+            full = self._game_path / rel_path
+            if full.is_file():
+                full.unlink()
+                print(f"bg3_installer: deleted {full}")
+
+        # Clean up empty directories (bottom-up)
+        data_dir = self._game_path / "Data"
+        if data_dir.is_dir():
+            for rel_path in reversed(manifest.get("files", [])):
+                parent = (self._game_path / rel_path).parent
+                while parent != data_dir and parent.is_dir():
+                    try:
+                        parent.rmdir()  # only removes if empty
+                    except OSError:
+                        break
+                    parent = parent.parent
+
+        # Delete manifest
+        manifest_dir = self._override_manifest_dir()
+        if manifest_dir:
+            json_path = manifest_dir / f"{mod_name}.json"
+            if json_path.is_file():
+                json_path.unlink()
+                print(f"bg3_installer: manifest deleted {json_path}")
+
+        return True
+
+    # ── Mod-Type Detection ─────────────────────────────────────────────
+
+    def detect_mod_type(self, file_list: list[str]) -> tuple[str, object]:
+        """Detect mod type from extracted archive contents.
+
+        Args:
+            file_list: Relative file paths in the extracted archive.
+
+        Returns:
+            Tuple of (mod_type, extra_data):
+              - ("framework", FrameworkMod) if framework match found
+              - ("pak", None) if .pak files present
+              - ("data_override", None) otherwise
+        """
+        # 1. Check framework patterns
+        fw = self._plugin.is_framework_mod(file_list)
+        if fw is not None:
+            return (MOD_TYPE_FRAMEWORK, fw)
+
+        # 2. Check for .pak files
+        has_pak = any(f.lower().endswith(".pak") for f in file_list)
+        if has_pak:
+            return (MOD_TYPE_PAK, None)
+
+        # 3. Everything else is a data override
+        return (MOD_TYPE_DATA_OVERRIDE, None)
+
+    # ── Private: install dispatchers ───────────────────────────────────
+
+    def _install_from_extracted(self, temp_dir: Path, archive_name: str) -> dict | None:
+        """Detect type and dispatch to the right installer."""
+        # Collect all relative paths in the extracted archive
+        file_list = [
+            str(f.relative_to(temp_dir))
+            for f in temp_dir.rglob("*")
+            if f.is_file()
+        ]
+
+        if not file_list:
+            print("bg3_installer: archive is empty", file=sys.stderr)
+            return None
+
+        mod_type, extra = self.detect_mod_type(file_list)
+
+        if mod_type == MOD_TYPE_FRAMEWORK:
+            return self._install_framework(temp_dir, extra)
+        elif mod_type == MOD_TYPE_PAK:
+            return self._install_pak_from_dir(temp_dir)
+        else:
+            return self._install_data_override(temp_dir, archive_name)
+
+    def _install_pak_single(self, pak_path: Path) -> dict | None:
+        """Install a single .pak file (no extraction needed)."""
+        if self._mods_path is None or self._modsettings_path is None:
+            print("bg3_installer: Proton prefix not found", file=sys.stderr)
+            return None
+
+        self._mods_path.mkdir(parents=True, exist_ok=True)
+
+        dest = self._mods_path / pak_path.name
+        shutil.copy2(pak_path, dest)
+
+        return self._register_pak_files([dest])
+
+    def _install_pak_from_dir(self, temp_dir: Path) -> dict | None:
+        """Install .pak files from an extracted archive."""
+        if self._mods_path is None or self._modsettings_path is None:
+            print("bg3_installer: Proton prefix not found", file=sys.stderr)
+            return None
+
+        self._mods_path.mkdir(parents=True, exist_ok=True)
+
+        pak_files: list[Path] = []
+        for pak in temp_dir.rglob("*.pak"):
+            dest = self._mods_path / pak.name
+            shutil.copy2(pak, dest)
+            pak_files.append(dest)
+
+        if not pak_files:
+            print("bg3_installer: no .pak files found in archive", file=sys.stderr)
+            return None
+
+        result = self._register_pak_files(pak_files)
+        if result:
+            result["type"] = MOD_TYPE_PAK
+        return result
+
+    def _register_pak_files(self, pak_files: list[Path]) -> dict | None:
+        """Read metadata from paks and register in modsettings.lsx (inactive)."""
+        result_name = ""
+        result_uuid = ""
+        pak_names: list[str] = []
+
+        data = self._read_modsettings()
+        mod_order = data["mod_order"]
+        mods = data["mods"]
+        existing_uuids = {m["uuid"].lower() for m in mods}
+
+        for pak in pak_files:
+            pak_names.append(pak.name)
+            meta = self._lspk.read_pak_metadata(pak)
+            if meta is None or not meta.get("uuid"):
+                continue
+
+            result_name = result_name or meta.get("name", "")
+            result_uuid = result_uuid or meta.get("uuid", "")
+
+            # Add to Mods node if not already there
+            if meta["uuid"].lower() not in existing_uuids:
+                mods.append({
+                    "uuid": meta["uuid"],
+                    "name": meta.get("name", ""),
+                    "folder": meta.get("folder", ""),
+                    "md5": "",
+                    "version64": meta.get("version", "0") or "0",
+                    "publish_handle": "0",
+                })
+                existing_uuids.add(meta["uuid"].lower())
+
+        # Write back — mod is in Mods but NOT in ModOrder (inactive)
+        self._write_modsettings(mod_order, mods)
+
+        return {
+            "name": result_name or pak_names[0],
+            "type": MOD_TYPE_PAK,
+            "uuid": result_uuid,
+            "pak_files": pak_names,
+            "status": "inactive",
+        }
+
+    def _install_framework(self, temp_dir: Path, fw) -> dict | None:
+        """Install a framework mod (e.g. BG3SE) into the game directory."""
+        if self._game_path is None:
+            print("bg3_installer: game path not set, cannot install framework", file=sys.stderr)
+            return None
+
+        target_dir = self._game_path / fw.target if fw.target else self._game_path
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Find the framework files using the pattern
+        installed_files: list[str] = []
+        for src_file in temp_dir.rglob("*"):
+            if not src_file.is_file():
+                continue
+            # Match against framework patterns (case-insensitive)
+            rel = str(src_file.relative_to(temp_dir))
+            name_lower = src_file.name.lower()
+
+            # Copy files that match the pattern or are in the same directory
+            # as a matching file
+            matched = any(
+                pat.lower() in name_lower or name_lower == pat.lower()
+                for pat in fw.pattern
+            )
+            if matched:
+                dest = target_dir / src_file.name
+                shutil.copy2(src_file, dest)
+                installed_files.append(str(dest.relative_to(self._game_path)))
+            else:
+                # Also copy sibling files (e.g. .ini configs next to DWrite.dll)
+                for pat in fw.pattern:
+                    pat_files = list(temp_dir.rglob(pat))
+                    if pat_files:
+                        pat_parent = pat_files[0].parent
+                        if src_file.parent == pat_parent:
+                            dest = target_dir / src_file.name
+                            shutil.copy2(src_file, dest)
+                            installed_files.append(
+                                str(dest.relative_to(self._game_path))
+                            )
+                            break
+
+        print(f"bg3_installer: framework '{fw.name}' installed → {target_dir} "
+              f"({len(installed_files)} files)")
+
+        return {
+            "name": fw.name,
+            "type": MOD_TYPE_FRAMEWORK,
+            "target": fw.target,
+            "files": installed_files,
+            "status": "installed",
+        }
+
+    def _install_data_override(self, temp_dir: Path, mod_name: str) -> dict | None:
+        """Install a data-override mod: copy loose files to Data/."""
+        if self._game_path is None:
+            print("bg3_installer: game path not set, cannot install data override", file=sys.stderr)
+            return None
+
+        data_dir = self._game_path / "Data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Detect common root — if archive has a single top-level folder,
+        # strip it so files go directly into Data/
+        top_entries = list(temp_dir.iterdir())
+        content_root = temp_dir
+        if len(top_entries) == 1 and top_entries[0].is_dir():
+            content_root = top_entries[0]
+
+        installed_files: list[str] = []
+        for src_file in content_root.rglob("*"):
+            if not src_file.is_file():
+                continue
+            rel = src_file.relative_to(content_root)
+            dest = data_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_file, dest)
+            # Store path relative to game_path for uninstall
+            installed_files.append(str(Path("Data") / rel))
+
+        if not installed_files:
+            print("bg3_installer: no files to install as data override", file=sys.stderr)
+            return None
+
+        # Save manifest for later uninstall
+        self._save_override_manifest(mod_name, installed_files)
+
+        print(f"bg3_installer: data override '{mod_name}' installed "
+              f"({len(installed_files)} files)")
+
+        return {
+            "name": mod_name,
+            "type": MOD_TYPE_DATA_OVERRIDE,
+            "files": installed_files,
+            "status": "installed",
+        }
+
+    # ── Data-Override Manifest I/O ─────────────────────────────────────
+
+    def _override_manifest_dir(self) -> Path | None:
+        """Return the directory for data-override manifests."""
+        if self._instance_path is not None:
+            return self._instance_path / ".data_overrides"
+        return None
+
+    def _save_override_manifest(self, mod_name: str, files: list[str]) -> None:
+        """Write a JSON manifest for a data-override mod."""
+        manifest_dir = self._override_manifest_dir()
+        if manifest_dir is None:
+            print("bg3_installer: no instance_path, cannot save manifest", file=sys.stderr)
+            return
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        manifest = {
+            "name": mod_name,
+            "files": files,
+            "installed_at": str(date.today()),
+        }
+        json_path = manifest_dir / f"{mod_name}.json"
+        json_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def _load_override_manifest(self, mod_name: str) -> dict | None:
+        """Read a JSON manifest for a data-override mod."""
+        manifest_dir = self._override_manifest_dir()
+        if manifest_dir is None:
+            return None
+        json_path = manifest_dir / f"{mod_name}.json"
+        if not json_path.is_file():
+            return None
+        try:
+            return json.loads(json_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"bg3_installer: manifest read error: {exc}", file=sys.stderr)
+            return None
+
+    # ── Framework helpers ──────────────────────────────────────────────
+
+    def _get_frameworks(self) -> list[dict]:
+        """Return installed/available framework mods."""
+        result: list[dict] = []
+        for fw, installed in self._plugin.get_installed_frameworks():
+            result.append({
+                "name": fw.name,
+                "type": MOD_TYPE_FRAMEWORK,
+                "description": fw.description,
+                "installed": installed,
+                "target": fw.target,
+            })
+        return result
 
     # ── Private helpers ────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-"""BG3-specific mod list widget: active / inactive split with QSplitter."""
+"""BG3-specific mod list widget: active / inactive / extras split with QSplitter."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
     QSplitter,
     QStyledItemDelegate,
     QTreeView,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -186,7 +188,7 @@ def _setup_tree(tree: _BG3DropTreeView, model: BG3ModListModel, allow_reorder: b
 # ── Main widget ──────────────────────────────────────────────────────
 
 class BG3ModListView(QWidget):
-    """BG3 mod list with active/inactive split.
+    """BG3 mod list with active/inactive/extras split.
 
     Signals:
         archives_dropped(list): External archive paths dropped.
@@ -194,8 +196,9 @@ class BG3ModListView(QWidget):
         mod_deactivated(str): UUID of mod to deactivate.
         mods_reordered(list): New UUID order for active mods.
         context_menu_requested(QPoint, str, dict): (global_pos, section, mod_data)
-            section is 'active' or 'inactive'.
+            section is 'active', 'inactive', or 'extras'.
             mod_data is a dict with uuid, name, filename or empty if no selection.
+        data_override_uninstall(str): mod_name to uninstall.
     """
 
     archives_dropped = Signal(list)
@@ -203,6 +206,7 @@ class BG3ModListView(QWidget):
     mod_deactivated = Signal(str)
     mods_reordered = Signal(list)
     context_menu_requested = Signal(QPoint, str, dict)
+    data_override_uninstall = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -252,8 +256,35 @@ class BG3ModListView(QWidget):
 
         self._splitter.addWidget(inactive_pane)
 
-        # Default splitter proportions: 70% active, 30% inactive
-        self._splitter.setSizes([500, 200])
+        # ── Extras section (Data-Overrides & Frameworks) ──────────
+        extras_pane = QWidget()
+        extras_layout = QVBoxLayout(extras_pane)
+        extras_layout.setContentsMargins(0, 0, 0, 0)
+        extras_layout.setSpacing(2)
+
+        self._extras_label = QLabel("Data-Overrides & Frameworks (0)")
+        self._extras_label.setStyleSheet(
+            "QLabel { font-weight: bold; padding: 4px 6px; "
+            "background: #1a2a3a; border-bottom: 1px solid #333; }"
+        )
+        extras_layout.addWidget(self._extras_label)
+
+        self._extras_tree = QTreeWidget()
+        self._extras_tree.setHeaderLabels(["Name", "Typ", "Status"])
+        self._extras_tree.setRootIsDecorated(False)
+        self._extras_tree.setAlternatingRowColors(True)
+        self._extras_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._extras_tree.setUniformRowHeights(True)
+        self._extras_tree.setColumnWidth(0, 280)
+        self._extras_tree.setColumnWidth(1, 100)
+        self._extras_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._extras_tree.customContextMenuRequested.connect(self._on_extras_context_menu)
+        extras_layout.addWidget(self._extras_tree)
+
+        self._splitter.addWidget(extras_pane)
+
+        # Default splitter proportions: 55% active, 30% inactive, 15% extras
+        self._splitter.setSizes([400, 200, 100])
 
         layout.addWidget(self._splitter)
 
@@ -269,7 +300,7 @@ class BG3ModListView(QWidget):
         self._active_tree.archives_dropped.connect(self.archives_dropped)
         self._inactive_tree.archives_dropped.connect(self.archives_dropped)
 
-        # Checkbox toggle: active unchecked → deactivate, inactive checked → activate
+        # Checkbox toggle: active unchecked -> deactivate, inactive checked -> activate
         self._active_model.mod_toggled.connect(self._on_active_toggled)
         self._inactive_model.mod_toggled.connect(self._on_inactive_toggled)
 
@@ -286,8 +317,14 @@ class BG3ModListView(QWidget):
 
     # ── Public API ─────────────────────────────────────────────────
 
-    def load_mods(self, active: list[dict], inactive: list[dict]) -> None:
-        """Populate both trees from installer data."""
+    def load_mods(
+        self,
+        active: list[dict],
+        inactive: list[dict],
+        data_overrides: list[dict] | None = None,
+        frameworks: list[dict] | None = None,
+    ) -> None:
+        """Populate all three sections from installer data."""
         active_rows = [self._dict_to_row(m, enabled=True) for m in active]
         inactive_rows = [self._dict_to_row(m, enabled=False) for m in inactive]
 
@@ -296,6 +333,11 @@ class BG3ModListView(QWidget):
 
         self._active_label.setText(f"Aktive Mods ({len(active_rows)})")
         self._inactive_label.setText(f"Inaktive Mods ({len(inactive_rows)})")
+
+        # Extras section
+        overrides = data_overrides or []
+        fws = frameworks or []
+        self._load_extras(overrides, fws)
 
     def get_active_uuid_order(self) -> list[str]:
         """Return UUID list of active mods in current order."""
@@ -311,6 +353,8 @@ class BG3ModListView(QWidget):
 
     def get_selected_mod(self, section: str) -> dict:
         """Return data for the selected mod in the given section."""
+        if section == "extras":
+            return self._get_selected_extra()
         tree = self._active_tree if section == "active" else self._inactive_tree
         model = self._active_model if section == "active" else self._inactive_model
         proxy = tree.model()
@@ -341,17 +385,66 @@ class BG3ModListView(QWidget):
             rows.add(source_idx.row())
         return sorted(rows)
 
+    # ── Private: extras section ────────────────────────────────────
+
+    def _load_extras(self, data_overrides: list[dict], frameworks: list[dict]) -> None:
+        """Populate the extras tree with data-overrides and frameworks."""
+        self._extras_tree.clear()
+        total = len(data_overrides) + len(frameworks)
+        self._extras_label.setText(f"Data-Overrides & Frameworks ({total})")
+
+        # Frameworks first
+        for fw in frameworks:
+            item = QTreeWidgetItem()
+            item.setText(0, fw.get("name", "?"))
+            item.setText(1, "Framework")
+            installed = fw.get("installed", False)
+            item.setText(2, "installiert" if installed else "nicht installiert")
+            item.setData(0, Qt.ItemDataRole.UserRole, {"type": "framework", **fw})
+            if installed:
+                item.setForeground(2, QBrush(QColor("#4CAF50")))
+            else:
+                item.setForeground(2, QBrush(QColor("#F44336")))
+            self._extras_tree.addTopLevelItem(item)
+
+        # Data overrides
+        for ov in data_overrides:
+            item = QTreeWidgetItem()
+            item.setText(0, ov.get("name", "?"))
+            item.setText(1, "Data-Override")
+            file_count = len(ov.get("files", []))
+            item.setText(2, f"{file_count} Datei(en)")
+            item.setData(0, Qt.ItemDataRole.UserRole, {"type": "data_override", **ov})
+            item.setForeground(1, QBrush(QColor("#64B5F6")))
+            self._extras_tree.addTopLevelItem(item)
+
+    def _get_selected_extra(self) -> dict:
+        """Return data for the selected extras item."""
+        item = self._extras_tree.currentItem()
+        if item is None:
+            return {}
+        return item.data(0, Qt.ItemDataRole.UserRole) or {}
+
+    def _on_extras_context_menu(self, pos) -> None:
+        """Emit context menu for extras section."""
+        global_pos = self._extras_tree.viewport().mapToGlobal(pos)
+        item = self._extras_tree.itemAt(pos)
+        mod_data: dict = {}
+        if item:
+            mod_data = item.data(0, Qt.ItemDataRole.UserRole) or {}
+        self.context_menu_requested.emit(global_pos, "extras", mod_data)
+
     # ── Private slots ──────────────────────────────────────────────
 
     def _on_active_toggled(self, row: int, enabled: bool) -> None:
-        """Active mod unchecked → deactivate."""
+        """Active mod unchecked -> deactivate."""
         if not enabled:
             rd = self._active_model.row_data(row)
             if rd and rd.uuid:
                 self.mod_deactivated.emit(rd.uuid)
 
     def _on_inactive_toggled(self, row: int, enabled: bool) -> None:
-        """Inactive mod checked → activate."""
+        """Inactive mod checked -> activate."""
         if enabled:
             rd = self._inactive_model.row_data(row)
             if rd and rd.uuid:

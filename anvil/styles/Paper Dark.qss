@@ -359,3 +359,13 @@ QLabel {
 #InfoDialog QTextEdit {
   font-size: 15px;
   font-family: monospace; }
+
+#startButton {
+  background: #1a5c2a;
+  color: #E0E0E0;
+  font-weight: bold;
+  border-radius: 6px; }
+  #startButton:hover {
+    background: #237a38; }
+  #startButton:pressed {
+    background: #145020; }

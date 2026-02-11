@@ -488,7 +488,10 @@ class GamePanel(QWidget):
                 steam_bin = shutil.which("steam")
                 if steam_bin:
                     from PySide6.QtCore import QProcess
-                    args = ["-applaunch", str(plugin.GameSteamId)]
+                    steam_id = plugin.GameSteamId
+                    if isinstance(steam_id, list):
+                        steam_id = steam_id[0]
+                    args = ["-applaunch", str(steam_id)]
                     if hasattr(plugin, "GameLaunchArgs"):
                         args.extend(plugin.GameLaunchArgs)
                     QProcess.startDetached(steam_bin, args)

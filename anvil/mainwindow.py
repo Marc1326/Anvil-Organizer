@@ -1629,6 +1629,7 @@ class MainWindow(QMainWindow):
                 plugin.setGamePath(Path("/"), store=store)
 
         self._bg3_installer = plugin.get_mod_installer()
+        self._bg3_installer._instance_path = instance_path
 
         # Check if Proton prefix exists
         if self._bg3_installer._mods_path is None:
@@ -1663,8 +1664,12 @@ class MainWindow(QMainWindow):
         if self._bg3_installer is None or self._bg3_mod_list is None:
             return
         mod_list = self._bg3_installer.get_mod_list()
-        self._bg3_mod_list.load_mods(mod_list["active"], mod_list["inactive"])
-        total = len(mod_list["active"]) + len(mod_list["inactive"])
+        self._bg3_mod_list.load_mods(
+            mod_list["active"],
+            mod_list["inactive"],
+            data_overrides=mod_list.get("data_overrides", []),
+            frameworks=mod_list.get("frameworks", []),
+        )
         self._profile_bar.update_active_count(len(mod_list["active"]))
 
     def _on_bg3_mod_activated(self, uuid: str) -> None:
@@ -1711,16 +1716,24 @@ class MainWindow(QMainWindow):
         for path_str in paths:
             result = self._bg3_installer.install_mod(Path(path_str))
             if result:
-                installed.append(result.get("name", Path(path_str).name))
+                mod_type = result.get("type", "pak")
+                name = result.get("name", Path(path_str).name)
+                installed.append((name, mod_type))
             else:
                 self.statusBar().showMessage(
                     f"Installation fehlgeschlagen: {Path(path_str).name}", 5000,
                 )
         if installed:
             self._bg3_reload_mod_list()
-            self._bg3_mark_dirty()
-            names = ", ".join(installed)
-            self.statusBar().showMessage(f"Installiert (inaktiv): {names}", 5000)
+            # Only mark dirty for pak mods (framework/data don't need deploy)
+            if any(t == "pak" for _, t in installed):
+                self._bg3_mark_dirty()
+            names = ", ".join(n for n, _ in installed)
+            types = set(t for _, t in installed)
+            if types == {"pak"}:
+                self.statusBar().showMessage(f"Installiert (inaktiv): {names}", 5000)
+            else:
+                self.statusBar().showMessage(f"Installiert: {names}", 5000)
 
     def _on_bg3_deploy(self) -> None:
         """Deploy: validate and backup modsettings.lsx."""
@@ -1737,6 +1750,11 @@ class MainWindow(QMainWindow):
     def _on_bg3_context_menu(self, global_pos, section: str, mod_data: dict) -> None:
         """BG3-specific context menu."""
         if self._bg3_installer is None:
+            return
+
+        # Extras section has its own menu
+        if section == "extras":
+            self._on_bg3_extras_context_menu(global_pos, mod_data)
             return
 
         has_mod = bool(mod_data.get("uuid"))
@@ -1798,6 +1816,41 @@ class MainWindow(QMainWindow):
             mods_path = self._bg3_installer._mods_path
             if mods_path and mods_path.is_dir():
                 subprocess.Popen(["xdg-open", str(mods_path)])
+
+    def _on_bg3_extras_context_menu(self, global_pos, mod_data: dict) -> None:
+        """Context menu for data-overrides and frameworks."""
+        menu = QMenu(self)
+        mod_type = mod_data.get("type", "")
+        name = mod_data.get("name", "")
+
+        act_uninstall = None
+        if mod_type == "data_override" and name:
+            act_uninstall = menu.addAction("Deinstallieren...")
+
+        menu.addSeparator()
+        act_reload = menu.addAction("Neu laden")
+
+        chosen = menu.exec(global_pos)
+        if not chosen:
+            return
+
+        if chosen == act_reload:
+            self._bg3_reload_mod_list()
+            self.statusBar().showMessage("Mod-Liste neu geladen", 3000)
+        elif chosen == act_uninstall and name:
+            reply = QMessageBox.question(
+                self, "Data-Override deinstallieren",
+                f"Data-Override \"{name}\" wirklich deinstallieren?\n\n"
+                f"Alle zugehörigen Dateien werden aus Data/ gelöscht.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                ok = self._bg3_installer.uninstall_data_override(name)
+                if ok:
+                    self._bg3_reload_mod_list()
+                    self.statusBar().showMessage(f"Data-Override deinstalliert: {name}", 5000)
+                else:
+                    self.statusBar().showMessage("Deinstallation fehlgeschlagen", 5000)
 
     # ── Other slots ───────────────────────────────────────────────────
 
