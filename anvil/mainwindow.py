@@ -573,7 +573,8 @@ class MainWindow(QMainWindow):
             self._current_profile_path = None
             self._current_instance_path = None
             self._bg3_installer = None
-            self._toolbar.deploy_btn.setVisible(False)
+            self._toolbar.deploy_sep.setVisible(False)
+            self._toolbar.deploy_action.setVisible(False)
             self._mod_list_stack.setCurrentWidget(self._mod_list_view)
             self._update_active_count()
             self._status_bar.clear_instance()
@@ -619,7 +620,8 @@ class MainWindow(QMainWindow):
 
         # ── Standard path (non-BG3) ──────────────────────────────
         # Hide BG3 deploy button, switch to standard mod list
-        self._toolbar.deploy_btn.setVisible(False)
+        self._toolbar.deploy_sep.setVisible(False)
+        self._toolbar.deploy_action.setVisible(False)
         self._mod_list_stack.setCurrentWidget(self._mod_list_view)
         self._bg3_installer = None
 
@@ -1603,7 +1605,9 @@ class MainWindow(QMainWindow):
         """Load a BG3 instance with the BG3ModInstaller flow."""
         self._ensure_bg3_mod_list()
         self._mod_list_stack.setCurrentWidget(self._bg3_mod_list)
-        self._toolbar.deploy_btn.setVisible(True)
+        self._toolbar.deploy_sep.setVisible(True)
+        self._toolbar.deploy_action.setVisible(True)
+        self._toolbar.deploy_btn.setStyleSheet("")
 
         # Instance path
         instance_path = self._current_instance_path
@@ -1633,6 +1637,18 @@ class MainWindow(QMainWindow):
         # No auto-deploy for BG3 (user deploys manually)
         self._game_panel.set_instance_path(instance_path)
 
+    def _bg3_mark_dirty(self) -> None:
+        """Show and highlight the Deploy button (unsaved changes)."""
+        self._toolbar.deploy_sep.setVisible(True)
+        self._toolbar.deploy_action.setVisible(True)
+        self._toolbar.deploy_btn.setStyleSheet(
+            "QToolButton { color: #4DE0D0; font-weight: bold; }"
+        )
+
+    def _bg3_mark_clean(self) -> None:
+        """Remove highlight from Deploy button (no unsaved changes)."""
+        self._toolbar.deploy_btn.setStyleSheet("")
+
     def _bg3_reload_mod_list(self) -> None:
         """Reload the BG3 mod list from the installer."""
         if self._bg3_installer is None or self._bg3_mod_list is None:
@@ -1649,6 +1665,7 @@ class MainWindow(QMainWindow):
         ok = self._bg3_installer.activate_mod(uuid)
         if ok:
             self._bg3_reload_mod_list()
+            self._bg3_mark_dirty()
             self.statusBar().showMessage("Mod aktiviert", 3000)
         else:
             self.statusBar().showMessage("Mod konnte nicht aktiviert werden", 5000)
@@ -1660,6 +1677,7 @@ class MainWindow(QMainWindow):
         ok = self._bg3_installer.deactivate_mod(uuid)
         if ok:
             self._bg3_reload_mod_list()
+            self._bg3_mark_dirty()
             self.statusBar().showMessage("Mod deaktiviert", 3000)
         else:
             self.statusBar().showMessage("Mod konnte nicht deaktiviert werden", 5000)
@@ -1670,6 +1688,7 @@ class MainWindow(QMainWindow):
             return
         ok = self._bg3_installer.reorder_mods(uuid_order)
         if ok:
+            self._bg3_mark_dirty()
             self.statusBar().showMessage("Load-Order aktualisiert", 3000)
         else:
             self.statusBar().showMessage("Load-Order konnte nicht geändert werden", 5000)
@@ -1690,6 +1709,7 @@ class MainWindow(QMainWindow):
                 )
         if installed:
             self._bg3_reload_mod_list()
+            self._bg3_mark_dirty()
             names = ", ".join(installed)
             self.statusBar().showMessage(f"Installiert (inaktiv): {names}", 5000)
 
@@ -1700,6 +1720,7 @@ class MainWindow(QMainWindow):
             return
         ok = self._bg3_installer.deploy()
         if ok:
+            self._bg3_mark_clean()
             self.statusBar().showMessage("Mod-Liste exportiert \u2713", 5000)
         else:
             self.statusBar().showMessage("Deploy fehlgeschlagen — siehe Konsole", 5000)
@@ -1759,6 +1780,7 @@ class MainWindow(QMainWindow):
                 ok = self._bg3_installer.uninstall_mod(uuid, filename)
                 if ok:
                     self._bg3_reload_mod_list()
+                    self._bg3_mark_dirty()
                     self.statusBar().showMessage(f"Deinstalliert: {name}", 5000)
                 else:
                     self.statusBar().showMessage("Deinstallation fehlgeschlagen", 5000)
