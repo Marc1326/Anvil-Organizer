@@ -90,6 +90,7 @@ def create_toolbar(parent=None):
         lambda: SettingsDialog(
             bar.window(),
             getattr(bar.window(), "plugin_loader", None),
+            getattr(bar.window(), "instance_manager", None),
         ).exec()
     )
 
