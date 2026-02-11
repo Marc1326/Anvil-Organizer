@@ -134,23 +134,14 @@ class _GameSelectPage(QWizardPage):
             item.setIcon(self._game_icon(plugin.GameShortName))
             self._list.addItem(item)
 
-        # Non-installed games (skip those with existing instance)
-        for plugin in self._pl.all_plugins():
-            if plugin.isInstalled():
-                continue
-            if plugin.GameShortName in existing:
-                continue
-            text = f"{plugin.GameName}  —  nicht erkannt"
-            item = QListWidgetItem(text)
-            item.setData(Qt.ItemDataRole.UserRole, plugin.GameShortName)
-            item.setIcon(self._game_icon(plugin.GameShortName))
-            item.setFont(self._italic_font)
-            item.setForeground(Qt.GlobalColor.darkGray)
-            self._list.addItem(item)
-
-        # Hint if all games already have an instance
+        # Hint if no installed games available
         if self._list.count() == 0:
-            item = QListWidgetItem("Alle erkannten Spiele haben bereits eine Instanz.")
+            if existing:
+                msg = "Alle erkannten Spiele haben bereits eine Instanz."
+            else:
+                msg = ("Keine unterstützten Spiele gefunden.\n"
+                       "Stelle sicher dass deine Spiele installiert sind.")
+            item = QListWidgetItem(msg)
             item.setFont(self._italic_font)
             item.setForeground(Qt.GlobalColor.darkGray)
             item.setFlags(Qt.ItemFlag.NoItemFlags)
