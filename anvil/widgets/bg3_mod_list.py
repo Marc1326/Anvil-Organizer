@@ -106,6 +106,7 @@ class _BG3DropTreeView(QTreeView):
     uuids_dropped = Signal(list)      # UUIDs dropped from the OTHER tree
 
     def dragEnterEvent(self, event):
+        super().dragEnterEvent(event)
         md = event.mimeData()
         # Accept our mod-row MIME (cross-tree AND internal reorder)
         if md.hasFormat(MIME_BG3_MOD_ROWS):
@@ -118,9 +119,9 @@ class _BG3DropTreeView(QTreeView):
                     if Path(url.toLocalFile()).suffix.lower() in _DROP_EXTENSIONS:
                         event.acceptProposedAction()
                         return
-        super().dragEnterEvent(event)
 
     def dragMoveEvent(self, event):
+        super().dragMoveEvent(event)
         md = event.mimeData()
         if md.hasFormat(MIME_BG3_MOD_ROWS):
             event.acceptProposedAction()
@@ -128,7 +129,6 @@ class _BG3DropTreeView(QTreeView):
         if md.hasUrls():
             event.acceptProposedAction()
             return
-        super().dragMoveEvent(event)
 
     def dropEvent(self, event):
         md = event.mimeData()

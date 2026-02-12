@@ -90,8 +90,23 @@ class BG3ModInstaller:
 
         # Check mod exists in Mods node
         if not any(m["uuid"].lower() == uuid.lower() for m in mods):
-            print(f"bg3_installer: UUID {uuid} not found in Mods", file=sys.stderr)
-            return False
+            # Not in Mods node — try to find metadata from .pak file
+            meta = self._find_pak_metadata(uuid)
+            if meta is None:
+                print(f"bg3_installer: UUID {uuid} not found in Mods or pak files",
+                      file=sys.stderr)
+                return False
+            # Add to Mods node
+            mods.append({
+                "uuid": meta["uuid"],
+                "name": meta.get("name", ""),
+                "folder": meta.get("folder", ""),
+                "md5": "",
+                "version64": meta.get("version", "0") or "0",
+                "publish_handle": "0",
+            })
+            print(f"bg3_installer: added '{meta.get('name', uuid)}' to Mods node",
+                  file=sys.stderr)
 
         # Already active?
         if any(u.lower() == uuid.lower() for u in mod_order):
@@ -294,58 +309,15 @@ class BG3ModInstaller:
             info = mods_by_uuid.get(uuid.lower(), {"uuid": uuid, "name": uuid})
             active.append(info)
 
-        # Scan Mods folder for all .pak files
+        # Inactive mods: in Mods node but NOT in ModOrder
         inactive: list[dict] = []
-        if self._mods_path and self._mods_path.is_dir():
-            for pak in sorted(self._mods_path.glob("*.pak"), key=lambda p: p.name.lower()):
-                meta = self._lspk.read_pak_metadata(pak)
-                if meta is None or not meta.get("uuid"):
-                    # .pak without metadata — show by filename
-                    inactive.append({
-                        "uuid": "",
-                        "name": pak.stem,
-                        "folder": "",
-                        "filename": pak.name,
-                        "source": "pak_only",
-                    })
-                    continue
-
-                pak_uuid = meta["uuid"].lower()
-
-                # Skip Gustav/GustavDev
-                if pak_uuid in _HIDDEN_UUIDS:
-                    continue
-
-                # Skip if already active
-                if pak_uuid in active_uuids:
-                    continue
-
-                inactive.append({
-                    "uuid": meta["uuid"],
-                    "name": meta.get("name", pak.stem),
-                    "folder": meta.get("folder", ""),
-                    "author": meta.get("author", ""),
-                    "version": meta.get("version", ""),
-                    "description": meta.get("description", ""),
-                    "filename": pak.name,
-                    "dependencies": meta.get("dependencies", []),
-                    "source": "pak",
-                })
-
-        # Also add mods from Mods node that are not active and not in pak scan
-        inactive_uuids = {m.get("uuid", "").lower() for m in inactive if m.get("uuid")}
         for m in mods:
             m_uuid = m["uuid"].lower()
             if m_uuid in _HIDDEN_UUIDS:
                 continue
             if m_uuid in active_uuids:
                 continue
-            if m_uuid in inactive_uuids:
-                continue
-            inactive.append({
-                **m,
-                "source": "modsettings_only",
-            })
+            inactive.append(m)
 
         # Data overrides and frameworks
         data_overrides = self.get_data_overrides()
@@ -739,6 +711,16 @@ class BG3ModInstaller:
         return result
 
     # ── Private helpers ────────────────────────────────────────────────
+
+    def _find_pak_metadata(self, uuid: str) -> dict | None:
+        """Find metadata for a UUID by scanning .pak files in the Mods folder."""
+        if self._mods_path is None or not self._mods_path.is_dir():
+            return None
+        for pak in self._mods_path.glob("*.pak"):
+            meta = self._lspk.read_pak_metadata(pak)
+            if meta and meta.get("uuid", "").lower() == uuid.lower():
+                return meta
+        return None
 
     def _read_modsettings(self) -> dict:
         """Read modsettings.lsx, return defaults if missing."""

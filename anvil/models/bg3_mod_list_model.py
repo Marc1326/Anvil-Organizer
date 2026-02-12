@@ -202,7 +202,7 @@ class BG3ModListModel(QAbstractItemModel):
 
     def flags(self, index):
         if not index.isValid():
-            return Qt.ItemFlag.ItemIsDropEnabled if self._allow_reorder else Qt.ItemFlag.NoItemFlags
+            return Qt.ItemFlag.ItemIsDropEnabled
         f = (
             Qt.ItemFlag.ItemIsEnabled
             | Qt.ItemFlag.ItemIsSelectable
@@ -222,9 +222,9 @@ class BG3ModListModel(QAbstractItemModel):
     # ── Drag & Drop (reorder only) ────────────────────────────────
 
     def supportedDropActions(self):
-        if self._allow_reorder:
-            return Qt.DropAction.MoveAction
-        return Qt.DropAction.IgnoreAction
+        # Both models must accept MoveAction for cross-tree DnD to work.
+        # The view handles cross-tree drops; the model handles internal reorder.
+        return Qt.DropAction.MoveAction
 
     def supportedDragActions(self):
         return Qt.DropAction.MoveAction  # both models support drag
@@ -241,7 +241,9 @@ class BG3ModListModel(QAbstractItemModel):
         return mime
 
     def canDropMimeData(self, data, action, row, column, parent):
-        return self._allow_reorder and data.hasFormat(MIME_BG3_MOD_ROWS)
+        # Accept MIME for both models — cross-tree drops are handled by the
+        # view (uuids_dropped signal), internal reorder by dropMimeData().
+        return data.hasFormat(MIME_BG3_MOD_ROWS)
 
     def dropMimeData(self, data, action, row, column, parent):
         if action == Qt.DropAction.IgnoreAction:
