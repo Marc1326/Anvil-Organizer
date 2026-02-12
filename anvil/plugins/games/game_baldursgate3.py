@@ -254,7 +254,27 @@ class BaldursGate3Game(BaseGame):
                 detect_installed=["bin/DWrite.dll"],
                 required_by=["SE-Mods", "Native Mods"],
             ),
+            FrameworkMod(
+                name="NativeModLoader",
+                pattern=["bink2w64.dll", "bink2w64_original.dll"],
+                target="bin/",
+                description="DLL-Loader fuer Native Mods (bink2w64 hook)",
+                detect_installed=["bin/bink2w64_original.dll"],
+                required_by=["WASD", "Native Mods"],
+            ),
         ]
+
+    def get_data_override_path_rewrites(self) -> dict[str, str]:
+        """Return path prefix rewrites for data-override installation.
+
+        Keys are prefixes found in archives, values are the correct
+        target prefix relative to the game root.  For example,
+        ``"NativeMods/"`` in an archive should become ``"bin/NativeMods/"``
+        in the game directory, not ``"Data/NativeMods/"``.
+        """
+        return {
+            "NativeMods/": "bin/NativeMods/",
+        }
 
     def get_conflict_ignores(self) -> list[str]:
         """Return patterns for harmless files in BG3 mods."""

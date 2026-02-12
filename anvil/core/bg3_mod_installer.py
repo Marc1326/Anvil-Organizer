@@ -423,17 +423,15 @@ class BG3ModInstaller:
                 full.unlink()
                 print(f"bg3_installer: deleted {full}")
 
-        # Clean up empty directories (bottom-up)
-        data_dir = self._game_path / "Data"
-        if data_dir.is_dir():
-            for rel_path in reversed(manifest.get("files", [])):
-                parent = (self._game_path / rel_path).parent
-                while parent != data_dir and parent.is_dir():
-                    try:
-                        parent.rmdir()  # only removes if empty
-                    except OSError:
-                        break
-                    parent = parent.parent
+        # Clean up empty directories (bottom-up), stop at game_path
+        for rel_path in reversed(manifest.get("files", [])):
+            parent = (self._game_path / rel_path).parent
+            while parent != self._game_path and parent.is_dir():
+                try:
+                    parent.rmdir()  # only removes if empty
+                except OSError:
+                    break
+                parent = parent.parent
 
         # Delete manifest
         manifest_dir = self._override_manifest_dir()
@@ -629,13 +627,16 @@ class BG3ModInstaller:
         }
 
     def _install_data_override(self, temp_dir: Path, mod_name: str) -> dict | None:
-        """Install a data-override mod: copy loose files to Data/."""
+        """Install a data-override mod: copy loose files to Data/ (or rewritten path)."""
         if self._game_path is None:
             print("bg3_installer: game path not set, cannot install data override", file=sys.stderr)
             return None
 
         data_dir = self._game_path / "Data"
         data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Path rewrites: some archive paths need to go to bin/ etc. instead of Data/
+        rewrites = self._plugin.get_data_override_path_rewrites() if self._plugin else {}
 
         # Detect common root — if archive has a single top-level folder,
         # strip it so files go directly into Data/
@@ -649,11 +650,24 @@ class BG3ModInstaller:
             if not src_file.is_file():
                 continue
             rel = src_file.relative_to(content_root)
-            dest = data_dir / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_file, dest)
-            # Store path relative to game_path for uninstall
-            installed_files.append(str(Path("Data") / rel))
+            rel_str = str(rel)
+
+            # Check if this path matches a rewrite rule
+            rewritten = False
+            for prefix, target in rewrites.items():
+                if rel_str.startswith(prefix) or rel_str.replace("\\", "/").startswith(prefix):
+                    dest = self._game_path / target / rel_str[len(prefix):]
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src_file, dest)
+                    installed_files.append(str(Path(target) / rel_str[len(prefix):]))
+                    rewritten = True
+                    break
+
+            if not rewritten:
+                dest = data_dir / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_file, dest)
+                installed_files.append(str(Path("Data") / rel))
 
         if not installed_files:
             print("bg3_installer: no files to install as data override", file=sys.stderr)
