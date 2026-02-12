@@ -270,6 +270,18 @@ class BaseGame:
 
     # ── Konflikterkennung ───────────────────────────────────────────────
 
+    def get_data_override_path_rewrites(self) -> dict[str, str]:
+        """Return path prefix rewrites for data-override installation.
+
+        Keys are prefixes found in archives, values are the correct
+        target prefix relative to the game root.  Subclasses override
+        this when some archive paths should not go into ``Data/``.
+
+        Example: ``{"NativeMods/": "bin/NativeMods/"}`` maps
+        ``NativeMods/BG3WASD.dll`` → ``bin/NativeMods/BG3WASD.dll``.
+        """
+        return {}
+
     def get_conflict_ignores(self) -> list[str]:
         """Return glob patterns for files to ignore during conflict detection.
 
