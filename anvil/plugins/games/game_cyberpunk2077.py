@@ -54,9 +54,8 @@ class Cyberpunk2077Game(BaseGame):
     GameDirectInstallMods = [
         "TweakXL",
         "ArchiveXL",
-        "CET",
         "Cyber Engine Tweaks",
-        "CET 1.37.1 - Scripting fixes",
+        "CET 1.37.1",
         "Codeware",
         "RED4ext",
         "RedData",
@@ -196,6 +195,35 @@ class Cyberpunk2077Game(BaseGame):
                 target="",
                 description="Shared Library fuer RED4ext-Plugins",
                 detect_installed=["red4ext/plugins/Codeware/Codeware.dll"],
+            ),
+            FrameworkMod(
+                name="RedFileSystem",
+                pattern=["red4ext/plugins/RedFileSystem/"],
+                target="",
+                description="Dateisystem-Zugriff fuer RED4ext-Plugins",
+                detect_installed=["red4ext/plugins/RedFileSystem/RedFileSystem.dll"],
+            ),
+            FrameworkMod(
+                name="RedData",
+                pattern=["red4ext/plugins/RedData/"],
+                target="",
+                description="JSON-Parsing Library fuer RED4ext-Plugins",
+                detect_installed=["red4ext/plugins/RedData/RedData.dll"],
+            ),
+            FrameworkMod(
+                name="Native Settings UI",
+                pattern=["bin/x64/plugins/cyber_engine_tweaks/mods/nativeSettings/"],
+                target="",
+                description="UI-Framework fuer Mod-Einstellungen (CET)",
+                detect_installed=["bin/x64/plugins/cyber_engine_tweaks/mods/nativeSettings/init.lua"],
+                required_by=["Mods mit Einstellungs-Menues"],
+            ),
+            FrameworkMod(
+                name="Mod Settings",
+                pattern=["red4ext/plugins/mod_settings/"],
+                target="",
+                description="Einstellungs-Framework fuer RED4ext-Mods",
+                detect_installed=["red4ext/plugins/mod_settings/mod_settings.dll"],
             ),
         ]
 

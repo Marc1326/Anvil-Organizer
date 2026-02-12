@@ -56,6 +56,24 @@ def _todo(name):
     return _
 
 
+def _matches_direct_install(name_lower: str, patterns: list[str]) -> bool:
+    """Check if a mod name matches any direct-install pattern.
+
+    The name must start with the pattern AND the character after the
+    pattern (if any) must be non-alphabetic (space, digit, dash, dot, etc.).
+    This prevents 'CET' from matching 'CET NPC Body Tweaks' while still
+    matching 'CET 1.37.1 - Scripting fixes'.
+    """
+    for pat in patterns:
+        if not name_lower.startswith(pat):
+            continue
+        # Exact match or rest starts with a non-alpha char (version, suffix)
+        rest = name_lower[len(pat):]
+        if not rest or not rest[0].isalpha():
+            return True
+    return False
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -642,12 +660,27 @@ class MainWindow(QMainWindow):
             lp = [p.lower() for p in direct_patterns]
             for entry in self._current_mod_entries:
                 name_lower = (entry.display_name or entry.name).lower()
-                if any(pat in name_lower for pat in lp):
+                if _matches_direct_install(name_lower, lp):
                     entry.is_direct_install = True
         conflict_data = self._compute_conflict_data()
-        mod_rows = [mod_entry_to_row(e, conflict_data) for e in self._current_mod_entries]
+        # Filter out framework (direct-install) mods from the main list
+        visible_entries = [e for e in self._current_mod_entries if not e.is_direct_install]
+        mod_rows = [mod_entry_to_row(e, conflict_data) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._update_active_count()
+
+        # Framework detection (Cyberpunk, etc.)
+        if plugin is not None:
+            fw_list = []
+            for fw, installed in plugin.get_installed_frameworks():
+                fw_list.append({
+                    "name": fw.name,
+                    "description": fw.description,
+                    "installed": installed,
+                })
+            self._mod_list_view.load_frameworks(fw_list)
+        else:
+            self._mod_list_view.load_frameworks([])
 
         # 5. Mod deployer + auto-deploy
         self._game_panel.set_instance_path(instance_path)
@@ -875,14 +908,8 @@ class MainWindow(QMainWindow):
         if not installed:
             return
 
-        # Reload mod list
-        self._current_mod_entries = scan_mods_directory(
-            self._current_instance_path, self._current_profile_path,
-        )
-        conflict_data = self._compute_conflict_data()
-        mod_rows = [mod_entry_to_row(e, conflict_data) for e in self._current_mod_entries]
-        self._mod_list_view.source_model().set_mods(mod_rows)
-        self._update_active_count()
+        # Reload mod list (reuses _reload_mod_list which handles framework filtering)
+        self._reload_mod_list()
 
         names = ", ".join(installed)
         self.statusBar().showMessage(f"Installiert: {names}", 5000)
@@ -1401,8 +1428,18 @@ class MainWindow(QMainWindow):
         self._current_mod_entries = scan_mods_directory(
             self._current_instance_path, self._current_profile_path,
         )
+        # Re-mark direct-install mods
+        plugin = self._current_plugin
+        direct_patterns = getattr(plugin, "GameDirectInstallMods", []) if plugin else []
+        if direct_patterns:
+            lp = [p.lower() for p in direct_patterns]
+            for entry in self._current_mod_entries:
+                name_lower = (entry.display_name or entry.name).lower()
+                if _matches_direct_install(name_lower, lp):
+                    entry.is_direct_install = True
         conflict_data = self._compute_conflict_data()
-        mod_rows = [mod_entry_to_row(e, conflict_data) for e in self._current_mod_entries]
+        visible_entries = [e for e in self._current_mod_entries if not e.is_direct_install]
+        mod_rows = [mod_entry_to_row(e, conflict_data) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._update_active_count()
 
@@ -1558,6 +1595,7 @@ class MainWindow(QMainWindow):
 
         # Standard mod list — always visible
         self._mod_list_view.restore_column_widths()
+        self._mod_list_view.restore_framework_widths()
 
         # BG3 mod list — visible when BG3 instance is active
         if self._bg3_mod_list is not None:
