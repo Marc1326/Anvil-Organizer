@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
     QLineEdit,
     QSplitter,
     QStyledItemDelegate,
@@ -22,6 +21,7 @@ from PySide6.QtCore import QModelIndex, QPoint, QRect, QSize, QSortFilterProxyMo
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 
 from anvil.core.persistent_header import PersistentHeader
+from anvil.widgets.collapsible_bar import CollapsibleSectionBar
 from anvil.models.bg3_mod_list_model import (
     BG3ModListModel,
     BG3ModRow,
@@ -252,15 +252,17 @@ class BG3ModListView(QWidget):
         active_layout.setContentsMargins(0, 0, 0, 0)
         active_layout.setSpacing(2)
 
-        self._active_label = QLabel("Aktive Mods (0)")
-        self._active_label.setStyleSheet(
-            "QLabel { font-weight: bold; padding: 4px 6px; "
-            "background: #1a3a1a; border-bottom: 1px solid #333; }"
-        )
-        active_layout.addWidget(self._active_label)
-
         self._active_model = BG3ModListModel(allow_reorder=True)
         self._active_tree = _BG3DropTreeView()
+
+        self._active_label = CollapsibleSectionBar(
+            "Aktive Mods", "bg3_active", self._active_tree,
+            style="QLabel { font-weight: bold; padding: 4px 6px; "
+                  "background: #1a3a1a; border-bottom: 1px solid #333; }",
+            container=active_pane,
+        )
+        self._active_label.set_count(0)
+        active_layout.addWidget(self._active_label)
         self._ph_active = _setup_tree(
             self._active_tree, self._active_model,
             allow_reorder=True, settings_key="bg3_active",
@@ -275,15 +277,17 @@ class BG3ModListView(QWidget):
         inactive_layout.setContentsMargins(0, 0, 0, 0)
         inactive_layout.setSpacing(0)
 
-        self._inactive_label = QLabel("Inaktive Mods (0)")
-        self._inactive_label.setStyleSheet(
-            "QLabel { font-weight: bold; padding: 4px 6px; "
-            "background: #3a1a1a; border-bottom: 1px solid #333; }"
-        )
-        inactive_layout.addWidget(self._inactive_label)
-
         self._inactive_model = BG3ModListModel(allow_reorder=False)
         self._inactive_tree = _BG3DropTreeView()
+
+        self._inactive_label = CollapsibleSectionBar(
+            "Inaktive Mods", "bg3_inactive", self._inactive_tree,
+            style="QLabel { font-weight: bold; padding: 4px 6px; "
+                  "background: #3a1a1a; border-bottom: 1px solid #333; }",
+            container=inactive_pane,
+        )
+        self._inactive_label.set_count(0)
+        inactive_layout.addWidget(self._inactive_label)
         self._ph_inactive = _setup_tree(
             self._inactive_tree, self._inactive_model,
             allow_reorder=False, settings_key="bg3_inactive",
@@ -300,14 +304,16 @@ class BG3ModListView(QWidget):
         extras_layout.setContentsMargins(0, 0, 0, 0)
         extras_layout.setSpacing(0)
 
-        self._extras_label = QLabel("Data-Overrides & Frameworks (0)")
-        self._extras_label.setStyleSheet(
-            "QLabel { font-weight: bold; padding: 4px 6px; "
-            "background: #1a2a3a; border-bottom: 1px solid #333; }"
-        )
-        extras_layout.addWidget(self._extras_label)
-
         self._extras_tree = QTreeWidget()
+
+        self._extras_label = CollapsibleSectionBar(
+            "Data-Overrides & Frameworks", "bg3_extras", self._extras_tree,
+            style="QLabel { font-weight: bold; padding: 4px 6px; "
+                  "background: #1a2a3a; border-bottom: 1px solid #333; }",
+            container=extras_pane,
+        )
+        self._extras_label.set_count(0)
+        extras_layout.addWidget(self._extras_label)
         self._extras_tree.setHeaderLabels(["Name", "Typ", "Status"])
         self._extras_tree.setRootIsDecorated(False)
         self._extras_tree.setAlternatingRowColors(True)
@@ -384,8 +390,8 @@ class BG3ModListView(QWidget):
         self._active_model.set_mods(active_rows)
         self._inactive_model.set_mods(inactive_rows)
 
-        self._active_label.setText(f"Aktive Mods ({len(active_rows)})")
-        self._inactive_label.setText(f"Inaktive Mods ({len(inactive_rows)})")
+        self._active_label.set_count(len(active_rows))
+        self._inactive_label.set_count(len(inactive_rows))
 
         # Extras section
         overrides = data_overrides or []
@@ -460,7 +466,7 @@ class BG3ModListView(QWidget):
         """Populate the extras tree with data-overrides and frameworks."""
         self._extras_tree.clear()
         total = len(data_overrides) + len(frameworks)
-        self._extras_label.setText(f"Data-Overrides & Frameworks ({total})")
+        self._extras_label.set_count(total)
 
         # Frameworks first
         for fw in frameworks:
@@ -555,9 +561,11 @@ class BG3ModListView(QWidget):
         self.context_menu_requested.emit(global_pos, section, mod_data)
 
     def _on_extras_splitter_moved(self) -> None:
-        """Hide/show trees based on available space."""
-        self._inactive_tree.setVisible(self._inactive_pane.height() > 60)
-        self._extras_tree.setVisible(self._extras_pane.height() > 60)
+        """Hide/show trees based on available space (respects collapsed state)."""
+        if not self._inactive_label.collapsed:
+            self._inactive_tree.setVisible(self._inactive_pane.height() > 60)
+        if not self._extras_label.collapsed:
+            self._extras_tree.setVisible(self._extras_pane.height() > 60)
 
     def _on_filter_changed(self, text: str) -> None:
         """Apply text filter to both proxy models."""

@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
     QPushButton,
-    QLabel,
     QSplitter,
     QAbstractItemView,
     QStyledItemDelegate,
@@ -20,6 +19,7 @@ from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.persistent_header import PersistentHeader
+from anvil.widgets.collapsible_bar import CollapsibleSectionBar
 from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME
 
 
@@ -281,14 +281,16 @@ class ModListView(QWidget):
         fw_layout.setContentsMargins(0, 0, 0, 0)
         fw_layout.setSpacing(0)
 
-        self._fw_label = QLabel("Frameworks (0)")
-        self._fw_label.setStyleSheet(
-            "QLabel { font-weight: bold; padding: 4px 6px; "
-            "background: #1a2a3a; border-bottom: 1px solid #333; }"
-        )
-        fw_layout.addWidget(self._fw_label)
-
         self._fw_tree = QTreeWidget()
+
+        self._fw_label = CollapsibleSectionBar(
+            "Frameworks", "frameworks", self._fw_tree,
+            style="QLabel { font-weight: bold; padding: 4px 6px; "
+                  "background: #1a2a3a; border-bottom: 1px solid #333; }",
+            container=fw_container,
+        )
+        self._fw_label.set_count(0)
+        fw_layout.addWidget(self._fw_label)
         self._fw_tree.setHeaderLabels(["Name", "Beschreibung", "Status"])
         self._fw_tree.setRootIsDecorated(False)
         self._fw_tree.setAlternatingRowColors(True)
@@ -337,10 +339,10 @@ class ModListView(QWidget):
         layout.addLayout(filter_row)
 
     def _on_fw_splitter_moved(self) -> None:
-        """Hide/show the framework tree based on available space."""
-        h = self._fw_container.height()
-        # Label is ~28px; hide tree if container is too small to show anything useful
-        self._fw_tree.setVisible(h > 60)
+        """Hide/show the framework tree based on available space (respects collapsed state)."""
+        if not self._fw_label.collapsed:
+            h = self._fw_container.height()
+            self._fw_tree.setVisible(h > 60)
 
     def source_model(self) -> ModListModel:
         """Return the underlying ModListModel."""
@@ -377,7 +379,7 @@ class ModListView(QWidget):
             return
 
         self._fw_container.setVisible(True)
-        self._fw_label.setText(f"Frameworks ({len(frameworks)})")
+        self._fw_label.set_count(len(frameworks))
 
         for fw in frameworks:
             item = QTreeWidgetItem()
