@@ -132,10 +132,19 @@ class ProfileBar(QWidget):
             layout.addWidget(btn)
 
         layout.addWidget(QLabel("Aktiv:"))
-        self._active = QLabel("0")
+        self._active = QLabel("<b>0</b>")
         self._active.setObjectName("activeCount")
         layout.addWidget(self._active)
 
-    def update_active_count(self, count: int) -> None:
-        """Update the active mod counter badge."""
-        self._active.setText(str(count))
+    def update_active_count(self, active: int, total: int | None = None) -> None:
+        """Update the active mod counter badge.
+
+        Args:
+            active: Number of active/enabled mods.
+            total:  Total number of mods (if given, displays "active / total").
+                    If None, displays only the active count (used by BG3).
+        """
+        if total is not None:
+            self._active.setText(f"<b>{active} / {total}</b>")
+        else:
+            self._active.setText(f"<b>{active}</b>")
