@@ -4,9 +4,13 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QTreeView,
+    QTreeWidget,
+    QTreeWidgetItem,
     QHBoxLayout,
     QLineEdit,
     QPushButton,
+    QLabel,
+    QSplitter,
     QAbstractItemView,
     QStyledItemDelegate,
     QHeaderView,
@@ -270,7 +274,53 @@ class ModListView(QWidget):
         self._persistent_header = PersistentHeader(
             header, "modlist", fixed_columns=frozenset({COL_CHECK}),
         )
-        layout.addWidget(self._tree)
+
+        # ── Frameworks section (below mod list) ──────────────────
+        fw_container = QWidget()
+        fw_layout = QVBoxLayout(fw_container)
+        fw_layout.setContentsMargins(0, 0, 0, 0)
+        fw_layout.setSpacing(0)
+
+        self._fw_label = QLabel("Frameworks (0)")
+        self._fw_label.setStyleSheet(
+            "QLabel { font-weight: bold; padding: 4px 6px; "
+            "background: #1a2a3a; border-bottom: 1px solid #333; }"
+        )
+        fw_layout.addWidget(self._fw_label)
+
+        self._fw_tree = QTreeWidget()
+        self._fw_tree.setHeaderLabels(["Name", "Beschreibung", "Status"])
+        self._fw_tree.setRootIsDecorated(False)
+        self._fw_tree.setAlternatingRowColors(True)
+        self._fw_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._fw_tree.setUniformRowHeights(True)
+        self._fw_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        fw_hdr = self._fw_tree.header()
+        fw_hdr.setStretchLastSection(False)
+        fw_hdr.setCascadingSectionResizes(True)
+        fw_hdr.setMinimumSectionSize(30)
+        fw_hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self._fw_tree.setColumnWidth(0, 180)
+        self._fw_tree.setColumnWidth(1, 280)
+        self._fw_tree.setColumnWidth(2, 100)
+        self._ph_frameworks = PersistentHeader(fw_hdr, "frameworks")
+        fw_layout.addWidget(self._fw_tree)
+
+        # Minimum height = label only (~28px), tree hides when collapsed
+        fw_container.setMinimumHeight(28)
+
+        # Splitter: mod list (top) + frameworks (bottom)
+        self._splitter = QSplitter(Qt.Orientation.Vertical)
+        self._splitter.addWidget(self._tree)
+        self._splitter.addWidget(fw_container)
+        self._splitter.setStretchFactor(0, 85)
+        self._splitter.setStretchFactor(1, 15)
+        self._splitter.setChildrenCollapsible(False)
+        self._splitter.splitterMoved.connect(self._on_fw_splitter_moved)
+        # Hide frameworks section by default (shown when load_frameworks is called)
+        fw_container.setVisible(False)
+        self._fw_container = fw_container
+        layout.addWidget(self._splitter)
 
         filter_row = QHBoxLayout()
         self._filter_left = QLineEdit()
@@ -285,6 +335,12 @@ class ModListView(QWidget):
         self._filter_right.textChanged.connect(lambda t: _todo("Filter")())
         filter_row.addWidget(self._filter_right)
         layout.addLayout(filter_row)
+
+    def _on_fw_splitter_moved(self) -> None:
+        """Hide/show the framework tree based on available space."""
+        h = self._fw_container.height()
+        # Label is ~28px; hide tree if container is too small to show anything useful
+        self._fw_tree.setVisible(h > 60)
 
     def source_model(self) -> ModListModel:
         """Return the underlying ModListModel."""
@@ -305,6 +361,39 @@ class ModListView(QWidget):
     def flush_column_widths(self) -> None:
         """Flush any pending debounced column-width write."""
         self._persistent_header.flush()
+        self._ph_frameworks.flush()
+
+    # ── Frameworks section ────────────────────────────────────────
+
+    def load_frameworks(self, frameworks: list[dict]) -> None:
+        """Populate the frameworks tree.
+
+        Each dict should have: name, description, installed (bool).
+        If the list is empty the section is hidden.
+        """
+        self._fw_tree.clear()
+        if not frameworks:
+            self._fw_container.setVisible(False)
+            return
+
+        self._fw_container.setVisible(True)
+        self._fw_label.setText(f"Frameworks ({len(frameworks)})")
+
+        for fw in frameworks:
+            item = QTreeWidgetItem()
+            item.setText(0, fw.get("name", "?"))
+            item.setText(1, fw.get("description", ""))
+            installed = fw.get("installed", False)
+            item.setText(2, "installiert" if installed else "nicht installiert")
+            if installed:
+                item.setForeground(2, QBrush(QColor("#4CAF50")))
+            else:
+                item.setForeground(2, QBrush(QColor("#F44336")))
+            self._fw_tree.addTopLevelItem(item)
+
+    def restore_framework_widths(self) -> None:
+        """Restore saved column widths for the frameworks tree."""
+        self._ph_frameworks.restore()
 
     def get_current_mod_name(self):
         """Liefert den Mod-Namen der aktuell gewählten Zeile oder None."""
