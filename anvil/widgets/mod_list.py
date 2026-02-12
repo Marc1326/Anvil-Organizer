@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect,
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
+from anvil.core.persistent_header import PersistentHeader
 from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME
 
 
@@ -266,6 +267,9 @@ class ModListView(QWidget):
         self._tree.setColumnWidth(4, 100)
         self._tree.setColumnWidth(5, 80)
         self._tree.setColumnWidth(6, 60)
+        self._persistent_header = PersistentHeader(
+            header, "modlist", fixed_columns=frozenset({COL_CHECK}),
+        )
         layout.addWidget(self._tree)
 
         filter_row = QHBoxLayout()
@@ -293,6 +297,14 @@ class ModListView(QWidget):
     def header(self) -> QHeaderView:
         """Return the tree header for state save/restore."""
         return self._tree.header()
+
+    def restore_column_widths(self) -> None:
+        """Restore saved column widths (call after data is populated)."""
+        self._persistent_header.restore()
+
+    def flush_column_widths(self) -> None:
+        """Flush any pending debounced column-width write."""
+        self._persistent_header.flush()
 
     def get_current_mod_name(self):
         """Liefert den Mod-Namen der aktuell gewählten Zeile oder None."""
