@@ -296,7 +296,7 @@ class BG3ModListView(QWidget):
         extras_pane = QWidget()
         extras_layout = QVBoxLayout(extras_pane)
         extras_layout.setContentsMargins(0, 0, 0, 0)
-        extras_layout.setSpacing(2)
+        extras_layout.setSpacing(0)
 
         self._extras_label = QLabel("Data-Overrides & Frameworks (0)")
         self._extras_label.setStyleSheet(
@@ -311,6 +311,7 @@ class BG3ModListView(QWidget):
         self._extras_tree.setAlternatingRowColors(True)
         self._extras_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._extras_tree.setUniformRowHeights(True)
+        self._extras_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         extras_hdr = self._extras_tree.header()
         extras_hdr.setStretchLastSection(False)
         extras_hdr.setCascadingSectionResizes(True)
@@ -323,10 +324,14 @@ class BG3ModListView(QWidget):
         self._extras_tree.customContextMenuRequested.connect(self._on_extras_context_menu)
         extras_layout.addWidget(self._extras_tree)
 
+        extras_pane.setMinimumHeight(28)
+        self._extras_pane = extras_pane
         self._splitter.addWidget(extras_pane)
 
         # Default splitter proportions: 55% active, 30% inactive, 15% extras
         self._splitter.setSizes([400, 200, 100])
+        self._splitter.setChildrenCollapsible(False)
+        self._splitter.splitterMoved.connect(self._on_extras_splitter_moved)
 
         layout.addWidget(self._splitter)
 
@@ -546,6 +551,11 @@ class BG3ModListView(QWidget):
                 }
 
         self.context_menu_requested.emit(global_pos, section, mod_data)
+
+    def _on_extras_splitter_moved(self) -> None:
+        """Hide/show the extras tree based on available space."""
+        h = self._extras_pane.height()
+        self._extras_tree.setVisible(h > 60)
 
     def _on_filter_changed(self, text: str) -> None:
         """Apply text filter to both proxy models."""
