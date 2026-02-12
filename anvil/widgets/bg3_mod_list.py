@@ -273,7 +273,7 @@ class BG3ModListView(QWidget):
         inactive_pane = QWidget()
         inactive_layout = QVBoxLayout(inactive_pane)
         inactive_layout.setContentsMargins(0, 0, 0, 0)
-        inactive_layout.setSpacing(2)
+        inactive_layout.setSpacing(0)
 
         self._inactive_label = QLabel("Inaktive Mods (0)")
         self._inactive_label.setStyleSheet(
@@ -290,6 +290,8 @@ class BG3ModListView(QWidget):
         )
         inactive_layout.addWidget(self._inactive_tree)
 
+        inactive_pane.setMinimumHeight(28)
+        self._inactive_pane = inactive_pane
         self._splitter.addWidget(inactive_pane)
 
         # ── Extras section (Data-Overrides & Frameworks) ──────────
@@ -553,9 +555,9 @@ class BG3ModListView(QWidget):
         self.context_menu_requested.emit(global_pos, section, mod_data)
 
     def _on_extras_splitter_moved(self) -> None:
-        """Hide/show the extras tree based on available space."""
-        h = self._extras_pane.height()
-        self._extras_tree.setVisible(h > 60)
+        """Hide/show trees based on available space."""
+        self._inactive_tree.setVisible(self._inactive_pane.height() > 60)
+        self._extras_tree.setVisible(self._extras_pane.height() > 60)
 
     def _on_filter_changed(self, text: str) -> None:
         """Apply text filter to both proxy models."""
