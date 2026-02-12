@@ -7,8 +7,6 @@ import os
 from PySide6.QtCore import (
     QAbstractItemModel,
     QByteArray,
-    QDataStream,
-    QIODevice,
     QModelIndex,
     QSize,
     Qt,
@@ -205,11 +203,13 @@ class BG3ModListModel(QAbstractItemModel):
     def flags(self, index):
         if not index.isValid():
             return Qt.ItemFlag.ItemIsDropEnabled if self._allow_reorder else Qt.ItemFlag.NoItemFlags
-        f = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        f = (
+            Qt.ItemFlag.ItemIsEnabled
+            | Qt.ItemFlag.ItemIsSelectable
+            | Qt.ItemFlag.ItemIsDragEnabled  # both models support drag
+        )
         if index.column() == COL_CHECK:
             f |= Qt.ItemFlag.ItemIsUserCheckable
-        if self._allow_reorder:
-            f |= Qt.ItemFlag.ItemIsDragEnabled
         return f
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
@@ -227,9 +227,7 @@ class BG3ModListModel(QAbstractItemModel):
         return Qt.DropAction.IgnoreAction
 
     def supportedDragActions(self):
-        if self._allow_reorder:
-            return Qt.DropAction.MoveAction
-        return Qt.DropAction.IgnoreAction
+        return Qt.DropAction.MoveAction  # both models support drag
 
     def mimeTypes(self):
         return [MIME_BG3_MOD_ROWS]
@@ -238,11 +236,8 @@ class BG3ModListModel(QAbstractItemModel):
         from PySide6.QtCore import QMimeData
         mime = QMimeData()
         rows = sorted(set(idx.row() for idx in indexes if idx.isValid()))
-        data = QByteArray()
-        stream = QDataStream(data, QIODevice.OpenModeFlag.WriteOnly)
-        for row in rows:
-            stream.writeInt32(row)
-        mime.setData(MIME_BG3_MOD_ROWS, data)
+        uuids = [self._rows[r].uuid for r in rows if 0 <= r < len(self._rows)]
+        mime.setData(MIME_BG3_MOD_ROWS, QByteArray("\n".join(uuids).encode("utf-8")))
         return mime
 
     def canDropMimeData(self, data, action, row, column, parent):
@@ -254,13 +249,20 @@ class BG3ModListModel(QAbstractItemModel):
         if not self._allow_reorder or not data.hasFormat(MIME_BG3_MOD_ROWS):
             return False
 
-        raw = data.data(MIME_BG3_MOD_ROWS)
-        stream = QDataStream(raw, QIODevice.OpenModeFlag.ReadOnly)
-        source_rows = []
-        while not stream.atEnd():
-            source_rows.append(stream.readInt32())
-        if not source_rows:
+        raw = bytes(data.data(MIME_BG3_MOD_ROWS))
+        uuids = [u for u in raw.decode("utf-8").split("\n") if u]
+        if not uuids:
             return False
+
+        # Find source row by UUID
+        uuid = uuids[0]
+        source_row = None
+        for i, r in enumerate(self._rows):
+            if r.uuid == uuid:
+                source_row = i
+                break
+        if source_row is None:
+            return False  # UUID not in this model (cross-tree handled by view)
 
         if row >= 0:
             target = row
@@ -269,7 +271,6 @@ class BG3ModListModel(QAbstractItemModel):
         else:
             target = self.rowCount()
 
-        source_row = source_rows[0]
         p = QModelIndex()
         if source_row < target:
             if not self.beginMoveRows(p, source_row, source_row, p, target):

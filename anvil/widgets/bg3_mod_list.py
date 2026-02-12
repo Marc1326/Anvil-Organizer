@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QModelIndex, QPoint, QRect, QSize, QSortFilterProxyModel, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 
+from anvil.core.persistent_header import PersistentHeader
 from anvil.models.bg3_mod_list_model import (
     BG3ModListModel,
     BG3ModRow,
@@ -29,6 +30,7 @@ from anvil.models.bg3_mod_list_model import (
     COL_CONFLICTS,
     COL_NAME,
     COL_VERSION,
+    MIME_BG3_MOD_ROWS,
     ROLE_UUID,
 )
 
@@ -98,29 +100,42 @@ class _BG3CheckboxDelegate(QStyledItemDelegate):
 # ── Drop-enabled QTreeView ───────────────────────────────────────────
 
 class _BG3DropTreeView(QTreeView):
-    """QTreeView that accepts external .pak / archive drops."""
+    """QTreeView that accepts external archives AND cross-tree mod DnD."""
 
-    archives_dropped = Signal(list)  # list of file path strings
+    archives_dropped = Signal(list)   # list of file path strings
+    uuids_dropped = Signal(list)      # UUIDs dropped from the OTHER tree
 
     def dragEnterEvent(self, event):
-        super().dragEnterEvent(event)
-        if event.mimeData().hasUrls():
-            for url in event.mimeData().urls():
+        md = event.mimeData()
+        # Accept our mod-row MIME (cross-tree AND internal reorder)
+        if md.hasFormat(MIME_BG3_MOD_ROWS):
+            event.acceptProposedAction()
+            return
+        # External archives
+        if md.hasUrls():
+            for url in md.urls():
                 if url.isLocalFile():
-                    suffix = Path(url.toLocalFile()).suffix.lower()
-                    if suffix in _DROP_EXTENSIONS:
+                    if Path(url.toLocalFile()).suffix.lower() in _DROP_EXTENSIONS:
                         event.acceptProposedAction()
                         return
+        super().dragEnterEvent(event)
 
     def dragMoveEvent(self, event):
-        super().dragMoveEvent(event)
-        if event.mimeData().hasUrls():
+        md = event.mimeData()
+        if md.hasFormat(MIME_BG3_MOD_ROWS):
             event.acceptProposedAction()
+            return
+        if md.hasUrls():
+            event.acceptProposedAction()
+            return
+        super().dragMoveEvent(event)
 
     def dropEvent(self, event):
-        if event.mimeData().hasUrls():
+        md = event.mimeData()
+        # External archives
+        if md.hasUrls():
             paths = []
-            for url in event.mimeData().urls():
+            for url in md.urls():
                 if url.isLocalFile():
                     path = url.toLocalFile()
                     if Path(path).suffix.lower() in _DROP_EXTENSIONS:
@@ -129,14 +144,30 @@ class _BG3DropTreeView(QTreeView):
                 event.acceptProposedAction()
                 self.archives_dropped.emit(paths)
                 return
-        # Internal DnD (reorder)
+        # Cross-tree DnD (source is a different tree)
+        if md.hasFormat(MIME_BG3_MOD_ROWS) and event.source() is not self:
+            raw = bytes(md.data(MIME_BG3_MOD_ROWS))
+            uuids = [u for u in raw.decode("utf-8").split("\n") if u]
+            if uuids:
+                event.acceptProposedAction()
+                self.uuids_dropped.emit(uuids)
+                return
+        # Internal DnD (reorder within same tree)
         super().dropEvent(event)
 
 
 # ── Helper: configure a tree view ────────────────────────────────────
 
-def _setup_tree(tree: _BG3DropTreeView, model: BG3ModListModel, allow_reorder: bool) -> None:
-    """Apply common settings to a BG3 mod tree view."""
+def _setup_tree(
+    tree: _BG3DropTreeView,
+    model: BG3ModListModel,
+    allow_reorder: bool,
+    settings_key: str,
+) -> PersistentHeader:
+    """Apply common settings to a BG3 mod tree view.
+
+    Returns the PersistentHeader so the caller can keep a reference.
+    """
     proxy = QSortFilterProxyModel(tree)
     proxy.setSourceModel(model)
     tree.setModel(proxy)
@@ -147,16 +178,11 @@ def _setup_tree(tree: _BG3DropTreeView, model: BG3ModListModel, allow_reorder: b
     tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
     tree.setUniformRowHeights(True)
     tree.setAcceptDrops(True)
-
-    if allow_reorder:
-        tree.setDragEnabled(True)
-        tree.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
-        tree.setDefaultDropAction(Qt.DropAction.MoveAction)
-        tree.setDropIndicatorShown(True)
-        tree.setDragDropOverwriteMode(False)
-    else:
-        tree.setDragEnabled(False)
-        tree.setDragDropMode(QAbstractItemView.DragDropMode.NoDragDrop)
+    tree.setDragEnabled(True)
+    tree.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
+    tree.setDefaultDropAction(Qt.DropAction.MoveAction)
+    tree.setDropIndicatorShown(allow_reorder)  # position indicator only for active
+    tree.setDragDropOverwriteMode(False)
 
     # Context menu
     tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -178,11 +204,15 @@ def _setup_tree(tree: _BG3DropTreeView, model: BG3ModListModel, allow_reorder: b
     tree.setColumnWidth(COL_VERSION, 120)
     tree.setColumnWidth(COL_AUTHOR, 140)
 
+    ph = PersistentHeader(header, settings_key, fixed_columns=frozenset({COL_CHECK}))
+
     # Sorting for inactive tree only
     if not allow_reorder:
         header.setSortIndicatorShown(True)
         header.setSectionsClickable(True)
         header.sortIndicatorChanged.connect(proxy.sort)
+
+    return ph
 
 
 # ── Main widget ──────────────────────────────────────────────────────
@@ -231,7 +261,10 @@ class BG3ModListView(QWidget):
 
         self._active_model = BG3ModListModel(allow_reorder=True)
         self._active_tree = _BG3DropTreeView()
-        _setup_tree(self._active_tree, self._active_model, allow_reorder=True)
+        self._ph_active = _setup_tree(
+            self._active_tree, self._active_model,
+            allow_reorder=True, settings_key="bg3_active",
+        )
         active_layout.addWidget(self._active_tree)
 
         self._splitter.addWidget(active_pane)
@@ -251,7 +284,10 @@ class BG3ModListView(QWidget):
 
         self._inactive_model = BG3ModListModel(allow_reorder=False)
         self._inactive_tree = _BG3DropTreeView()
-        _setup_tree(self._inactive_tree, self._inactive_model, allow_reorder=False)
+        self._ph_inactive = _setup_tree(
+            self._inactive_tree, self._inactive_model,
+            allow_reorder=False, settings_key="bg3_inactive",
+        )
         inactive_layout.addWidget(self._inactive_tree)
 
         self._splitter.addWidget(inactive_pane)
@@ -275,8 +311,14 @@ class BG3ModListView(QWidget):
         self._extras_tree.setAlternatingRowColors(True)
         self._extras_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._extras_tree.setUniformRowHeights(True)
+        extras_hdr = self._extras_tree.header()
+        extras_hdr.setStretchLastSection(False)
+        extras_hdr.setCascadingSectionResizes(True)
+        extras_hdr.setMinimumSectionSize(30)
+        extras_hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self._extras_tree.setColumnWidth(0, 280)
         self._extras_tree.setColumnWidth(1, 100)
+        self._ph_extras = PersistentHeader(extras_hdr, "bg3_extras")
         self._extras_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._extras_tree.customContextMenuRequested.connect(self._on_extras_context_menu)
         extras_layout.addWidget(self._extras_tree)
@@ -306,6 +348,10 @@ class BG3ModListView(QWidget):
 
         # Reorder in active list
         self._active_model.mods_reordered.connect(self._on_reorder)
+
+        # Cross-tree DnD: dropped on active → activate, on inactive → deactivate
+        self._active_tree.uuids_dropped.connect(self._on_cross_drop_activate)
+        self._inactive_tree.uuids_dropped.connect(self._on_cross_drop_deactivate)
 
         # Context menus
         self._active_tree.customContextMenuRequested.connect(
@@ -350,6 +396,22 @@ class BG3ModListView(QWidget):
     def inactive_header(self) -> QHeaderView:
         """Return the inactive tree header for state persistence."""
         return self._inactive_tree.header()
+
+    def extras_header(self) -> QHeaderView:
+        """Return the extras tree header for state persistence."""
+        return self._extras_tree.header()
+
+    def restore_column_widths(self) -> None:
+        """Restore saved column widths for all three trees."""
+        self._ph_active.restore()
+        self._ph_inactive.restore()
+        self._ph_extras.restore()
+
+    def flush_column_widths(self) -> None:
+        """Flush any pending debounced column-width writes."""
+        self._ph_active.flush()
+        self._ph_inactive.flush()
+        self._ph_extras.flush()
 
     def get_selected_mod(self, section: str) -> dict:
         """Return data for the selected mod in the given section."""
@@ -449,6 +511,16 @@ class BG3ModListView(QWidget):
             rd = self._inactive_model.row_data(row)
             if rd and rd.uuid:
                 self.mod_activated.emit(rd.uuid)
+
+    def _on_cross_drop_activate(self, uuids: list) -> None:
+        """Mods dropped from inactive onto active tree → activate."""
+        for uuid in uuids:
+            self.mod_activated.emit(uuid)
+
+    def _on_cross_drop_deactivate(self, uuids: list) -> None:
+        """Mods dropped from active onto inactive tree → deactivate."""
+        for uuid in uuids:
+            self.mod_deactivated.emit(uuid)
 
     def _on_reorder(self) -> None:
         """Active mods reordered via DnD."""

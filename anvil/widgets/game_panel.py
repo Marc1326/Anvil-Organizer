@@ -34,6 +34,7 @@ from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl, QMimeData
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.mod_deployer import ModDeployer
 from anvil.core.download_manager import DownloadManager
+from anvil.core.persistent_header import PersistentHeader
 
 
 def _todo(name):
@@ -193,6 +194,7 @@ class GamePanel(QWidget):
         self._data_tree.setColumnWidth(2, 70)
         self._data_tree.setColumnWidth(3, 80)
         self._data_tree.setColumnWidth(4, 130)
+        self._ph_data = PersistentHeader(data_header, "data")
         data_layout.addWidget(self._data_tree)
         data_bar = QHBoxLayout()
         data_bar.addWidget(QCheckBox("Nur Konflikte"))
@@ -213,7 +215,9 @@ class GamePanel(QWidget):
         saves_header = self._saves_tree.header()
         saves_header.setStretchLastSection(False)
         saves_header.setCascadingSectionResizes(True)
+        saves_header.setMinimumSectionSize(40)
         saves_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self._ph_saves = PersistentHeader(saves_header, "saves")
         saves_layout.addWidget(self._saves_tree)
         tabs.addTab(saves, "Spielstände")
 
@@ -239,6 +243,7 @@ class GamePanel(QWidget):
         self._dl_table.setColumnWidth(1, 90)
         self._dl_table.setColumnWidth(2, 120)
         self._dl_table.setColumnWidth(3, 140)
+        self._ph_downloads = PersistentHeader(dl_header, "downloads")
         self._dl_table.verticalHeader().setDefaultSectionSize(46)
         self._dl_table.verticalHeader().setVisible(False)
         self._dl_table.setStyleSheet("QTableWidget { font-size: 14px; }")
@@ -283,6 +288,29 @@ class GamePanel(QWidget):
         self._download_manager.download_error.connect(self._on_dm_error)
         # Track active download rows: download_id → dl_table row
         self._active_dl_rows: dict[int, int] = {}
+
+    # ── Column persistence ─────────────────────────────────────────────
+
+    def restore_tab_column_widths(self, tab_index: int) -> None:
+        """Restore column widths for a specific tab (0=data, 1=saves, 2=downloads)."""
+        if tab_index == 0:
+            self._ph_data.restore()
+        elif tab_index == 1:
+            self._ph_saves.restore()
+        elif tab_index == 2:
+            self._ph_downloads.restore()
+
+    def restore_all_column_widths(self) -> None:
+        """Restore column widths for all three tabs."""
+        self._ph_data.restore()
+        self._ph_saves.restore()
+        self._ph_downloads.restore()
+
+    def flush_column_widths(self) -> None:
+        """Flush any pending debounced column-width writes."""
+        self._ph_data.flush()
+        self._ph_saves.flush()
+        self._ph_downloads.flush()
 
     # ── Public API ────────────────────────────────────────────────────
 

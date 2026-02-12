@@ -159,8 +159,8 @@ class MainWindow(QMainWindow):
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
 
-        # ── Deferred tab header restore ──────────────────────────────
-        self._pending_tab_states: dict[int, tuple] = {}
+        # ── Deferred tab column restore ───────────────────────────────
+        self._restored_tabs: set[int] = set()
         self._game_panel._tabs.currentChanged.connect(self._on_tab_changed)
 
         # ── Erster Start / Instanz laden ──────────────────────────────
@@ -1515,16 +1515,19 @@ class MainWindow(QMainWindow):
         return QSettings(path, QSettings.Format.IniFormat)
 
     def _save_ui_state(self) -> None:
-        """Persist splitter, mod-list, downloads column widths and view settings."""
+        """Persist splitter proportions and view settings.
+
+        Column widths are saved live by PersistentHeader (debounced).
+        Flush any pending writes so nothing is lost on shutdown.
+        """
+        # Flush debounced column-width writes
+        self._mod_list_view.flush_column_widths()
+        self._game_panel.flush_column_widths()
+        if self._bg3_mod_list is not None:
+            self._bg3_mod_list.flush_column_widths()
+
         s = self._settings()
         s.setValue("splitter/state", self._splitter.saveState())
-        s.setValue("mod_list/header_state", self._mod_list_view.header().saveState())
-        s.setValue("downloads/header_state",
-                   self._game_panel._dl_table.horizontalHeader().saveState())
-        s.setValue("data/header_state",
-                   self._game_panel._data_tree.header().saveState())
-        s.setValue("saves/header_state",
-                   self._game_panel._saves_tree.header().saveState())
         # View settings
         s.setValue("view/menubar_visible", self.menuBar().isVisible())
         s.setValue("view/toolbar_visible", self._toolbar.isVisible())
@@ -1542,43 +1545,36 @@ class MainWindow(QMainWindow):
         s.sync()
 
     def _restore_ui_state(self) -> None:
-        """Restore splitter, mod-list and tab column widths.
+        """Restore splitter and column widths.
 
-        Tab headers (Daten/Spielstände/Downloads) are restored deferred:
-        hidden tabs ignore restoreState(), so we store the bytes and
-        apply them when the tab becomes visible for the first time.
+        Column widths are restored via PersistentHeader.restore().
+        Tab column restores are deferred until the tab becomes visible
+        for the first time (hidden widgets may not layout correctly).
         """
         s = self._settings()
         val = s.value("splitter/state")
         if val:
             self._splitter.restoreState(val)
-        val = s.value("mod_list/header_state")
-        if val:
-            self._mod_list_view.header().restoreState(val)
 
-        # Tab headers: deferred restore (hidden tabs ignore restoreState)
-        tab_map = {
-            0: ("data/header_state", lambda: self._game_panel._data_tree.header()),
-            1: ("saves/header_state", lambda: self._game_panel._saves_tree.header()),
-            2: ("downloads/header_state", lambda: self._game_panel._dl_table.horizontalHeader()),
-        }
-        self._pending_tab_states.clear()
-        for tab_idx, (key, header_fn) in tab_map.items():
-            val = s.value(key)
-            if val:
-                self._pending_tab_states[tab_idx] = (val, header_fn)
+        # Standard mod list — always visible
+        self._mod_list_view.restore_column_widths()
 
-        # Restore the currently active tab immediately (it's visible)
+        # BG3 mod list — visible when BG3 instance is active
+        if self._bg3_mod_list is not None:
+            self._bg3_mod_list.restore_column_widths()
+
+        # Game-panel tabs — only restore the currently visible tab;
+        # hidden tabs are restored on first switch via _on_tab_changed()
+        self._restored_tabs.clear()
         active = self._game_panel._tabs.currentIndex()
-        if active in self._pending_tab_states:
-            val, header_fn = self._pending_tab_states.pop(active)
-            header_fn().restoreState(val)
+        self._game_panel.restore_tab_column_widths(active)
+        self._restored_tabs.add(active)
 
     def _on_tab_changed(self, index: int) -> None:
-        """Restore header state when a tab becomes visible for the first time."""
-        if index in self._pending_tab_states:
-            val, header_fn = self._pending_tab_states.pop(index)
-            header_fn().restoreState(val)
+        """Restore column widths when a tab becomes visible for the first time."""
+        if index not in self._restored_tabs:
+            self._game_panel.restore_tab_column_widths(index)
+            self._restored_tabs.add(index)
 
     def closeEvent(self, event) -> None:
         # Purge deployed mods before closing
