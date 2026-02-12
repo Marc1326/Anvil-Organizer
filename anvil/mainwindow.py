@@ -737,8 +737,9 @@ class MainWindow(QMainWindow):
 
     def _update_active_count(self) -> None:
         """Update the active mod counter in the profile bar."""
-        count = sum(1 for e in self._current_mod_entries if e.enabled)
-        self._profile_bar.update_active_count(count)
+        active = sum(1 for e in self._current_mod_entries if e.enabled)
+        total = len(self._current_mod_entries)
+        self._profile_bar.update_active_count(active, total)
 
     def _compute_conflict_data(self) -> dict:
         """Run ConflictScanner and return per-mod conflict info.
