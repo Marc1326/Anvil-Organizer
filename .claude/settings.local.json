@@ -28,7 +28,21 @@
       "Bash(PYTHONPATH=\".venv/lib/python3.14/site-packages:$PYTHONPATH\" QT_QPA_PLATFORM=offscreen python3:*)",
       "Bash(grep:*)",
       "Bash(.venv/bin/pip:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(PYTHONPATH=\".venv/lib/python3.14/site-packages:$PYTHONPATH\" QT_QPA_PLATFORM=offscreen timeout 8 python3:*)",
+      "Bash(/dev/null -exec echo \"--- {} ---\" ; -exec cat {} ;)",
+      "Bash(PYTHONPATH=\".venv/lib/python3.14/site-packages:$PYTHONPATH\" QT_QPA_PLATFORM=offscreen timeout 10 python3:*)",
+      "Bash(ffprobe:*)",
+      "Bash('GAME=/home/mob/.local/share/Steam/steamapps/common/Cyberpunk 2077' echo '=== RedFileSystem ===' ls $GAME/red4ext/plugins/RedFileSystem/ 2)",
+      "Bash(/dev/null echo '=== RedData ===' ls $GAME/red4ext/plugins/RedData/ 2)",
+      "Bash(/dev/null echo '=== Native Settings UI ===' ls $GAME/bin/x64/plugins/cyber_engine_tweaks/mods/nativeSettings/)",
+      "Bash(ffmpeg:*)",
+      "Bash(findmnt:*)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(pip3 install:*)",
+      "Bash(/home/mob/Projekte/Anvil\\ Organizer/.venv/bin/python:*)",
+      "Bash(/home/mob/Projekte/Anvil Organizer/.venv/bin/python:*)",
+      "Bash(cd:*)"
     ],
     "deny": [],
     "ask": []

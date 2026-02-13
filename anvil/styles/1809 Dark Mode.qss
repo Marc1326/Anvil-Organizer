@@ -283,3 +283,41 @@ LinkLabel {
 
 #displayCategoriesBtn {
   min-width: 12px; }
+
+/* ── FilterPanel ──────────────────────────────────────── */
+
+#filterPanel {
+  background: #191919;
+  border-right: 1px solid #2B2B2B; }
+
+#filterChip {
+  background: #2B2B2B;
+  color: #DEDEDE;
+  border: 1px solid #3D3D3D;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 11px; }
+  #filterChip:hover {
+    background: #3D3D3D;
+    border-color: #535353; }
+  #filterChip:checked {
+    background: #0078D7;
+    color: #FFF;
+    border-color: #0078D7; }
+  #filterChip:checked:hover {
+    background: #1a8ae6;
+    border-color: #1a8ae6; }
+
+#filterToggleBar {
+  background: #1a2a3a;
+  border-right: 1px solid #333; }
+  #filterToggleBar:hover {
+    background: #1a2a3a; }
+
+#filterResetBtn, #filterManageBtn {
+  background: #2B2B2B;
+  border: 1px solid #3D3D3D;
+  border-radius: 3px;
+  padding: 4px 12px; }
+  #filterResetBtn:hover, #filterManageBtn:hover {
+    background: #4D4D4D; }

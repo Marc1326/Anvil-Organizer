@@ -282,6 +282,14 @@ class BaseGame:
         """
         return {}
 
+    def get_default_categories(self) -> list[dict] | None:
+        """Return game-specific default categories, or None to use global defaults.
+
+        Each entry: ``{"id": int, "name": str}``.
+        Subclasses override this for game-specific category sets.
+        """
+        return None
+
     def get_conflict_ignores(self) -> list[str]:
         """Return glob patterns for files to ignore during conflict detection.
 

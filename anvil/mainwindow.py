@@ -28,6 +28,7 @@ from anvil.styles.dark_theme import load_theme, default_theme
 from anvil.widgets.toolbar import create_toolbar
 from anvil.widgets.profile_bar import ProfileBar
 from anvil.widgets.mod_list import ModListView
+from anvil.widgets.filter_panel import FilterPanel
 from anvil.widgets.game_panel import GamePanel
 from anvil.widgets.status_bar import StatusBarWidget
 from anvil.dialogs import ModDetailDialog
@@ -42,12 +43,13 @@ from anvil.core.mod_list_io import (
     add_mod_to_modlist, write_modlist, remove_mod_from_modlist,
     rename_mod_in_modlist,
 )
-from anvil.core.categories import CategoryManager
+from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nxm_handler import parse_nxm_url, check_cli_for_nxm
 from anvil.core.conflict_scanner import ConflictScanner
 from anvil.models.mod_list_model import mod_entry_to_row
 from anvil.widgets.instance_wizard import CreateInstanceWizard
+from anvil.widgets.category_dialog import CategoryDialog
 
 
 def _todo(name):
@@ -107,6 +109,7 @@ class MainWindow(QMainWindow):
         left_pane = QWidget()
         left_layout = QVBoxLayout(left_pane)
         left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
         self._profile_bar = ProfileBar(self)
         left_layout.addWidget(self._profile_bar)
         self._mod_list_view = ModListView()
@@ -116,7 +119,23 @@ class MainWindow(QMainWindow):
         # Stacked widget: standard mod list (index 0) / BG3 mod list (index 1)
         self._mod_list_stack = QStackedWidget()
         self._mod_list_stack.addWidget(self._mod_list_view)
-        left_layout.addWidget(self._mod_list_stack)
+
+        # ── FilterPanel + ModList ────────────────────────────────────
+        self._filter_panel = FilterPanel()
+        self._filter_panel.filter_changed.connect(self._on_filter_changed)
+        self._filter_panel.panel_toggled.connect(self._on_filter_panel_toggled)
+        self._filter_panel.manage_categories_requested.connect(self._on_manage_categories)
+
+        self._filter_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._filter_splitter.addWidget(self._filter_panel)
+        self._filter_splitter.addWidget(self._mod_list_stack)
+        self._filter_splitter.setStretchFactor(0, 0)
+        self._filter_splitter.setStretchFactor(1, 1)
+        self._filter_splitter.setSizes([220, 560])
+        self._filter_splitter.setChildrenCollapsible(False)
+        self._filter_panel.set_splitter(self._filter_splitter)
+
+        left_layout.addWidget(self._filter_splitter)
 
         # BG3 mod list (lazy-created when needed)
         self._bg3_mod_list: None = None  # BG3ModListView, created on demand
@@ -280,6 +299,13 @@ class MainWindow(QMainWindow):
         # Sync checkmarks when menu is about to show
         self._tb_menu.aboutToShow.connect(self._update_toolbar_menu)
 
+        # ── Filter-Panel (Toggle) ─────────────────────────────────
+        self._act_filter_panel = vm.addAction("Filter-Panel")
+        self._act_filter_panel.setCheckable(True)
+        self._act_filter_panel.setChecked(False)
+        self._act_filter_panel.setShortcut(QKeySequence("Ctrl+F"))
+        self._act_filter_panel.triggered.connect(self._on_toggle_filter_panel)
+
         # ── Log (Toggle) ──────────────────────────────────────────
         self._act_log = vm.addAction("Log")
         self._act_log.setCheckable(True)
@@ -380,6 +406,39 @@ class MainWindow(QMainWindow):
         self._reload_mod_list()
         self.statusBar().showMessage("Mod-Liste neu geladen", 3000)
 
+    def _on_toggle_filter_panel(self, checked: bool) -> None:
+        """Ansicht → Filter-Panel (Menu action / Strg+F)."""
+        self._filter_panel.set_open(checked)
+        self._act_filter_panel.blockSignals(True)
+        self._act_filter_panel.setChecked(checked)
+        self._act_filter_panel.blockSignals(False)
+
+    def _on_filter_panel_toggled(self, is_open: bool) -> None:
+        """FilterPanel toggle bar was clicked — sync menu action."""
+        self._act_filter_panel.blockSignals(True)
+        self._act_filter_panel.setChecked(is_open)
+        self._act_filter_panel.blockSignals(False)
+
+    def _on_manage_categories(self) -> None:
+        """Open the category management dialog and refresh chips afterward."""
+        # Determine default category IDs (plugin-specific or global fallback)
+        default_cats = None
+        if self._current_plugin is not None:
+            default_cats = self._current_plugin.get_default_categories()
+        if default_cats is None:
+            default_cats = _DEFAULT_CATEGORIES
+        default_ids = {c["id"] for c in default_cats}
+
+        dlg = CategoryDialog(
+            self._category_manager,
+            self._current_mod_entries,
+            default_category_ids=default_ids,
+            parent=self,
+        )
+        dlg.exec()
+        # Refresh filter chips with (possibly changed) categories
+        self._filter_panel.set_categories(self._category_manager.all_categories())
+
     def _on_toggle_log(self, checked: bool) -> None:
         """Ansicht → Log (Toggle)."""
         self._log_panel.setVisible(checked)
@@ -470,6 +529,14 @@ class MainWindow(QMainWindow):
             self._toolbar.setVisible(s.value("view/toolbar_visible", True, type=bool))
         if s.value("view/statusbar_visible") is not None:
             self._status_bar.setVisible(s.value("view/statusbar_visible", True, type=bool))
+
+        # Filter panel
+        fp_open = s.value("view/filter_panel_open", False, type=bool)
+        self._filter_panel.set_open(fp_open)
+        self._act_filter_panel.setChecked(fp_open)
+        fp_splitter = s.value("view/filter_splitter_state")
+        if fp_splitter:
+            self._filter_splitter.restoreState(fp_splitter)
 
         log_vis = s.value("view/log_visible", False, type=bool)
         self._log_panel.setVisible(log_vis)
@@ -650,6 +717,11 @@ class MainWindow(QMainWindow):
         # Load categories for this instance
         self._category_manager.load(instance_path)
         self._mod_list_view.source_model().set_category_manager(self._category_manager)
+        self._mod_list_view._proxy_model.set_category_manager(self._category_manager)
+
+        # Populate FilterPanel with categories
+        self._filter_panel.set_categories(self._category_manager.all_categories())
+        self._filter_panel.reset_all()
 
         profile_name = data.get("selected_profile", "Default")
         self._current_profile_path = instance_path / ".profiles" / profile_name
@@ -667,6 +739,8 @@ class MainWindow(QMainWindow):
         visible_entries = [e for e in self._current_mod_entries if not e.is_direct_install]
         mod_rows = [mod_entry_to_row(e, conflict_data) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
+        # Provide visible entries to proxy for filter logic
+        self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
         self._update_active_count()
 
         # Framework detection (Cyberpunk, etc.)
@@ -740,6 +814,15 @@ class MainWindow(QMainWindow):
         active = sum(1 for e in self._current_mod_entries if e.enabled)
         total = len(self._current_mod_entries)
         self._profile_bar.update_active_count(active, total)
+
+    def _on_filter_changed(self) -> None:
+        """FilterPanel chip/text changed — update proxy filter."""
+        proxy = self._mod_list_view._proxy_model
+        proxy.set_filter_state(
+            self._filter_panel.search_text(),
+            self._filter_panel.active_property_ids(),
+            self._filter_panel.active_category_ids(),
+        )
 
     def _compute_conflict_data(self) -> dict:
         """Run ConflictScanner and return per-mod conflict info.
@@ -1442,6 +1525,7 @@ class MainWindow(QMainWindow):
         visible_entries = [e for e in self._current_mod_entries if not e.is_direct_install]
         mod_rows = [mod_entry_to_row(e, conflict_data) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
+        self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
         self._update_active_count()
 
     # ── Nexus API integration ─────────────────────────────────────────
@@ -1571,6 +1655,8 @@ class MainWindow(QMainWindow):
         s.setValue("view/toolbar_visible", self._toolbar.isVisible())
         s.setValue("view/statusbar_visible", self._status_bar.isVisible())
         s.setValue("view/log_visible", self._log_panel.isVisible())
+        s.setValue("view/filter_panel_open", self._filter_panel.is_open())
+        s.setValue("view/filter_splitter_state", self._filter_splitter.saveState())
         # Icon size → index (0=small, 1=medium, 2=large)
         cur_size = self._toolbar.iconSize()
         size_idx = 1  # default medium
