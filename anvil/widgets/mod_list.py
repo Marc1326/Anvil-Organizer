@@ -6,9 +6,6 @@ from PySide6.QtWidgets import (
     QTreeView,
     QTreeWidget,
     QTreeWidgetItem,
-    QHBoxLayout,
-    QLineEdit,
-    QPushButton,
     QSplitter,
     QAbstractItemView,
     QStyledItemDelegate,
@@ -21,12 +18,6 @@ from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.persistent_header import PersistentHeader
 from anvil.widgets.collapsible_bar import CollapsibleSectionBar
 from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME
-
-
-def _todo(name):
-    def _():
-        print(f"TODO: {name}")
-    return _
 
 
 class CheckboxDelegate(QStyledItemDelegate):
@@ -138,11 +129,17 @@ class CheckboxDelegate(QStyledItemDelegate):
 
 class ModListProxyModel(QSortFilterProxyModel):
     """Proxy-Model für Mod-Liste. Qt leitet DnD automatisch ans Source-Model weiter.
-    Supports hiding mods under collapsed separators."""
+    Supports hiding mods under collapsed separators and chip-based filtering."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._hidden_rows: set[int] = set()
+        # Filter state (set by FilterPanel via MainWindow)
+        self._filter_text: str = ""
+        self._filter_prop_ids: set[int] = set()
+        self._filter_cat_ids: set[int] = set()
+        self._mod_entries: list = []  # Reference to MainWindow._current_mod_entries
+        self._category_manager = None
 
     def set_hidden_rows(self, rows: set[int]):
         """Set which source rows should be hidden (collapsed under a separator)."""
@@ -150,9 +147,89 @@ class ModListProxyModel(QSortFilterProxyModel):
         self._hidden_rows = rows
         self.endResetModel()
 
+    def set_filter_state(self, text: str, prop_ids: set[int], cat_ids: set[int]):
+        """Update filter criteria from FilterPanel and re-filter."""
+        self._filter_text = text
+        self._filter_prop_ids = prop_ids
+        self._filter_cat_ids = cat_ids
+        self.invalidateFilter()
+
+    def set_mod_entries(self, entries: list):
+        """Set reference to the current mod entries for filter logic."""
+        self._mod_entries = entries
+
+    def set_category_manager(self, manager):
+        """Set CategoryManager reference for category name lookup."""
+        self._category_manager = manager
+
     def filterAcceptsRow(self, source_row, source_parent):
         if source_row in self._hidden_rows:
             return False
+
+        # If no filters active, accept all
+        if not self._filter_text and not self._filter_prop_ids and not self._filter_cat_ids:
+            return True
+
+        # Separators always visible (they structure the list)
+        source = self.sourceModel()
+        if source:
+            from anvil.models.mod_list_model import ROLE_IS_SEPARATOR
+            idx = source.index(source_row, 0)
+            if source.data(idx, ROLE_IS_SEPARATOR):
+                return True
+
+        # Get corresponding ModEntry (visible_entries index = source_row)
+        if source_row >= len(self._mod_entries):
+            return True
+        entry = self._mod_entries[source_row]
+
+        # Text filter (AND: all words must match name, author, or category)
+        if self._filter_text:
+            words = self._filter_text.split()
+            search_name = (entry.display_name or entry.name).lower()
+            search_author = (entry.author or "").lower()
+            # Resolve category name for text search
+            cat_name = ""
+            if self._category_manager and entry.primary_category:
+                cat_name = self._category_manager.get_name(entry.primary_category).lower()
+            search_target = f"{search_name} {search_author} {cat_name}"
+            for word in words:
+                if word not in search_target:
+                    return False
+
+        # Property filters (OR within properties: show if ANY checked property matches)
+        if self._filter_prop_ids:
+            from anvil.widgets.filter_panel import (
+                PROP_ENABLED, PROP_DISABLED, PROP_HAS_CATEGORY,
+                PROP_NO_CATEGORY, PROP_CONFLICT_WIN, PROP_CONFLICT_LOSE,
+            )
+            match = False
+            if PROP_ENABLED in self._filter_prop_ids and entry.enabled:
+                match = True
+            if PROP_DISABLED in self._filter_prop_ids and not entry.enabled:
+                match = True
+            if PROP_HAS_CATEGORY in self._filter_prop_ids and entry.category_ids:
+                match = True
+            if PROP_NO_CATEGORY in self._filter_prop_ids and not entry.category_ids:
+                match = True
+            # Conflict filters need conflict data from model row
+            if source and source_row < source.rowCount():
+                row_data = source._rows[source_row] if source_row < len(source._rows) else None
+                if row_data and isinstance(row_data.conflicts, dict):
+                    ctype = row_data.conflicts.get("type", "")
+                    if PROP_CONFLICT_WIN in self._filter_prop_ids and ctype in ("win", "both"):
+                        match = True
+                    if PROP_CONFLICT_LOSE in self._filter_prop_ids and ctype in ("lose", "both"):
+                        match = True
+            if not match:
+                return False
+
+        # Category filters (OR: show if mod has ANY of the checked categories)
+        if self._filter_cat_ids:
+            mod_cats = set(entry.category_ids)
+            if not mod_cats.intersection(self._filter_cat_ids):
+                return False
+
         return True
 
 
@@ -323,20 +400,6 @@ class ModListView(QWidget):
         fw_container.setVisible(False)
         self._fw_container = fw_container
         layout.addWidget(self._splitter)
-
-        filter_row = QHBoxLayout()
-        self._filter_left = QLineEdit()
-        self._filter_left.setPlaceholderText("Filter")
-        self._filter_left.textChanged.connect(lambda t: _todo("Filter")())
-        filter_row.addWidget(self._filter_left)
-        btn = QPushButton("Keine Gruppen")
-        btn.clicked.connect(_todo("Keine Gruppen"))
-        filter_row.addWidget(btn)
-        self._filter_right = QLineEdit()
-        self._filter_right.setPlaceholderText("Filter")
-        self._filter_right.textChanged.connect(lambda t: _todo("Filter")())
-        filter_row.addWidget(self._filter_right)
-        layout.addLayout(filter_row)
 
     def _on_fw_splitter_moved(self) -> None:
         """Hide/show the framework tree based on available space (respects collapsed state)."""

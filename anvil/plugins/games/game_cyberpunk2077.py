@@ -227,6 +227,28 @@ class Cyberpunk2077Game(BaseGame):
             ),
         ]
 
+    def get_default_categories(self) -> list[dict] | None:
+        """Return Cyberpunk 2077 specific default categories."""
+        return [
+            {"id": 1, "name": "Gameplay"},
+            {"id": 2, "name": "Waffen"},
+            {"id": 3, "name": "Kleidung & Rüstung"},
+            {"id": 4, "name": "Fahrzeuge"},
+            {"id": 5, "name": "Cyberware"},
+            {"id": 6, "name": "Grafik & Visuals"},
+            {"id": 7, "name": "UI"},
+            {"id": 8, "name": "Audio"},
+            {"id": 9, "name": "NPC & Companions"},
+            {"id": 10, "name": "Umgebung"},
+            {"id": 11, "name": "Frisuren & Gesicht"},
+            {"id": 12, "name": "Körper"},
+            {"id": 13, "name": "Foto-Modus"},
+            {"id": 14, "name": "Bug Fixes"},
+            {"id": 15, "name": "Utilities"},
+            {"id": 16, "name": "Frameworks"},
+            {"id": 17, "name": "Patches"},
+        ]
+
     def get_conflict_ignores(self) -> list[str]:
         """Return patterns for harmless files in Cyberpunk 2077 mods."""
         return [
