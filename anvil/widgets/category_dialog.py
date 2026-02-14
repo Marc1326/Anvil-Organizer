@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QMessageBox,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 
 from anvil.core.categories import CategoryManager
 from anvil.core.mod_entry import ModEntry
@@ -38,10 +38,12 @@ class CategoryDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle("Kategorien verwalten")
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(1380, 800)
+        self.resize(1380, 800)
         self._cat_mgr = category_manager
         self._mod_entries = mod_entries
         self._default_ids: set[int] = default_category_ids or set()
+        self._was_shown = False
 
         # ── Layout ─────────────────────────────────────────────────
         outer = QVBoxLayout(self)
@@ -100,18 +102,33 @@ class CategoryDialog(QDialog):
         # Initial fill
         self._refresh_table()
 
+        # Persist column widths
+        header.sectionResized.connect(self._save_column_widths)
+
         # Sort by name initially
         self._tree.sortByColumn(1, Qt.SortOrder.AscendingOrder)
 
-        # Center over parent
-        if parent is not None:
-            pg = parent.geometry()
-            self.move(
-                pg.x() + (pg.width() - self.width()) // 2,
-                pg.y() + (pg.height() - self.height()) // 2,
-            )
+    # ── Overrides ─────────────────────────────────────────────────
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._was_shown:
+            self._was_shown = True
+            self.resize(1380, 800)
+            # Restore saved column widths
+            settings = QSettings()
+            widths = settings.value("CategoryDialog/columnWidths")
+            if widths and len(widths) == self._tree.columnCount():
+                for i, w in enumerate(widths):
+                    self._tree.setColumnWidth(i, int(w))
 
     # ── Helpers ────────────────────────────────────────────────────
+
+    def _save_column_widths(self) -> None:
+        """Persist current column widths to QSettings."""
+        header = self._tree.header()
+        widths = [header.sectionSize(i) for i in range(header.count())]
+        QSettings().setValue("CategoryDialog/columnWidths", widths)
 
     def _mod_count(self, cat_id: int) -> int:
         """Return how many mods reference *cat_id*."""

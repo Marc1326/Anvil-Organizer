@@ -28,6 +28,7 @@ from anvil.styles.dark_theme import load_theme, default_theme
 from anvil.widgets.toolbar import create_toolbar
 from anvil.widgets.profile_bar import ProfileBar
 from anvil.widgets.mod_list import ModListView
+from anvil.widgets.collapsible_bar import CollapsibleSectionBar
 from anvil.widgets.filter_panel import FilterPanel
 from anvil.widgets.game_panel import GamePanel
 from anvil.widgets.status_bar import StatusBarWidget
@@ -96,6 +97,7 @@ class MainWindow(QMainWindow):
 
         self._toolbar = create_toolbar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._toolbar)
+        self._toolbar.installEventFilter(self)
         self._build_menu_bar()
 
         central = QWidget()
@@ -124,7 +126,9 @@ class MainWindow(QMainWindow):
         self._filter_panel = FilterPanel()
         self._filter_panel.filter_changed.connect(self._on_filter_changed)
         self._filter_panel.panel_toggled.connect(self._on_filter_panel_toggled)
-        self._filter_panel.manage_categories_requested.connect(self._on_manage_categories)
+        self._filter_panel.category_add_requested.connect(self._on_category_add)
+        self._filter_panel.category_rename_requested.connect(self._on_category_rename)
+        self._filter_panel.category_delete_requested.connect(self._on_category_delete)
 
         self._filter_splitter = QSplitter(Qt.Orientation.Horizontal)
         self._filter_splitter.addWidget(self._filter_panel)
@@ -146,26 +150,42 @@ class MainWindow(QMainWindow):
         splitter.setSizes([780, 420])
         main_layout.addWidget(splitter)
 
-        # ── Log-Panel (toggleable via Ansicht → Log) ──────────────────
+        # ── Log-Panel (collapsible section) ───────────────────────────
+        self._log_container = QWidget()
+        self._log_container.setMinimumHeight(28)
+        self._log_container.setMaximumHeight(148)  # 28 bar + 120 text
+        log_layout = QVBoxLayout(self._log_container)
+        log_layout.setContentsMargins(0, 0, 0, 0)
+        log_layout.setSpacing(0)
+
         self._log_panel = QTextEdit()
         self._log_panel.setReadOnly(True)
-        self._log_panel.setMaximumHeight(150)
+        self._log_panel.setMaximumHeight(120)
         self._log_panel.setPlaceholderText("Log-Ausgabe...")
         self._log_panel.setStyleSheet(
             "QTextEdit { font-family: monospace; font-size: 12px; }"
         )
-        self._log_panel.setVisible(False)
-        main_layout.addWidget(self._log_panel)
+
+        self._log_bar = CollapsibleSectionBar(
+            "Log",
+            "log",
+            self._log_panel,
+            style="QLabel { font-weight: bold; padding: 4px 6px; "
+                  "background: #1a2a3a; border-bottom: 1px solid #333; }",
+            container=self._log_container,
+            default_collapsed=True,
+            max_expanded_height=148,
+        )
+        self._log_bar.toggled.connect(self._on_log_bar_toggled)
+        log_layout.addWidget(self._log_bar)
+        log_layout.addWidget(self._log_panel)
+        main_layout.addWidget(self._log_container)
 
         self._status_bar = StatusBarWidget(self)
         self.setStatusBar(self._status_bar)
 
         # ── Restore view settings (toolbar size, visibility, etc.) ────
         self._restore_view_settings()
-
-        # ── Right-click recovery for hidden menu bar ──────────────────
-        # Install event filter on toolbar so right-click there also works
-        self._toolbar.installEventFilter(self)
 
         # ── Category manager ────────────────────────────────────────────
         self._category_manager = CategoryManager()
@@ -202,6 +222,10 @@ class MainWindow(QMainWindow):
 
         # ── Erster Start / Instanz laden ──────────────────────────────
         self._check_first_start()
+
+        # App-weiter Event-Filter für ContextMenu-Events (Wayland-Kompatibilität)
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance().installEventFilter(self)
 
     # ── Menu bar (MO2-Struktur) ─────────────────────────────────────
 
@@ -419,29 +443,48 @@ class MainWindow(QMainWindow):
         self._act_filter_panel.setChecked(is_open)
         self._act_filter_panel.blockSignals(False)
 
-    def _on_manage_categories(self) -> None:
-        """Open the category management dialog and refresh chips afterward."""
-        # Determine default category IDs (plugin-specific or global fallback)
-        default_cats = None
-        if self._current_plugin is not None:
-            default_cats = self._current_plugin.get_default_categories()
-        if default_cats is None:
-            default_cats = _DEFAULT_CATEGORIES
-        default_ids = {c["id"] for c in default_cats}
-
-        dlg = CategoryDialog(
-            self._category_manager,
-            self._current_mod_entries,
-            default_category_ids=default_ids,
-            parent=self,
-        )
-        dlg.exec()
-        # Refresh filter chips with (possibly changed) categories
+    def _on_category_add(self, name: str) -> None:
+        """Inline add: create a new category and refresh chips."""
+        if not self._current_instance_path:
+            return
+        self._category_manager.add_category(name)
         self._filter_panel.set_categories(self._category_manager.all_categories())
+        self.statusBar().showMessage(f"Kategorie erstellt: {name}", 3000)
+
+    def _on_category_rename(self, cat_id: int, new_name: str) -> None:
+        """Inline rename: rename an existing category and refresh chips."""
+        if not self._current_instance_path:
+            return
+        self._category_manager.rename_category(cat_id, new_name)
+        self._filter_panel.set_categories(self._category_manager.all_categories())
+        self.statusBar().showMessage(f"Kategorie umbenannt: {new_name}", 3000)
+
+    def _on_category_delete(self, cat_id: int) -> None:
+        """Delete a category after confirmation and refresh chips."""
+        if not self._current_instance_path:
+            return
+        name = self._category_manager.get_name(cat_id) or str(cat_id)
+        reply = QMessageBox.question(
+            self, "Kategorie löschen",
+            f"Kategorie \"{name}\" wirklich löschen?\n\n"
+            "Die Kategorie wird von allen Mods entfernt.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        self._category_manager.remove_category(cat_id)
+        self._filter_panel.set_categories(self._category_manager.all_categories())
+        self.statusBar().showMessage(f"Kategorie gelöscht: {name}", 3000)
 
     def _on_toggle_log(self, checked: bool) -> None:
-        """Ansicht → Log (Toggle)."""
-        self._log_panel.setVisible(checked)
+        """Ansicht → Log (Toggle) — sync with CollapsibleSectionBar."""
+        self._log_bar.set_collapsed(not checked)
+
+    def _on_log_bar_toggled(self, is_open: bool) -> None:
+        """Log bar was clicked — sync menu action."""
+        self._act_log.blockSignals(True)
+        self._act_log.setChecked(is_open)
+        self._act_log.blockSignals(False)
 
     def _on_toggle_menubar(self, checked: bool) -> None:
         """Ansicht → Toolbars → Menüleiste (Toggle)."""
@@ -538,9 +581,8 @@ class MainWindow(QMainWindow):
         if fp_splitter:
             self._filter_splitter.restoreState(fp_splitter)
 
-        log_vis = s.value("view/log_visible", False, type=bool)
-        self._log_panel.setVisible(log_vis)
-        self._act_log.setChecked(log_vis)
+        # Log: CollapsibleSectionBar restores its own state; sync menu check
+        self._act_log.setChecked(not self._log_bar.collapsed)
 
     def _show_view_recovery_menu(self, global_pos) -> None:
         """Show the view/toolbar recovery context menu at *global_pos*.
@@ -555,20 +597,19 @@ class MainWindow(QMainWindow):
         self._update_toolbar_menu()
         menu.exec(global_pos)
 
-    def contextMenuEvent(self, event) -> None:
-        """MainWindow-level right-click: show view recovery menu.
-
-        This catches right-clicks that aren't consumed by child widgets,
-        e.g. on empty areas of the central widget or margins.
-        """
-        self._show_view_recovery_menu(event.globalPos())
-
-    def eventFilter(self, obj, event) -> bool:
-        """Catch right-clicks on the toolbar for view recovery menu."""
+    def eventFilter(self, obj, event):
+        from PySide6.QtWidgets import QToolBar
         from PySide6.QtCore import QEvent
-        if obj is self._toolbar and event.type() == QEvent.Type.ContextMenu:
-            self._show_view_recovery_menu(event.globalPos())
-            return True
+        from PySide6.QtGui import QCursor
+
+        if event.type() == QEvent.Type.ContextMenu:
+            # Toolbar: View-Recovery-Menü
+            if isinstance(obj, QToolBar):
+                self._show_view_recovery_menu(QCursor.pos())
+                return True
+            # FilterPanel und Chips handlen ihre Kontextmenüs selbst
+            # via CustomContextMenu + customContextMenuRequested Signal
+
         return super().eventFilter(obj, event)
 
     # ── Instance switching ────────────────────────────────────────────
@@ -1008,9 +1049,16 @@ class MainWindow(QMainWindow):
                 {"name": e.name, "path": str(self._current_instance_path / ".mods" / e.name)}
                 for e in self._current_mod_entries if e.enabled
             ]
+            # ModEntry für diesen Mod finden
+            mod_entry = next(
+                (e for e in self._current_mod_entries if e.name == mod_name),
+                None
+            )
             ModDetailDialog(
                 self, mod_name=mod_name, mod_path=mod_path,
                 all_mods=all_mods, game_plugin=self._current_plugin,
+                category_manager=self._category_manager,
+                mod_entry=mod_entry,
             ).exec()
 
     # ── Mod list context menu ──────────────────────────────────────
@@ -1049,40 +1097,166 @@ class MainWindow(QMainWindow):
         act = all_mods_menu.addAction("Als CSV exportieren...")
         act.setEnabled(False)
 
-        # ── Kategorien (Submenus, MO2-Pattern) ────────────────────
+        # ── Kategorien (Submenus) ─────────────────────────────────
         andere_kat_menu = menu.addMenu("Andere Kategorien")
         primaere_kat_menu = menu.addMenu("Primäre Kategorie")
-        _cat_checkboxes = []  # keep refs: (cat_id, QCheckBox)
-        _primary_radios = []  # keep refs: (cat_id, QRadioButton)
+        # Kein eigenes Stylesheet - globales Paper Dark.qss greift
+
+        _cat_buttons = []  # keep refs: (cat_id, QPushButton)
 
         if single and selected_rows[0] < len(self._current_mod_entries):
             entry = self._current_mod_entries[selected_rows[0]]
+            row = selected_rows[0]
             assigned_ids = set(entry.category_ids)
 
-            # "Andere Kategorien" — checkboxes for all categories
-            from PySide6.QtWidgets import QCheckBox, QWidgetAction, QRadioButton
-            for cat in self._category_manager.all_categories():
-                cb = QCheckBox(cat["name"], andere_kat_menu)
-                cb.setChecked(cat["id"] in assigned_ids)
-                wa = QWidgetAction(andere_kat_menu)
-                wa.setDefaultWidget(cb)
-                wa.setData(cat["id"])
-                andere_kat_menu.addAction(wa)
-                _cat_checkboxes.append((cat["id"], cb))
+            from PySide6.QtWidgets import QWidgetAction, QPushButton
 
-            # "Primäre Kategorie" — radio buttons (only assigned categories)
+            # "Andere Kategorien" — toggle buttons (Menü bleibt offen)
+            for cat in self._category_manager.all_categories():
+                cat_id = cat["id"]
+                is_assigned = cat_id in assigned_ids
+                prefix = "●  " if is_assigned else "    "
+
+                btn = QPushButton(f"{prefix}{cat['name']}")
+                btn.setFlat(True)
+                btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                # Styling: türkis wenn zugewiesen
+                if is_assigned:
+                    btn.setStyleSheet("""
+                        QPushButton {
+                            color: #00d4aa;
+                            font-weight: bold;
+                            text-align: left;
+                            padding: 6px 12px;
+                            border: none;
+                            background: transparent;
+                        }
+                        QPushButton:hover { background: #2d2d2d; }
+                    """)
+                else:
+                    btn.setStyleSheet("""
+                        QPushButton {
+                            color: #e0e0e0;
+                            text-align: left;
+                            padding: 6px 12px;
+                            border: none;
+                            background: transparent;
+                        }
+                        QPushButton:hover { background: #2d2d2d; }
+                    """)
+
+                # Click-Handler: Toggle und UI aktualisieren
+                def make_toggle_handler(cid, button, cats_menu, prim_menu):
+                    def handler():
+                        self._toggle_category(row, cid)
+                        entry = self._current_mod_entries[row]
+                        # UI aktualisieren ohne Menü zu schließen
+                        new_assigned = cid in entry.category_ids
+                        new_prefix = "●  " if new_assigned else "    "
+                        cat_name = self._category_manager.get_name(cid)
+                        button.setText(f"{new_prefix}{cat_name}")
+                        if new_assigned:
+                            button.setStyleSheet("""
+                                QPushButton {
+                                    color: #00d4aa;
+                                    font-weight: bold;
+                                    text-align: left;
+                                    padding: 6px 12px;
+                                    border: none;
+                                    background: transparent;
+                                }
+                                QPushButton:hover { background: #2d2d2d; }
+                            """)
+                            # Erste Kategorie zugewiesen → automatisch als Primary
+                            if len(entry.category_ids) == 1:
+                                self._set_primary_category(row, cid)
+                        else:
+                            button.setStyleSheet("""
+                                QPushButton {
+                                    color: #e0e0e0;
+                                    text-align: left;
+                                    padding: 6px 12px;
+                                    border: none;
+                                    background: transparent;
+                                }
+                                QPushButton:hover { background: #2d2d2d; }
+                            """)
+                            # Letzte Kategorie entfernt → Primary auf 0
+                            if not entry.category_ids:
+                                self._set_primary_category(row, 0)
+                            # Entfernte Kategorie war Primary → neue Primary setzen
+                            elif entry.primary_category == cid or entry.primary_category not in entry.category_ids:
+                                self._set_primary_category(row, entry.category_ids[0])
+
+                        # "Primäre Kategorie" Menü NEU befüllen (mit gelbem Stern-Icon)
+                        from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
+                        prim_menu.clear()
+                        if entry.category_ids:
+                            prim_menu.setEnabled(True)
+                            # Gelbes Stern-Icon erstellen
+                            px = QPixmap(16, 16)
+                            px.fill(Qt.GlobalColor.transparent)
+                            p = QPainter(px)
+                            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+                            f = QFont()
+                            f.setPixelSize(16)
+                            p.setFont(f)
+                            p.setPen(QColor('#FFD700'))
+                            p.drawText(0, 0, 16, 16, Qt.AlignmentFlag.AlignCenter, '★')
+                            p.end()
+                            s_icon = QIcon(px)
+
+                            for cat_id_p in entry.category_ids:
+                                name_p = self._category_manager.get_name(cat_id_p)
+                                if not name_p:
+                                    continue
+                                is_prim = cat_id_p == entry.primary_category
+                                if is_prim:
+                                    act_p = prim_menu.addAction(s_icon, name_p)
+                                else:
+                                    act_p = prim_menu.addAction(f"    {name_p}")
+                                act_p.setData(cat_id_p)
+                        else:
+                            prim_menu.setEnabled(False)
+                    return handler
+
+                btn.clicked.connect(make_toggle_handler(cat_id, btn, andere_kat_menu, primaere_kat_menu))
+
+                wa = QWidgetAction(andere_kat_menu)
+                wa.setDefaultWidget(btn)
+                andere_kat_menu.addAction(wa)
+                _cat_buttons.append((cat_id, btn))
+
+            # "Primäre Kategorie" — QActions mit gelbem Stern-Icon
+            from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
+
+            def create_star_icon(size=16):
+                """Erstellt ein gelbes Stern-Icon."""
+                pixmap = QPixmap(size, size)
+                pixmap.fill(Qt.GlobalColor.transparent)
+                painter = QPainter(pixmap)
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                font = QFont()
+                font.setPixelSize(size)
+                painter.setFont(font)
+                painter.setPen(QColor('#FFD700'))  # Gold
+                painter.drawText(0, 0, size, size, Qt.AlignmentFlag.AlignCenter, '★')
+                painter.end()
+                return QIcon(pixmap)
+
+            star_icon = create_star_icon()
+
             if assigned_ids:
                 for cat_id in entry.category_ids:
                     name = self._category_manager.get_name(cat_id)
                     if not name:
                         continue
-                    rb = QRadioButton(name, primaere_kat_menu)
-                    rb.setChecked(cat_id == entry.primary_category)
-                    wa = QWidgetAction(primaere_kat_menu)
-                    wa.setDefaultWidget(rb)
-                    wa.setData(cat_id)
-                    primaere_kat_menu.addAction(wa)
-                    _primary_radios.append((cat_id, rb))
+                    is_primary = cat_id == entry.primary_category
+                    if is_primary:
+                        act = primaere_kat_menu.addAction(star_icon, name)
+                    else:
+                        act = primaere_kat_menu.addAction(f"    {name}")
+                    act.setData(cat_id)
             else:
                 primaere_kat_menu.setEnabled(False)
         else:
@@ -1133,11 +1307,13 @@ class MainWindow(QMainWindow):
         # ── Execute ───────────────────────────────────────────────
         chosen = menu.exec(global_pos)
 
-        # Apply category changes (MO2 aboutToHide pattern)
-        if single and _cat_checkboxes and selected_rows[0] < len(self._current_mod_entries):
-            self._apply_category_changes(
-                selected_rows[0], _cat_checkboxes, _primary_radios,
-            )
+        # Handle "Primäre Kategorie" actions
+        if chosen and single and selected_rows[0] < len(self._current_mod_entries):
+            row = selected_rows[0]
+            # Prüfe ob Action aus "Primäre Kategorie" (via .data())
+            if chosen.data() is not None and chosen.parent() == primaere_kat_menu:
+                cat_id = chosen.data()
+                self._set_primary_category(row, cat_id)
 
         if not chosen:
             return
@@ -1284,6 +1460,94 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"Kategorien aktualisiert: {entry.display_name or entry.name}", 3000,
         )
+
+    def _toggle_category(self, row: int, cat_id: int) -> None:
+        """Toggle a category assignment for a mod."""
+        from anvil.core.mod_metadata import write_meta_ini
+
+        entry = self._current_mod_entries[row]
+        current_ids = list(entry.category_ids)
+
+        if cat_id in current_ids:
+            # Remove category
+            current_ids.remove(cat_id)
+            # If removed was primary, set new primary
+            if cat_id == entry.primary_category:
+                entry.primary_category = current_ids[0] if current_ids else 0
+        else:
+            # Add category
+            current_ids.append(cat_id)
+            # If first category, make it primary
+            if len(current_ids) == 1:
+                entry.primary_category = cat_id
+
+        # Reorder: primary first
+        ordered = []
+        if entry.primary_category and entry.primary_category in current_ids:
+            ordered.append(entry.primary_category)
+        for cid in current_ids:
+            if cid != entry.primary_category:
+                ordered.append(cid)
+
+        cat_str = ",".join(str(i) for i in ordered)
+
+        # Update in-memory
+        entry.category = cat_str
+        entry.category_ids = ordered
+
+        # Persist to meta.ini
+        if entry.install_path:
+            write_meta_ini(entry.install_path, {"category": cat_str})
+
+        # Update model row
+        model = self._mod_list_view.source_model()
+        if row < len(model._rows):
+            model._rows[row].category = cat_str
+            idx = model.index(row, 4)  # COL_CATEGORY
+            model.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DisplayRole])
+
+        action = "hinzugefügt" if cat_id in ordered else "entfernt"
+        name = self._category_manager.get_name(cat_id) or str(cat_id)
+        self.statusBar().showMessage(f"Kategorie {action}: {name}", 3000)
+
+    def _set_primary_category(self, row: int, cat_id: int) -> None:
+        """Set a category as primary for a mod."""
+        from anvil.core.mod_metadata import write_meta_ini
+
+        entry = self._current_mod_entries[row]
+
+        if cat_id not in entry.category_ids:
+            return  # Can only set assigned categories as primary
+
+        if cat_id == entry.primary_category:
+            return  # Already primary
+
+        # Reorder: new primary first
+        ordered = [cat_id]
+        for cid in entry.category_ids:
+            if cid != cat_id:
+                ordered.append(cid)
+
+        cat_str = ",".join(str(i) for i in ordered)
+
+        # Update in-memory
+        entry.category = cat_str
+        entry.category_ids = ordered
+        entry.primary_category = cat_id
+
+        # Persist to meta.ini
+        if entry.install_path:
+            write_meta_ini(entry.install_path, {"category": cat_str})
+
+        # Update model row
+        model = self._mod_list_view.source_model()
+        if row < len(model._rows):
+            model._rows[row].category = cat_str
+            idx = model.index(row, 4)  # COL_CATEGORY
+            model.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DisplayRole])
+
+        name = self._category_manager.get_name(cat_id) or str(cat_id)
+        self.statusBar().showMessage(f"Primäre Kategorie: {name}", 3000)
 
     def _ctx_create_backup(self, row: int) -> None:
         """Create a ZIP backup of the mod folder in .backups/."""
@@ -1654,7 +1918,7 @@ class MainWindow(QMainWindow):
         s.setValue("view/menubar_visible", self.menuBar().isVisible())
         s.setValue("view/toolbar_visible", self._toolbar.isVisible())
         s.setValue("view/statusbar_visible", self._status_bar.isVisible())
-        s.setValue("view/log_visible", self._log_panel.isVisible())
+        # Log state is persisted by CollapsibleSectionBar (log/collapsed)
         s.setValue("view/filter_panel_open", self._filter_panel.is_open())
         s.setValue("view/filter_splitter_state", self._filter_splitter.saveState())
         # Icon size → index (0=small, 1=medium, 2=large)
