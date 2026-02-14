@@ -113,10 +113,10 @@ QPushButton:disabled {
   border: 2px solid #141414; }
 
 QMenu {
-  background: transparent;
+  background: #1a1a1a;
   border: 2px solid #242424;
   border-radius: 6px;
-  min-width: 280px;
+  min-width: 180px;
   font-size: 14px; }
   QMenu::separator {
     height: 2px;
@@ -124,7 +124,7 @@ QMenu {
   QMenu::icon {
     padding-left: 20px; }
   QMenu::item {
-    background: #141414;
+    background: #1a1a1a;
     padding: 8px 30px; }
     QMenu::item:disabled {
       background: #242424;

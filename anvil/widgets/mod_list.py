@@ -365,6 +365,7 @@ class ModListView(QWidget):
             style="QLabel { font-weight: bold; padding: 4px 6px; "
                   "background: #1a2a3a; border-bottom: 1px solid #333; }",
             container=fw_container,
+            default_collapsed=True,
         )
         self._fw_label.set_count(0)
         fw_layout.addWidget(self._fw_label)

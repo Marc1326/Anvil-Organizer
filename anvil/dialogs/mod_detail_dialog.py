@@ -25,11 +25,15 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QHeaderView,
     QFileSystemModel,
+    QComboBox,
+    QMenu,
 )
 from PySide6.QtCore import Qt, QRect, QSize, QTimer, QDir
 from PySide6.QtGui import QPainter, QColor, QFont, QFontDatabase, QIcon
 
 from anvil.core.conflict_scanner import ConflictScanner
+from anvil.core.mod_metadata import write_meta_ini
+from anvil.widgets.flow_layout import FlowLayout
 
 _MOD_DETAIL_DIALOG_STYLE = """
 QDialog, QWidget { background: #1C1C1C; color: #D3D3D3; border: none; }
@@ -552,9 +556,285 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
     return page
 
 
+# Chip-Stylesheet für Kategorien-Tab (wie FilterPanel)
+_CATEGORY_CHIP_STYLE = """
+QPushButton#catChip {
+    background: #363636;
+    color: #b0b0b0;
+    border: 1px solid #505050;
+    border-radius: 13px;
+    padding: 4px 12px;
+    font-size: 12px;
+}
+QPushButton#catChip:hover {
+    background: #454545;
+    color: #d0d0d0;
+    border-color: #606060;
+}
+QPushButton#catChip:checked {
+    background: #006868;
+    color: #ffffff;
+    border-color: #008888;
+}
+QPushButton#catChip:checked:hover {
+    background: #008888;
+}
+/* Primary-Markierung */
+QPushButton#catChipPrimary {
+    background: #006868;
+    color: #ffffff;
+    border: 2px solid #00aaaa;
+    border-radius: 13px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+QPushButton#catChipPrimary:hover {
+    background: #008888;
+}
+"""
+
+_CATEGORY_TAB_CONTEXT_MENU_STYLE = """
+QMenu {
+    background: #2b2b2b;
+    border: 1px solid #3a3a3a;
+    border-radius: 4px;
+    padding: 4px 0;
+}
+QMenu::item {
+    background: transparent;
+    padding: 6px 20px;
+    color: #e0e0e0;
+}
+QMenu::item:selected {
+    background: #4de0d0;
+    color: #1a1a1a;
+}
+"""
+
+
+def _build_categories_tab(category_manager, mod_entry, mod_path):
+    """Kategorien-Tab: Chips für alle Kategorien, Checked = Mod gehört dazu.
+
+    Features:
+    - Klick auf Chip = Toggle (zuweisen/entfernen)
+    - Rechtsklick auf aktiven Chip = "Als Primär setzen"
+    - ComboBox unten für Primär-Auswahl
+    - Änderungen werden sofort in meta.ini gespeichert
+    """
+    page = QWidget()
+    page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    page.setStyleSheet(_CATEGORY_CHIP_STYLE)
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(16, 16, 16, 16)
+    layout.setSpacing(12)
+
+    # Fallback wenn keine Daten
+    if not category_manager:
+        layout.addWidget(QLabel("Kategorien nicht verfügbar."))
+        layout.addStretch()
+        return page
+
+    # Aktuell zugewiesene Kategorien (kopieren um Original nicht zu ändern)
+    assigned_ids = list(mod_entry.category_ids) if mod_entry else []
+    primary_id = mod_entry.primary_category if mod_entry else 0
+
+    # Container-Widget für Chips
+    chip_container = QWidget()
+    chip_layout = FlowLayout(chip_container, margin=0, h_spacing=8, v_spacing=8)
+
+    # Dict: cat_id -> chip widget
+    chips: dict[int, QPushButton] = {}
+
+    def update_primary_combo():
+        """ComboBox aktualisieren mit nur aktiven Kategorien."""
+        nonlocal primary_id
+        primary_combo.blockSignals(True)
+        primary_combo.clear()
+        primary_combo.addItem("— Keine —", 0)
+        for cat_id in assigned_ids:
+            name = category_manager.get_name(cat_id)
+            if name:
+                primary_combo.addItem(name, cat_id)
+        # Aktuelle Primär-Auswahl setzen
+        idx = primary_combo.findData(primary_id)
+        if idx >= 0:
+            primary_combo.setCurrentIndex(idx)
+        elif assigned_ids:
+            # Primär nicht mehr zugewiesen - erste nehmen
+            primary_id = assigned_ids[0]
+            primary_combo.setCurrentIndex(1)
+        else:
+            primary_id = 0
+            primary_combo.setCurrentIndex(0)
+        primary_combo.blockSignals(False)
+
+    def update_chip_styles():
+        """Chip-Styles basierend auf Primary-Status aktualisieren."""
+        for cat_id, chip in chips.items():
+            if cat_id == primary_id and chip.isChecked():
+                chip.setObjectName("catChipPrimary")
+                chip.setText(f"★ {category_manager.get_name(cat_id)}")
+            else:
+                chip.setObjectName("catChip")
+                chip.setText(category_manager.get_name(cat_id))
+            # Force style refresh
+            chip.style().unpolish(chip)
+            chip.style().polish(chip)
+
+    def save_to_meta_ini():
+        """Speichert Kategorien in meta.ini."""
+        if not mod_path:
+            return
+        from pathlib import Path
+        # Primär zuerst, dann Rest
+        cat_ids = []
+        if primary_id and primary_id in assigned_ids:
+            cat_ids.append(primary_id)
+        for cid in assigned_ids:
+            if cid != primary_id:
+                cat_ids.append(cid)
+        cat_str = ",".join(str(c) for c in cat_ids)
+        write_meta_ini(Path(mod_path), {"category": cat_str})
+        # ModEntry aktualisieren
+        if mod_entry:
+            mod_entry.category_ids = cat_ids
+            mod_entry.primary_category = primary_id
+            mod_entry.category = cat_str
+
+    def on_chip_toggled(cat_id: int, checked: bool):
+        """Chip wurde an/abgewählt."""
+        nonlocal primary_id
+        if checked:
+            if cat_id not in assigned_ids:
+                assigned_ids.append(cat_id)
+                # Wenn erstes zugewiesenes, automatisch Primary
+                if len(assigned_ids) == 1:
+                    primary_id = cat_id
+        else:
+            if cat_id in assigned_ids:
+                assigned_ids.remove(cat_id)
+            # Wenn Primary entfernt, neues setzen
+            if cat_id == primary_id:
+                primary_id = assigned_ids[0] if assigned_ids else 0
+        update_primary_combo()
+        update_chip_styles()
+        save_to_meta_ini()
+
+    def on_chip_context_menu(chip: QPushButton, cat_id: int, pos):
+        """Rechtsklick-Menü auf Chip."""
+        nonlocal primary_id
+        if not chip.isChecked():
+            return  # Nur für aktive Chips
+        menu = QMenu(chip)
+        menu.setStyleSheet(_CATEGORY_TAB_CONTEXT_MENU_STYLE)
+        act = menu.addAction("★ Als Primär setzen")
+        act.setEnabled(cat_id != primary_id)
+        action = menu.exec(chip.mapToGlobal(pos))
+        if action == act:
+            primary_id = cat_id
+            update_primary_combo()
+            update_chip_styles()
+            save_to_meta_ini()
+
+    def on_primary_changed(index: int):
+        """ComboBox Primär-Auswahl geändert."""
+        nonlocal primary_id
+        new_primary = primary_combo.itemData(index)
+        if new_primary != primary_id:
+            primary_id = new_primary
+            update_chip_styles()
+            save_to_meta_ini()
+
+    # Chips erstellen
+    for cat in category_manager.all_categories():
+        cat_id = cat["id"]
+        name = cat["name"]
+        chip = QPushButton(name)
+        chip.setObjectName("catChip")
+        chip.setCheckable(True)
+        chip.setChecked(cat_id in assigned_ids)
+        chip.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        chip.setFixedHeight(26)
+        chip.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        chip.toggled.connect(lambda checked, cid=cat_id: on_chip_toggled(cid, checked))
+        chip.customContextMenuRequested.connect(
+            lambda pos, ch=chip, cid=cat_id: on_chip_context_menu(ch, cid, pos)
+        )
+        chip_layout.addWidget(chip)
+        chips[cat_id] = chip
+
+    # ScrollArea für viele Kategorien
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setWidget(chip_container)
+    scroll.setFrameShape(QFrame.Shape.NoFrame)
+    scroll.setStyleSheet("QScrollArea { background: transparent; }")
+    layout.addWidget(scroll, 1)
+
+    # WICHTIG: Layout-Update NACH dem Hinzufügen zur ScrollArea
+    chip_container.show()
+    chip_layout.invalidate()
+    chip_layout.activate()
+    chip_container.updateGeometry()
+    chip_container.adjustSize()
+    scroll.updateGeometry()
+
+    # Separator
+    sep = QFrame()
+    sep.setFrameShape(QFrame.Shape.HLine)
+    sep.setStyleSheet("background: #3a3a3a;")
+    layout.addWidget(sep)
+
+    # Primär-ComboBox
+    primary_row = QHBoxLayout()
+    primary_label = QLabel("Primäre Kategorie:")
+    primary_label.setStyleSheet("color: #aaaaaa; font-size: 12px;")
+    primary_row.addWidget(primary_label)
+
+    primary_combo = QComboBox()
+    primary_combo.setMinimumWidth(200)
+    primary_combo.setStyleSheet("""
+        QComboBox {
+            background: #2b2b2b;
+            color: #e0e0e0;
+            border: 1px solid #3a3a3a;
+            border-radius: 4px;
+            padding: 6px 12px;
+        }
+        QComboBox:hover { border-color: #006868; }
+        QComboBox::drop-down {
+            border: none;
+            width: 20px;
+        }
+        QComboBox QAbstractItemView {
+            background: #2b2b2b;
+            color: #e0e0e0;
+            selection-background-color: #006868;
+        }
+    """)
+    primary_combo.currentIndexChanged.connect(on_primary_changed)
+    primary_row.addWidget(primary_combo)
+    primary_row.addStretch()
+    layout.addLayout(primary_row)
+
+    # Initiale Werte setzen
+    update_primary_combo()
+    update_chip_styles()
+
+    # Widgets auf page speichern für späteren Zugriff beim Tab-Wechsel
+    page._chip_container = chip_container
+    page._chip_layout = chip_layout
+    page._scroll = scroll
+    page._chips = chips
+
+    return page
+
+
 class ModDetailDialog(QDialog):
     def __init__(self, parent=None, mod_name="", mod_path="",
-                 all_mods=None, game_plugin=None):
+                 all_mods=None, game_plugin=None,
+                 category_manager=None, mod_entry=None):
         super().__init__(parent)
         self.setWindowTitle(mod_name or "Mod-Details")
         self.setMinimumSize(1280, 720)
@@ -585,15 +865,18 @@ class ModDetailDialog(QDialog):
             _build_conflicts_tab(mod_name, all_mods, game_plugin), "Konflikte",
         )
 
-        post_conflict_tabs = [
-            ("Kategorien", "Platzhalter – Kategorien"),
-            ("Nexus Info", "Platzhalter – Nexus Info"),
-        ]
-        for tab_name, placeholder_text in post_conflict_tabs:
-            page = QWidget()
-            page_layout = QVBoxLayout(page)
-            page_layout.addWidget(QLabel(placeholder_text))
-            self.tab_widget.addTab(page, tab_name)
+        # Kategorien-Tab
+        self._categories_page = _build_categories_tab(category_manager, mod_entry, mod_path)
+        self.tab_widget.addTab(self._categories_page, "Kategorien")
+
+        # Layout-Update wenn Kategorien-Tab sichtbar wird
+        self.tab_widget.currentChanged.connect(self._on_tab_changed)
+
+        # Nexus Info (noch Platzhalter)
+        nexus_page = QWidget()
+        nexus_layout = QVBoxLayout(nexus_page)
+        nexus_layout.addWidget(QLabel("Platzhalter – Nexus Info"))
+        self.tab_widget.addTab(nexus_page, "Nexus Info")
 
         # Verzeichnisbaum-Tab (wie MO2: FileTreeTab)
         self.tab_widget.addTab(_build_filetree_tab(mod_path), "Verzeichnisbaum")
@@ -626,3 +909,38 @@ class ModDetailDialog(QDialog):
         btn_close.clicked.connect(self.accept)
         btn_row.addWidget(btn_close)
         layout.addLayout(btn_row)
+
+    def _on_tab_changed(self, index: int):
+        """Layout-Update wenn Kategorien-Tab sichtbar wird."""
+        current_widget = self.tab_widget.widget(index)
+        if current_widget is self._categories_page:
+            # Tab ist jetzt sichtbar - Layout mit echter Breite aktualisieren
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, self._refresh_categories_layout)
+
+    def _refresh_categories_layout(self):
+        """Aktualisiert das FlowLayout der Kategorien-Chips."""
+        page = self._categories_page
+        if not hasattr(page, '_scroll'):
+            return
+
+        scroll = page._scroll
+        chip_container = page._chip_container
+        chip_layout = page._chip_layout
+        chips = page._chips
+
+        width = scroll.viewport().width()
+        if width > 100:
+            # Chips sichtbar machen für heightForWidth()
+            for chip in chips.values():
+                chip.show()
+            container_width = width - 20
+            chip_container.setMinimumWidth(container_width)
+            # Höhe mit heightForWidth() berechnen und setzen
+            height = chip_layout.heightForWidth(container_width)
+            chip_container.setMinimumHeight(height)
+            chip_layout.invalidate()
+            chip_layout.activate()
+            chip_container.updateGeometry()
+            chip_container.repaint()
+            scroll.updateGeometry()
