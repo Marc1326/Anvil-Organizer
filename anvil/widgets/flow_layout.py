@@ -23,6 +23,20 @@ class FlowLayout(QLayout):
     def addItem(self, item):
         self._items.append(item)
 
+    def insertWidget(self, index: int, widget) -> None:
+        """Insert a widget at a specific position in the layout."""
+        from PySide6.QtWidgets import QWidgetItem
+        self.addChildWidget(widget)
+        item = QWidgetItem(widget)
+        index = max(0, min(index, len(self._items)))
+        self._items.insert(index, item)
+        # Geometry speichern VOR invalidate (wird sonst zurückgesetzt)
+        current_geo = QRect(self.geometry())
+        self.invalidate()
+        # Sofort Layout neu berechnen mit gespeicherter geometry
+        if current_geo.isValid():
+            self._do_layout(current_geo, test_only=False)
+
     def count(self):
         return len(self._items)
 
