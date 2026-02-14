@@ -370,18 +370,17 @@ class ModListModel(QAbstractItemModel):
     def _resolve_category_name(self, raw_category: str) -> str:
         """Resolve comma-separated category IDs to primary category name."""
         if not raw_category or not self._category_manager:
-            return raw_category
+            return ""
         # Primary category = first ID in list
         first = raw_category.split(",")[0].strip()
         try:
             cat_id = int(first)
-            if cat_id > 0:
-                name = self._category_manager.get_name(cat_id)
-                if name:
-                    return name
+            if cat_id <= 0:
+                return ""  # Keine Kategorie zugewiesen
+            name = self._category_manager.get_name(cat_id)
+            return name if name else ""
         except ValueError:
-            pass
-        return raw_category
+            return ""
 
     def sort(self, column, order=Qt.SortOrder.AscendingOrder):
         self.layoutAboutToBeChanged.emit()
