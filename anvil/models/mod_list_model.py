@@ -238,7 +238,12 @@ class ModListModel(QAbstractItemModel):
         return False
 
     def dropMimeData(self, data, action, row, column, parent):
-        """Beim Drop: Zeile verschieben mit beginMoveRows/endMoveRows."""
+        """Beim Drop: Zeile verschieben mit beginMoveRows/endMoveRows.
+
+        Wenn ein Separator verschoben wird, werden alle Mods zwischen
+        diesem Separator und dem nächsten Separator (oder Listenende)
+        als Block mitgenommen.
+        """
         if action == Qt.DropAction.IgnoreAction:
             return True
         if not data.hasFormat(MIME_MOD_ROWS):
@@ -263,7 +268,15 @@ class ModListModel(QAbstractItemModel):
 
         source_row = source_rows[0]
 
-        # beginMoveRows gibt False zurück wenn Zeile bereits an der Stelle ist
+        # Prüfen ob Separator verschoben wird → Block mitnehmen
+        if self._rows[source_row].is_separator:
+            return self._move_separator_block(source_row, target)
+
+        # Einzelne Mod verschieben (wie bisher)
+        return self._move_single_row(source_row, target)
+
+    def _move_single_row(self, source_row: int, target: int) -> bool:
+        """Verschiebt eine einzelne Zeile."""
         p = QModelIndex()
         if source_row < target:
             if not self.beginMoveRows(p, source_row, source_row, p, target):
@@ -276,8 +289,60 @@ class ModListModel(QAbstractItemModel):
             row_data = self._rows.pop(source_row)
             self._rows.insert(target, row_data)
         self.endMoveRows()
+        self._update_priorities()
+        return True
 
-        # Prioritäten neu durchnummerieren
+    def _move_separator_block(self, source_row: int, target: int) -> bool:
+        """Verschiebt einen Separator mit allen zugehörigen Mods als Block.
+
+        Der Block umfasst den Separator und alle Mods bis zum nächsten
+        Separator (oder Listenende).
+        """
+        # Ende des Blocks finden (nächster Separator oder Listenende)
+        end_row = source_row + 1
+        while end_row < len(self._rows) and not self._rows[end_row].is_separator:
+            end_row += 1
+
+        block_size = end_row - source_row
+
+        # Keine Verschiebung nötig wenn Block bereits an Zielposition
+        if target >= source_row and target <= end_row:
+            return False
+
+        p = QModelIndex()
+
+        # Block extrahieren
+        block = self._rows[source_row:end_row]
+
+        if source_row < target:
+            # Nach UNTEN verschieben
+            # Zielposition korrigieren: Nach Entfernen des Blocks verschiebt sich alles
+            adjusted_target = target - block_size
+
+            # beginMoveRows für den gesamten Block
+            if not self.beginMoveRows(p, source_row, end_row - 1, p, target):
+                return False
+
+            # Block entfernen und an neuer Position einfügen
+            del self._rows[source_row:end_row]
+            for i, row_data in enumerate(block):
+                self._rows.insert(adjusted_target + i, row_data)
+        else:
+            # Nach OBEN verschieben
+            if not self.beginMoveRows(p, source_row, end_row - 1, p, target):
+                return False
+
+            # Block entfernen und an neuer Position einfügen
+            del self._rows[source_row:end_row]
+            for i, row_data in enumerate(block):
+                self._rows.insert(target + i, row_data)
+
+        self.endMoveRows()
+        self._update_priorities()
+        return True
+
+    def _update_priorities(self) -> None:
+        """Prioritäten neu durchnummerieren und Signal emittieren."""
         for i, mod in enumerate(self._rows):
             mod.priority = i
         self.dataChanged.emit(
@@ -285,10 +350,8 @@ class ModListModel(QAbstractItemModel):
             self.index(len(self._rows) - 1, COL_PRIORITY),
             [Qt.ItemDataRole.DisplayRole],
         )
-
         self._drop_in_progress = True
         self.mods_reordered.emit()
-        return True
 
     def removeRows(self, row, count, parent=QModelIndex()):
         """No-Op nach DnD — beginMoveRows hat die Zeile bereits verschoben."""
