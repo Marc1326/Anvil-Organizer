@@ -173,6 +173,26 @@ class InstanceManager:
         data["name"] = name
         return data
 
+    def save_instance(self, name: str, data: dict) -> None:
+        """Save updated instance config to ``.anvil.ini``.
+
+        Args:
+            name: Instance directory name.
+            data: Dict with config values to update.
+        """
+        ini = self._base / name / ".anvil.ini"
+        if not ini.is_file():
+            return
+
+        s = QSettings(str(ini), QSettings.Format.IniFormat)
+
+        s.beginGroup("General")
+        if "selected_profile" in data:
+            s.setValue("selected_profile", data["selected_profile"])
+        s.endGroup()
+
+        s.sync()
+
     # ── Current instance ──────────────────────────────────────────────
 
     def current_instance(self) -> str | None:

@@ -131,6 +131,10 @@ class MainWindow(QMainWindow):
         self._profile_bar.open_ao_logs_requested.connect(self._open_ao_logs_folder)
         self._profile_bar.backup_requested.connect(self._create_backup)
         self._profile_bar.restore_requested.connect(self._restore_backup)
+        self._profile_bar.profile_create_confirmed.connect(self._on_profile_created)
+        self._profile_bar.profile_renamed.connect(self._on_profile_renamed)
+        self._profile_bar.profile_changed.connect(self._on_profile_changed)
+        self._profile_bar.profile_delete_requested.connect(self._on_profile_deleted)
         left_layout.addWidget(self._profile_bar)
         self._mod_list_view = ModListView()
         self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
@@ -784,7 +788,19 @@ class MainWindow(QMainWindow):
         self._filter_panel.set_categories(self._category_manager.all_categories())
         self._filter_panel.reset_all()
 
+        # Load available profiles from disk
+        profiles_dir = instance_path / ".profiles"
+        profiles_dir.mkdir(parents=True, exist_ok=True)
+        profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir()])
+        if not profile_folders:
+            (profiles_dir / "Default").mkdir(exist_ok=True)
+            profile_folders = ["Default"]
+
         profile_name = data.get("selected_profile", "Default")
+        if profile_name not in profile_folders:
+            profile_name = profile_folders[0]
+
+        self._profile_bar.set_profiles(profile_folders, active=profile_name)
         self._current_profile_path = instance_path / ".profiles" / profile_name
         self._current_mod_entries = scan_mods_directory(instance_path, self._current_profile_path)
         # Mark direct-install (framework) mods
@@ -1619,6 +1635,92 @@ class MainWindow(QMainWindow):
         # Reload and show toast
         self._reload_mod_list()
         Toast(self, f"Sicherung wiederhergestellt: {zip_path.name}")
+
+    def _on_profile_created(self, name: str) -> None:
+        """Handle new profile creation - create folder on disk."""
+        if not self._current_instance_path:
+            return
+
+        profiles_dir = self._current_instance_path / ".profiles"
+        new_profile_dir = profiles_dir / name
+        new_profile_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy modlist.txt from current profile if exists
+        if self._current_profile_path:
+            current_modlist = self._current_profile_path / "modlist.txt"
+            if current_modlist.exists():
+                shutil.copy(current_modlist, new_profile_dir / "modlist.txt")
+
+        # Switch to new profile
+        self._on_profile_changed(name)
+        Toast(self, f"Profil '{name}' erstellt")
+
+    def _on_profile_renamed(self, old_name: str, new_name: str) -> None:
+        """Handle profile rename - rename folder on disk."""
+        if not self._current_instance_path:
+            return
+
+        profiles_dir = self._current_instance_path / ".profiles"
+        old_path = profiles_dir / old_name
+        new_path = profiles_dir / new_name
+
+        if old_path.exists() and not new_path.exists():
+            old_path.rename(new_path)
+
+        # Update current profile path if this was the active profile
+        if self._current_profile_path and self._current_profile_path.name == old_name:
+            self._current_profile_path = new_path
+
+        Toast(self, f"Profil umbenannt: {old_name} → {new_name}")
+
+    def _on_profile_changed(self, name: str) -> None:
+        """Handle profile switch - load different modlist."""
+        if not self._current_instance_path:
+            return
+
+        # Update profile path
+        self._current_profile_path = self._current_instance_path / ".profiles" / name
+        self._current_profile_path.mkdir(parents=True, exist_ok=True)
+
+        # Save selected profile to instance data
+        current_instance = self.instance_manager.current_instance()
+        if current_instance:
+            data = self.instance_manager.load_instance(current_instance)
+            if data:
+                data["selected_profile"] = name
+                self.instance_manager.save_instance(current_instance, data)
+
+        # Reload mod list with new profile
+        self._reload_mod_list()
+
+    def _on_profile_deleted(self, name: str) -> None:
+        """Handle profile deletion request."""
+        if not self._current_instance_path:
+            return
+
+        profiles_dir = self._current_instance_path / ".profiles"
+        profile_path = profiles_dir / name
+
+        # Profil-Ordner löschen
+        if profile_path.exists():
+            shutil.rmtree(profile_path)
+
+        # Profile neu laden
+        profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir()])
+        if not profile_folders:
+            (profiles_dir / "Default").mkdir(exist_ok=True)
+            profile_folders = ["Default"]
+
+        # Wenn gelöschtes Profil aktiv war → erstes verbleibendes wählen
+        was_active = self._current_profile_path and self._current_profile_path.name == name
+        new_active = profile_folders[0] if was_active else self._profile_bar._active_profile
+
+        self._profile_bar.set_profiles(profile_folders, active=new_active)
+
+        if was_active:
+            self._on_profile_changed(new_active)
+
+        Toast(self, f"Profil '{name}' gelöscht")
 
     def _collapse_all_separators(self) -> None:
         """Collapse all separators in the mod list."""
