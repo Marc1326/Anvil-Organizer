@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QToolBar, QToolButton, QWidget, QSizePolicy
+from PySide6.QtWidgets import QToolBar, QToolButton, QWidget, QSizePolicy, QMenu
 from PySide6.QtCore import Qt, QSize
 
 from anvil.widgets.instance_manager_dialog import InstanceManagerDialog
@@ -59,10 +59,27 @@ def create_toolbar(parent=None):
 
     instances_btn.clicked.connect(_open_instance_manager)
 
+    def _call_win(method_name):
+        win = bar.window()
+        if win and hasattr(win, method_name):
+            getattr(win, method_name)()
+
     folder_btn = _add_btn("archives.svg", "Ordner")
-    folder_btn.clicked.connect(
-        lambda: subprocess.Popen(["xdg-open", os.path.expanduser("~")])
-    )
+    folder_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+    folder_menu = QMenu(bar)
+    folder_menu.addAction("Spielverzeichnis öffnen", lambda: _call_win("_open_game_folder"))
+    folder_menu.addAction("MyGames Ordner öffnen", lambda: _call_win("_open_mygames_folder"))
+    folder_menu.addAction("INI Ordner öffnen", lambda: _call_win("_open_ini_folder"))
+    folder_menu.addAction("Instanz Ordner öffnen", lambda: _call_win("_open_instance_folder"))
+    folder_menu.addAction("Mods Ordner öffnen", lambda: _call_win("_open_mods_folder"))
+    folder_menu.addAction("Profil Ordner öffnen", lambda: _call_win("_open_profile_folder"))
+    folder_menu.addAction("Downloads Ordner öffnen", lambda: _call_win("_open_downloads_folder"))
+    folder_menu.addSeparator()
+    folder_menu.addAction("AO Installationsordner öffnen", lambda: _call_win("_open_ao_install_folder"))
+    folder_menu.addAction("AO Plugins Ordner öffnen", lambda: _call_win("_open_ao_plugins_folder"))
+    folder_menu.addAction("AO Stylesheets Ordner öffnen", lambda: _call_win("_open_ao_styles_folder"))
+    folder_menu.addAction("AO Log Ordner öffnen", lambda: _call_win("_open_ao_logs_folder"))
+    folder_btn.setMenu(folder_menu)
 
     bar.addSeparator()
 
