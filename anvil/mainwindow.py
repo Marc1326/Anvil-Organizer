@@ -1480,7 +1480,7 @@ class MainWindow(QMainWindow):
     def _open_ao_install_folder(self) -> None:
         """Open the Anvil Organizer installation folder in file manager."""
         import subprocess
-        path = Path(__file__).parent
+        path = Path(__file__).parent.parent
         if path.is_dir():
             subprocess.Popen(["xdg-open", str(path)])
 
