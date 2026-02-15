@@ -32,6 +32,7 @@ from anvil.widgets.collapsible_bar import CollapsibleSectionBar
 from anvil.widgets.filter_panel import FilterPanel
 from anvil.widgets.game_panel import GamePanel
 from anvil.widgets.status_bar import StatusBarWidget
+from anvil.widgets.toast import Toast
 from anvil.dialogs import ModDetailDialog
 from anvil.dialogs.quick_install_dialog import QuickInstallDialog
 from anvil.dialogs.query_overwrite_dialog import QueryOverwriteDialog, OverwriteAction
@@ -128,6 +129,8 @@ class MainWindow(QMainWindow):
         self._profile_bar.open_ao_plugins_requested.connect(self._open_ao_plugins_folder)
         self._profile_bar.open_ao_styles_requested.connect(self._open_ao_styles_folder)
         self._profile_bar.open_ao_logs_requested.connect(self._open_ao_logs_folder)
+        self._profile_bar.backup_requested.connect(self._create_backup)
+        self._profile_bar.restore_requested.connect(self._restore_backup)
         left_layout.addWidget(self._profile_bar)
         self._mod_list_view = ModListView()
         self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
@@ -1506,6 +1509,115 @@ class MainWindow(QMainWindow):
             path.mkdir(parents=True, exist_ok=True)
         if path.is_dir():
             subprocess.Popen(["xdg-open", str(path)])
+
+    def _create_backup(self) -> None:
+        """Create a ZIP backup of modlist, categories, and all meta.ini files."""
+        try:
+            import zipfile
+            from datetime import datetime
+            print("[BACKUP] Start")
+
+            if not self._current_instance_path or not self._current_profile_path:
+                print("[BACKUP] Keine Instanz/Profil")
+                return
+
+            # Paths
+            backups_dir = self._current_instance_path / ".backups"
+            backups_dir.mkdir(exist_ok=True)
+            timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            zip_path = backups_dir / f"backup_{timestamp}.zip"
+            mods_dir = self._current_instance_path / ".mods"
+            print(f"[BACKUP] ZIP: {zip_path}")
+
+            # Create ZIP
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                # modlist.txt
+                modlist = self._current_profile_path / "modlist.txt"
+                if modlist.exists():
+                    zf.write(modlist, "modlist.txt")
+
+                # categories.json
+                cats = self._current_instance_path / "categories.json"
+                if cats.exists():
+                    zf.write(cats, "categories.json")
+
+                # All meta.ini files
+                for meta in mods_dir.glob("*/meta.ini"):
+                    arcname = f"mods/{meta.parent.name}/meta.ini"
+                    zf.write(meta, arcname)
+
+            print("[BACKUP] ZIP erstellt")
+
+            # Keep max 10 backups
+            backups = sorted(backups_dir.glob("backup_*.zip"))
+            while len(backups) > 10:
+                backups[0].unlink()
+                backups.pop(0)
+
+            # Show confirmation with details
+            mod_count = len(list(mods_dir.glob("*/meta.ini")))
+            zip_size = zip_path.stat().st_size
+            size_str = f"{zip_size / 1024:.1f} KB"
+            print(f"[BACKUP] {mod_count} Mods, {size_str}")
+
+            Toast(self, f"{mod_count} Mods gesichert | {zip_path.name} | {size_str}")
+            print("[BACKUP] Toast gezeigt")
+            self.statusBar().showMessage(f"Sicherung erstellt: {zip_path.name}", 5000)
+
+        except Exception as e:
+            print(f"[BACKUP] FEHLER: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _restore_backup(self) -> None:
+        """Restore from a ZIP backup."""
+        import zipfile
+
+        if not self._current_instance_path or not self._current_profile_path:
+            return
+
+        backups_dir = self._current_instance_path / ".backups"
+        backups = sorted(backups_dir.glob("backup_*.zip"), reverse=True)
+
+        if not backups:
+            QMessageBox.information(self, "Keine Sicherungen", "Es gibt keine Sicherungen zum Wiederherstellen.")
+            return
+
+        # Dialog with selection
+        names = [b.name for b in backups]
+        choice, ok = QInputDialog.getItem(self, "Sicherung wiederherstellen",
+                                          "Wähle eine Sicherung:", names, 0, False)
+        if not ok:
+            return
+
+        zip_path = backups_dir / choice
+
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            # modlist.txt
+            if "modlist.txt" in zf.namelist():
+                data = zf.read("modlist.txt")
+                (self._current_profile_path / "modlist.txt").write_bytes(data)
+
+            # categories.json
+            if "categories.json" in zf.namelist():
+                data = zf.read("categories.json")
+                (self._current_instance_path / "categories.json").write_bytes(data)
+
+            # meta.ini files
+            mods_dir = self._current_instance_path / ".mods"
+            for name in zf.namelist():
+                if name.startswith("mods/") and name.endswith("/meta.ini"):
+                    parts = name.split("/")
+                    if len(parts) >= 3:
+                        mod_name = parts[1]
+                        target_dir = mods_dir / mod_name
+                        if target_dir.exists():
+                            data = zf.read(name)
+                            (target_dir / "meta.ini").write_bytes(data)
+
+        # Reload
+        self._reload_mod_list()
+        self.statusBar().showMessage(f"Sicherung wiederhergestellt: {choice}", 5000)
 
     def _collapse_all_separators(self) -> None:
         """Collapse all separators in the mod list."""
