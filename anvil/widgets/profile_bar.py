@@ -59,6 +59,8 @@ class ProfileBar(QWidget):
     open_ao_plugins_requested = Signal()
     open_ao_styles_requested = Signal()
     open_ao_logs_requested = Signal()
+    backup_requested = Signal()
+    restore_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -104,6 +106,9 @@ class ProfileBar(QWidget):
         menu1.addAction(QAction("Neu laden", self, triggered=lambda checked: self.reload_requested.emit()))
         menu1.addSeparator()
         menu1.addAction(QAction("Als CSV exportieren...", self, triggered=lambda checked: self.export_csv_requested.emit()))
+        menu1.addSeparator()
+        menu1.addAction(QAction("Sicherung erstellen", self, triggered=lambda checked: (print("[MENU] Sicherung erstellen geklickt"), self.backup_requested.emit())))
+        menu1.addAction(QAction("Aus Sicherung wiederherstellen...", self, triggered=lambda checked: self.restore_requested.emit()))
         btn_menu = QToolButton(self)
         _set_icon(btn_menu, "dots.png")
         btn_menu.setToolTip("Menü")
@@ -133,21 +138,19 @@ class ProfileBar(QWidget):
         btn_view.setFixedSize(48, 32)
         btn_view.clicked.connect(_todo("Ansicht"))
 
-        btn_undo = QToolButton(self)
-        _set_icon(btn_undo, "restore.png")
-        btn_undo.setToolTip("Zurücksetzen")
-        btn_undo.setFixedSize(36, 32)
-        btn_undo.clicked.connect(_todo("Zurücksetzen"))
+        btn_restore = QToolButton(self)
+        _set_icon(btn_restore, "restore.png")
+        btn_restore.setToolTip("Aus Sicherung wiederherstellen")
+        btn_restore.setFixedSize(36, 32)
+        btn_restore.clicked.connect(lambda: self.restore_requested.emit())
 
-        btn_filter = QToolButton(self)
-        _set_icon(btn_filter, "backup.png")
-        btn_filter.setToolTip("Filter")
-        btn_filter.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        btn_filter.setMenu(QMenu())
-        btn_filter.setFixedSize(48, 32)
-        btn_filter.clicked.connect(_todo("Filter"))
+        btn_backup = QToolButton(self)
+        _set_icon(btn_backup, "backup.png")
+        btn_backup.setToolTip("Sicherung erstellen")
+        btn_backup.setFixedSize(36, 32)
+        btn_backup.clicked.connect(lambda: (print("[BTN] 💾 geklickt"), self.backup_requested.emit()))
 
-        for btn in [btn_menu, btn_view, btn_undo, btn_filter]:
+        for btn in [btn_menu, btn_view, btn_restore, btn_backup]:
             btn.setStyleSheet(BUTTON_STYLE)
             layout.addWidget(btn)
 
