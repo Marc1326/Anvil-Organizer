@@ -6,9 +6,9 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFrame, QLabel,
-    QPushButton, QScrollArea, QWidget,
+    QPushButton, QScrollArea, QWidget, QMessageBox,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 
 CARD_STYLE_NORMAL = """
@@ -24,15 +24,17 @@ CARD_STYLE_NORMAL = """
 
 CARD_STYLE_SELECTED = """
     QFrame {
-        background: #006868;
+        background: #3D3D3D;
         border-radius: 8px;
-        border: 2px solid #008888;
+        border: 2px solid #3D3D3D;
     }
 """
 
 
 class BackupCard(QFrame):
     """A clickable card representing a backup."""
+
+    delete_requested = Signal(Path)
 
     def __init__(self, backup_path: Path, parent=None):
         super().__init__(parent)
@@ -43,9 +45,14 @@ class BackupCard(QFrame):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setStyleSheet(CARD_STYLE_NORMAL)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(4)
+        # Main horizontal layout: [text_column] [stretch] [delete_btn]
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(16, 12, 12, 12)
+        main_layout.setSpacing(8)
+
+        # Text column
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(4)
 
         # Parse date from filename: backup_2026_02_15_14_39_20.zip
         name = backup_path.stem
@@ -82,7 +89,7 @@ class BackupCard(QFrame):
             color: #D3D3D3;
             background: transparent;
         """)
-        layout.addWidget(self._date_label)
+        text_layout.addWidget(self._date_label)
 
         # Info label
         self._info_label = QLabel(f"{mod_count} Mods  ·  {size_str}")
@@ -91,7 +98,35 @@ class BackupCard(QFrame):
             color: #808080;
             background: transparent;
         """)
-        layout.addWidget(self._info_label)
+        text_layout.addWidget(self._info_label)
+
+        main_layout.addLayout(text_layout)
+        main_layout.addStretch()
+
+        # Delete button
+        self._btn_delete = QPushButton("✕")
+        self._btn_delete.setFixedSize(32, 32)
+        self._btn_delete.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_delete.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #808080;
+                border: none;
+                border-radius: 4px;
+                font-size: 18px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: #4D4D4D;
+                color: #ff4444;
+            }
+        """)
+        self._btn_delete.clicked.connect(self._on_delete_clicked)
+        main_layout.addWidget(self._btn_delete)
+
+    def _on_delete_clicked(self):
+        """Handle delete button click."""
+        self.delete_requested.emit(self.backup_path)
 
     def set_selected(self, selected: bool):
         self._selected = selected
@@ -105,7 +140,7 @@ class BackupCard(QFrame):
             """)
             self._info_label.setStyleSheet("""
                 font-size: 12px;
-                color: #B0E0E0;
+                color: #A0A0A0;
                 background: transparent;
             """)
         else:
@@ -136,7 +171,8 @@ class BackupDialog(QDialog):
     def __init__(self, parent, backups: list[Path]):
         super().__init__(parent)
         self.setWindowTitle("Sicherung wiederherstellen")
-        self.setFixedWidth(400)
+        self.setFixedWidth(420)
+        self.setMinimumHeight(200)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
 
         self.setStyleSheet("""
@@ -197,22 +233,22 @@ class BackupDialog(QDialog):
                 height: 0;
             }
         """)
-        scroll.setMaximumHeight(280)
 
-        scroll_widget = QWidget()
-        scroll_widget.setStyleSheet("background: transparent;")
-        scroll_layout = QVBoxLayout(scroll_widget)
-        scroll_layout.setContentsMargins(0, 0, 8, 0)
-        scroll_layout.setSpacing(8)
+        self._scroll_widget = QWidget()
+        self._scroll_widget.setStyleSheet("background: transparent;")
+        self._scroll_layout = QVBoxLayout(self._scroll_widget)
+        self._scroll_layout.setContentsMargins(0, 0, 8, 0)
+        self._scroll_layout.setSpacing(8)
 
         for backup in backups:
             card = BackupCard(backup, self)
+            card.delete_requested.connect(self._delete_backup)
             self._cards.append(card)
-            scroll_layout.addWidget(card)
+            self._scroll_layout.addWidget(card)
 
-        scroll_layout.addStretch()
-        scroll.setWidget(scroll_widget)
-        layout.addWidget(scroll)
+        self._scroll_layout.addStretch()
+        scroll.setWidget(self._scroll_widget)
+        layout.addWidget(scroll, 1)  # stretch factor 1 so it grows
 
         # Buttons
         btn_layout = QHBoxLayout()
@@ -275,6 +311,41 @@ class BackupDialog(QDialog):
             c.set_selected(c == card)
         self._selected_backup = card.backup_path
         self._btn_restore.setEnabled(True)
+
+    def _delete_backup(self, backup_path: Path):
+        """Delete a backup after confirmation."""
+        reply = QMessageBox.question(
+            self,
+            "Sicherung löschen",
+            f"Sicherung wirklich löschen?\n\n{backup_path.name}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Delete the file
+        try:
+            backup_path.unlink()
+        except OSError:
+            return
+
+        # Find and remove the card
+        for card in self._cards:
+            if card.backup_path == backup_path:
+                self._cards.remove(card)
+                card.setParent(None)
+                card.deleteLater()
+                break
+
+        # If deleted card was selected, clear selection
+        if self._selected_backup == backup_path:
+            self._selected_backup = None
+            self._btn_restore.setEnabled(False)
+
+        # If no cards left, close dialog
+        if not self._cards:
+            self.reject()
 
     def selected_backup(self) -> Path | None:
         """Return the selected backup path."""
