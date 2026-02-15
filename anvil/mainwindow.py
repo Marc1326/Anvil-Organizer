@@ -115,6 +115,8 @@ class MainWindow(QMainWindow):
         self._profile_bar = ProfileBar(self)
         self._profile_bar.collapse_all_requested.connect(self._collapse_all_separators)
         self._profile_bar.expand_all_requested.connect(self._expand_all_separators)
+        self._profile_bar.reload_requested.connect(self._on_menu_refresh)
+        self._profile_bar.export_csv_requested.connect(self._ctx_export_csv)
         left_layout.addWidget(self._profile_bar)
         self._mod_list_view = ModListView()
         self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
@@ -1486,7 +1488,6 @@ class MainWindow(QMainWindow):
 
     def _ctx_export_csv(self) -> None:
         """Export the mod list as CSV file."""
-        print("[DEBUG] _ctx_export_csv() CALLED")
         import csv
 
         path, _ = QFileDialog.getSaveFileName(
