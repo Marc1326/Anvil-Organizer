@@ -1570,8 +1570,9 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
 
     def _restore_backup(self) -> None:
-        """Restore from a ZIP backup."""
+        """Restore from a ZIP backup using the card-based dialog."""
         import zipfile
+        from anvil.dialogs.backup_dialog import BackupDialog
 
         if not self._current_instance_path or not self._current_profile_path:
             return
@@ -1583,14 +1584,14 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Keine Sicherungen", "Es gibt keine Sicherungen zum Wiederherstellen.")
             return
 
-        # Dialog with selection
-        names = [b.name for b in backups]
-        choice, ok = QInputDialog.getItem(self, "Sicherung wiederherstellen",
-                                          "Wähle eine Sicherung:", names, 0, False)
-        if not ok:
+        # Show card-based dialog
+        dialog = BackupDialog(self, backups)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
-        zip_path = backups_dir / choice
+        zip_path = dialog.selected_backup()
+        if not zip_path:
+            return
 
         with zipfile.ZipFile(zip_path, 'r') as zf:
             # modlist.txt
@@ -1615,9 +1616,9 @@ class MainWindow(QMainWindow):
                             data = zf.read(name)
                             (target_dir / "meta.ini").write_bytes(data)
 
-        # Reload
+        # Reload and show toast
         self._reload_mod_list()
-        self.statusBar().showMessage(f"Sicherung wiederhergestellt: {choice}", 5000)
+        Toast(self, f"Sicherung wiederhergestellt: {zip_path.name}")
 
     def _collapse_all_separators(self) -> None:
         """Collapse all separators in the mod list."""

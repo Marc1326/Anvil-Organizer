@@ -10,7 +10,7 @@ class Toast(QLabel):
     def __init__(self, parent, message: str, duration: int = 3000):
         super().__init__(message, parent)
         self.setStyleSheet("""
-            background: #1a7a7a;
+            background: #006868;
             color: white;
             padding: 8px 16px;
             border-radius: 4px;
