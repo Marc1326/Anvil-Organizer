@@ -46,6 +46,8 @@ BUTTON_STYLE = """
 class ProfileBar(QWidget):
     collapse_all_requested = Signal()
     expand_all_requested = Signal()
+    reload_requested = Signal()
+    export_csv_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -82,11 +84,15 @@ class ProfileBar(QWidget):
         menu1.addAction(QAction("Aktiviere alle", self, triggered=_todo("Aktiviere alle")))
         menu1.addAction(QAction("Deaktiviere alle", self, triggered=_todo("Deaktiviere alle")))
         menu1.addSeparator()
-        menu1.addAction(QAction("Auf Updates prüfen", self, triggered=_todo("Auf Updates prüfen")))
-        menu1.addAction(QAction("Kategorien automatisch zuweisen", self, triggered=_todo("Kategorien automatisch zuweisen")))
-        menu1.addAction(QAction("Neu laden", self, triggered=_todo("Neu laden")))
+        act_updates = QAction("Auf Updates prüfen", self, triggered=_todo("Auf Updates prüfen"))
+        act_updates.setEnabled(False)
+        menu1.addAction(act_updates)
+        act_auto_cat = QAction("Kategorien automatisch zuweisen", self, triggered=_todo("Kategorien automatisch zuweisen"))
+        act_auto_cat.setEnabled(False)
+        menu1.addAction(act_auto_cat)
+        menu1.addAction(QAction("Neu laden", self, triggered=lambda checked: self.reload_requested.emit()))
         menu1.addSeparator()
-        menu1.addAction(QAction("Als CSV exportieren...", self, triggered=_todo("Als CSV exportieren...")))
+        menu1.addAction(QAction("Als CSV exportieren...", self, triggered=lambda checked: self.export_csv_requested.emit()))
         btn_menu = QToolButton(self)
         _set_icon(btn_menu, "dots.png")
         btn_menu.setToolTip("Menü")
