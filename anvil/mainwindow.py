@@ -117,6 +117,17 @@ class MainWindow(QMainWindow):
         self._profile_bar.expand_all_requested.connect(self._expand_all_separators)
         self._profile_bar.reload_requested.connect(self._on_menu_refresh)
         self._profile_bar.export_csv_requested.connect(self._ctx_export_csv)
+        self._profile_bar.open_game_requested.connect(self._open_game_folder)
+        self._profile_bar.open_mygames_requested.connect(self._open_mygames_folder)
+        self._profile_bar.open_ini_requested.connect(self._open_ini_folder)
+        self._profile_bar.open_instance_requested.connect(self._open_instance_folder)
+        self._profile_bar.open_mods_requested.connect(self._open_mods_folder)
+        self._profile_bar.open_profile_requested.connect(self._open_profile_folder)
+        self._profile_bar.open_downloads_requested.connect(self._open_downloads_folder)
+        self._profile_bar.open_ao_install_requested.connect(self._open_ao_install_folder)
+        self._profile_bar.open_ao_plugins_requested.connect(self._open_ao_plugins_folder)
+        self._profile_bar.open_ao_styles_requested.connect(self._open_ao_styles_folder)
+        self._profile_bar.open_ao_logs_requested.connect(self._open_ao_logs_folder)
         left_layout.addWidget(self._profile_bar)
         self._mod_list_view = ModListView()
         self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
@@ -209,6 +220,7 @@ class MainWindow(QMainWindow):
         self._current_profile_path: Path | None = None
         self._current_instance_path: Path | None = None
         self._current_plugin = None  # Active game plugin
+        self._current_game_path: Path | None = None
 
         # Connect model signals for persistence
         model = self._mod_list_view.source_model()
@@ -728,6 +740,7 @@ class MainWindow(QMainWindow):
 
         plugin = self.plugin_loader.get_game(short_name) if short_name else None
         self._current_plugin = plugin
+        self._current_game_path = game_path
 
         # 1. Title
         self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v0.1.0")
@@ -1396,6 +1409,103 @@ class MainWindow(QMainWindow):
         add_mod_to_modlist(self._current_profile_path, folder_name, True)
         self._reload_mod_list()
         self.statusBar().showMessage(f"Trenner erstellt: {name}", 5000)
+
+    def _open_mods_folder(self) -> None:
+        """Open the mods folder in file manager."""
+        import subprocess
+        print(f"DEBUG _open_mods_folder: instance={self._current_instance_path}")
+        if not self._current_instance_path:
+            print("DEBUG _open_mods_folder: No instance path, returning")
+            return
+        path = self._current_instance_path / ".mods"
+        print(f"DEBUG _open_mods_folder: mods_path={path}, is_dir={path.is_dir()}")
+        if path.is_dir():
+            subprocess.Popen(["xdg-open", str(path)])
+
+    def _open_game_folder(self) -> None:
+        """Open the game installation folder in file manager."""
+        import subprocess
+        if not self._current_game_path:
+            return
+        if self._current_game_path.is_dir():
+            subprocess.Popen(["xdg-open", str(self._current_game_path)])
+
+    def _open_mygames_folder(self) -> None:
+        """Open the My Games folder in file manager."""
+        import subprocess
+        if not self._current_plugin:
+            return
+        if hasattr(self._current_plugin, "gameDocumentsDirectory"):
+            path = self._current_plugin.gameDocumentsDirectory()
+            if path and path.is_dir():
+                subprocess.Popen(["xdg-open", str(path)])
+
+    def _open_ini_folder(self) -> None:
+        """Open the INI folder in file manager (same as My Games for most games)."""
+        import subprocess
+        if not self._current_plugin:
+            return
+        if hasattr(self._current_plugin, "gameDocumentsDirectory"):
+            path = self._current_plugin.gameDocumentsDirectory()
+            if path and path.is_dir():
+                subprocess.Popen(["xdg-open", str(path)])
+
+    def _open_instance_folder(self) -> None:
+        """Open the instance folder in file manager."""
+        import subprocess
+        if not self._current_instance_path:
+            return
+        if self._current_instance_path.is_dir():
+            subprocess.Popen(["xdg-open", str(self._current_instance_path)])
+
+    def _open_profile_folder(self) -> None:
+        """Open the profile folder in file manager."""
+        import subprocess
+        print(f"DEBUG _open_profile_folder: profile={self._current_profile_path}")
+        if not self._current_profile_path:
+            print("DEBUG _open_profile_folder: No profile path, returning")
+            return
+        if self._current_profile_path.is_dir():
+            subprocess.Popen(["xdg-open", str(self._current_profile_path)])
+
+    def _open_downloads_folder(self) -> None:
+        """Open the downloads folder in file manager."""
+        import subprocess
+        if not self._current_instance_path:
+            return
+        path = self._current_instance_path / ".downloads"
+        if path.is_dir():
+            subprocess.Popen(["xdg-open", str(path)])
+
+    def _open_ao_install_folder(self) -> None:
+        """Open the Anvil Organizer installation folder in file manager."""
+        import subprocess
+        path = Path(__file__).parent
+        if path.is_dir():
+            subprocess.Popen(["xdg-open", str(path)])
+
+    def _open_ao_plugins_folder(self) -> None:
+        """Open the Anvil Organizer plugins folder in file manager."""
+        import subprocess
+        path = Path(__file__).parent / "plugins"
+        if path.is_dir():
+            subprocess.Popen(["xdg-open", str(path)])
+
+    def _open_ao_styles_folder(self) -> None:
+        """Open the Anvil Organizer styles folder in file manager."""
+        import subprocess
+        path = Path(__file__).parent / "styles"
+        if path.is_dir():
+            subprocess.Popen(["xdg-open", str(path)])
+
+    def _open_ao_logs_folder(self) -> None:
+        """Open the Anvil Organizer logs folder in file manager."""
+        import subprocess
+        path = Path.home() / ".anvil-organizer" / "logs"
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
+        if path.is_dir():
+            subprocess.Popen(["xdg-open", str(path)])
 
     def _collapse_all_separators(self) -> None:
         """Collapse all separators in the mod list."""
