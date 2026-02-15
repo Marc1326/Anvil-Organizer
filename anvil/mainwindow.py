@@ -113,6 +113,8 @@ class MainWindow(QMainWindow):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
         self._profile_bar = ProfileBar(self)
+        self._profile_bar.collapse_all_requested.connect(self._collapse_all_separators)
+        self._profile_bar.expand_all_requested.connect(self._expand_all_separators)
         left_layout.addWidget(self._profile_bar)
         self._mod_list_view = ModListView()
         self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
@@ -1065,6 +1067,7 @@ class MainWindow(QMainWindow):
 
     def _on_mod_context_menu(self, global_pos) -> None:
         """Build and show the mod list context menu (MO2 structure)."""
+        print("[DEBUG] _on_mod_context_menu() aufgerufen!")
         if not self._current_instance_path:
             return
 
@@ -1076,16 +1079,12 @@ class MainWindow(QMainWindow):
 
         # ── Alle Mods (Submenu) ────────────────────────────────────
         all_mods_menu = menu.addMenu("Alle Mods")
-        act = all_mods_menu.addAction("Installiere Mod über...")
-        act.setEnabled(False)
-        act = all_mods_menu.addAction("Erstelle leere Mod über...")
-        act.setEnabled(False)
-        act_create_sep = all_mods_menu.addAction("Erstelle Trenner über...")
+        act_install_mod = all_mods_menu.addAction("Installiere Mod...")
+        act_create_empty = all_mods_menu.addAction("Erstelle leere Mod...")
+        act_create_sep = all_mods_menu.addAction("Erstelle Trenner...")
         all_mods_menu.addSeparator()
-        act = all_mods_menu.addAction("Alle einklappen")
-        act.setEnabled(False)
-        act = all_mods_menu.addAction("Alle ausklappen")
-        act.setEnabled(False)
+        act_collapse_all = all_mods_menu.addAction("Alle einklappen")
+        act_expand_all = all_mods_menu.addAction("Alle ausklappen")
         all_mods_menu.addSeparator()
         act_enable_all = all_mods_menu.addAction("Aktiviere alle")
         act_disable_all = all_mods_menu.addAction("Deaktiviere alle")
@@ -1094,8 +1093,7 @@ class MainWindow(QMainWindow):
         act = all_mods_menu.addAction("Kategorien automatisch zuweisen")
         act.setEnabled(False)
         act_reload = all_mods_menu.addAction("Neu laden")
-        act = all_mods_menu.addAction("Als CSV exportieren...")
-        act.setEnabled(False)
+        act_export_csv = all_mods_menu.addAction("Als CSV exportieren...")
 
         # ── Kategorien (Submenus) ─────────────────────────────────
         andere_kat_menu = menu.addMenu("Andere Kategorien")
@@ -1318,14 +1316,32 @@ class MainWindow(QMainWindow):
         if not chosen:
             return
 
-        if chosen == act_create_sep:
+        print(f"[DEBUG] chosen = {chosen}, text = {chosen.text() if chosen else 'None'}")
+        print(f"[DEBUG] act_install_mod = {act_install_mod}, text = {act_install_mod.text()}")
+        print(f"[DEBUG] chosen == act_install_mod: {chosen == act_install_mod}")
+
+        if chosen == act_install_mod:
+            print("[MENU] Installiere Mod clicked")
+            self._ctx_install_mod()
+        elif chosen == act_create_empty:
+            print("[MENU] Leere Mod clicked")
+            self._ctx_create_empty_mod()
+        elif chosen == act_create_sep:
+            print("[MENU] Trenner clicked")
             self._ctx_create_separator()
+        elif chosen == act_export_csv:
+            print("[MENU] CSV Export clicked")
+            self._ctx_export_csv()
         elif chosen == act_enable_all:
             self._ctx_enable_all(True)
         elif chosen == act_disable_all:
             self._ctx_enable_all(False)
         elif chosen == act_reload:
             self._on_menu_refresh()
+        elif chosen == act_collapse_all:
+            self._collapse_all_separators()
+        elif chosen == act_expand_all:
+            self._expand_all_separators()
         elif chosen == act_enable:
             self._ctx_enable_selected(selected_rows, True)
         elif chosen == act_disable:
@@ -1378,6 +1394,134 @@ class MainWindow(QMainWindow):
         add_mod_to_modlist(self._current_profile_path, folder_name, True)
         self._reload_mod_list()
         self.statusBar().showMessage(f"Trenner erstellt: {name}", 5000)
+
+    def _collapse_all_separators(self) -> None:
+        """Collapse all separators in the mod list."""
+        tree = self._mod_list_view._tree
+        source = self._mod_list_view.source_model()
+
+        # Collect all separator folder names
+        separator_folders: set[str] = set()
+        for row in range(source.rowCount()):
+            row_data = source._rows[row]
+            if row_data.is_separator:
+                separator_folders.add(row_data.folder_name)
+
+        # Add all to collapsed set
+        tree._collapsed_separators = separator_folders
+        tree._apply_separator_filter()
+        self.statusBar().showMessage(f"Alle Trenner eingeklappt ({len(separator_folders)})", 3000)
+
+    def _expand_all_separators(self) -> None:
+        """Expand all separators in the mod list."""
+        tree = self._mod_list_view._tree
+        tree._collapsed_separators.clear()
+        tree._apply_separator_filter()
+        self.statusBar().showMessage("Alle Trenner ausgeklappt", 3000)
+
+    def _ctx_install_mod(self) -> None:
+        """Install a mod from an archive file."""
+        print("[DEBUG] _ctx_install_mod() CALLED")
+        from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
+
+        exts = " ".join(f"*{e}" for e in sorted(SUPPORTED_EXTENSIONS))
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Mod-Archiv auswählen",
+            str(Path.home()),
+            f"Archive ({exts})",
+        )
+        if not path:
+            return
+
+        archive_path = Path(path)
+        installer = ModInstaller(self._current_instance_path)
+        result = installer.install_from_archive(archive_path)
+
+        if result:
+            add_mod_to_modlist(self._current_profile_path, result.name, True)
+            self._reload_mod_list()
+            self.statusBar().showMessage(f"Mod installiert: {result.name}", 5000)
+        else:
+            QMessageBox.warning(
+                self,
+                "Installation fehlgeschlagen",
+                f"Die Mod konnte nicht installiert werden:\n{archive_path.name}",
+            )
+
+    def _ctx_create_empty_mod(self) -> None:
+        """Create a new empty mod folder."""
+        print("[DEBUG] _ctx_create_empty_mod() CALLED")
+        from anvil.core.mod_metadata import create_default_meta_ini
+
+        name, ok = QInputDialog.getText(
+            self, "Leere Mod erstellen", "Name der Mod:",
+        )
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+
+        mods_dir = self._current_instance_path / ".mods"
+        mod_path = mods_dir / name
+
+        if mod_path.exists():
+            QMessageBox.warning(
+                self, "Mod erstellen",
+                f"Eine Mod mit dem Namen \"{name}\" existiert bereits.",
+            )
+            return
+
+        try:
+            mod_path.mkdir(parents=True, exist_ok=True)
+            create_default_meta_ini(mod_path, name)
+        except OSError as exc:
+            QMessageBox.warning(
+                self, "Mod erstellen", str(exc),
+            )
+            return
+
+        add_mod_to_modlist(self._current_profile_path, name, True)
+        self._reload_mod_list()
+        self.statusBar().showMessage(f"Leere Mod erstellt: {name}", 5000)
+
+    def _ctx_export_csv(self) -> None:
+        """Export the mod list as CSV file."""
+        print("[DEBUG] _ctx_export_csv() CALLED")
+        import csv
+
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Modliste exportieren",
+            str(Path.home() / "modlist.csv"),
+            "CSV-Dateien (*.csv)",
+        )
+        if not path:
+            return
+
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f, delimiter=";")
+                writer.writerow(["Name", "Kategorie", "Version", "Priorität", "Aktiv"])
+
+                for entry in self._current_mod_entries:
+                    if entry.is_separator:
+                        continue  # Trenner nicht exportieren
+                    cat_name = ""
+                    if entry.category_ids:
+                        cat_name = self._category_manager.get_name(entry.category_ids[0]) or ""
+                    writer.writerow([
+                        entry.display_name or entry.name,
+                        cat_name,
+                        entry.version,
+                        entry.priority,
+                        "Ja" if entry.enabled else "Nein",
+                    ])
+
+            self.statusBar().showMessage(f"Modliste exportiert: {path}", 5000)
+        except OSError as exc:
+            QMessageBox.warning(
+                self, "Export fehlgeschlagen", str(exc),
+            )
 
     def _ctx_enable_selected(self, rows: list[int], enabled: bool) -> None:
         """Enable or disable selected mods."""

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QMenu,
 )
-from PySide6.QtCore import QSize
+from PySide6.QtCore import QSize, Signal
 
 ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "files")
 
@@ -44,6 +44,9 @@ BUTTON_STYLE = """
 
 
 class ProfileBar(QWidget):
+    collapse_all_requested = Signal()
+    expand_all_requested = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("profileBar")
@@ -73,8 +76,8 @@ class ProfileBar(QWidget):
         menu1.addAction(QAction("Leere Mod erstellen", self, triggered=_todo("Leere Mod erstellen")))
         menu1.addAction(QAction("Erstelle Trenner", self, triggered=_todo("Erstelle Trenner")))
         menu1.addSeparator()
-        menu1.addAction(QAction("Alle einklappen", self, triggered=_todo("Alle einklappen")))
-        menu1.addAction(QAction("Alle ausklappen", self, triggered=_todo("Alle ausklappen")))
+        menu1.addAction(QAction("Alle einklappen", self, triggered=lambda checked: self.collapse_all_requested.emit()))
+        menu1.addAction(QAction("Alle ausklappen", self, triggered=lambda checked: self.expand_all_requested.emit()))
         menu1.addSeparator()
         menu1.addAction(QAction("Aktiviere alle", self, triggered=_todo("Aktiviere alle")))
         menu1.addAction(QAction("Deaktiviere alle", self, triggered=_todo("Deaktiviere alle")))
