@@ -56,6 +56,7 @@ class FilterChip(QPushButton):
         # Double-click detection: delay toggle to detect double-click
         self._pending_toggle = False
         self._pre_click_state = False
+        self._double_click_handled = False  # Ignore release after double-click
         self._click_timer = QTimer(self)
         self._click_timer.setSingleShot(True)
         self._click_timer.setInterval(200)  # ms to wait for double-click
@@ -74,6 +75,11 @@ class FilterChip(QPushButton):
     def mouseReleaseEvent(self, event):
         """Delay toggle for category chips to detect double-click."""
         if event.button() == Qt.MouseButton.LeftButton and self.chip_id > 0:
+            # Ignore release after double-click was handled
+            if self._double_click_handled:
+                self._double_click_handled = False
+                self.setDown(False)
+                return
             # Let QPushButton handle visual feedback but we'll control the actual toggle
             self._pending_toggle = True
             self._click_timer.start()
@@ -99,6 +105,7 @@ class FilterChip(QPushButton):
             # Cancel pending toggle - double-click should NOT toggle
             self._click_timer.stop()
             self._pending_toggle = False
+            self._double_click_handled = True  # Ignore next mouseReleaseEvent
             # Restore pre-click state (undo any visual toggle)
             self.setChecked(self._pre_click_state)
             # Emit rename signal
