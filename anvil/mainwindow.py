@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import json
 import shutil
 
 from PySide6.QtWidgets import (
@@ -136,6 +137,7 @@ class MainWindow(QMainWindow):
         self._profile_bar.profile_renamed.connect(self._on_profile_renamed)
         self._profile_bar.profile_changed.connect(self._on_profile_changed)
         self._profile_bar.profile_delete_requested.connect(self._on_profile_deleted)
+        self._profile_bar.profiles_reordered.connect(self._on_profiles_reordered)
         left_layout.addWidget(self._profile_bar)
         self._mod_list_view = ModListView()
         self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
@@ -792,6 +794,18 @@ class MainWindow(QMainWindow):
         if not profile_folders:
             (profiles_dir / "Default").mkdir(exist_ok=True)
             profile_folders = ["Default"]
+
+        # Apply saved order if available
+        order_file = profiles_dir / "profiles_order.json"
+        if order_file.exists():
+            try:
+                saved_order = json.loads(order_file.read_text())
+                # Sortiere nach gespeicherter Reihenfolge, neue Profile ans Ende
+                ordered = [p for p in saved_order if p in profile_folders]
+                ordered += [p for p in profile_folders if p not in saved_order]
+                profile_folders = ordered
+            except (json.JSONDecodeError, TypeError):
+                pass  # Bei Fehler: Standard-Sortierung beibehalten
 
         profile_name = data.get("selected_profile", "Default")
         if profile_name not in profile_folders:
@@ -1706,11 +1720,32 @@ class MainWindow(QMainWindow):
         if profile_path.exists():
             shutil.rmtree(profile_path)
 
+        # Gelöschtes Profil aus Order-Datei entfernen
+        order_file = profiles_dir / "profiles_order.json"
+        if order_file.exists():
+            try:
+                saved_order = json.loads(order_file.read_text())
+                if name in saved_order:
+                    saved_order.remove(name)
+                    order_file.write_text(json.dumps(saved_order, indent=2))
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         # Profile neu laden
         profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir()])
         if not profile_folders:
             (profiles_dir / "Default").mkdir(exist_ok=True)
             profile_folders = ["Default"]
+
+        # Gespeicherte Reihenfolge anwenden
+        if order_file.exists():
+            try:
+                saved_order = json.loads(order_file.read_text())
+                ordered = [p for p in saved_order if p in profile_folders]
+                ordered += [p for p in profile_folders if p not in saved_order]
+                profile_folders = ordered
+            except (json.JSONDecodeError, TypeError):
+                pass
 
         # Wenn gelöschtes Profil aktiv war → erstes verbleibendes wählen
         was_active = self._current_profile_path and self._current_profile_path.name == name
@@ -1722,6 +1757,15 @@ class MainWindow(QMainWindow):
             self._on_profile_changed(new_active)
 
         Toast(self, f"Profil '{name}' gelöscht")
+
+    def _on_profiles_reordered(self, order: list[str]) -> None:
+        """Handle profile reorder via drag & drop."""
+        if not self._current_instance_path:
+            return
+
+        profiles_dir = self._current_instance_path / ".profiles"
+        order_file = profiles_dir / "profiles_order.json"
+        order_file.write_text(json.dumps(order, indent=2))
 
     def _collapse_all_separators(self) -> None:
         """Collapse all separators in the mod list."""

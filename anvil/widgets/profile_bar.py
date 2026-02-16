@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QLineEdit,
 )
-from PySide6.QtCore import QSize, Signal, Qt, QTimer
+from PySide6.QtCore import QSize, Signal, Qt, QTimer, QPoint, QEvent
 
 ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "files")
 
@@ -142,6 +142,7 @@ class ProfileBar(QWidget):
     profile_create_confirmed = Signal(str)  # Emits profile name
     profile_renamed = Signal(str, str)  # (old_name, new_name)
     profile_delete_requested = Signal(str)  # Profilname
+    profiles_reordered = Signal(list)  # Neue Reihenfolge
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -157,6 +158,17 @@ class ProfileBar(QWidget):
         self._rename_input: QLineEdit | None = None
         self._rename_tab: QPushButton | None = None
         self._rename_confirmed = False
+
+        # Drag & Drop state
+        self._drag_active = False
+        self._drag_tab: QPushButton | None = None
+        self._drag_start_pos: QPoint | None = None
+        self._drag_start_index = -1
+        self._drag_timer = QTimer(self)
+        self._drag_timer.setSingleShot(True)
+        self._drag_timer.setInterval(200)
+        self._drag_timer.timeout.connect(self._on_drag_timer_timeout)
+        self._drag_ready = False  # Timer abgelaufen, bereit zum Drag
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(8, 4, 8, 4)
@@ -194,6 +206,7 @@ class ProfileBar(QWidget):
         self._tabs_layout.addStretch()
 
         self._scroll_area.setWidget(self._tabs_widget)
+        self._tabs_widget.installEventFilter(self)
         container_layout.addWidget(self._scroll_area)
 
         # Fade edges
@@ -355,6 +368,7 @@ class ProfileBar(QWidget):
             tab.customContextMenuRequested.connect(
                 lambda pos, t=tab: self._show_tab_context_menu(t, pos)
             )
+            tab.installEventFilter(self)  # Für Drag & Drop
             self._button_group.addButton(tab)
             self._tabs_layout.addWidget(tab)
             self._tabs.append(tab)
@@ -380,6 +394,8 @@ class ProfileBar(QWidget):
 
     def _show_tab_context_menu(self, tab: QPushButton, pos):
         """Show context menu for profile tab."""
+        if tab.text() == "Default":
+            return  # Default-Profil nicht löschbar
         if len(self._tabs) <= 1:
             return  # Letztes Profil nicht löschbar
         menu = QMenu(self)
@@ -483,6 +499,8 @@ class ProfileBar(QWidget):
 
     def _start_inline_rename(self, tab: QPushButton):
         """Show inline input for renaming a profile."""
+        if tab.text() == "Default":
+            return  # Default-Profil nicht umbenennen
         if self._rename_input is not None:
             return  # Already renaming
 
@@ -567,3 +585,135 @@ class ProfileBar(QWidget):
         tab.show()
         self._rename_input = None
         self._rename_tab = None
+
+    # ── Drag & Drop ──────────────────────────────────────────────────
+
+    def _on_drag_timer_timeout(self):
+        """Timer abgelaufen - bereit zum Drag wenn Maus bewegt wird."""
+        self._drag_ready = True
+
+    def _get_tab_at_pos(self, global_pos: QPoint) -> QPushButton | None:
+        """Find tab at global position."""
+        for tab in self._tabs:
+            if tab.isVisible() and tab.geometry().contains(
+                self._tabs_widget.mapFromGlobal(global_pos)
+            ):
+                return tab
+        return None
+
+    def _calculate_drop_index(self, global_pos: QPoint) -> int:
+        """Calculate drop index based on mouse X position."""
+        local_x = self._tabs_widget.mapFromGlobal(global_pos).x()
+
+        for i, tab in enumerate(self._tabs):
+            if tab == self._drag_tab:
+                continue
+            tab_center = tab.x() + tab.width() // 2
+            if local_x < tab_center:
+                return i
+        return len(self._tabs) - 1
+
+    def eventFilter(self, obj, event: QEvent) -> bool:
+        """Handle drag & drop events on tabs."""
+        # Nur Events von Tabs verarbeiten
+        if obj not in self._tabs:
+            return super().eventFilter(obj, event)
+
+        # Nicht während Rename
+        if self._rename_input is not None or self._inline_input is not None:
+            return super().eventFilter(obj, event)
+
+        if event.type() == QEvent.Type.MouseButtonPress:
+            if event.button() == Qt.MouseButton.LeftButton:
+                tab = obj
+                if tab.text() == "Default":
+                    return super().eventFilter(obj, event)  # Default nicht draggen
+                self._drag_start_pos = event.globalPosition().toPoint()
+                self._drag_tab = tab
+                self._drag_start_index = self._tabs.index(tab)
+                self._drag_ready = False
+                self._drag_timer.start()
+
+        elif event.type() == QEvent.Type.MouseMove:
+            if self._drag_tab and self._drag_start_pos:
+                delta = event.globalPosition().toPoint() - self._drag_start_pos
+                # Nur horizontal, > 10px UND Timer abgelaufen
+                if self._drag_ready and abs(delta.x()) > 10:
+                    if not self._drag_active:
+                        self._start_drag()
+                    else:
+                        self._update_drag(event.globalPosition().toPoint())
+
+        elif event.type() == QEvent.Type.MouseButtonRelease:
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._drag_timer.stop()
+                if self._drag_active:
+                    self._finish_drag(event.globalPosition().toPoint())
+                self._reset_drag_state()
+
+        return super().eventFilter(obj, event)
+
+    def _start_drag(self):
+        """Aktiviere Drag-Modus."""
+        self._drag_active = True
+        if self._drag_tab:
+            self._drag_tab.grabMouse()  # Alle Mouse-Events an diesen Tab
+            self._drag_tab.setStyleSheet(
+                self._drag_tab.styleSheet() + "QPushButton#profileTab { opacity: 0.5; }"
+            )
+            self._drag_tab.setCursor(Qt.CursorShape.ClosedHandCursor)
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+
+    def _update_drag(self, global_pos: QPoint):
+        """Update während Drag - visuelle Position."""
+        # Visuelles Feedback: Der Tab folgt der Maus nicht direkt,
+        # aber wir könnten hier eine Vorschau-Position zeigen
+        pass
+
+    def _finish_drag(self, global_pos: QPoint):
+        """Drop ausführen und neue Reihenfolge speichern."""
+        if not self._drag_tab:
+            return
+
+        new_index = self._calculate_drop_index(global_pos)
+        # Default bleibt immer an Index 0 - kein Tab davor
+        if self._tabs and self._tabs[0].text() == "Default":
+            new_index = max(1, new_index)
+
+        if new_index != self._drag_start_index:
+            # Tab aus Liste entfernen und neu einfügen
+            tab = self._tabs.pop(self._drag_start_index)
+            self._tabs.insert(new_index, tab)
+
+            # Layout neu aufbauen
+            # Erst alle Tabs entfernen (außer Stretch)
+            while self._tabs_layout.count() > 0:
+                item = self._tabs_layout.takeAt(0)
+
+            # Tabs in neuer Reihenfolge einfügen
+            for t in self._tabs:
+                self._tabs_layout.addWidget(t)
+            self._tabs_layout.addStretch()
+
+            # Signal mit neuer Reihenfolge emittieren
+            new_order = [t.text() for t in self._tabs]
+            self.profiles_reordered.emit(new_order)
+
+    def _reset_drag_state(self):
+        """Drag-State zurücksetzen."""
+        if self._drag_tab:
+            if self._drag_active:
+                self._drag_tab.releaseMouse()  # Mouse-Grab aufheben
+            # Style zurücksetzen
+            is_active = self._drag_tab.text() == self._active_profile
+            self._drag_tab.setStyleSheet(
+                TAB_STYLE_SELECTED if is_active else TAB_STYLE_NORMAL
+            )
+            self._drag_tab.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self._drag_active = False
+        self._drag_tab = None
+        self._drag_start_pos = None
+        self._drag_start_index = -1
+        self._drag_ready = False
