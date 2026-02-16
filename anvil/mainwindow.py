@@ -44,7 +44,8 @@ from anvil.core.mod_entry import scan_mods_directory
 from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
 from anvil.core.mod_list_io import (
     add_mod_to_modlist, write_modlist, remove_mod_from_modlist,
-    rename_mod_in_modlist,
+    rename_mod_in_modlist, read_active_mods, write_active_mods,
+    write_global_modlist, migrate_to_global_modlist,
 )
 from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
 from anvil.core.nexus_api import NexusAPI
@@ -790,6 +791,10 @@ class MainWindow(QMainWindow):
         # Load available profiles from disk
         profiles_dir = instance_path / ".profiles"
         profiles_dir.mkdir(parents=True, exist_ok=True)
+
+        # Migrate legacy per-profile modlist.txt to global modlist + active_mods.json
+        migrate_to_global_modlist(profiles_dir)
+
         profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir()])
         if not profile_folders:
             (profiles_dir / "Default").mkdir(exist_ok=True)
@@ -861,11 +866,23 @@ class MainWindow(QMainWindow):
     # ── Mod list persistence ─────────────────────────────────────────
 
     def _write_current_modlist(self) -> None:
-        """Write the current mod entries to modlist.txt."""
-        if self._current_profile_path is None:
+        """Write mod order globally and active state to profile.
+
+        - Global modlist.txt in .profiles/ contains load order only
+        - Profile-specific active_mods.json contains enabled mod names
+        """
+        if self._current_profile_path is None or self._current_instance_path is None:
             return
-        mods = [(e.name, e.enabled) for e in self._current_mod_entries]
-        write_modlist(self._current_profile_path, mods)
+
+        profiles_dir = self._current_instance_path / ".profiles"
+
+        # 1. Write global load order (all mod names)
+        mod_names = [e.name for e in self._current_mod_entries]
+        write_global_modlist(profiles_dir, mod_names)
+
+        # 2. Write active mods to current profile
+        active_mods = {e.name for e in self._current_mod_entries if e.enabled}
+        write_active_mods(self._current_profile_path, active_mods)
 
     def _on_mod_toggled(self, row: int, enabled: bool) -> None:
         """A mod checkbox was toggled — update entries and persist."""
@@ -1652,7 +1669,7 @@ class MainWindow(QMainWindow):
         Toast(self, f"Sicherung wiederhergestellt: {zip_path.name}")
 
     def _on_profile_created(self, name: str) -> None:
-        """Handle new profile creation - create folder on disk."""
+        """Handle new profile creation - create folder and copy Default's active_mods."""
         if not self._current_instance_path:
             return
 
@@ -1660,11 +1677,15 @@ class MainWindow(QMainWindow):
         new_profile_dir = profiles_dir / name
         new_profile_dir.mkdir(parents=True, exist_ok=True)
 
-        # Copy modlist.txt from current profile if exists
-        if self._current_profile_path:
-            current_modlist = self._current_profile_path / "modlist.txt"
-            if current_modlist.exists():
-                shutil.copy(current_modlist, new_profile_dir / "modlist.txt")
+        # Copy active_mods.json from Default profile (basis template)
+        default_profile = profiles_dir / "Default"
+        default_active = default_profile / "active_mods.json"
+        if default_active.exists():
+            shutil.copy(default_active, new_profile_dir / "active_mods.json")
+        else:
+            # If Default has no active_mods.json yet, create one with current state
+            active_mods = {e.name for e in self._current_mod_entries if e.enabled}
+            write_active_mods(new_profile_dir, active_mods)
 
         # Switch to new profile
         self._on_profile_changed(name)
@@ -1689,15 +1710,27 @@ class MainWindow(QMainWindow):
         Toast(self, f"Profil umbenannt: {old_name} → {new_name}")
 
     def _on_profile_changed(self, name: str) -> None:
-        """Handle profile switch - load different modlist."""
+        """Handle profile switch - update checkboxes only, keep order.
+
+        The global modlist.txt (load order) is shared across profiles.
+        Only active_mods.json differs per profile.
+        """
         if not self._current_instance_path:
             return
 
-        # Update profile path
-        self._current_profile_path = self._current_instance_path / ".profiles" / name
-        self._current_profile_path.mkdir(parents=True, exist_ok=True)
+        profiles_dir = self._current_instance_path / ".profiles"
+        new_profile_path = profiles_dir / name
+        new_profile_path.mkdir(parents=True, exist_ok=True)
 
-        # Save selected profile to instance data
+        # 1. Save current active mods to OLD profile before switching
+        if self._current_profile_path and self._current_profile_path != new_profile_path:
+            active_mods = {e.name for e in self._current_mod_entries if e.enabled}
+            write_active_mods(self._current_profile_path, active_mods)
+
+        # 2. Update profile path
+        self._current_profile_path = new_profile_path
+
+        # 3. Save selected profile to instance data
         current_instance = self.instance_manager.current_instance()
         if current_instance:
             data = self.instance_manager.load_instance(current_instance)
@@ -1705,8 +1738,35 @@ class MainWindow(QMainWindow):
                 data["selected_profile"] = name
                 self.instance_manager.save_instance(current_instance, data)
 
-        # Reload mod list with new profile
-        self._reload_mod_list()
+        # 4. Load active mods from new profile and update checkboxes only
+        new_active = read_active_mods(self._current_profile_path)
+        self._apply_active_state(new_active)
+
+    def _apply_active_state(self, active_mods: set[str]) -> None:
+        """Update checkbox state for all mods without reloading.
+
+        Args:
+            active_mods: Set of mod names that should be enabled.
+        """
+        # Update internal entries
+        for entry in self._current_mod_entries:
+            entry.enabled = entry.name in active_mods
+
+        # Update model rows to reflect new state
+        model = self._mod_list_view.source_model()
+        for i, row_data in enumerate(model._rows):
+            folder = row_data.folder_name
+            new_enabled = folder in active_mods
+            if row_data.enabled != new_enabled:
+                row_data.enabled = new_enabled
+
+        # Notify view that data changed
+        model.dataChanged.emit(
+            model.index(0, 0),
+            model.index(model.rowCount() - 1, model.columnCount() - 1),
+        )
+
+        self._update_active_count()
 
     def _on_profile_deleted(self, name: str) -> None:
         """Handle profile deletion request."""

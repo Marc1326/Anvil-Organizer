@@ -20,6 +20,7 @@ Format::
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -145,3 +146,195 @@ def rename_mod_in_modlist(
         (new_name if n == old_name else n, e) for n, e in existing
     ]
     write_modlist(profile_path, updated)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Profile-specific active mods (active_mods.json)
+# ─────────────────────────────────────────────────────────────────────
+
+def read_active_mods(profile_path: Path) -> set[str]:
+    """Read ``active_mods.json`` from a profile folder.
+
+    Args:
+        profile_path: Path to a profile folder
+                      (e.g. ``.profiles/Default/``).
+
+    Returns:
+        Set of mod names that are active in this profile.
+        Empty set if file doesn't exist.
+    """
+    json_file = profile_path / "active_mods.json"
+    if not json_file.is_file():
+        return set()
+
+    try:
+        text = json_file.read_text(encoding="utf-8")
+        data = json.loads(text)
+        if isinstance(data, list):
+            return set(data)
+        return set()
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"mod_list_io: failed to read {json_file}: {exc}",
+            file=sys.stderr,
+        )
+        return set()
+
+
+def write_active_mods(profile_path: Path, active_mods: set[str]) -> None:
+    """Write ``active_mods.json`` to a profile folder.
+
+    Args:
+        profile_path: Path to a profile folder.
+        active_mods: Set of mod names that are active.
+    """
+    json_file = profile_path / "active_mods.json"
+
+    try:
+        profile_path.mkdir(parents=True, exist_ok=True)
+        # Sort for consistent output
+        json_file.write_text(
+            json.dumps(sorted(active_mods), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        print(
+            f"mod_list_io: failed to write {json_file}: {exc}",
+            file=sys.stderr,
+        )
+
+
+def read_global_modlist(profiles_dir: Path) -> list[str]:
+    """Read global ``modlist.txt`` from the .profiles directory.
+
+    The global modlist contains only the load order (all mods listed).
+    Active/inactive state comes from profile-specific active_mods.json.
+
+    Args:
+        profiles_dir: Path to the .profiles directory
+                      (e.g. ``instance_path/.profiles/``).
+
+    Returns:
+        List of mod names in load order (first = lowest priority).
+    """
+    modlist = profiles_dir / "modlist.txt"
+    if not modlist.is_file():
+        return []
+
+    result: list[str] = []
+
+    try:
+        text = modlist.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(
+            f"mod_list_io: failed to read {modlist}: {exc}",
+            file=sys.stderr,
+        )
+        return []
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        # Strip +/- prefix if present (treat all as order-only)
+        if line.startswith("+") or line.startswith("-"):
+            result.append(line[1:])
+        else:
+            result.append(line)
+
+    return result
+
+
+def write_global_modlist(profiles_dir: Path, mod_names: list[str]) -> None:
+    """Write global ``modlist.txt`` to the .profiles directory.
+
+    All mods are written with '+' prefix (order-only, no enabled state).
+
+    Args:
+        profiles_dir: Path to the .profiles directory.
+        mod_names: List of mod names in desired load order.
+    """
+    modlist = profiles_dir / "modlist.txt"
+
+    lines = [_HEADER]
+    for name in mod_names:
+        lines.append(f"+{name}\n")
+
+    try:
+        profiles_dir.mkdir(parents=True, exist_ok=True)
+        modlist.write_text("".join(lines), encoding="utf-8")
+    except OSError as exc:
+        print(
+            f"mod_list_io: failed to write {modlist}: {exc}",
+            file=sys.stderr,
+        )
+
+
+def migrate_to_global_modlist(profiles_dir: Path) -> bool:
+    """Migrate from per-profile modlist.txt to global modlist + active_mods.json.
+
+    This function checks if migration is needed and performs it automatically.
+    Migration happens when:
+    - No global modlist.txt exists in profiles_dir
+    - At least one profile has a legacy per-profile modlist.txt
+
+    The Default profile's modlist.txt becomes the global load order.
+    Each profile's enabled mods are extracted to active_mods.json.
+
+    Args:
+        profiles_dir: Path to the .profiles directory.
+
+    Returns:
+        True if migration was performed, False if not needed.
+    """
+    global_modlist = profiles_dir / "modlist.txt"
+
+    # Already migrated?
+    if global_modlist.is_file():
+        return False
+
+    # Find all profile folders
+    if not profiles_dir.is_dir():
+        return False
+
+    profile_folders = [d for d in profiles_dir.iterdir() if d.is_dir()]
+    if not profile_folders:
+        return False
+
+    # Use Default profile as the source for global order, or first available
+    default_profile = profiles_dir / "Default"
+    source_profile = default_profile if default_profile.is_dir() else profile_folders[0]
+    source_modlist = source_profile / "modlist.txt"
+
+    if not source_modlist.is_file():
+        return False
+
+    print(f"mod_list_io: Migrating to global modlist from {source_profile.name}")
+
+    # Read source modlist for global order
+    source_data = read_modlist(source_profile)
+    if not source_data:
+        return False
+
+    # Write global modlist (order only)
+    mod_order = [name for name, _ in source_data]
+    write_global_modlist(profiles_dir, mod_order)
+
+    # Migrate each profile's enabled state to active_mods.json
+    for profile_folder in profile_folders:
+        legacy_modlist = profile_folder / "modlist.txt"
+        if not legacy_modlist.is_file():
+            continue
+
+        legacy_data = read_modlist(profile_folder)
+        active_mods = {name for name, enabled in legacy_data if enabled}
+        write_active_mods(profile_folder, active_mods)
+
+        # Remove legacy per-profile modlist.txt
+        try:
+            legacy_modlist.unlink()
+            print(f"mod_list_io: Migrated profile '{profile_folder.name}'")
+        except OSError:
+            pass
+
+    return True
