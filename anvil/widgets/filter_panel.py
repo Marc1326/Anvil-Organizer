@@ -360,8 +360,8 @@ class FilterPanel(QWidget):
         edit.returnPressed.connect(self._confirm_inline_rename)
         # Escape und Focus-Lost handling
         edit.installEventFilter(self)
-        # Insert edit at the chip's position in the flow
-        idx = self._cat_chips.index(chip)
+        # Insert edit at the chip's position in the layout (NOT list index!)
+        idx = self._cat_flow.indexOf(chip)
         self._cat_flow.insertWidget(idx, edit)
         self._inline_edit = edit
         self._inline_chip = chip
