@@ -16,6 +16,8 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal, QThread
 
+from anvil.version import APP_VERSION
+
 
 CHUNK_SIZE = 64 * 1024  # 64 KB per read
 
@@ -40,7 +42,7 @@ class _DownloadWorker(QThread):
         try:
             req = urllib.request.Request(
                 self._url,
-                headers={"User-Agent": "Anvil Organizer/0.1.0"},
+                headers={"User-Agent": f"Anvil Organizer/{APP_VERSION}"},
             )
             with urllib.request.urlopen(req, timeout=60) as resp:
                 total = int(resp.headers.get("Content-Length", 0))
