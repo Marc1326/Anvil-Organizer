@@ -20,6 +20,8 @@ from urllib.parse import urlencode
 
 from PySide6.QtCore import QObject, Signal, QThread
 
+from anvil.version import APP_VERSION
+
 
 API_BASE = "https://api.nexusmods.com/v1"
 
@@ -158,7 +160,7 @@ class NexusAPI(QObject):
         url = API_BASE + path
         headers = {
             "apikey": self._api_key,
-            "User-Agent": "Anvil Organizer/0.1.0",
+            "User-Agent": f"Anvil Organizer/{APP_VERSION}",
             "Content-Type": "application/json",
         }
 

@@ -1,22 +1,34 @@
 """Toast notification widget - shows brief messages that auto-disappear."""
 
 from PySide6.QtWidgets import QLabel, QGraphicsOpacityEffect
-from PySide6.QtCore import QTimer, QPropertyAnimation, Qt, QEasingCurve
+from PySide6.QtCore import QTimer, QPropertyAnimation, Qt, QEasingCurve, Signal
 
 
 class Toast(QLabel):
-    """A toast notification that appears briefly and fades out."""
+    """A toast notification that appears briefly and fades out.
 
-    def __init__(self, parent, message: str, duration: int = 3000):
+    Supports optional click handling via the `clicked` signal.
+    """
+
+    clicked = Signal()
+
+    def __init__(self, parent, message: str, duration: int = 3000, clickable: bool = False):
         super().__init__(message, parent)
-        self.setStyleSheet("""
+        self._clickable = clickable
+
+        style = """
             background: #006868;
             color: white;
             padding: 8px 16px;
             border-radius: 4px;
             font-size: 12px;
-        """)
+        """
+        self.setStyleSheet(style)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        if clickable:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+
         self.adjustSize()
 
         # Position: bottom right of parent
@@ -41,6 +53,13 @@ class Toast(QLabel):
         QTimer.singleShot(duration, self._fade_out)
         self.show()
         self.raise_()
+
+    def mousePressEvent(self, event):
+        """Handle click on toast."""
+        if self._clickable:
+            self.clicked.emit()
+            self._fade_out()
+        super().mousePressEvent(event)
 
     def _fade_out(self):
         """Fade out and delete the toast."""
