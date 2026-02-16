@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect,
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
+from anvil.core.translator import tr
 from anvil.core.persistent_header import PersistentHeader
 from anvil.widgets.collapsible_bar import CollapsibleSectionBar
 from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME
@@ -361,7 +362,7 @@ class ModListView(QWidget):
         self._fw_tree = QTreeWidget()
 
         self._fw_label = CollapsibleSectionBar(
-            "Frameworks", "frameworks", self._fw_tree,
+            tr("label.type_framework") + "s", "frameworks", self._fw_tree,
             style="QLabel { font-weight: bold; padding: 4px 6px; "
                   "background: #1a2a3a; border-bottom: 1px solid #333; }",
             container=fw_container,
@@ -369,7 +370,7 @@ class ModListView(QWidget):
         )
         self._fw_label.set_count(0)
         fw_layout.addWidget(self._fw_label)
-        self._fw_tree.setHeaderLabels(["Name", "Beschreibung", "Status"])
+        self._fw_tree.setHeaderLabels([tr("label.name"), tr("label.header_description"), tr("game_panel.header_status")])
         self._fw_tree.setRootIsDecorated(False)
         self._fw_tree.setAlternatingRowColors(True)
         self._fw_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -450,7 +451,7 @@ class ModListView(QWidget):
             item.setText(0, fw.get("name", "?"))
             item.setText(1, fw.get("description", ""))
             installed = fw.get("installed", False)
-            item.setText(2, "installiert" if installed else "nicht installiert")
+            item.setText(2, tr("game_panel.installed") if installed else tr("game_panel.not_installed"))
             if installed:
                 item.setForeground(2, QBrush(QColor("#4CAF50")))
             else:

@@ -197,7 +197,10 @@
     "wizard_next": "Next >",
     "wizard_create": "Create",
     "wizard_create_error": "Could not create instance:\n{error}",
-    "not_detected": "not detected"
+    "not_detected": "not detected",
+    "no_instance_title": "No Instance",
+    "no_instance_message": "Please select an instance first.",
+    "about_text": "Anvil Organizer v{version}"
   },
 
   "button": {
@@ -233,7 +236,12 @@
     "activate_plugins": "Activate selected plugins (move back to mod root)",
     "link": "Shortcut",
     "start": "Start",
-    "deploy_redmod": "Manually deploy REDmod"
+    "deploy_redmod": "Manually deploy REDmod",
+    "conflict_overwrites": "Overwrites {wins} file(s) in {win_mods} mod(s)",
+    "conflict_overwritten": "Overwritten by {lose_mods} mod(s) in {losses} file(s)",
+    "conflict_both": "Wins {wins}, loses {losses} conflicts",
+    "direct_install": "Direct-Install: Copied to game directory",
+    "dependencies": "Dependencies: {deps}"
   },
 
   "label": {
@@ -246,6 +254,22 @@
     "header_mods": "Mods",
     "header_source": "Source",
     "header_nexus_category": "Nexus Category",
+    "header_description": "Description",
+    "header_plugin": "Plugin",
+    "header_version": "Version",
+    "header_conflicts": "Conflicts",
+    "header_markers": "Markers",
+    "header_category": "Category",
+    "header_priority": "Priority",
+    "type_framework": "Framework",
+    "type_data_override": "Data-Override",
+    "files_count": "{count} file(s)",
+    "no_category": "— None —",
+    "section_active_mods": "Active Mods",
+    "section_inactive_mods": "Inactive Mods",
+    "section_extras": "Data-Overrides & Frameworks",
+    "log_level_info": "Info (recommended)",
+    "crash_dump_mini": "Mini (recommended)",
     "source_standard": "Standard",
     "source_custom": "Custom",
     "executable_file": "Executable File",
@@ -307,10 +331,13 @@
     "no_file_selected": "No file selected",
     "select_file": "Select file…",
     "select_ini": "Select INI file…",
-    "filter": "Filter"
+    "filter": "Filter",
+    "profile_name": "Profile name..."
   },
 
   "status": {
+    "no_instance": "No instance selected",
+    "notifications": "Notifications",
     "mods_loaded": "{count} mods loaded ({active} active)",
     "mod_list_reloaded": "Mod list reloaded",
     "mod_installed": "Mod installed: {name}",

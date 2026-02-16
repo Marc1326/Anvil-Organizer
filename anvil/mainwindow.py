@@ -993,7 +993,7 @@ class MainWindow(QMainWindow):
     def _on_install_mod(self) -> None:
         """Menu: Datei → Mod installieren..."""
         if not self._current_instance_path:
-            QMessageBox.warning(self, "Keine Instanz", "Bitte zuerst eine Instanz auswählen.")
+            QMessageBox.warning(self, tr("dialog.no_instance_title"), tr("dialog.no_instance_message"))
             return
 
         # BG3: also accept .pak files
@@ -2809,7 +2809,7 @@ class MainWindow(QMainWindow):
     # ── Other slots ───────────────────────────────────────────────────
 
     def _on_about(self):
-        QMessageBox.about(self, tr("menu.about_anvil"), f"Anvil Organizer v{APP_VERSION}\n\nPlaceholder GUI.")
+        QMessageBox.about(self, tr("menu.about_anvil"), tr("dialog.about_text", version=APP_VERSION))
 
     def _on_update_available(self, version: str, url: str):
         """Show toast when a new version is available."""

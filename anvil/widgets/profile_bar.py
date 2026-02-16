@@ -468,7 +468,7 @@ class ProfileBar(QWidget):
 
         edit = QLineEdit()
         edit.setObjectName("profileInlineInput")
-        edit.setPlaceholderText("Profilname...")
+        edit.setPlaceholderText(tr("placeholder.profile_name"))
         edit.setFixedWidth(140)
         edit.setStyleSheet("""
             QLineEdit#profileInlineInput {

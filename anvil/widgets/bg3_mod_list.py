@@ -21,6 +21,7 @@ from PySide6.QtCore import QModelIndex, QPoint, QRect, QSize, QSortFilterProxyMo
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 
 from anvil.core.persistent_header import PersistentHeader
+from anvil.core.translator import tr
 from anvil.widgets.collapsible_bar import CollapsibleSectionBar
 from anvil.models.bg3_mod_list_model import (
     BG3ModListModel,
@@ -256,7 +257,7 @@ class BG3ModListView(QWidget):
         self._active_tree = _BG3DropTreeView()
 
         self._active_label = CollapsibleSectionBar(
-            "Aktive Mods", "bg3_active", self._active_tree,
+            tr("label.section_active_mods"), "bg3_active", self._active_tree,
             style="QLabel { font-weight: bold; padding: 4px 6px; "
                   "background: #1a3a1a; border-bottom: 1px solid #333; }",
             container=active_pane,
@@ -281,7 +282,7 @@ class BG3ModListView(QWidget):
         self._inactive_tree = _BG3DropTreeView()
 
         self._inactive_label = CollapsibleSectionBar(
-            "Inaktive Mods", "bg3_inactive", self._inactive_tree,
+            tr("label.section_inactive_mods"), "bg3_inactive", self._inactive_tree,
             style="QLabel { font-weight: bold; padding: 4px 6px; "
                   "background: #3a1a1a; border-bottom: 1px solid #333; }",
             container=inactive_pane,
@@ -307,14 +308,14 @@ class BG3ModListView(QWidget):
         self._extras_tree = QTreeWidget()
 
         self._extras_label = CollapsibleSectionBar(
-            "Data-Overrides & Frameworks", "bg3_extras", self._extras_tree,
+            tr("label.section_extras"), "bg3_extras", self._extras_tree,
             style="QLabel { font-weight: bold; padding: 4px 6px; "
                   "background: #1a2a3a; border-bottom: 1px solid #333; }",
             container=extras_pane,
         )
         self._extras_label.set_count(0)
         extras_layout.addWidget(self._extras_label)
-        self._extras_tree.setHeaderLabels(["Name", "Typ", "Status"])
+        self._extras_tree.setHeaderLabels([tr("label.name"), tr("game_panel.header_type"), tr("game_panel.header_status")])
         self._extras_tree.setRootIsDecorated(False)
         self._extras_tree.setAlternatingRowColors(True)
         self._extras_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -346,7 +347,7 @@ class BG3ModListView(QWidget):
         # ── Filter row ────────────────────────────────────────────
         filter_row = QHBoxLayout()
         self._filter = QLineEdit()
-        self._filter.setPlaceholderText("Filter...")
+        self._filter.setPlaceholderText(tr("placeholder.filter"))
         self._filter.textChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._filter)
         layout.addLayout(filter_row)
@@ -472,9 +473,9 @@ class BG3ModListView(QWidget):
         for fw in frameworks:
             item = QTreeWidgetItem()
             item.setText(0, fw.get("name", "?"))
-            item.setText(1, "Framework")
+            item.setText(1, tr("label.type_framework"))
             installed = fw.get("installed", False)
-            item.setText(2, "installiert" if installed else "nicht installiert")
+            item.setText(2, tr("game_panel.installed") if installed else tr("game_panel.not_installed"))
             item.setData(0, Qt.ItemDataRole.UserRole, {"type": "framework", **fw})
             if installed:
                 item.setForeground(2, QBrush(QColor("#4CAF50")))
@@ -486,9 +487,9 @@ class BG3ModListView(QWidget):
         for ov in data_overrides:
             item = QTreeWidgetItem()
             item.setText(0, ov.get("name", "?"))
-            item.setText(1, "Data-Override")
+            item.setText(1, tr("label.type_data_override"))
             file_count = len(ov.get("files", []))
-            item.setText(2, f"{file_count} Datei(en)")
+            item.setText(2, tr("label.files_count", count=file_count))
             item.setData(0, Qt.ItemDataRole.UserRole, {"type": "data_override", **ov})
             item.setForeground(1, QBrush(QColor("#64B5F6")))
             self._extras_tree.addTopLevelItem(item)

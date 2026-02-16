@@ -197,7 +197,10 @@
     "wizard_next": "Siguiente >",
     "wizard_create": "Crear",
     "wizard_create_error": "No se pudo crear la instancia:\n{error}",
-    "not_detected": "no detectado"
+    "not_detected": "no detectado",
+    "no_instance_title": "Sin Instancia",
+    "no_instance_message": "Por favor, seleccione primero una instancia.",
+    "about_text": "Anvil Organizer v{version}"
   },
 
   "button": {
@@ -233,7 +236,12 @@
     "activate_plugins": "Activar Plugins seleccionados (volver a la raíz del Mod)",
     "link": "Enlace",
     "start": "Iniciar",
-    "deploy_redmod": "Desplegar REDmod manualmente"
+    "deploy_redmod": "Desplegar REDmod manualmente",
+    "conflict_overwrites": "Sobrescribe {wins} archivo(s) en {win_mods} mod(s)",
+    "conflict_overwritten": "Sobrescrito por {lose_mods} mod(s) en {losses} archivo(s)",
+    "conflict_both": "Gana {wins}, pierde {losses} conflictos",
+    "direct_install": "Instalación directa: Copiado al directorio del juego",
+    "dependencies": "Dependencias: {deps}"
   },
 
   "label": {
@@ -246,6 +254,22 @@
     "header_mods": "Mods",
     "header_source": "Fuente",
     "header_nexus_category": "Categoría Nexus",
+    "header_description": "Descripción",
+    "header_plugin": "Plugin",
+    "header_version": "Versión",
+    "header_conflicts": "Conflictos",
+    "header_markers": "Marcadores",
+    "header_category": "Categoría",
+    "header_priority": "Prioridad",
+    "type_framework": "Framework",
+    "type_data_override": "Data-Override",
+    "files_count": "{count} archivo(s)",
+    "no_category": "— Ninguna —",
+    "section_active_mods": "Mods Activos",
+    "section_inactive_mods": "Mods Inactivos",
+    "section_extras": "Data-Overrides & Frameworks",
+    "log_level_info": "Info (recomendado)",
+    "crash_dump_mini": "Mini (recomendado)",
     "source_standard": "Estándar",
     "source_custom": "Personalizada",
     "executable_file": "Archivo ejecutable",
@@ -307,10 +331,13 @@
     "no_file_selected": "Ningún archivo seleccionado",
     "select_file": "Seleccionar archivo…",
     "select_ini": "Seleccionar archivo INI…",
-    "filter": "Filtrar"
+    "filter": "Filtrar",
+    "profile_name": "Nombre de perfil..."
   },
 
   "status": {
+    "no_instance": "Ninguna instancia seleccionada",
+    "notifications": "Notificaciones",
     "mods_loaded": "{count} Mods cargados ({active} activos)",
     "mod_list_reloaded": "Lista de Mods recargada",
     "mod_installed": "Mod instalado: {name}",
@@ -359,7 +386,9 @@
     "load_order_updated": "Orden de carga actualizado",
     "load_order_failed": "No se pudo cambiar el orden de carga",
     "no_bg3_installer": "Ningún instalador BG3 activo",
-    "deploy_failed": "Deploy fallido — ver consola"
+    "deploy_failed": "Deploy fallido — ver consola",
+    "unknown": "desconocido",
+    "instance_info": "Instancia: {game} | Plugin: {plugin} | Tienda: {store}"
   },
 
   "toast": {
