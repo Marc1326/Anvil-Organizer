@@ -379,6 +379,205 @@ def _build_textfiles_tab():
     return page
 
 
+def _build_ini_tab(mod_path: str):
+    """INI-Dateien Tab: Links Liste der .ini Dateien, rechts Editor.
+
+    Findet alle .ini Dateien im Mod-Ordner (rekursiv) und ermöglicht
+    das Anzeigen und Bearbeiten.
+    """
+    from pathlib import Path
+
+    page = QWidget()
+    page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(0)
+
+    splitter = QSplitter(Qt.Orientation.Horizontal)
+    splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+    # LINKS: Label "INI Dateien", QListWidget
+    left_pane = QWidget()
+    left_layout = QVBoxLayout(left_pane)
+    left_layout.setContentsMargins(0, 0, 0, 0)
+    left_layout.setSpacing(6)
+    left_layout.addWidget(QLabel("INI Dateien"))
+
+    file_list = QListWidget()
+    file_list.setObjectName("iniFileList")
+    file_list.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+    file_list.setMinimumWidth(180)
+
+    # Alle .ini Dateien im Mod-Ordner finden (rekursiv)
+    ini_files: list[tuple[str, str]] = []  # (display_name, full_path)
+    if mod_path and os.path.isdir(mod_path):
+        mod_root = Path(mod_path)
+        for ini_path in mod_root.rglob("*.ini"):
+            # Relativen Pfad für Anzeige, vollen Pfad für Zugriff
+            rel_path = ini_path.relative_to(mod_root)
+            ini_files.append((str(rel_path), str(ini_path)))
+
+    # Sortieren und zur Liste hinzufügen
+    ini_files.sort(key=lambda x: x[0].lower())
+    for display_name, full_path in ini_files:
+        item = QListWidgetItem(display_name)
+        item.setData(Qt.ItemDataRole.UserRole, full_path)
+        file_list.addItem(item)
+
+    if file_list.count() > 0:
+        file_list.setCurrentRow(0)
+
+    left_layout.addWidget(file_list)
+
+    # Info-Label für Anzahl
+    info_label = QLabel(f"{len(ini_files)} INI-Datei(en) gefunden")
+    info_label.setStyleSheet("color: #808080; font-size: 11px;")
+    left_layout.addWidget(info_label)
+
+    splitter.addWidget(left_pane)
+
+    # RECHTS: Toolbar-Zeile oben, darunter Editor
+    right_pane = QWidget()
+    right_layout = QVBoxLayout(right_pane)
+    right_layout.setContentsMargins(0, 0, 0, 0)
+    right_layout.setSpacing(0)
+
+    # Toolbar
+    toolbar_widget = QWidget()
+    toolbar_widget.setObjectName("iniFileToolbar")
+    toolbar_widget.setMaximumHeight(35)
+    toolbar_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+    toolbar_layout = QHBoxLayout(toolbar_widget)
+    toolbar_layout.setContentsMargins(6, 4, 6, 4)
+    toolbar_layout.setSpacing(8)
+
+    btn_save = QPushButton()
+    btn_save.setObjectName("toolbarIconBtn")
+    btn_save.setIcon(QIcon(_icon_path("diskette (1).png")))
+    btn_save.setToolTip("Speichern (Strg+S)")
+    toolbar_layout.addWidget(btn_save)
+
+    btn_reload = QPushButton()
+    btn_reload.setObjectName("toolbarIconBtn")
+    btn_reload.setIcon(QIcon(_icon_path("aktualisieren.png")))
+    btn_reload.setToolTip("Neu laden")
+    toolbar_layout.addWidget(btn_reload)
+
+    btn_ordner = QPushButton("Ordner")
+    btn_ordner.setToolTip("Ordner im Dateimanager öffnen")
+    toolbar_layout.addWidget(btn_ordner)
+
+    btn_wrap = QPushButton()
+    btn_wrap.setObjectName("toolbarIconBtn")
+    btn_wrap.setIcon(QIcon(_icon_path("zeilenumbruch (1).png")))
+    btn_wrap.setToolTip("Zeilenumbruch ein/aus")
+    btn_wrap.setCheckable(True)
+    toolbar_layout.addWidget(btn_wrap)
+
+    path_edit = QLineEdit()
+    path_edit.setReadOnly(True)
+    path_edit.setPlaceholderText("Keine Datei ausgewählt")
+    path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
+    toolbar_layout.addWidget(path_edit, 1)
+
+    right_layout.addWidget(toolbar_widget)
+
+    # Editor
+    editor = CodeEditor()
+    editor.setFont(_code_font())
+    editor.setPlaceholderText("INI-Datei auswählen …")
+    editor.setPlainText("")
+    editor.setReadOnly(False)
+    editor.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    right_layout.addWidget(editor, 1)
+
+    # State
+    current_path = [None]
+    has_changes = [False]
+
+    def mark_changed():
+        if current_path[0] and not has_changes[0]:
+            has_changes[0] = True
+            # Zeige * im Pfad
+            path_edit.setText(f"* {current_path[0]}")
+
+    def on_file_selected():
+        # Änderungen speichern fragen? (hier einfach überschreiben)
+        item = file_list.currentItem()
+        if not item:
+            current_path[0] = None
+            path_edit.clear()
+            path_edit.setPlaceholderText("Keine Datei ausgewählt")
+            editor.setPlainText("")
+            has_changes[0] = False
+            return
+
+        path = item.data(Qt.ItemDataRole.UserRole)
+        current_path[0] = path
+        path_edit.setText(path)
+        path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
+        has_changes[0] = False
+
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                editor.setPlainText(f.read())
+        except Exception as e:
+            editor.setPlainText(f"Fehler beim Laden: {e}")
+
+    def on_save():
+        path = current_path[0]
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(editor.toPlainText())
+            has_changes[0] = False
+            path_edit.setText(path)
+            path_edit.setStyleSheet("color: #4CAF50; background: #1C1C1C; border: none;")
+
+            def restore():
+                path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
+            QTimer.singleShot(1500, restore)
+        except Exception as e:
+            path_edit.setText(f"Fehler: {e}")
+            path_edit.setStyleSheet("color: #F44336; background: #1C1C1C; border: none;")
+
+    def on_reload():
+        on_file_selected()
+
+    def on_wrap_toggled(checked):
+        mode = QPlainTextEdit.LineWrapMode.WidgetWidth if checked else QPlainTextEdit.LineWrapMode.NoWrap
+        editor.setLineWrapMode(mode)
+
+    def on_ordner():
+        path = current_path[0]
+        if path:
+            dirpath = os.path.dirname(path)
+            try:
+                subprocess.Popen(["xdg-open", dirpath])
+            except Exception:
+                pass
+
+    # Verbindungen
+    btn_save.clicked.connect(on_save)
+    btn_reload.clicked.connect(on_reload)
+    btn_ordner.clicked.connect(on_ordner)
+    btn_wrap.toggled.connect(on_wrap_toggled)
+    file_list.currentItemChanged.connect(lambda *a: on_file_selected())
+    editor.textChanged.connect(mark_changed)
+
+    # Initial laden
+    on_file_selected()
+
+    splitter.addWidget(right_pane)
+    splitter.setSizes([220, 1080])
+    splitter.setStretchFactor(0, 0)
+    splitter.setStretchFactor(1, 1)
+    layout.addWidget(splitter, 1)
+
+    return page
+
+
 def _build_filetree_tab(mod_path: str):
     """Verzeichnisbaum-Tab wie MO2: QFileSystemModel + QTreeView.
 
@@ -848,9 +1047,9 @@ class ModDetailDialog(QDialog):
         self.tab_widget = QTabWidget()
 
         self.tab_widget.addTab(_build_textfiles_tab(), "Textdateien")
+        self.tab_widget.addTab(_build_ini_tab(mod_path), "INI Dateien")
 
         pre_conflict_tabs = [
-            ("INI Dateien", "Platzhalter – INI Dateien"),
             ("Bilder", "Platzhalter – Bilder"),
             ("Optionale ESPs", "Platzhalter – Optionale ESPs"),
         ]
