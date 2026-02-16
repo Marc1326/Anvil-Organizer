@@ -578,6 +578,195 @@ def _build_ini_tab(mod_path: str):
     return page
 
 
+def _build_optional_esps_tab(mod_path: str):
+    """Optionale ESPs Tab: Links deaktivierte Plugins, rechts aktive.
+
+    Plugins können zwischen den Listen verschoben werden:
+    - Nach links (←): Plugin wird in 'optional/' Unterordner verschoben (deaktiviert)
+    - Nach rechts (→): Plugin wird zurück in Mod-Root verschoben (aktiviert)
+    """
+    from pathlib import Path
+    import shutil
+
+    PLUGIN_EXTENSIONS = {".esp", ".esm", ".esl"}
+
+    page = QWidget()
+    page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    layout = QHBoxLayout(page)
+    layout.setContentsMargins(12, 12, 12, 12)
+    layout.setSpacing(8)
+
+    # State
+    mod_root = Path(mod_path) if mod_path else None
+    optional_dir = mod_root / "optional" if mod_root else None
+
+    # --- LINKE SPALTE: Optionale (deaktivierte) Plugins ---
+    left_pane = QWidget()
+    left_layout = QVBoxLayout(left_pane)
+    left_layout.setContentsMargins(0, 0, 0, 0)
+    left_layout.setSpacing(6)
+
+    left_label = QLabel("Optionale ESPs (deaktiviert)")
+    left_label.setStyleSheet("font-weight: bold;")
+    left_layout.addWidget(left_label)
+
+    optional_list = QListWidget()
+    optional_list.setObjectName("optionalEspList")
+    optional_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+    optional_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    left_layout.addWidget(optional_list)
+
+    optional_count = QLabel("0 Plugins")
+    optional_count.setStyleSheet("color: #808080; font-size: 11px;")
+    left_layout.addWidget(optional_count)
+
+    layout.addWidget(left_pane, 1)
+
+    # --- MITTE: Buttons ---
+    button_pane = QWidget()
+    button_layout = QVBoxLayout(button_pane)
+    button_layout.setContentsMargins(0, 0, 0, 0)
+    button_layout.setSpacing(8)
+    button_layout.addStretch()
+
+    btn_to_optional = QPushButton("←")
+    btn_to_optional.setFixedSize(40, 30)
+    btn_to_optional.setToolTip("Ausgewählte Plugins deaktivieren (nach optional/ verschieben)")
+    button_layout.addWidget(btn_to_optional)
+
+    btn_to_active = QPushButton("→")
+    btn_to_active.setFixedSize(40, 30)
+    btn_to_active.setToolTip("Ausgewählte Plugins aktivieren (zurück in Mod-Root)")
+    button_layout.addWidget(btn_to_active)
+
+    button_layout.addStretch()
+    layout.addWidget(button_pane)
+
+    # --- RECHTE SPALTE: Aktive Plugins ---
+    right_pane = QWidget()
+    right_layout = QVBoxLayout(right_pane)
+    right_layout.setContentsMargins(0, 0, 0, 0)
+    right_layout.setSpacing(6)
+
+    right_label = QLabel("Aktive ESPs (im Mod)")
+    right_label.setStyleSheet("font-weight: bold;")
+    right_layout.addWidget(right_label)
+
+    active_list = QListWidget()
+    active_list.setObjectName("activeEspList")
+    active_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+    active_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    right_layout.addWidget(active_list)
+
+    active_count = QLabel("0 Plugins")
+    active_count.setStyleSheet("color: #808080; font-size: 11px;")
+    right_layout.addWidget(active_count)
+
+    layout.addWidget(right_pane, 1)
+
+    # --- Hilfsfunktionen ---
+    def scan_plugins():
+        """Scannt Mod-Ordner und optional/-Unterordner nach Plugins."""
+        optional_list.clear()
+        active_list.clear()
+
+        if not mod_root or not mod_root.is_dir():
+            optional_count.setText("Kein Mod-Ordner")
+            active_count.setText("Kein Mod-Ordner")
+            return
+
+        # Aktive Plugins (nur Root-Ebene, nicht rekursiv)
+        active_plugins = []
+        for f in mod_root.iterdir():
+            if f.is_file() and f.suffix.lower() in PLUGIN_EXTENSIONS:
+                active_plugins.append(f.name)
+
+        active_plugins.sort(key=str.lower)
+        for name in active_plugins:
+            item = QListWidgetItem(name)
+            item.setData(Qt.ItemDataRole.UserRole, str(mod_root / name))
+            active_list.addItem(item)
+
+        # Optionale Plugins (im optional/ Unterordner)
+        opt_plugins = []
+        if optional_dir and optional_dir.is_dir():
+            for f in optional_dir.iterdir():
+                if f.is_file() and f.suffix.lower() in PLUGIN_EXTENSIONS:
+                    opt_plugins.append(f.name)
+
+        opt_plugins.sort(key=str.lower)
+        for name in opt_plugins:
+            item = QListWidgetItem(name)
+            item.setData(Qt.ItemDataRole.UserRole, str(optional_dir / name))
+            optional_list.addItem(item)
+
+        # Counts aktualisieren
+        optional_count.setText(f"{len(opt_plugins)} Plugin(s)")
+        active_count.setText(f"{len(active_plugins)} Plugin(s)")
+
+    def move_to_optional():
+        """Verschiebt ausgewählte aktive Plugins nach optional/."""
+        if not mod_root or not optional_dir:
+            return
+
+        selected = active_list.selectedItems()
+        if not selected:
+            return
+
+        # optional/ Ordner erstellen falls nötig
+        optional_dir.mkdir(exist_ok=True)
+
+        for item in selected:
+            src = Path(item.data(Qt.ItemDataRole.UserRole))
+            dst = optional_dir / src.name
+            try:
+                shutil.move(str(src), str(dst))
+            except OSError:
+                pass  # Fehler ignorieren
+
+        scan_plugins()
+
+    def move_to_active():
+        """Verschiebt ausgewählte optionale Plugins zurück in Mod-Root."""
+        if not mod_root:
+            return
+
+        selected = optional_list.selectedItems()
+        if not selected:
+            return
+
+        for item in selected:
+            src = Path(item.data(Qt.ItemDataRole.UserRole))
+            dst = mod_root / src.name
+            try:
+                shutil.move(str(src), str(dst))
+            except OSError:
+                pass  # Fehler ignorieren
+
+        scan_plugins()
+
+    # Buttons verbinden
+    btn_to_optional.clicked.connect(move_to_optional)
+    btn_to_active.clicked.connect(move_to_active)
+
+    # Doppelklick zum schnellen Verschieben
+    def on_optional_double_click(item):
+        optional_list.setCurrentItem(item)
+        move_to_active()
+
+    def on_active_double_click(item):
+        active_list.setCurrentItem(item)
+        move_to_optional()
+
+    optional_list.itemDoubleClicked.connect(on_optional_double_click)
+    active_list.itemDoubleClicked.connect(on_active_double_click)
+
+    # Initial scannen
+    scan_plugins()
+
+    return page
+
+
 def _build_filetree_tab(mod_path: str):
     """Verzeichnisbaum-Tab wie MO2: QFileSystemModel + QTreeView.
 
@@ -1046,38 +1235,41 @@ class ModDetailDialog(QDialog):
 
         self.tab_widget = QTabWidget()
 
+        # Tab 0: Textdateien
         self.tab_widget.addTab(_build_textfiles_tab(), "Textdateien")
+        # Tab 1: INI Dateien
         self.tab_widget.addTab(_build_ini_tab(mod_path), "INI Dateien")
 
-        pre_conflict_tabs = [
-            ("Bilder", "Platzhalter – Bilder"),
-            ("Optionale ESPs", "Platzhalter – Optionale ESPs"),
-        ]
-        for tab_name, placeholder_text in pre_conflict_tabs:
-            page = QWidget()
-            page_layout = QVBoxLayout(page)
-            page_layout.addWidget(QLabel(placeholder_text))
-            self.tab_widget.addTab(page, tab_name)
+        # Tab 2: Bilder (Platzhalter, deaktiviert)
+        bilder_page = QWidget()
+        bilder_layout = QVBoxLayout(bilder_page)
+        bilder_layout.addWidget(QLabel("Platzhalter – Bilder"))
+        self.tab_widget.addTab(bilder_page, "Bilder")
+        self.tab_widget.setTabEnabled(2, False)
 
-        # Konflikte-Tab (wie MO2: ConflictsTab)
+        # Tab 3: Optionale ESPs
+        self.tab_widget.addTab(_build_optional_esps_tab(mod_path), "Optionale ESPs")
+
+        # Tab 4: Konflikte (wie MO2: ConflictsTab)
         self.tab_widget.addTab(
             _build_conflicts_tab(mod_name, all_mods, game_plugin), "Konflikte",
         )
 
-        # Kategorien-Tab
+        # Tab 5: Kategorien
         self._categories_page = _build_categories_tab(category_manager, mod_entry, mod_path)
         self.tab_widget.addTab(self._categories_page, "Kategorien")
 
         # Layout-Update wenn Kategorien-Tab sichtbar wird
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
 
-        # Nexus Info (noch Platzhalter)
+        # Tab 6: Nexus Info (Platzhalter, deaktiviert)
         nexus_page = QWidget()
         nexus_layout = QVBoxLayout(nexus_page)
         nexus_layout.addWidget(QLabel("Platzhalter – Nexus Info"))
         self.tab_widget.addTab(nexus_page, "Nexus Info")
+        self.tab_widget.setTabEnabled(6, False)
 
-        # Verzeichnisbaum-Tab (wie MO2: FileTreeTab)
+        # Tab 7: Verzeichnisbaum (wie MO2: FileTreeTab)
         self.tab_widget.addTab(_build_filetree_tab(mod_path), "Verzeichnisbaum")
 
         tab_bar = self.tab_widget.tabBar()
