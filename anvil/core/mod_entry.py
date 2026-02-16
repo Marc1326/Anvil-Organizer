@@ -4,9 +4,10 @@ A ``ModEntry`` holds all metadata for a single mod.  The
 :func:`scan_mods_directory` function builds a list of entries by
 merging data from three sources:
 
-1. ``modlist.txt`` — load order and enabled/disabled state
-2. ``meta.ini``   — display name, version, author, etc.
-3. Filesystem     — file count and total size
+1. ``modlist.txt`` — global load order (in .profiles/)
+2. ``active_mods.json`` — profile-specific enabled state
+3. ``meta.ini``   — display name, version, author, etc.
+4. Filesystem     — file count and total size
 """
 
 from __future__ import annotations
@@ -15,7 +16,11 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from anvil.core.mod_list_io import read_modlist
+from anvil.core.mod_list_io import (
+    read_active_mods,
+    read_global_modlist,
+    read_modlist,
+)
 from anvil.core.mod_metadata import read_meta_ini
 
 
@@ -138,12 +143,15 @@ def scan_mods_directory(
 
     Merge logic:
 
-    1. Read ``modlist.txt`` from *profile_path* for order + enabled state.
-    2. Scan ``.mods/`` under *instance_path* for actual mod folders.
-    3. For each mod in ``modlist.txt`` that exists on disk: build entry.
-    4. For each mod on disk **not** in ``modlist.txt``: append at end
+    1. Read global ``modlist.txt`` from ``.profiles/`` for load order.
+    2. Read ``active_mods.json`` from *profile_path* for enabled state.
+    3. Scan ``.mods/`` under *instance_path* for actual mod folders.
+    4. For each mod in ``modlist.txt`` that exists on disk: build entry.
+    5. For each mod on disk **not** in ``modlist.txt``: append at end
        (newly installed, enabled by default).
-    5. Mods in ``modlist.txt`` but **not** on disk are skipped (deleted).
+    6. Mods in ``modlist.txt`` but **not** on disk are skipped (deleted).
+
+    Falls back to legacy per-profile modlist.txt if no global modlist exists.
 
     Args:
         instance_path: Root of the instance
@@ -156,9 +164,21 @@ def scan_mods_directory(
         (index 0 = lowest priority).
     """
     mods_dir = instance_path / ".mods"
+    profiles_dir = instance_path / ".profiles"
 
-    # 1. Read modlist.txt
-    modlist = read_modlist(profile_path)
+    # 1. Try global modlist first, fallback to legacy per-profile
+    global_modlist = profiles_dir / "modlist.txt"
+    if global_modlist.is_file():
+        # New system: global order + profile-specific active state
+        mod_order = read_global_modlist(profiles_dir)
+        active_mods = read_active_mods(profile_path)
+        use_global = True
+    else:
+        # Legacy: per-profile modlist with +/- prefixes
+        legacy = read_modlist(profile_path)
+        mod_order = [name for name, _ in legacy]
+        active_mods = {name for name, enabled in legacy if enabled}
+        use_global = False
 
     # 2. Discover actual mod folders on disk
     on_disk: set[str] = set()
@@ -178,14 +198,16 @@ def scan_mods_directory(
     seen: set[str] = set()
     priority = 0
 
-    for name, enabled in modlist:
+    for name in mod_order:
         if name not in on_disk:
             continue  # deleted from disk
         seen.add(name)
+        enabled = name in active_mods
         result.append(_build_entry(name, enabled, priority, mods_dir))
         priority += 1
 
     # 4. Append new mods (on disk but not in modlist)
+    # New mods default to enabled
     new_mods = sorted(on_disk - seen)
     for name in new_mods:
         result.append(_build_entry(name, True, priority, mods_dir))
