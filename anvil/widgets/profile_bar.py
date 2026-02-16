@@ -75,17 +75,18 @@ TAB_STYLE_SELECTED = """
 """
 
 ADD_BUTTON_STYLE = """
-    QPushButton {
-        background: transparent;
+    #profileAddButton {
+        background: #242424;
         color: #888888;
-        border: 1px dashed #333333;
+        border: 1px solid #3D3D3D;
         border-radius: 6px;
-        font-size: 16px;
+        font-size: 18px;
         font-weight: bold;
     }
-    QPushButton:hover {
-        border-color: #00a8a8;
-        color: #00a8a8;
+    #profileAddButton:hover {
+        background: #006868;
+        border-color: #006868;
+        color: #FFFFFF;
     }
 """
 
@@ -205,7 +206,8 @@ class ProfileBar(QWidget):
 
         # ── Add Profile Button ────────────────────────────────────────
         self._btn_add = QPushButton("+")
-        self._btn_add.setFixedSize(28, 28)
+        self._btn_add.setObjectName("profileAddButton")
+        self._btn_add.setFixedSize(30, 30)
         self._btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_add.setStyleSheet(ADD_BUTTON_STYLE)
         self._btn_add.setToolTip("Neues Profil erstellen")
@@ -367,7 +369,7 @@ class ProfileBar(QWidget):
                 self._select_profile(profiles[0], animate=False)
             self._update_fade_visibility()
 
-        QTimer.singleShot(50, _delayed_select)
+        QTimer.singleShot(100, _delayed_select)
 
     def _on_tab_clicked(self, profile_name: str):
         """Handle tab click."""
