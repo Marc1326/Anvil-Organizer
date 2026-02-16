@@ -28,6 +28,7 @@ from PySide6.QtGui import QPainter, QFontMetrics
 
 from anvil.widgets.flow_layout import FlowLayout
 from anvil.widgets.filter_chip import FilterChip
+from anvil.core.categories import get_display_name
 
 
 # Property chip IDs (negative to avoid clash with category IDs)
@@ -211,7 +212,10 @@ class FilterPanel(QWidget):
         self._cat_chips.clear()
 
         for cat in categories:
-            chip = FilterChip(cat["name"], chip_id=cat["id"])
+            # Display translated name, keep internal name for reference
+            display_name = get_display_name(cat["name"])
+            chip = FilterChip(display_name, chip_id=cat["id"])
+            chip._internal_name = cat["name"]  # Store for rename/reference
             chip.toggled.connect(self._on_changed)
             chip.rename_started.connect(self._start_inline_rename)
             # Kontextmenü wird vom _cat_container gehandelt, nicht vom Chip

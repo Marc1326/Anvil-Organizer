@@ -35,6 +35,43 @@ _DEFAULT_CATEGORIES: list[dict[str, Any]] = [
     {"id": 17, "name": "Weapons"},
 ]
 
+# German translations for category names (display only, internal names stay English)
+CATEGORY_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "de": {
+        "Animations": "Animationen",
+        "Armor & Clothing": "Rüstung & Kleidung",
+        "Audio": "Audio",
+        "Bug Fixes": "Fehlerbehebungen",
+        "Gameplay": "Spielmechanik",
+        "Graphics": "Grafik",
+        "Hair & Face": "Haare & Gesicht",
+        "Items": "Gegenstände",
+        "Miscellaneous": "Verschiedenes",
+        "Models & Textures": "Modelle & Texturen",
+        "NPC": "NPCs",
+        "Overhauls": "Überarbeitungen",
+        "Patches": "Patches",
+        "Player Homes": "Spielerunterkünfte",
+        "UI": "Benutzeroberfläche",
+        "Utilities": "Werkzeuge",
+        "Weapons": "Waffen",
+    }
+}
+
+
+def get_display_name(name: str, lang: str = "de") -> str:
+    """Get localized display name for a category.
+
+    Args:
+        name: Internal category name (English).
+        lang: Language code (default: "de").
+
+    Returns:
+        Translated name if available, otherwise original name.
+    """
+    translations = CATEGORY_TRANSLATIONS.get(lang, {})
+    return translations.get(name, name)
+
 
 class CategoryManager:
     """Manages categories for a single instance.

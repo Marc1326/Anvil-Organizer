@@ -74,6 +74,18 @@ TAB_STYLE_SELECTED = """
     }
 """
 
+TAB_STYLE_DEFAULT_SELECTED = """
+    QPushButton#profileTab {
+        background: #004d4d;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 16px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+"""
+
 ADD_BUTTON_STYLE = """
     #profileAddButton {
         background: #242424;
@@ -158,6 +170,13 @@ class ProfileBar(QWidget):
         self._rename_input: QLineEdit | None = None
         self._rename_tab: QPushButton | None = None
         self._rename_confirmed = False
+
+        # Double-click handling: delay single click to detect double-click
+        self._pending_click_profile: str | None = None
+        self._click_timer = QTimer(self)
+        self._click_timer.setSingleShot(True)
+        self._click_timer.setInterval(200)  # ms to wait for double-click
+        self._click_timer.timeout.connect(self._on_click_timer_timeout)
 
         # Drag & Drop state
         self._drag_active = False
@@ -386,9 +405,18 @@ class ProfileBar(QWidget):
         QTimer.singleShot(100, _delayed_select)
 
     def _on_tab_clicked(self, profile_name: str):
-        """Handle tab click."""
+        """Handle tab click - delayed to allow double-click detection."""
         print(f"[DEBUG] TAB CLICKED: {profile_name}")
         if profile_name != self._active_profile:
+            # Delay profile switch to detect double-click for rename
+            self._pending_click_profile = profile_name
+            self._click_timer.start()
+
+    def _on_click_timer_timeout(self):
+        """Timer expired - no double-click detected, perform profile switch."""
+        if self._pending_click_profile:
+            profile_name = self._pending_click_profile
+            self._pending_click_profile = None
             self._select_profile(profile_name, animate=True)
             self.profile_changed.emit(profile_name)
 
@@ -411,7 +439,11 @@ class ProfileBar(QWidget):
         for tab in self._tabs:
             if tab.text() == profile_name:
                 tab.setChecked(True)
-                tab.setStyleSheet(TAB_STYLE_SELECTED)
+                # Default-Profil bekommt dunkleres Teal
+                if profile_name == "Default":
+                    tab.setStyleSheet(TAB_STYLE_DEFAULT_SELECTED)
+                else:
+                    tab.setStyleSheet(TAB_STYLE_SELECTED)
                 self._scroll_to_tab(tab)
             else:
                 tab.setChecked(False)
@@ -503,6 +535,10 @@ class ProfileBar(QWidget):
             return  # Default-Profil nicht umbenennen
         if self._rename_input is not None:
             return  # Already renaming
+
+        # Cancel pending click (double-click should not switch profile)
+        self._click_timer.stop()
+        self._pending_click_profile = None
 
         self._rename_confirmed = False
         old_name = tab.text()
@@ -706,9 +742,11 @@ class ProfileBar(QWidget):
                 self._drag_tab.releaseMouse()  # Mouse-Grab aufheben
             # Style zurücksetzen
             is_active = self._drag_tab.text() == self._active_profile
-            self._drag_tab.setStyleSheet(
-                TAB_STYLE_SELECTED if is_active else TAB_STYLE_NORMAL
-            )
+            if is_active:
+                style = TAB_STYLE_DEFAULT_SELECTED if self._drag_tab.text() == "Default" else TAB_STYLE_SELECTED
+            else:
+                style = TAB_STYLE_NORMAL
+            self._drag_tab.setStyleSheet(style)
             self._drag_tab.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.setCursor(Qt.CursorShape.ArrowCursor)
