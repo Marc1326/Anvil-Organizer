@@ -1137,7 +1137,6 @@ class MainWindow(QMainWindow):
 
     def _on_mod_context_menu(self, global_pos) -> None:
         """Build and show the mod list context menu (MO2 structure)."""
-        print("[DEBUG] _on_mod_context_menu() aufgerufen!")
         if not self._current_instance_path:
             return
 
@@ -1386,21 +1385,13 @@ class MainWindow(QMainWindow):
         if not chosen:
             return
 
-        print(f"[DEBUG] chosen = {chosen}, text = {chosen.text() if chosen else 'None'}")
-        print(f"[DEBUG] act_install_mod = {act_install_mod}, text = {act_install_mod.text()}")
-        print(f"[DEBUG] chosen == act_install_mod: {chosen == act_install_mod}")
-
         if chosen == act_install_mod:
-            print("[MENU] Installiere Mod clicked")
             self._ctx_install_mod()
         elif chosen == act_create_empty:
-            print("[MENU] Leere Mod clicked")
             self._ctx_create_empty_mod()
         elif chosen == act_create_sep:
-            print("[MENU] Trenner clicked")
             self._ctx_create_separator()
         elif chosen == act_export_csv:
-            print("[MENU] CSV Export clicked")
             self._ctx_export_csv()
         elif chosen == act_enable_all:
             self._ctx_enable_all(True)
@@ -1468,12 +1459,9 @@ class MainWindow(QMainWindow):
     def _open_mods_folder(self) -> None:
         """Open the mods folder in file manager."""
         import subprocess
-        print(f"DEBUG _open_mods_folder: instance={self._current_instance_path}")
         if not self._current_instance_path:
-            print("DEBUG _open_mods_folder: No instance path, returning")
             return
         path = self._current_instance_path / ".mods"
-        print(f"DEBUG _open_mods_folder: mods_path={path}, is_dir={path.is_dir()}")
         if path.is_dir():
             subprocess.Popen(["xdg-open", str(path)])
 
@@ -1782,7 +1770,11 @@ class MainWindow(QMainWindow):
 
         # Profil-Ordner löschen
         if profile_path.exists():
-            shutil.rmtree(profile_path)
+            try:
+                shutil.rmtree(profile_path)
+            except OSError as e:
+                Toast(self, f"Fehler beim Löschen: {e.strerror}")
+                return
 
         # Gelöschtes Profil aus Order-Datei entfernen
         order_file = profiles_dir / "profiles_order.json"
@@ -1857,7 +1849,6 @@ class MainWindow(QMainWindow):
 
     def _ctx_install_mod(self) -> None:
         """Install a mod from an archive file."""
-        print("[DEBUG] _ctx_install_mod() CALLED")
         from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
 
         exts = " ".join(f"*{e}" for e in sorted(SUPPORTED_EXTENSIONS))
@@ -1887,7 +1878,6 @@ class MainWindow(QMainWindow):
 
     def _ctx_create_empty_mod(self) -> None:
         """Create a new empty mod folder."""
-        print("[DEBUG] _ctx_create_empty_mod() CALLED")
         from anvil.core.mod_metadata import create_default_meta_ini
 
         name, ok = QInputDialog.getText(

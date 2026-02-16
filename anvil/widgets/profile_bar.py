@@ -357,7 +357,6 @@ class ProfileBar(QWidget):
 
     def set_profiles(self, profiles: list[str], active: str = ""):
         """Set available profiles and optionally select one."""
-        print(f"[DEBUG] SET_PROFILES: {profiles}, active={active}")
         # Clear existing tabs
         for tab in self._tabs:
             self._button_group.removeButton(tab)
@@ -402,7 +401,6 @@ class ProfileBar(QWidget):
 
     def _on_tab_clicked(self, profile_name: str):
         """Handle tab click - delayed to allow double-click detection."""
-        print(f"[DEBUG] TAB CLICKED: {profile_name}")
         if profile_name != self._active_profile:
             # Delay profile switch to detect double-click for rename
             self._pending_click_profile = profile_name

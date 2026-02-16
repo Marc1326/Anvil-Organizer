@@ -315,7 +315,7 @@ class BackupDialog(QDialog):
     def _delete_backup(self, backup_path: Path):
         """Delete a backup after confirmation."""
         reply = QMessageBox.question(
-            self,
+            self.window(),
             "Sicherung löschen",
             f"Sicherung wirklich löschen?\n\n{backup_path.name}",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,

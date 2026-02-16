@@ -268,7 +268,6 @@ class FilterPanel(QWidget):
         """Handle context menu for entire category area (chip or empty space)."""
         # Re-Entry Guard
         if FilterPanel._ctx_in_progress:
-            print("[CTX-MENU] BLOCKED - bereits aktiv")
             return
         FilterPanel._ctx_in_progress = True
 

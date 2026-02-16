@@ -309,8 +309,6 @@ def migrate_to_global_modlist(profiles_dir: Path) -> bool:
     if not source_modlist.is_file():
         return False
 
-    print(f"mod_list_io: Migrating to global modlist from {source_profile.name}")
-
     # Read source modlist for global order
     source_data = read_modlist(source_profile)
     if not source_data:
@@ -333,7 +331,6 @@ def migrate_to_global_modlist(profiles_dir: Path) -> bool:
         # Remove legacy per-profile modlist.txt
         try:
             legacy_modlist.unlink()
-            print(f"mod_list_io: Migrated profile '{profile_folder.name}'")
         except OSError:
             pass
 

@@ -29,14 +29,6 @@ class Toast(QLabel):
         if clickable:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        self.adjustSize()
-
-        # Position: bottom right of parent
-        self.move(
-            parent.width() - self.width() - 20,
-            parent.height() - self.height() - 40
-        )
-
         # Fade-in effect
         self.effect = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(self.effect)
@@ -53,6 +45,13 @@ class Toast(QLabel):
         QTimer.singleShot(duration, self._fade_out)
         self.show()
         self.raise_()
+
+        # Position NACH show() berechnen (Größe ist dann korrekt)
+        self.adjustSize()
+        self.move(
+            parent.width() - self.width() - 20,
+            parent.height() - self.height() - 40
+        )
 
     def mousePressEvent(self, event):
         """Handle click on toast."""
