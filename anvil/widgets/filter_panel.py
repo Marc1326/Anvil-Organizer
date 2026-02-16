@@ -74,8 +74,10 @@ class FilterPanel(QWidget):
         self._open = False
         self._splitter = None          # set via set_splitter()
         self._saved_sizes: list[int] | None = None
-        self._inline_edit: QLineEdit | None = None  # active inline editor
-        self._inline_chip: FilterChip | None = None  # chip being renamed
+        # Inline rename state (same pattern as profile_bar.py)
+        self._rename_edit: QLineEdit | None = None
+        self._rename_chip: FilterChip | None = None
+        self._rename_confirmed = False
 
         outer = QHBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -347,53 +349,77 @@ class FilterPanel(QWidget):
         self._cat_add_edit.setVisible(False)
 
     def _start_inline_rename(self, chip_id: int, current_name: str) -> None:
-        """Replace a chip with a QLineEdit for renaming."""
-        self._cancel_inline_edit()
+        """Show inline input for renaming a category.
+
+        Input is placed AS CHILD of the chip (overlay), not inserted into layout.
+        This preserves FlowLayout positioning.
+        """
+        if self._rename_edit is not None:
+            return  # Already renaming
+
         chip = self._find_chip(chip_id)
         if chip is None:
             return
-        chip.setVisible(False)
-        edit = QLineEdit(current_name)
-        edit.setObjectName("filterChip")
-        edit.setFixedHeight(26)
-        edit.selectAll()
-        edit.returnPressed.connect(self._confirm_inline_rename)
-        # Escape und Focus-Lost handling
-        edit.installEventFilter(self)
-        # Insert edit at the chip's position in the layout (NOT list index!)
-        idx = self._cat_flow.indexOf(chip)
-        self._cat_flow.insertWidget(idx, edit)
-        self._inline_edit = edit
-        self._inline_chip = chip
+
+        self._rename_confirmed = False
+        old_name = current_name
+
+        # Create input AS CHILD of chip (overlay, no layout manipulation)
+        edit = QLineEdit(chip)  # Parent = chip
+        edit.setObjectName("categoryInlineInput")
+        edit.setText(old_name)
+        edit.setGeometry(chip.rect())  # Same size/position as chip
+        edit.setStyleSheet("""
+            QLineEdit#categoryInlineInput {
+                background: #1a1a1a;
+                border: 1px solid #006868;
+                border-radius: 4px;
+                color: #FFFFFF;
+                padding: 2px 6px;
+                font-size: 12px;
+            }
+        """)
+
+        edit.show()
         edit.setFocus()
+        edit.selectAll()
+        edit.returnPressed.connect(lambda: self._finish_inline_rename(edit, chip, old_name))
+        edit.editingFinished.connect(lambda: self._cancel_inline_rename(edit, chip))
 
-    def _confirm_inline_rename(self) -> None:
-        """User pressed Enter in the rename-inline editor."""
-        if self._inline_edit is None or self._inline_chip is None:
+        self._rename_edit = edit
+        self._rename_chip = chip
+
+    def _finish_inline_rename(self, edit: QLineEdit, chip: FilterChip, old_name: str):
+        """Handle Enter press - rename the category."""
+        new_name = edit.text().strip()
+
+        # If empty or same name, cancel
+        if not new_name or new_name == old_name:
+            self._cancel_inline_rename(edit, chip)
             return
-        new_name = self._inline_edit.text().strip()
-        chip_id = self._inline_chip.chip_id
-        old_name = self._inline_chip.text()
-        self._inline_chip.setVisible(True)
-        self._remove_inline_edit()
-        if new_name and new_name != old_name:
-            self.category_rename_requested.emit(chip_id, new_name)
 
-    def _cancel_inline_edit(self) -> None:
-        """Cancel any active inline edit and restore the chip."""
-        if self._inline_edit is not None:
-            print("[INLINE-INPUT] Escape/Cancel")
-            if self._inline_chip is not None:
-                self._inline_chip.setVisible(True)
-            self._remove_inline_edit()
+        self._rename_confirmed = True
 
-    def _remove_inline_edit(self) -> None:
-        """Remove the inline QLineEdit widget."""
-        if self._inline_edit is not None:
-            self._cat_flow.removeWidget(self._inline_edit)
-            self._inline_edit.deleteLater()
-            self._inline_edit = None
-            self._inline_chip = None
+        # Remove input (it's a child of chip, just delete it)
+        edit.deleteLater()
+        self._rename_edit = None
+        self._rename_chip = None
+
+        # Emit signal (chip was never hidden)
+        self.category_rename_requested.emit(chip.chip_id, new_name)
+
+    def _cancel_inline_rename(self, edit: QLineEdit, chip: FilterChip):
+        """Handle Escape or focus loss - cancel rename."""
+        if self._rename_confirmed:
+            return  # Already confirmed via Enter
+
+        if self._rename_edit is None:
+            return  # Already cleaned up
+
+        # Remove input (it's a child of chip, just delete it)
+        edit.deleteLater()
+        self._rename_edit = None
+        self._rename_chip = None
 
     def _find_chip(self, chip_id: int) -> FilterChip | None:
         for chip in self._cat_chips:
@@ -412,16 +438,6 @@ class FilterPanel(QWidget):
             elif event.type() == QEvent.Type.FocusOut:
                 from PySide6.QtCore import QTimer
                 QTimer.singleShot(0, self._hide_add_edit)
-                return False
-        # Inline-Rename Feld (für Umbenennen)
-        if obj is self._inline_edit:
-            if event.type() == QEvent.Type.KeyPress:
-                if event.key() == Qt.Key.Key_Escape:
-                    self._cancel_inline_edit()
-                    return True
-            elif event.type() == QEvent.Type.FocusOut:
-                from PySide6.QtCore import QTimer
-                QTimer.singleShot(0, self._cancel_inline_edit)
                 return False
         return super().eventFilter(obj, event)
 
