@@ -59,6 +59,9 @@ class ConflictScanner:
     # Files that are always internal to Anvil and never conflict.
     _INTERNAL_FILES = {"meta.ini"}
 
+    # Extensions that are never real conflicts (readme files, docs, etc.)
+    _IGNORED_EXTENSIONS = {".txt"}
+
     def scan_conflicts(
         self,
         mods: list[dict],
@@ -108,6 +111,10 @@ class ConflictScanner:
 
                 # Skip Anvil-internal files
                 if file_path.name in self._INTERNAL_FILES:
+                    continue
+
+                # Skip ignored extensions (readme files, docs, etc.)
+                if file_path.suffix.lower() in self._IGNORED_EXTENSIONS:
                     continue
 
                 owners = file_owners.setdefault(rel, [])
