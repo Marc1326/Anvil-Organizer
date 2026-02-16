@@ -29,6 +29,7 @@ from PySide6.QtGui import QPainter, QFontMetrics
 from anvil.widgets.flow_layout import FlowLayout
 from anvil.widgets.filter_chip import FilterChip
 from anvil.core.categories import get_display_name
+from anvil.core.translator import tr
 
 
 # Property chip IDs (negative to avoid clash with category IDs)
@@ -41,16 +42,18 @@ PROP_NO_CATEGORY = -6
 PROP_CONFLICT_WIN = -7
 PROP_CONFLICT_LOSE = -8
 
-_PROPERTY_CHIPS = [
-    (PROP_ENABLED, "Aktiviert"),
-    (PROP_DISABLED, "Deaktiviert"),
-    (PROP_ENDORSED, "Endorsed"),
-    (PROP_HAS_NOTES, "Hat Notizen"),
-    (PROP_HAS_CATEGORY, "Hat Kategorie"),
-    (PROP_NO_CATEGORY, "Ohne Kategorie"),
-    (PROP_CONFLICT_WIN, "Konflikte (Gewinner)"),
-    (PROP_CONFLICT_LOSE, "Konflikte (Verlierer)"),
-]
+def _get_property_chips():
+    """Return property chips with translated labels."""
+    return [
+        (PROP_ENABLED, tr("filter.prop_enabled")),
+        (PROP_DISABLED, tr("filter.prop_disabled")),
+        (PROP_ENDORSED, tr("filter.prop_endorsed")),
+        (PROP_HAS_NOTES, tr("filter.prop_has_notes")),
+        (PROP_HAS_CATEGORY, tr("filter.prop_has_category")),
+        (PROP_NO_CATEGORY, tr("filter.prop_no_category")),
+        (PROP_CONFLICT_WIN, tr("filter.prop_conflict_win")),
+        (PROP_CONFLICT_LOSE, tr("filter.prop_conflict_lose")),
+    ]
 
 
 class FilterPanel(QWidget):
@@ -92,7 +95,7 @@ class FilterPanel(QWidget):
 
         # ── Search field ──────────────────────────────────────────
         self._search = QLineEdit()
-        self._search.setPlaceholderText("Mod suchen...")
+        self._search.setPlaceholderText(tr("filter.search_placeholder"))
         self._search.setClearButtonEnabled(True)
         self._search.textChanged.connect(self._on_changed)
         content_layout.addWidget(self._search)
@@ -112,7 +115,7 @@ class FilterPanel(QWidget):
         self._inner_layout.setSpacing(8)
 
         # ── Eigenschaften section ─────────────────────────────────
-        lbl_props = QLabel("Eigenschaften")
+        lbl_props = QLabel(tr("filter.properties"))
         lbl_props.setObjectName("filterSectionLabel")
         lbl_props.setStyleSheet(
             "QLabel { font-weight: bold; padding: 2px 0; }"
@@ -128,14 +131,14 @@ class FilterPanel(QWidget):
         self._inner_layout.addWidget(prop_container)
 
         self._prop_chips: list[FilterChip] = []
-        for chip_id, label in _PROPERTY_CHIPS:
+        for chip_id, label in _get_property_chips():
             chip = FilterChip(label, chip_id=chip_id)
             chip.toggled.connect(self._on_changed)
             self._prop_flow.addWidget(chip)
             self._prop_chips.append(chip)
 
         # ── Kategorien section ────────────────────────────────────
-        lbl_cats = QLabel("Kategorien")
+        lbl_cats = QLabel(tr("filter.categories"))
         lbl_cats.setObjectName("filterSectionLabel")
         lbl_cats.setStyleSheet(
             "QLabel { font-weight: bold; padding: 2px 0; }"
@@ -146,7 +149,7 @@ class FilterPanel(QWidget):
         self._cat_add_edit = QLineEdit()
         self._cat_add_edit.setObjectName("filterChip")
         self._cat_add_edit.setFixedHeight(26)
-        self._cat_add_edit.setPlaceholderText("Kategorie-Name...")
+        self._cat_add_edit.setPlaceholderText(tr("filter.category_placeholder"))
         self._cat_add_edit.setVisible(False)
         self._cat_add_edit.returnPressed.connect(self._confirm_add)
         self._cat_add_edit.installEventFilter(self)
@@ -172,7 +175,7 @@ class FilterPanel(QWidget):
         # ── Bottom buttons ────────────────────────────────────────
         btn_row = QHBoxLayout()
 
-        btn_reset = QPushButton("Abwählen")
+        btn_reset = QPushButton(tr("filter.deselect"))
         btn_reset.setObjectName("filterResetBtn")
         btn_reset.clicked.connect(self.reset_all)
         btn_row.addWidget(btn_reset)
@@ -294,9 +297,9 @@ class FilterPanel(QWidget):
 
             if chip:
                 # Chip-Menü (3 Einträge)
-                act_add = menu.addAction("Hinzufügen")
-                act_delete = menu.addAction("Löschen")
-                act_nexus = menu.addAction("Nexus löschen")
+                act_add = menu.addAction(tr("context.add"))
+                act_delete = menu.addAction(tr("context.delete"))
+                act_nexus = menu.addAction(tr("context.delete_nexus"))
                 act_nexus.setEnabled(False)
                 chosen = menu.exec(global_pos)
                 if chosen == act_add:
@@ -305,7 +308,7 @@ class FilterPanel(QWidget):
                     self._delete_category(chip)
             else:
                 # Leere Fläche (1 Eintrag)
-                menu.addAction("Hinzufügen", self._add_category)
+                menu.addAction(tr("context.add"), self._add_category)
                 menu.exec(global_pos)
         finally:
             FilterPanel._ctx_in_progress = False
@@ -322,7 +325,7 @@ class FilterPanel(QWidget):
             global_pos = self._inner.mapToGlobal(pos)
             menu = QMenu(self)
             menu.setStyleSheet(CONTEXT_MENU_STYLE)
-            menu.addAction("Hinzufügen", self._add_category)
+            menu.addAction(tr("context.add"), self._add_category)
             menu.exec(global_pos)
 
     def _add_category(self):

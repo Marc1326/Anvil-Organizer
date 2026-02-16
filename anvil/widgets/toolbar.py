@@ -13,6 +13,7 @@ from anvil.widgets.profile_dialog import ProfileDialog
 from anvil.widgets.executables_dialog import ExecutablesDialog
 from anvil.widgets.settings_dialog import SettingsDialog
 from anvil.core import _todo
+from anvil.core.translator import tr
 
 _ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
 
@@ -59,31 +60,31 @@ def create_toolbar(parent=None):
         if win and hasattr(win, method_name):
             getattr(win, method_name)()
 
-    folder_btn = _add_btn("archives.svg", "Ordner")
+    folder_btn = _add_btn("archives.svg", "Folders")
     folder_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
     folder_menu = QMenu(bar)
-    folder_menu.addAction("Spielverzeichnis öffnen", lambda: _call_win("_open_game_folder"))
-    folder_menu.addAction("MyGames Ordner öffnen", lambda: _call_win("_open_mygames_folder"))
-    folder_menu.addAction("INI Ordner öffnen", lambda: _call_win("_open_ini_folder"))
-    folder_menu.addAction("Instanz Ordner öffnen", lambda: _call_win("_open_instance_folder"))
-    folder_menu.addAction("Mods Ordner öffnen", lambda: _call_win("_open_mods_folder"))
-    folder_menu.addAction("Profil Ordner öffnen", lambda: _call_win("_open_profile_folder"))
-    folder_menu.addAction("Downloads Ordner öffnen", lambda: _call_win("_open_downloads_folder"))
+    folder_menu.addAction(tr("toolbar.open_game_folder"), lambda: _call_win("_open_game_folder"))
+    folder_menu.addAction(tr("toolbar.open_mygames_folder"), lambda: _call_win("_open_mygames_folder"))
+    folder_menu.addAction(tr("toolbar.open_ini_folder"), lambda: _call_win("_open_ini_folder"))
+    folder_menu.addAction(tr("toolbar.open_instance_folder"), lambda: _call_win("_open_instance_folder"))
+    folder_menu.addAction(tr("toolbar.open_mods_folder"), lambda: _call_win("_open_mods_folder"))
+    folder_menu.addAction(tr("toolbar.open_profile_folder"), lambda: _call_win("_open_profile_folder"))
+    folder_menu.addAction(tr("toolbar.open_downloads_folder"), lambda: _call_win("_open_downloads_folder"))
     folder_menu.addSeparator()
-    folder_menu.addAction("AO Installationsordner öffnen", lambda: _call_win("_open_ao_install_folder"))
-    folder_menu.addAction("AO Plugins Ordner öffnen", lambda: _call_win("_open_ao_plugins_folder"))
-    folder_menu.addAction("AO Stylesheets Ordner öffnen", lambda: _call_win("_open_ao_styles_folder"))
-    folder_menu.addAction("AO Log Ordner öffnen", lambda: _call_win("_open_ao_logs_folder"))
+    folder_menu.addAction(tr("toolbar.open_ao_install_folder"), lambda: _call_win("_open_ao_install_folder"))
+    folder_menu.addAction(tr("toolbar.open_ao_plugins_folder"), lambda: _call_win("_open_ao_plugins_folder"))
+    folder_menu.addAction(tr("toolbar.open_ao_styles_folder"), lambda: _call_win("_open_ao_styles_folder"))
+    folder_menu.addAction(tr("toolbar.open_ao_logs_folder"), lambda: _call_win("_open_ao_logs_folder"))
     folder_btn.setMenu(folder_menu)
 
     bar.addSeparator()
 
-    profile_btn = _add_btn("profiles.svg", "Profile")
+    profile_btn = _add_btn("profiles.svg", "Profiles")
     profile_btn.clicked.connect(lambda: ProfileDialog(bar.window()).exec())
 
     bar.addSeparator()
 
-    refresh_btn = _add_btn("refresh.svg", "Neu laden")
+    refresh_btn = _add_btn("refresh.svg", tr("menu.reload"))
     def _on_refresh():
         win = bar.window()
         if win and hasattr(win, "_on_menu_refresh"):
@@ -97,7 +98,7 @@ def create_toolbar(parent=None):
     tools_btn = _add_btn("tools.svg", "Tools")
     tools_btn.clicked.connect(_todo("Tools"))
 
-    settings_btn = _add_btn("settings.svg", "Einstellungen")
+    settings_btn = _add_btn("settings.svg", tr("menu.settings"))
     settings_btn.clicked.connect(
         lambda: SettingsDialog(
             bar.window(),

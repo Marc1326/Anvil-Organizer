@@ -22,6 +22,7 @@ from PySide6.QtCore import Qt
 from anvil.core.instance_manager import InstanceManager
 from anvil.core.icon_manager import IconManager, placeholder_game_icon
 from anvil.plugins.plugin_loader import PluginLoader
+from anvil.core.translator import tr
 
 # ── Style ─────────────────────────────────────────────────────────────
 
@@ -66,24 +67,19 @@ QCheckBox::indicator:checked { background: #4FC3F7; }
 class _IntroPage(QWizardPage):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setTitle("Erstelle eine neue Instanz")
+        self.setTitle(tr("dialog.wizard_intro_title"))
 
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
 
-        text = QLabel(
-            "Eine Instanz ist ein vollständiges Set von Mods, Downloads, "
-            "Profilen und Konfigurationen für ein Spiel.\n\n"
-            "Jedes Spiel muss in seiner eigenen Instanz verwaltet werden. "
-            "Anvil Organizer kann problemlos zwischen Instanzen wechseln."
-        )
+        text = QLabel(tr("dialog.wizard_intro_text"))
         text.setWordWrap(True)
         text.setStyleSheet("font-size: 13px; line-height: 1.5;")
         layout.addWidget(text)
 
         layout.addStretch()
 
-        self._skip_cb = QCheckBox("Zeige diese Seite nie wieder")
+        self._skip_cb = QCheckBox(tr("dialog.wizard_skip_checkbox"))
         layout.addWidget(self._skip_cb)
 
 
@@ -96,12 +92,12 @@ class _GameSelectPage(QWizardPage):
         self._pl = plugin_loader
         self._im = instance_manager
         self._icons = icon_manager
-        self.setTitle("Wähle ein Spiel")
+        self.setTitle(tr("dialog.wizard_game_title"))
 
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
 
-        hint = QLabel("Wähle das Spiel für das du eine Instanz erstellen möchtest:")
+        hint = QLabel(tr("dialog.select_game_hint"))
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
@@ -137,10 +133,9 @@ class _GameSelectPage(QWizardPage):
         # Hint if no installed games available
         if self._list.count() == 0:
             if existing:
-                msg = "Alle erkannten Spiele haben bereits eine Instanz."
+                msg = tr("dialog.wizard_all_games_have_instance")
             else:
-                msg = ("Keine unterstützten Spiele gefunden.\n"
-                       "Stelle sicher dass deine Spiele installiert sind.")
+                msg = tr("dialog.wizard_no_games_found")
             item = QListWidgetItem(msg)
             item.setFont(self._italic_font)
             item.setForeground(Qt.GlobalColor.darkGray)
@@ -184,7 +179,7 @@ class _ConfigPage(QWizardPage):
         self._pl = plugin_loader
         self._im = instance_manager
         self._game_page = game_select_page
-        self.setTitle("Instanz-Name und Pfade")
+        self.setTitle(tr("dialog.wizard_config_title"))
 
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
@@ -194,15 +189,15 @@ class _ConfigPage(QWizardPage):
 
         self._name_edit = QLineEdit()
         self._name_edit.textChanged.connect(self._on_name_changed)
-        form.addRow("Instanz-Name:", self._name_edit)
+        form.addRow(tr("label.instance_name"), self._name_edit)
 
         self._path_label = QLabel("")
         self._path_label.setStyleSheet("color: #808080;")
-        form.addRow("Spielpfad:", self._path_label)
+        form.addRow(tr("label.game_path"), self._path_label)
 
         self._dir_label = QLabel("")
         self._dir_label.setStyleSheet("color: #808080;")
-        form.addRow("Instanz-Ordner:", self._dir_label)
+        form.addRow(tr("label.instance_folder"), self._dir_label)
 
         layout.addLayout(form)
 
@@ -221,7 +216,7 @@ class _ConfigPage(QWizardPage):
         if plugin:
             self._name_edit.setText(plugin.GameName)
             gd = plugin.gameDirectory()
-            self._path_label.setText(str(gd) if gd else "nicht erkannt")
+            self._path_label.setText(str(gd) if gd else tr("dialog.not_detected"))
         else:
             self._name_edit.setText("")
             self._path_label.setText("—")
@@ -252,9 +247,7 @@ class _ConfigPage(QWizardPage):
 
         existing = {inst["name"] for inst in self._im.list_instances()}
         if name in existing:
-            self._warning.setText(
-                f'Eine Instanz mit dem Namen "{name}" existiert bereits.'
-            )
+            self._warning.setText(tr("dialog.wizard_instance_exists", name=name))
             self._warning.show()
         else:
             self._warning.hide()
@@ -287,13 +280,13 @@ class _SummaryPage(QWizardPage):
         self._im = instance_manager
         self._game_page = game_select_page
         self._config_page = config_page
-        self.setTitle("Instanz erstellen?")
+        self.setTitle(tr("dialog.wizard_summary_title"))
         self.setCommitPage(True)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
-        hint = QLabel("Folgende Instanz wird erstellt:")
+        hint = QLabel(tr("dialog.wizard_summary_hint"))
         hint.setStyleSheet("font-size: 13px;")
         layout.addWidget(hint)
 
@@ -301,24 +294,21 @@ class _SummaryPage(QWizardPage):
         self._form.setSpacing(8)
 
         self._game_label = QLabel()
-        self._form.addRow("Spiel:", self._game_label)
+        self._form.addRow(tr("label.game"), self._game_label)
         self._name_label = QLabel()
-        self._form.addRow("Instanz-Name:", self._name_label)
+        self._form.addRow(tr("label.instance_name"), self._name_label)
         self._store_label = QLabel()
-        self._form.addRow("Store:", self._store_label)
+        self._form.addRow(tr("label.store"), self._store_label)
         self._path_label = QLabel()
         self._path_label.setWordWrap(True)
-        self._form.addRow("Spielpfad:", self._path_label)
+        self._form.addRow(tr("label.game_path"), self._path_label)
         self._dir_label = QLabel()
         self._dir_label.setWordWrap(True)
-        self._form.addRow("Instanz-Ordner:", self._dir_label)
+        self._form.addRow(tr("label.instance_folder"), self._dir_label)
 
         layout.addLayout(self._form)
 
-        self._dirs_label = QLabel(
-            "Folgende Ordner werden erstellt:\n"
-            "  .mods/  .downloads/  .profiles/Default/  .overwrite/"
-        )
+        self._dirs_label = QLabel(tr("dialog.wizard_dirs_created"))
         self._dirs_label.setStyleSheet("color: #808080; font-size: 12px;")
         layout.addWidget(self._dirs_label)
 
@@ -331,9 +321,9 @@ class _SummaryPage(QWizardPage):
 
         if plugin:
             self._game_label.setText(plugin.GameName)
-            self._store_label.setText(plugin.detectedStore() or "nicht erkannt")
+            self._store_label.setText(plugin.detectedStore() or tr("dialog.not_detected"))
             gd = plugin.gameDirectory()
-            self._path_label.setText(str(gd) if gd else "nicht erkannt")
+            self._path_label.setText(str(gd) if gd else tr("dialog.not_detected"))
         else:
             self._game_label.setText("—")
             self._store_label.setText("—")
@@ -365,17 +355,17 @@ class CreateInstanceWizard(QWizard):
         self._icons = icon_manager
         self.created_instance = None
 
-        self.setWindowTitle("Neue Instanz erstellen")
+        self.setWindowTitle(tr("dialog.instance_wizard_title"))
         self.setMinimumSize(600, 450)
         self.setStyleSheet(_WIZARD_STYLE)
         self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
 
         # Button text
-        self.setButtonText(QWizard.WizardButton.BackButton, "< Zurück")
-        self.setButtonText(QWizard.WizardButton.NextButton, "Nächster >")
-        self.setButtonText(QWizard.WizardButton.CancelButton, "Abbrechen")
-        self.setButtonText(QWizard.WizardButton.FinishButton, "Erstellen")
-        self.setButtonText(QWizard.WizardButton.CommitButton, "Erstellen")
+        self.setButtonText(QWizard.WizardButton.BackButton, tr("dialog.wizard_back"))
+        self.setButtonText(QWizard.WizardButton.NextButton, tr("dialog.wizard_next"))
+        self.setButtonText(QWizard.WizardButton.CancelButton, tr("button.cancel"))
+        self.setButtonText(QWizard.WizardButton.FinishButton, tr("dialog.wizard_create"))
+        self.setButtonText(QWizard.WizardButton.CommitButton, tr("dialog.wizard_create"))
 
         # Pages
         self._intro_page = _IntroPage()
@@ -413,8 +403,8 @@ class CreateInstanceWizard(QWizard):
 
             QMessageBox.critical(
                 self,
-                "Fehler",
-                f"Instanz konnte nicht erstellt werden:\n{exc}",
+                tr("error.install_failed_title"),
+                tr("dialog.wizard_create_error", error=str(exc)),
             )
             return
 

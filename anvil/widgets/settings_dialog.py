@@ -37,6 +37,7 @@ from anvil.plugins.plugin_loader import PluginLoader, ensure_user_plugin_dir
 from anvil.styles.dark_theme import list_themes, load_theme, get_styles_dir, default_theme
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nexus_sso import NexusSSOLogin
+from anvil.core.translator import Translator
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, plugin_loader: PluginLoader | None = None,
@@ -66,9 +67,22 @@ class SettingsDialog(QDialog):
         # Gruppe Sprache
         lang_grp = QGroupBox("Sprache")
         lang_layout = QVBoxLayout(lang_grp)
-        lang_combo = QComboBox()
-        lang_combo.addItem("Deutsch (Deutschland)")
-        lang_layout.addWidget(lang_combo)
+        self._lang_combo = QComboBox()
+        # Verfügbare Sprachen aus Translator laden
+        translator = Translator.instance()
+        self._lang_codes: list[str] = []
+        for code, name in translator.available_languages():
+            self._lang_combo.addItem(name)
+            self._lang_codes.append(code)
+        # Gespeicherte Sprache auswählen
+        saved_lang = self._settings().value("General/language", "de")
+        if saved_lang in self._lang_codes:
+            self._lang_combo.setCurrentIndex(self._lang_codes.index(saved_lang))
+        lang_layout.addWidget(self._lang_combo)
+        # Hinweis: Neustart erforderlich
+        lang_hint = QLabel("Änderung erfordert Neustart der Anwendung.")
+        lang_hint.setStyleSheet("color: #808080; font-style: italic; font-size: 11px;")
+        lang_layout.addWidget(lang_hint)
         scroll_layout.addWidget(lang_grp)
 
         # Gruppe Download Liste
@@ -698,9 +712,13 @@ class SettingsDialog(QDialog):
         subprocess.Popen(["xdg-open", str(get_styles_dir())])
 
     def accept(self):
-        """Save theme selection to QSettings and close."""
+        """Save theme and language selection to QSettings and close."""
         settings = self._settings()
         settings.setValue("style/theme", self._stil_combo.currentText())
+        # Sprache speichern
+        lang_idx = self._lang_combo.currentIndex()
+        if 0 <= lang_idx < len(self._lang_codes):
+            settings.setValue("General/language", self._lang_codes[lang_idx])
         super().accept()
 
     def reject(self):

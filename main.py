@@ -1,14 +1,32 @@
 """Entry Point Anvil Organizer."""
 
 import sys
+from pathlib import Path
+
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QSettings
+
 from anvil.mainwindow import MainWindow
+from anvil.core.translator import Translator
+
+
+def _init_translator():
+    """Initialisiert den Translator mit der gespeicherten Sprache."""
+    config_path = Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf"
+    settings = QSettings(str(config_path), QSettings.Format.IniFormat)
+    saved_lang = settings.value("General/language", "de")
+    translator = Translator.instance()
+    translator.load(saved_lang)
 
 
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Anvil Organizer")
     app.setApplicationVersion("0.1.0")
+
+    # Translator mit gespeicherter Sprache initialisieren
+    _init_translator()
+
     w = MainWindow()
     w.showMaximized()
     sys.exit(app.exec())

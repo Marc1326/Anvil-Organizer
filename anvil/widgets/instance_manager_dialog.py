@@ -26,6 +26,7 @@ from anvil.core.instance_manager import InstanceManager
 from anvil.core.icon_manager import IconManager, placeholder_game_icon
 from anvil.plugins.plugin_loader import PluginLoader
 from anvil.widgets.instance_wizard import CreateInstanceWizard
+from anvil.core.translator import tr
 
 _ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
 
@@ -75,7 +76,7 @@ class InstanceManagerDialog(QDialog):
         self._icons = icon_manager
         self.switched_to = None
 
-        self.setWindowTitle("Instanz Manager")
+        self.setWindowTitle(tr("dialog.instance_manager_title"))
         self.setMinimumSize(720, 480)
         self.setStyleSheet(_DIALOG_STYLE)
 
@@ -85,10 +86,7 @@ class InstanceManagerDialog(QDialog):
 
         # ── Welcome hint (first start) ────────────────────────────────
         if welcome:
-            hint = QLabel(
-                "Willkommen bei Anvil Organizer! "
-                "Erstelle deine erste Instanz um loszulegen."
-            )
+            hint = QLabel(tr("dialog.welcome_hint"))
             hint.setStyleSheet(
                 "color: #4FC3F7; font-size: 13px; padding: 6px 0;"
             )
@@ -97,12 +95,12 @@ class InstanceManagerDialog(QDialog):
 
         # ── Top row: create + info ────────────────────────────────────
         top_row = QHBoxLayout()
-        new_btn = QPushButton("+ Erstelle neue Instanz")
+        new_btn = QPushButton(tr("dialog.create_new_instance"))
         new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         new_btn.clicked.connect(self._on_create)
         top_row.addWidget(new_btn)
 
-        link_btn = QPushButton("Was ist eine Instanz?")
+        link_btn = QPushButton(tr("dialog.what_is_instance"))
         link_btn.setObjectName("linkButton")
         link_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         link_btn.clicked.connect(self._on_info)
@@ -128,31 +126,31 @@ class InstanceManagerDialog(QDialog):
 
         self._name_edit = QLineEdit()
         self._name_edit.setReadOnly(True)
-        form_layout.addRow("Name:", self._name_edit)
+        form_layout.addRow(tr("label.name") + ":", self._name_edit)
 
         self._game_edit = QLineEdit()
         self._game_edit.setReadOnly(True)
-        form_layout.addRow("Spiel:", self._game_edit)
+        form_layout.addRow(tr("label.game"), self._game_edit)
 
         self._store_edit = QLineEdit()
         self._store_edit.setReadOnly(True)
-        form_layout.addRow("Store:", self._store_edit)
+        form_layout.addRow(tr("label.store"), self._store_edit)
 
         self._path_edit = QLineEdit()
         self._path_edit.setReadOnly(True)
-        form_layout.addRow("Spielpfad:", self._path_edit)
+        form_layout.addRow(tr("label.game_path"), self._path_edit)
 
         self._profile_edit = QLineEdit()
         self._profile_edit.setReadOnly(True)
-        form_layout.addRow("Profil:", self._profile_edit)
+        form_layout.addRow(tr("label.profile"), self._profile_edit)
 
         self._dir_edit = QLineEdit()
         self._dir_edit.setReadOnly(True)
-        form_layout.addRow("Instanz-Ordner:", self._dir_edit)
+        form_layout.addRow(tr("label.instance_folder"), self._dir_edit)
 
         self._created_edit = QLineEdit()
         self._created_edit.setReadOnly(True)
-        form_layout.addRow("Erstellt:", self._created_edit)
+        form_layout.addRow(tr("label.created"), self._created_edit)
 
         content.addWidget(form, 1)
         layout.addLayout(content)
@@ -160,23 +158,23 @@ class InstanceManagerDialog(QDialog):
         # ── Bottom row: filter + action buttons ───────────────────────
         bottom_row = QHBoxLayout()
         self._filter_edit = QLineEdit()
-        self._filter_edit.setPlaceholderText("Filter")
+        self._filter_edit.setPlaceholderText(tr("placeholder.filter"))
         self._filter_edit.setMaximumWidth(200)
         self._filter_edit.textChanged.connect(self._on_filter)
         bottom_row.addWidget(self._filter_edit)
         bottom_row.addStretch()
 
-        open_ini_btn = QPushButton("Öffne INI")
+        open_ini_btn = QPushButton(tr("dialog.open_ini"))
         open_ini_btn.clicked.connect(self._on_open_ini)
 
-        delete_btn = QPushButton("Lösche Instanz")
+        delete_btn = QPushButton(tr("dialog.delete_instance"))
         delete_btn.setObjectName("deleteInstance")
         delete_btn.clicked.connect(self._on_delete)
 
-        switch_btn = QPushButton("Wechsle zu dieser Instanz")
+        switch_btn = QPushButton(tr("dialog.switch_to_instance"))
         switch_btn.clicked.connect(self._on_switch)
 
-        close_btn = QPushButton("Schließen")
+        close_btn = QPushButton(tr("button.close"))
         close_btn.clicked.connect(self.accept)
 
         bottom_row.addWidget(open_ini_btn)
@@ -202,7 +200,7 @@ class InstanceManagerDialog(QDialog):
             name = inst["name"]
             label = name
             if name == current:
-                label = f"{name}  (aktiv)"
+                label = f"{name}  {tr('dialog.active_suffix')}"
             item = QListWidgetItem(label)
             # Game-specific icon from cache, fallback to placeholder
             gsn = inst.get("game_short_name", "")
@@ -260,8 +258,8 @@ class InstanceManagerDialog(QDialog):
         """Open the create-instance wizard."""
         if self._im is None or self._pl is None:
             QMessageBox.warning(
-                self, "Fehler",
-                "Plugin-Loader nicht verfügbar.",
+                self, tr("error.install_failed_title"),
+                tr("dialog.plugin_loader_error"),
             )
             return
 
@@ -290,10 +288,8 @@ class InstanceManagerDialog(QDialog):
 
         reply = QMessageBox.warning(
             self,
-            "Instanz löschen",
-            f'Instanz "{name}" wirklich löschen?\n\n'
-            "Alle Mods, Downloads und Profile dieser Instanz "
-            "werden unwiderruflich gelöscht!",
+            tr("dialog.delete_instance_title"),
+            tr("dialog.delete_instance_confirm", name=name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -326,11 +322,7 @@ class InstanceManagerDialog(QDialog):
         """Show a brief explanation of instances."""
         QMessageBox.information(
             self,
-            "Was ist eine Instanz?",
-            "Eine Instanz ist eine eigenständige Mod-Umgebung für ein Spiel.\n\n"
-            "Jede Instanz hat eigene Mod-Ordner, Download-Ordner, Profile "
-            "und Overwrite-Verzeichnisse.\n\n"
-            "So kannst du z.B. mehrere Mod-Setups für das gleiche Spiel "
-            "verwalten oder verschiedene Spiele parallel modden.",
+            tr("dialog.what_is_instance"),
+            tr("dialog.what_is_instance_text"),
         )
 

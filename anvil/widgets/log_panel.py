@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 
+from anvil.core.translator import tr
+
 LogLevel = Literal["debug", "info", "warning", "error"]
 
 LEVEL_CONFIG = {
@@ -310,15 +312,15 @@ class LogPanel(QWidget):
         """Show context menu."""
         menu = QMenu(self)
 
-        copy_action = menu.addAction("Kopieren")
+        copy_action = menu.addAction(tr("context.copy"))
         copy_action.triggered.connect(self.copy_all)
 
-        copy_all_action = menu.addAction("Alles kopieren")
+        copy_all_action = menu.addAction(tr("context.copy_all"))
         copy_all_action.triggered.connect(self.copy_all)
 
         menu.addSeparator()
 
-        clear_action = menu.addAction("Alles l\u00f6schen")
+        clear_action = menu.addAction(tr("context.clear_all"))
         clear_action.triggered.connect(self.clear)
 
         menu.exec(self.mapToGlobal(pos))

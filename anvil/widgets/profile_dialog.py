@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
+from anvil.core.translator import tr
+
 _PROFILE_DIALOG_STYLE = """
 QDialog {
     background: #1C1C1C;
@@ -43,7 +45,7 @@ QListWidget::item:selected { background: #3D3D3D; color: #D3D3D3; }
 class ProfileDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Profile")
+        self.setWindowTitle(tr("dialog.profiles_title"))
         self.setMinimumSize(520, 380)
         self.setStyleSheet(_PROFILE_DIALOG_STYLE)
 
@@ -68,22 +70,22 @@ class ProfileDialog(QDialog):
         # Rechts: Buttons vertikal
         btn_col = QVBoxLayout()
         btn_col.setSpacing(6)
-        btn_col.addWidget(QPushButton("Neu"))
-        btn_col.addWidget(QPushButton("Kopieren"))
-        btn_col.addWidget(QPushButton("Löschen"))
-        btn_col.addWidget(QPushButton("Umbenennen"))
-        btn_col.addWidget(QPushButton("Spielstände übertragen"))
+        btn_col.addWidget(QPushButton(tr("button.new")))
+        btn_col.addWidget(QPushButton(tr("button.copy")))
+        btn_col.addWidget(QPushButton(tr("button.delete")))
+        btn_col.addWidget(QPushButton(tr("button.rename")))
+        btn_col.addWidget(QPushButton(tr("label.transfer_saves")))
         btn_col.addStretch()
         content.addLayout(btn_col)
         layout.addLayout(content)
 
         # Unten: drei Checkboxen (alle aktiviert), eine ausgegraut
         cb_row = QVBoxLayout()
-        cb_saves = QCheckBox("Profil-Spezifische Speicherstände benutzen")
+        cb_saves = QCheckBox(tr("label.profile_saves"))
         cb_saves.setChecked(True)
-        cb_ini = QCheckBox("Profil-Spezifische INI-Dateien nutzen")
+        cb_ini = QCheckBox(tr("label.profile_ini"))
         cb_ini.setChecked(True)
-        cb_archive = QCheckBox("Automatische Archiv Invalidierung")
+        cb_archive = QCheckBox(tr("label.auto_archive_invalidation"))
         cb_archive.setChecked(True)
         cb_archive.setEnabled(False)
         cb_row.addWidget(cb_saves)
@@ -94,8 +96,8 @@ class ProfileDialog(QDialog):
         # Unten rechts: Auswählen, Schliessen
         bottom_row = QHBoxLayout()
         bottom_row.addStretch()
-        select_btn = QPushButton("Auswählen")
-        close_btn = QPushButton("Schliessen")
+        select_btn = QPushButton(tr("button.select"))
+        close_btn = QPushButton(tr("button.close"))
         close_btn.clicked.connect(self.accept)
         bottom_row.addWidget(select_btn)
         bottom_row.addWidget(close_btn)

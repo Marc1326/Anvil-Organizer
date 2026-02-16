@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
+from anvil.core.translator import tr
+
 _EXEC_DIALOG_STYLE = """
 QDialog, QWidget { background: #1C1C1C; color: #D3D3D3; border: none; }
 QLineEdit, QListWidget, QPushButton, QComboBox {
@@ -33,7 +35,7 @@ QPushButton:disabled { color: #808080; }
 class ExecutablesDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Ausführbare Programme ändern")
+        self.setWindowTitle(tr("dialog.executables_title"))
         self.setMinimumSize(680, 520)
         self.setStyleSheet(_EXEC_DIALOG_STYLE)
 
@@ -47,7 +49,7 @@ class ExecutablesDialog(QDialog):
         # Links: "Programme" + 4 kleine Buttons, darunter Liste
         left = QVBoxLayout()
         prog_row = QHBoxLayout()
-        prog_row.addWidget(QLabel("Programme"))
+        prog_row.addWidget(QLabel(tr("label.programs")))
         for _ in ("+", "-", "Stern", "Pfeil"):
             b = QPushButton(_)
             b.setFixedSize(28, 28)
@@ -73,66 +75,66 @@ class ExecutablesDialog(QDialog):
         fl = QFormLayout(form)
         fl.setSpacing(8)
 
-        fl.addRow("Name:", QLineEdit())
+        fl.addRow(tr("label.name") + ":", QLineEdit())
 
         exe_row = QHBoxLayout()
         exe_edit = QLineEdit()
-        exe_edit.setPlaceholderText("Ausführbare Datei")
+        exe_edit.setPlaceholderText(tr("label.executable_file"))
         exe_row.addWidget(exe_edit)
         exe_row.addWidget(QPushButton("..."))
-        fl.addRow("Ausführbare Datei:", exe_row)
+        fl.addRow(tr("label.executable_file") + ":", exe_row)
 
         work_row = QHBoxLayout()
         work_edit = QLineEdit()
-        work_edit.setPlaceholderText("Arbeitsverzeichnis")
+        work_edit.setPlaceholderText(tr("label.working_dir"))
         work_row.addWidget(work_edit)
         work_row.addWidget(QPushButton("..."))
-        fl.addRow("Arbeitsverzeichnis:", work_row)
+        fl.addRow(tr("label.working_dir") + ":", work_row)
 
-        fl.addRow("Startparameter:", QLineEdit())
+        fl.addRow(tr("label.start_params") + ":", QLineEdit())
 
-        cb_steam = QCheckBox("Überschreibt die Steam AppID")
+        cb_steam = QCheckBox(tr("label.overrides_steam_appid"))
         cb_steam.setChecked(False)
         steam_row = QHBoxLayout()
         steam_row.addWidget(cb_steam)
         steam_row.addWidget(QLineEdit())
         fl.addRow("", steam_row)
 
-        cb_mod = QCheckBox("Erzeuge Dateien im Mod-Verzeichnis statt im Overwrite (*)")
+        cb_mod = QCheckBox(tr("label.create_files_in_mod"))
         cb_mod.setChecked(False)
         mod_row = QHBoxLayout()
         mod_row.addWidget(cb_mod)
         mod_row.addWidget(QComboBox())
         fl.addRow("", mod_row)
 
-        cb_archive = QCheckBox("Erzwinge das Laden der Archive (*)")
+        cb_archive = QCheckBox(tr("label.force_load_archives"))
         cb_archive.setChecked(True)
         arch_row = QHBoxLayout()
         arch_row.addWidget(cb_archive)
-        arch_row.addWidget(QPushButton("Archive konfigurieren"))
+        arch_row.addWidget(QPushButton(tr("label.configure_archives")))
         fl.addRow("", arch_row)
 
-        cb_icon = QCheckBox("Nutze das Icon der Anwendung für Desktopverknüpfungen")
+        cb_icon = QCheckBox(tr("label.use_app_icon"))
         cb_icon.setChecked(True)
         fl.addRow(cb_icon)
 
-        cb_hide = QCheckBox("In der Benutzeroberfläche verbergen")
+        cb_hide = QCheckBox(tr("label.hide_in_ui"))
         cb_hide.setChecked(False)
         fl.addRow(cb_hide)
 
         content.addWidget(form)
         layout.addLayout(content)
 
-        layout.addWidget(QLabel("(*) Profilspezifisch"))
+        layout.addWidget(QLabel(tr("label.profile_specific")))
 
         # Unten rechts: OK, Abbrechen, Anwenden (ausgegraut)
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        ok_btn = QPushButton("OK")
+        ok_btn = QPushButton(tr("button.ok"))
         ok_btn.clicked.connect(self.accept)
-        cancel_btn = QPushButton("Abbrechen")
+        cancel_btn = QPushButton(tr("button.cancel"))
         cancel_btn.clicked.connect(self.reject)
-        apply_btn = QPushButton("Anwenden")
+        apply_btn = QPushButton(tr("button.apply"))
         apply_btn.setEnabled(False)
         btn_row.addWidget(ok_btn)
         btn_row.addWidget(cancel_btn)

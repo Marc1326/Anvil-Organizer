@@ -58,6 +58,7 @@ from anvil.widgets.instance_wizard import CreateInstanceWizard
 from anvil.widgets.category_dialog import CategoryDialog
 from anvil.widgets.log_panel import LogPanel
 from anvil.core import _todo
+from anvil.core.translator import tr
 
 
 def _matches_direct_install(name_lower: str, patterns: list[str]) -> bool:
@@ -262,30 +263,30 @@ class MainWindow(QMainWindow):
         # ════════════════════════════════════════════════════════════════
         # 1. DATEI
         # ════════════════════════════════════════════════════════════════
-        fm = menubar.addMenu("Datei")
+        fm = menubar.addMenu(tr("menu.file"))
 
-        act = fm.addAction("Instanzen verwalten...")
+        act = fm.addAction(tr("menu.manage_instances"))
         act.triggered.connect(self._on_manage_instances)
 
-        act = fm.addAction("Mod installieren...")
+        act = fm.addAction(tr("menu.install_mod"))
         act.setShortcut(QKeySequence("Ctrl+M"))
         act.triggered.connect(self._on_install_mod)
 
-        act = fm.addAction("Nexus besuchen")
+        act = fm.addAction(tr("menu.visit_nexus"))
         act.setShortcut(QKeySequence("Ctrl+N"))
         act.triggered.connect(self._on_menu_visit_nexus)
 
         fm.addSeparator()
 
-        act = fm.addAction("Beenden")
+        act = fm.addAction(tr("menu.quit"))
         act.triggered.connect(self.close)
 
         # ════════════════════════════════════════════════════════════════
         # 2. ANSICHT
         # ════════════════════════════════════════════════════════════════
-        vm = menubar.addMenu("Ansicht")
+        vm = menubar.addMenu(tr("menu.view"))
 
-        act = vm.addAction("Neu laden")
+        act = vm.addAction(tr("menu.reload"))
         act.setShortcut(QKeySequence("F5"))
         act.triggered.connect(self._on_menu_refresh)
 
@@ -293,15 +294,15 @@ class MainWindow(QMainWindow):
         self._tb_menu = vm.addMenu("Toolbars")
 
         # Visibility toggles
-        self._act_menubar = self._tb_menu.addAction("Menüleiste")
+        self._act_menubar = self._tb_menu.addAction(tr("menu.menubar"))
         self._act_menubar.setCheckable(True)
         self._act_menubar.triggered.connect(self._on_toggle_menubar)
 
-        self._act_toolbar = self._tb_menu.addAction("Hauptleiste")
+        self._act_toolbar = self._tb_menu.addAction(tr("menu.toolbar"))
         self._act_toolbar.setCheckable(True)
         self._act_toolbar.triggered.connect(self._on_toggle_toolbar)
 
-        self._act_statusbar = self._tb_menu.addAction("Statusleiste")
+        self._act_statusbar = self._tb_menu.addAction(tr("menu.statusbar"))
         self._act_statusbar.setCheckable(True)
         self._act_statusbar.triggered.connect(self._on_toggle_statusbar)
 
@@ -309,17 +310,17 @@ class MainWindow(QMainWindow):
 
         # Icon size (radio group)
         size_group = QActionGroup(self)
-        self._act_small_icons = self._tb_menu.addAction("Kleine Icons")
+        self._act_small_icons = self._tb_menu.addAction(tr("menu.small_icons"))
         self._act_small_icons.setCheckable(True)
         self._act_small_icons.setActionGroup(size_group)
         self._act_small_icons.triggered.connect(lambda: self._set_toolbar_icon_size(0))
 
-        self._act_medium_icons = self._tb_menu.addAction("Mittlere Icons")
+        self._act_medium_icons = self._tb_menu.addAction(tr("menu.medium_icons"))
         self._act_medium_icons.setCheckable(True)
         self._act_medium_icons.setActionGroup(size_group)
         self._act_medium_icons.triggered.connect(lambda: self._set_toolbar_icon_size(1))
 
-        self._act_large_icons = self._tb_menu.addAction("Große Icons")
+        self._act_large_icons = self._tb_menu.addAction(tr("menu.large_icons"))
         self._act_large_icons.setCheckable(True)
         self._act_large_icons.setActionGroup(size_group)
         self._act_large_icons.triggered.connect(lambda: self._set_toolbar_icon_size(2))
@@ -328,19 +329,19 @@ class MainWindow(QMainWindow):
 
         # Button style (radio group)
         style_group = QActionGroup(self)
-        self._act_icons_only = self._tb_menu.addAction("Nur Icons")
+        self._act_icons_only = self._tb_menu.addAction(tr("menu.icons_only"))
         self._act_icons_only.setCheckable(True)
         self._act_icons_only.setActionGroup(style_group)
         self._act_icons_only.triggered.connect(
             lambda: self._set_toolbar_button_style(Qt.ToolButtonStyle.ToolButtonIconOnly))
 
-        self._act_text_only = self._tb_menu.addAction("Nur Text")
+        self._act_text_only = self._tb_menu.addAction(tr("menu.text_only"))
         self._act_text_only.setCheckable(True)
         self._act_text_only.setActionGroup(style_group)
         self._act_text_only.triggered.connect(
             lambda: self._set_toolbar_button_style(Qt.ToolButtonStyle.ToolButtonTextOnly))
 
-        self._act_icons_text = self._tb_menu.addAction("Icons und Text")
+        self._act_icons_text = self._tb_menu.addAction(tr("menu.icons_and_text"))
         self._act_icons_text.setCheckable(True)
         self._act_icons_text.setActionGroup(style_group)
         self._act_icons_text.triggered.connect(
@@ -350,67 +351,67 @@ class MainWindow(QMainWindow):
         self._tb_menu.aboutToShow.connect(self._update_toolbar_menu)
 
         # ── Filter-Panel (Toggle) ─────────────────────────────────
-        self._act_filter_panel = vm.addAction("Filter-Panel")
+        self._act_filter_panel = vm.addAction(tr("menu.filter_panel"))
         self._act_filter_panel.setCheckable(True)
         self._act_filter_panel.setChecked(False)
         self._act_filter_panel.setShortcut(QKeySequence("Ctrl+F"))
         self._act_filter_panel.triggered.connect(self._on_toggle_filter_panel)
 
         # ── Log (Toggle) ──────────────────────────────────────────
-        self._act_log = vm.addAction("Log")
+        self._act_log = vm.addAction(tr("menu.log"))
         self._act_log.setCheckable(True)
         self._act_log.setChecked(False)  # default_collapsed=True
         self._act_log.triggered.connect(self._on_toggle_log)
 
         vm.addSeparator()
 
-        act = vm.addAction("Benachrichtigungen...")
+        act = vm.addAction(tr("menu.notifications"))
         act.setEnabled(False)
 
         # ════════════════════════════════════════════════════════════════
         # 3. WERKZEUGE
         # ════════════════════════════════════════════════════════════════
-        tm = menubar.addMenu("Werkzeuge")
+        tm = menubar.addMenu(tr("menu.tools"))
 
-        act = tm.addAction("Profile...")
+        act = tm.addAction(tr("menu.profiles"))
         act.setShortcut(QKeySequence("Ctrl+P"))
         act.triggered.connect(self._on_menu_profiles)
 
-        act = tm.addAction("Executables...")
+        act = tm.addAction(tr("menu.executables"))
         act.setShortcut(QKeySequence("Ctrl+E"))
         act.triggered.connect(self._on_menu_executables)
 
         tm.addSeparator()
 
-        act = tm.addAction("Tool-Plugins")
+        act = tm.addAction(tr("menu.tool_plugins"))
         act.setShortcut(QKeySequence("Ctrl+I"))
         act.setEnabled(False)
 
         tm.addSeparator()
 
-        act = tm.addAction("Einstellungen...")
+        act = tm.addAction(tr("menu.settings"))
         act.setShortcut(QKeySequence("Ctrl+S"))
         act.triggered.connect(self._on_menu_settings)
 
         # ════════════════════════════════════════════════════════════════
         # 4. HILFE
         # ════════════════════════════════════════════════════════════════
-        hm = menubar.addMenu("Hilfe")
+        hm = menubar.addMenu(tr("menu.help"))
 
-        act = hm.addAction("Hilfe")
+        act = hm.addAction(tr("menu.help_item"))
         act.setShortcut(QKeySequence("Ctrl+H"))
         act.triggered.connect(self._on_menu_help)
 
-        act = hm.addAction("UI-Hilfe")
+        act = hm.addAction(tr("menu.ui_help"))
         act.setEnabled(False)
 
-        act = hm.addAction("Dokumentation")
+        act = hm.addAction(tr("menu.documentation"))
         act.setEnabled(False)
 
-        act = hm.addAction("Chat auf Discord")
+        act = hm.addAction(tr("menu.discord"))
         act.setEnabled(False)
 
-        act = hm.addAction("Problem melden")
+        act = hm.addAction(tr("menu.report_issue"))
         act.setEnabled(False)
 
         tutorials_menu = hm.addMenu("Tutorials")
@@ -418,10 +419,10 @@ class MainWindow(QMainWindow):
 
         hm.addSeparator()
 
-        act = hm.addAction("Über Anvil Organizer")
+        act = hm.addAction(tr("menu.about_anvil"))
         act.triggered.connect(self._on_about)
 
-        act = hm.addAction("Über Qt")
+        act = hm.addAction(tr("menu.about_qt"))
         act.setEnabled(False)
 
     # ── MO2 icon size constants ─────────────────────────────────────
@@ -454,7 +455,7 @@ class MainWindow(QMainWindow):
     def _on_menu_refresh(self) -> None:
         """Ansicht → Neu laden (F5)."""
         self._reload_mod_list()
-        self.statusBar().showMessage("Mod-Liste neu geladen", 3000)
+        self.statusBar().showMessage(tr("status.mod_list_reloaded"), 3000)
 
     def _on_toggle_filter_panel(self, checked: bool) -> None:
         """Ansicht → Filter-Panel (Menu action / Strg+F)."""
@@ -475,7 +476,7 @@ class MainWindow(QMainWindow):
             return
         self._category_manager.add_category(name)
         self._filter_panel.set_categories(self._category_manager.all_categories())
-        self.statusBar().showMessage(f"Kategorie erstellt: {name}", 3000)
+        self.statusBar().showMessage(tr("status.category_created", name=name), 3000)
 
     def _on_category_rename(self, cat_id: int, new_name: str) -> None:
         """Inline rename: rename an existing category and refresh chips."""
@@ -483,7 +484,7 @@ class MainWindow(QMainWindow):
             return
         self._category_manager.rename_category(cat_id, new_name)
         self._filter_panel.set_categories(self._category_manager.all_categories())
-        self.statusBar().showMessage(f"Kategorie umbenannt: {new_name}", 3000)
+        self.statusBar().showMessage(tr("status.category_renamed", name=new_name), 3000)
 
     def _on_category_delete(self, cat_id: int) -> None:
         """Delete a category after confirmation and refresh chips."""
@@ -491,16 +492,15 @@ class MainWindow(QMainWindow):
             return
         name = self._category_manager.get_name(cat_id) or str(cat_id)
         reply = QMessageBox.question(
-            self, "Kategorie löschen",
-            f"Kategorie \"{name}\" wirklich löschen?\n\n"
-            "Die Kategorie wird von allen Mods entfernt.",
+            self, tr("dialog.delete_category_title"),
+            tr("dialog.delete_category_confirm", name=name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
         self._category_manager.remove_category(cat_id)
         self._filter_panel.set_categories(self._category_manager.all_categories())
-        self.statusBar().showMessage(f"Kategorie gelöscht: {name}", 3000)
+        self.statusBar().showMessage(tr("status.category_deleted", name=name), 3000)
 
     def _on_toggle_log(self, checked: bool) -> None:
         """Ansicht → Log (Toggle) — sync with CollapsibleSectionBar."""
@@ -1030,12 +1030,12 @@ class MainWindow(QMainWindow):
         success = QProcess.startDetached(binary_path, [], working_dir)
         if success:
             self.statusBar().showMessage(
-                f"Gestartet: {Path(binary_path).name}", 5000,
+                tr("status.started", name=Path(binary_path).name), 5000,
             )
         else:
             QMessageBox.warning(
-                self, "Starten fehlgeschlagen",
-                f"Konnte nicht gestartet werden:\n{binary_path}",
+                self, tr("error.start_failed_title"),
+                tr("error.start_failed_message", path=binary_path),
             )
 
     def _on_downloads_install(self, paths: list) -> None:
@@ -1097,9 +1097,8 @@ class MainWindow(QMainWindow):
                 installed.append(mod_path.name)
             else:
                 QMessageBox.warning(
-                    self, "Installation fehlgeschlagen",
-                    f"Mod \"{mod_name}\" konnte nicht installiert werden.\n"
-                    "Prüfe ob das Archiv gültig ist und die nötigen Tools installiert sind.",
+                    self, tr("error.install_failed_title"),
+                    tr("error.install_failed_message", name=mod_name),
                 )
 
         if not installed:
@@ -1109,7 +1108,7 @@ class MainWindow(QMainWindow):
         self._reload_mod_list()
 
         names = ", ".join(installed)
-        self.statusBar().showMessage(f"Installiert: {names}", 5000)
+        self.statusBar().showMessage(tr("status.installed", names=names), 5000)
 
     # ── Other slots ───────────────────────────────────────────────────
 
@@ -1147,26 +1146,26 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
 
         # ── Alle Mods (Submenu) ────────────────────────────────────
-        all_mods_menu = menu.addMenu("Alle Mods")
-        act_install_mod = all_mods_menu.addAction("Installiere Mod...")
-        act_create_empty = all_mods_menu.addAction("Erstelle leere Mod...")
-        act_create_sep = all_mods_menu.addAction("Erstelle Trenner...")
+        all_mods_menu = menu.addMenu(tr("context.all_mods"))
+        act_install_mod = all_mods_menu.addAction(tr("context.install_mod"))
+        act_create_empty = all_mods_menu.addAction(tr("context.create_empty_mod"))
+        act_create_sep = all_mods_menu.addAction(tr("context.create_separator"))
         all_mods_menu.addSeparator()
-        act_collapse_all = all_mods_menu.addAction("Alle einklappen")
-        act_expand_all = all_mods_menu.addAction("Alle ausklappen")
+        act_collapse_all = all_mods_menu.addAction(tr("context.collapse_all"))
+        act_expand_all = all_mods_menu.addAction(tr("context.expand_all"))
         all_mods_menu.addSeparator()
-        act_enable_all = all_mods_menu.addAction("Aktiviere alle")
-        act_disable_all = all_mods_menu.addAction("Deaktiviere alle")
-        act = all_mods_menu.addAction("Auf Updates prüfen")
+        act_enable_all = all_mods_menu.addAction(tr("context.enable_all"))
+        act_disable_all = all_mods_menu.addAction(tr("context.disable_all"))
+        act = all_mods_menu.addAction(tr("context.check_updates"))
         act.setEnabled(False)
-        act = all_mods_menu.addAction("Kategorien automatisch zuweisen")
+        act = all_mods_menu.addAction(tr("context.auto_assign_categories"))
         act.setEnabled(False)
-        act_reload = all_mods_menu.addAction("Neu laden")
-        act_export_csv = all_mods_menu.addAction("Als CSV exportieren...")
+        act_reload = all_mods_menu.addAction(tr("context.reload"))
+        act_export_csv = all_mods_menu.addAction(tr("context.export_csv"))
 
         # ── Kategorien (Submenus) ─────────────────────────────────
-        andere_kat_menu = menu.addMenu("Andere Kategorien")
-        primaere_kat_menu = menu.addMenu("Primäre Kategorie")
+        andere_kat_menu = menu.addMenu(tr("context.other_categories"))
+        primaere_kat_menu = menu.addMenu(tr("label.primary_category"))
         # Kein eigenes Stylesheet - globales Paper Dark.qss greift
 
         _cat_buttons = []  # keep refs: (cat_id, QPushButton)
@@ -1332,43 +1331,43 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
 
         # ── Updates / Aktivieren ──────────────────────────────────
-        act = menu.addAction("Update-Prüfung erzwingen")
+        act = menu.addAction(tr("context.force_update_check"))
         act.setEnabled(False)
-        act = menu.addAction("Ignoriere Update")
+        act = menu.addAction(tr("context.ignore_update"))
         act.setEnabled(False)
-        act_enable = menu.addAction("Aktiviere Ausgewählte")
+        act_enable = menu.addAction(tr("context.enable_selected"))
         act_enable.setEnabled(has_selection)
-        act_disable = menu.addAction("Deaktiviere Ausgewählte")
+        act_disable = menu.addAction(tr("context.disable_selected"))
         act_disable.setEnabled(has_selection)
         menu.addSeparator()
 
         # ── Senden / Mod-Aktionen ────────────────────────────────
-        send_to_menu = menu.addMenu("Sende zu...")
+        send_to_menu = menu.addMenu(tr("context.send_to"))
         send_to_menu.setEnabled(False)
-        act_rename = menu.addAction("Mod umbenennen...")
+        act_rename = menu.addAction(tr("context.rename_mod"))
         act_rename.setEnabled(single)
-        act_reinstall = menu.addAction("Mod neu installieren")
+        act_reinstall = menu.addAction(tr("context.reinstall_mod"))
         act_reinstall.setEnabled(single)
-        act_remove = menu.addAction("Mod entfernen...")
+        act_remove = menu.addAction(tr("context.remove_mod"))
         act_remove.setEnabled(has_selection)
         menu.addSeparator()
 
         # ── Sicherung / Nexus / Explorer ─────────────────────────
-        act_backup = menu.addAction("Erstelle eine Sicherung")
+        act_backup = menu.addAction(tr("context.create_backup"))
         act_backup.setEnabled(single)
-        act = menu.addAction("Endorsement entfernen")
+        act = menu.addAction(tr("context.remove_endorsement"))
         act.setEnabled(False)
-        act = menu.addAction("Kategorie neu zuordnen (von Nexus)")
+        act = menu.addAction(tr("context.reassign_category"))
         act.setEnabled(False)
-        act = menu.addAction("Beginne Beobachtung")
+        act = menu.addAction(tr("context.start_tracking"))
         act.setEnabled(False)
         # Nexus: nur aktiviert wenn Mod eine Nexus-ID hat
-        act_nexus = menu.addAction("Besuche auf NexusMods")
+        act_nexus = menu.addAction(tr("context.visit_nexus"))
         has_nexus = single and selected_rows[0] < len(self._current_mod_entries) and self._current_mod_entries[selected_rows[0]].nexus_id > 0
         act_nexus.setEnabled(has_nexus)
-        act_explorer = menu.addAction("Öffne im Explorer")
+        act_explorer = menu.addAction(tr("context.open_explorer"))
         act_explorer.setEnabled(single)
-        act_info = menu.addAction("Informationen...")
+        act_info = menu.addAction(tr("context.information"))
         act_info.setEnabled(single)
 
         # ── Execute ───────────────────────────────────────────────
@@ -1427,7 +1426,7 @@ class MainWindow(QMainWindow):
     def _ctx_create_separator(self) -> None:
         """Create a new separator in the mod list."""
         name, ok = QInputDialog.getText(
-            self, "Trenner erstellen", "Name des Trenners:",
+            self, tr("dialog.create_separator_title"), tr("dialog.create_separator_prompt"),
         )
         if not ok or not name.strip():
             return
@@ -1439,8 +1438,8 @@ class MainWindow(QMainWindow):
 
         if sep_path.exists():
             QMessageBox.warning(
-                self, "Trenner erstellen",
-                f"Ein Trenner mit dem Namen \"{name}\" existiert bereits.",
+                self, tr("dialog.create_separator_title"),
+                tr("dialog.separator_exists", name=name),
             )
             return
 
@@ -1448,13 +1447,13 @@ class MainWindow(QMainWindow):
             sep_path.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             QMessageBox.warning(
-                self, "Trenner erstellen", str(exc),
+                self, tr("dialog.create_separator_title"), str(exc),
             )
             return
 
         add_mod_to_modlist(self._current_profile_path, folder_name, True)
         self._reload_mod_list()
-        self.statusBar().showMessage(f"Trenner erstellt: {name}", 5000)
+        self.statusBar().showMessage(tr("status.separator_created", name=name), 5000)
 
     def _open_mods_folder(self) -> None:
         """Open the mods folder in file manager."""
@@ -1600,9 +1599,9 @@ class MainWindow(QMainWindow):
             size_str = f"{zip_size / 1024:.1f} KB"
             print(f"[BACKUP] {mod_count} Mods, {size_str}")
 
-            Toast(self, f"{mod_count} Mods gesichert | {zip_path.name} | {size_str}")
+            Toast(self, tr("toast.backup_created", count=mod_count, name=zip_path.name, size=size_str))
             print("[BACKUP] Toast gezeigt")
-            self.statusBar().showMessage(f"Sicherung erstellt: {zip_path.name}", 5000)
+            self.statusBar().showMessage(tr("status.backup_created", name=zip_path.name), 5000)
 
         except Exception as e:
             print(f"[BACKUP] FEHLER: {e}")
@@ -1621,7 +1620,7 @@ class MainWindow(QMainWindow):
         backups = sorted(backups_dir.glob("backup_*.zip"), reverse=True)
 
         if not backups:
-            QMessageBox.information(self, "Keine Sicherungen", "Es gibt keine Sicherungen zum Wiederherstellen.")
+            QMessageBox.information(self, tr("dialog.no_backups_title"), tr("dialog.backup_none"))
             return
 
         # Show card-based dialog
@@ -1658,7 +1657,7 @@ class MainWindow(QMainWindow):
 
         # Reload and show toast
         self._reload_mod_list()
-        Toast(self, f"Sicherung wiederhergestellt: {zip_path.name}")
+        Toast(self, tr("toast.backup_restored", name=zip_path.name))
 
     def _on_profile_created(self, name: str) -> None:
         """Handle new profile creation - create folder and copy Default's active_mods."""
@@ -1681,7 +1680,7 @@ class MainWindow(QMainWindow):
 
         # Switch to new profile
         self._on_profile_changed(name)
-        Toast(self, f"Profil '{name}' erstellt")
+        Toast(self, tr("toast.profile_created", name=name))
 
     def _on_profile_renamed(self, old_name: str, new_name: str) -> None:
         """Handle profile rename - rename folder on disk."""
@@ -1699,7 +1698,7 @@ class MainWindow(QMainWindow):
         if self._current_profile_path and self._current_profile_path.name == old_name:
             self._current_profile_path = new_path
 
-        Toast(self, f"Profil umbenannt: {old_name} → {new_name}")
+        Toast(self, tr("toast.profile_renamed", old=old_name, new=new_name))
 
     def _on_profile_changed(self, name: str) -> None:
         """Handle profile switch - update checkboxes only, keep order.
@@ -1773,7 +1772,7 @@ class MainWindow(QMainWindow):
             try:
                 shutil.rmtree(profile_path)
             except OSError as e:
-                Toast(self, f"Fehler beim Löschen: {e.strerror}")
+                Toast(self, tr("toast.delete_error", error=e.strerror))
                 return
 
         # Gelöschtes Profil aus Order-Datei entfernen
@@ -1812,7 +1811,7 @@ class MainWindow(QMainWindow):
         if was_active:
             self._on_profile_changed(new_active)
 
-        Toast(self, f"Profil '{name}' gelöscht")
+        Toast(self, tr("toast.profile_deleted", name=name))
 
     def _on_profiles_reordered(self, order: list[str]) -> None:
         """Handle profile reorder via drag & drop."""
@@ -1838,14 +1837,14 @@ class MainWindow(QMainWindow):
         # Add all to collapsed set
         tree._collapsed_separators = separator_folders
         tree._apply_separator_filter()
-        self.statusBar().showMessage(f"Alle Trenner eingeklappt ({len(separator_folders)})", 3000)
+        self.statusBar().showMessage(tr("status.separators_collapsed", count=len(separator_folders)), 3000)
 
     def _expand_all_separators(self) -> None:
         """Expand all separators in the mod list."""
         tree = self._mod_list_view._tree
         tree._collapsed_separators.clear()
         tree._apply_separator_filter()
-        self.statusBar().showMessage("Alle Trenner ausgeklappt", 3000)
+        self.statusBar().showMessage(tr("status.separators_expanded"), 3000)
 
     def _ctx_install_mod(self) -> None:
         """Install a mod from an archive file."""
@@ -1854,7 +1853,7 @@ class MainWindow(QMainWindow):
         exts = " ".join(f"*{e}" for e in sorted(SUPPORTED_EXTENSIONS))
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Mod-Archiv auswählen",
+            tr("dialog.select_mod_archive_single"),
             str(Path.home()),
             f"Archive ({exts})",
         )
@@ -1868,12 +1867,12 @@ class MainWindow(QMainWindow):
         if result:
             add_mod_to_modlist(self._current_profile_path, result.name, True)
             self._reload_mod_list()
-            self.statusBar().showMessage(f"Mod installiert: {result.name}", 5000)
+            self.statusBar().showMessage(tr("status.mod_installed", name=result.name), 5000)
         else:
             QMessageBox.warning(
                 self,
-                "Installation fehlgeschlagen",
-                f"Die Mod konnte nicht installiert werden:\n{archive_path.name}",
+                tr("error.install_failed_title"),
+                tr("error.install_failed_archive", name=archive_path.name),
             )
 
     def _ctx_create_empty_mod(self) -> None:
@@ -1881,7 +1880,7 @@ class MainWindow(QMainWindow):
         from anvil.core.mod_metadata import create_default_meta_ini
 
         name, ok = QInputDialog.getText(
-            self, "Leere Mod erstellen", "Name der Mod:",
+            self, tr("dialog.create_empty_mod_title"), tr("dialog.create_empty_mod_prompt"),
         )
         if not ok or not name.strip():
             return
@@ -1892,8 +1891,8 @@ class MainWindow(QMainWindow):
 
         if mod_path.exists():
             QMessageBox.warning(
-                self, "Mod erstellen",
-                f"Eine Mod mit dem Namen \"{name}\" existiert bereits.",
+                self, tr("error.mod_create_error"),
+                tr("dialog.mod_exists_message", name=name),
             )
             return
 
@@ -1902,13 +1901,13 @@ class MainWindow(QMainWindow):
             create_default_meta_ini(mod_path, name)
         except OSError as exc:
             QMessageBox.warning(
-                self, "Mod erstellen", str(exc),
+                self, tr("error.mod_create_error"), str(exc),
             )
             return
 
         add_mod_to_modlist(self._current_profile_path, name, True)
         self._reload_mod_list()
-        self.statusBar().showMessage(f"Leere Mod erstellt: {name}", 5000)
+        self.statusBar().showMessage(tr("status.empty_mod_created", name=name), 5000)
 
     def _ctx_export_csv(self) -> None:
         """Export the mod list as CSV file."""
@@ -1916,9 +1915,9 @@ class MainWindow(QMainWindow):
 
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Modliste exportieren",
+            tr("dialog.export_modlist_title"),
             str(Path.home() / "modlist.csv"),
-            "CSV-Dateien (*.csv)",
+            tr("dialog.csv_filter"),
         )
         if not path:
             return
@@ -1926,11 +1925,11 @@ class MainWindow(QMainWindow):
         try:
             with open(path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f, delimiter=";")
-                writer.writerow(["Name", "Kategorie", "Version", "Priorität", "Aktiv"])
+                writer.writerow(["Name", "Category", "Version", "Priority", "Active"])
 
                 for entry in self._current_mod_entries:
                     if entry.is_separator:
-                        continue  # Trenner nicht exportieren
+                        continue
                     cat_name = ""
                     if entry.category_ids:
                         cat_name = self._category_manager.get_name(entry.category_ids[0]) or ""
@@ -1939,13 +1938,13 @@ class MainWindow(QMainWindow):
                         cat_name,
                         entry.version,
                         entry.priority,
-                        "Ja" if entry.enabled else "Nein",
+                        "Yes" if entry.enabled else "No",
                     ])
 
-            self.statusBar().showMessage(f"Modliste exportiert: {path}", 5000)
+            self.statusBar().showMessage(tr("status.modlist_exported", path=path), 5000)
         except OSError as exc:
             QMessageBox.warning(
-                self, "Export fehlgeschlagen", str(exc),
+                self, tr("error.export_failed_title"), str(exc),
             )
 
     def _ctx_enable_selected(self, rows: list[int], enabled: bool) -> None:
@@ -1967,8 +1966,8 @@ class MainWindow(QMainWindow):
         """Enable or disable ALL mods."""
         all_rows = list(range(len(self._current_mod_entries)))
         self._ctx_enable_selected(all_rows, enabled)
-        label = "aktiviert" if enabled else "deaktiviert"
-        self.statusBar().showMessage(f"Alle Mods {label}", 3000)
+        msg = tr("status.all_mods_enabled") if enabled else tr("status.all_mods_disabled")
+        self.statusBar().showMessage(msg, 3000)
 
     def _apply_category_changes(
         self,
@@ -2027,7 +2026,7 @@ class MainWindow(QMainWindow):
             model.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DisplayRole])
 
         self.statusBar().showMessage(
-            f"Kategorien aktualisiert: {entry.display_name or entry.name}", 3000,
+            tr("status.categories_updated", name=entry.display_name or entry.name), 3000,
         )
 
     def _toggle_category(self, row: int, cat_id: int) -> None:
@@ -2075,9 +2074,9 @@ class MainWindow(QMainWindow):
             idx = model.index(row, 4)  # COL_CATEGORY
             model.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DisplayRole])
 
-        action = "hinzugefügt" if cat_id in ordered else "entfernt"
         name = self._category_manager.get_name(cat_id) or str(cat_id)
-        self.statusBar().showMessage(f"Kategorie {action}: {name}", 3000)
+        msg = tr("status.category_added", name=name) if cat_id in ordered else tr("status.category_removed", name=name)
+        self.statusBar().showMessage(msg, 3000)
 
     def _set_primary_category(self, row: int, cat_id: int) -> None:
         """Set a category as primary for a mod."""
@@ -2116,7 +2115,7 @@ class MainWindow(QMainWindow):
             model.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DisplayRole])
 
         name = self._category_manager.get_name(cat_id) or str(cat_id)
-        self.statusBar().showMessage(f"Primäre Kategorie: {name}", 3000)
+        self.statusBar().showMessage(tr("status.primary_category_set", name=name), 3000)
 
     def _ctx_create_backup(self, row: int) -> None:
         """Create a ZIP backup of the mod folder in .backups/."""
@@ -2148,11 +2147,11 @@ class MainWindow(QMainWindow):
                     if file.is_file():
                         zf.write(file, file.relative_to(mod_path))
             self.statusBar().showMessage(
-                f"Sicherung erstellt: {zip_name}", 5000,
+                tr("status.backup_created", name=zip_name), 5000,
             )
         except OSError as exc:
             QMessageBox.warning(
-                self, "Sicherung fehlgeschlagen", str(exc),
+                self, tr("error.backup_failed_title"), str(exc),
             )
 
     def _ctx_visit_nexus(self, row: int) -> None:
@@ -2183,7 +2182,7 @@ class MainWindow(QMainWindow):
         old_name = entry.name
 
         new_name, ok = QInputDialog.getText(
-            self, "Mod umbenennen", "Neuer Name:", text=old_name,
+            self, tr("dialog.rename_mod_title"), tr("dialog.rename_mod_prompt"), text=old_name,
         )
         if not ok or not new_name.strip() or new_name.strip() == old_name:
             return
@@ -2194,8 +2193,8 @@ class MainWindow(QMainWindow):
 
         if new_path.exists():
             QMessageBox.warning(
-                self, "Umbenennen fehlgeschlagen",
-                f"Ein Mod mit dem Namen \"{new_name}\" existiert bereits.",
+                self, tr("error.rename_failed_title"),
+                tr("dialog.mod_exists_message", name=new_name),
             )
             return
 
@@ -2203,13 +2202,13 @@ class MainWindow(QMainWindow):
             old_path.rename(new_path)
         except OSError as exc:
             QMessageBox.warning(
-                self, "Umbenennen fehlgeschlagen", str(exc),
+                self, tr("error.rename_failed_title"), str(exc),
             )
             return
 
         rename_mod_in_modlist(self._current_profile_path, old_name, new_name)
         self._reload_mod_list()
-        self.statusBar().showMessage(f"Umbenannt: {old_name} → {new_name}", 5000)
+        self.statusBar().showMessage(tr("status.renamed", old=old_name, new=new_name), 5000)
 
     def _ctx_reinstall_mod(self, row: int) -> None:
         """Reinstall a mod from its archive in .downloads/."""
@@ -2220,8 +2219,8 @@ class MainWindow(QMainWindow):
 
         if not downloads_path.is_dir():
             QMessageBox.warning(
-                self, "Neu installieren",
-                "Kein Downloads-Ordner gefunden.",
+                self, tr("dialog.reinstall_title"),
+                tr("status.no_downloads_folder"),
             )
             return
 
@@ -2236,8 +2235,8 @@ class MainWindow(QMainWindow):
 
         if not archive:
             QMessageBox.information(
-                self, "Neu installieren",
-                f"Kein passendes Archiv für \"{entry.name}\" in .downloads/ gefunden.",
+                self, tr("dialog.reinstall_title"),
+                tr("dialog.no_matching_archive", name=entry.name),
             )
             return
 
@@ -2253,12 +2252,13 @@ class MainWindow(QMainWindow):
             return
 
         if len(names) == 1:
-            msg = f"Mod \"{names[0]}\" wirklich löschen?\n\nDer Mod-Ordner wird unwiderruflich gelöscht."
+            msg = tr("dialog.remove_mod_single", name=names[0])
         else:
-            msg = f"{len(names)} Mods wirklich löschen?\n\n" + "\n".join(f"  • {n}" for n in names) + "\n\nDie Mod-Ordner werden unwiderruflich gelöscht."
+            names_list = "\n".join(f"  • {n}" for n in names)
+            msg = tr("dialog.remove_mod_multi", count=len(names), list=names_list)
 
         reply = QMessageBox.question(
-            self, "Mod entfernen", msg,
+            self, tr("dialog.remove_mod_title"), msg,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -2271,7 +2271,7 @@ class MainWindow(QMainWindow):
             remove_mod_from_modlist(self._current_profile_path, name)
 
         self._reload_mod_list()
-        self.statusBar().showMessage(f"Entfernt: {', '.join(names)}", 5000)
+        self.statusBar().showMessage(tr("status.removed", names=", ".join(names)), 5000)
 
     def _ctx_open_explorer(self, row: int) -> None:
         """Open the mod folder in the file manager."""
@@ -2320,7 +2320,7 @@ class MainWindow(QMainWindow):
 
         dlg = QDialog(self)
         dlg.setObjectName("InfoDialog")
-        dlg.setWindowTitle(f"Informationen: {entry.display_name or entry.name}")
+        dlg.setWindowTitle(tr("dialog.info_title", name=entry.display_name or entry.name))
         layout = QVBoxLayout(dlg)
         text_edit = QTextEdit()
         text_edit.setReadOnly(True)
@@ -2368,13 +2368,12 @@ class MainWindow(QMainWindow):
         if not self._nexus_api.has_api_key():
             QMessageBox.warning(
                 self, "Nexus API",
-                "Kein Nexus API-Schlüssel konfiguriert.\n"
-                "Bitte unter Werkzeuge → Einstellungen → Nexus einen API-Schlüssel eingeben.",
+                tr("status.nexus_api_key_missing"),
             )
             return
 
         self.statusBar().showMessage(
-            f"Nexus: Lade Download-Links für Mod {nxm_link.mod_id}...", 5000,
+            tr("status.nexus_loading", id=nxm_link.mod_id), 5000,
         )
 
         # First get mod info (for name/version), then download links
@@ -2401,7 +2400,7 @@ class MainWindow(QMainWindow):
             # Use first available download URL
             url = data[0].get("URI", "")
             if not url:
-                self.statusBar().showMessage("Nexus: Kein Download-Link erhalten.", 5000)
+                self.statusBar().showMessage(tr("status.nexus_no_link"), 5000)
                 return
 
             # Determine filename from URL
@@ -2424,7 +2423,7 @@ class MainWindow(QMainWindow):
                 mod_version=mod_version,
             )
             self.statusBar().showMessage(
-                f"Nexus: Download gestartet — {file_name}", 5000,
+                tr("status.nexus_download_started", name=file_name), 5000,
             )
 
             # Switch to Downloads tab
@@ -2440,7 +2439,7 @@ class MainWindow(QMainWindow):
 
     def _on_nexus_error(self, tag: str, message: str) -> None:
         """Handle Nexus API errors."""
-        self.statusBar().showMessage(f"Nexus Fehler: {message}", 5000)
+        self.statusBar().showMessage(tr("status.nexus_error", message=message), 5000)
 
     def _update_api_status(self, daily: int, hourly: int) -> None:
         """Update status bar API rate limit display (MO2 style)."""
@@ -2592,7 +2591,7 @@ class MainWindow(QMainWindow):
         # Check if Proton prefix exists
         if self._bg3_installer._mods_path is None:
             self.statusBar().showMessage(
-                "BG3: Proton-Prefix nicht gefunden — Mods-Ordner fehlt", 8000,
+                tr("status.bg3_proton_missing"), 8000,
             )
 
         # Load mod list
@@ -2638,9 +2637,9 @@ class MainWindow(QMainWindow):
         if ok:
             self._bg3_reload_mod_list()
             self._bg3_mark_dirty()
-            self.statusBar().showMessage("Mod aktiviert", 3000)
+            self.statusBar().showMessage(tr("status.mod_activated"), 3000)
         else:
-            self.statusBar().showMessage("Mod konnte nicht aktiviert werden", 5000)
+            self.statusBar().showMessage(tr("status.mod_activation_failed"), 5000)
 
     def _on_bg3_mod_deactivated(self, uuid: str) -> None:
         """Deactivate a BG3 mod (remove from ModOrder)."""
@@ -2650,9 +2649,9 @@ class MainWindow(QMainWindow):
         if ok:
             self._bg3_reload_mod_list()
             self._bg3_mark_dirty()
-            self.statusBar().showMessage("Mod deaktiviert", 3000)
+            self.statusBar().showMessage(tr("status.mod_deactivated"), 3000)
         else:
-            self.statusBar().showMessage("Mod konnte nicht deaktiviert werden", 5000)
+            self.statusBar().showMessage(tr("status.mod_deactivation_failed"), 5000)
 
     def _on_bg3_mods_reordered(self, uuid_order: list[str]) -> None:
         """Reorder BG3 active mods."""
@@ -2661,9 +2660,9 @@ class MainWindow(QMainWindow):
         ok = self._bg3_installer.reorder_mods(uuid_order)
         if ok:
             self._bg3_mark_dirty()
-            self.statusBar().showMessage("Load-Order aktualisiert", 3000)
+            self.statusBar().showMessage(tr("status.load_order_updated"), 3000)
         else:
-            self.statusBar().showMessage("Load-Order konnte nicht geändert werden", 5000)
+            self.statusBar().showMessage(tr("status.load_order_failed"), 5000)
             self._bg3_reload_mod_list()
 
     def _on_bg3_archives_dropped(self, paths: list) -> None:
@@ -2679,7 +2678,7 @@ class MainWindow(QMainWindow):
                 installed.append((name, mod_type))
             else:
                 self.statusBar().showMessage(
-                    f"Installation fehlgeschlagen: {Path(path_str).name}", 5000,
+                    tr("status.install_failed", name=Path(path_str).name), 5000,
                 )
         if installed:
             self._bg3_reload_mod_list()
@@ -2689,21 +2688,21 @@ class MainWindow(QMainWindow):
             names = ", ".join(n for n, _ in installed)
             types = set(t for _, t in installed)
             if types == {"pak"}:
-                self.statusBar().showMessage(f"Installiert (inaktiv): {names}", 5000)
+                self.statusBar().showMessage(tr("status.installed_inactive", names=names), 5000)
             else:
-                self.statusBar().showMessage(f"Installiert: {names}", 5000)
+                self.statusBar().showMessage(tr("status.installed", names=names), 5000)
 
     def _on_bg3_deploy(self) -> None:
         """Deploy: validate and backup modsettings.lsx."""
         if self._bg3_installer is None:
-            self.statusBar().showMessage("Kein BG3-Installer aktiv", 5000)
+            self.statusBar().showMessage(tr("status.no_bg3_installer"), 5000)
             return
         ok = self._bg3_installer.deploy()
         if ok:
             self._bg3_mark_clean()
-            self.statusBar().showMessage("Mod-Liste exportiert \u2713", 5000)
+            self.statusBar().showMessage(tr("status.modlist_exported_check"), 5000)
         else:
-            self.statusBar().showMessage("Deploy fehlgeschlagen — siehe Konsole", 5000)
+            self.statusBar().showMessage(tr("status.deploy_failed"), 5000)
 
     def _on_bg3_context_menu(self, global_pos, section: str, mod_data: dict) -> None:
         """BG3-specific context menu."""
@@ -2720,23 +2719,23 @@ class MainWindow(QMainWindow):
 
         if has_mod:
             if section == "inactive":
-                act_activate = menu.addAction("Aktivieren")
+                act_activate = menu.addAction(tr("context.activate"))
             else:
                 act_activate = None
-                act_deactivate = menu.addAction("Deaktivieren")
+                act_deactivate = menu.addAction(tr("context.deactivate"))
 
             menu.addSeparator()
-            act_uninstall = menu.addAction("Deinstallieren...")
+            act_uninstall = menu.addAction(tr("context.uninstall"))
         else:
             act_activate = None
             act_deactivate = None
             act_uninstall = None
 
         menu.addSeparator()
-        act_explorer = menu.addAction("Im Dateimanager öffnen")
+        act_explorer = menu.addAction(tr("context.open_file_manager"))
         act_explorer.setEnabled(has_mod)
         menu.addSeparator()
-        act_reload = menu.addAction("Neu laden")
+        act_reload = menu.addAction(tr("context.reload"))
 
         chosen = menu.exec(global_pos)
         if not chosen:
@@ -2747,7 +2746,7 @@ class MainWindow(QMainWindow):
 
         if chosen == act_reload:
             self._bg3_reload_mod_list()
-            self.statusBar().showMessage("Mod-Liste neu geladen", 3000)
+            self.statusBar().showMessage(tr("status.mod_list_reloaded"), 3000)
         elif act_activate is not None and chosen == act_activate:
             self._on_bg3_mod_activated(uuid)
         elif act_deactivate is not None and chosen == act_deactivate:
@@ -2755,10 +2754,8 @@ class MainWindow(QMainWindow):
         elif chosen == act_uninstall and uuid:
             name = mod_data.get("name", uuid)
             reply = QMessageBox.question(
-                self, "Mod deinstallieren",
-                f"Mod \"{name}\" wirklich deinstallieren?\n\n"
-                "Die .pak-Datei wird gelöscht und der Eintrag aus\n"
-                "modsettings.lsx entfernt.",
+                self, tr("dialog.uninstall_mod_title"),
+                tr("dialog.uninstall_mod_message", name=name),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.Yes:
@@ -2766,9 +2763,9 @@ class MainWindow(QMainWindow):
                 if ok:
                     self._bg3_reload_mod_list()
                     self._bg3_mark_dirty()
-                    self.statusBar().showMessage(f"Deinstalliert: {name}", 5000)
+                    self.statusBar().showMessage(tr("status.uninstalled", name=name), 5000)
                 else:
-                    self.statusBar().showMessage("Deinstallation fehlgeschlagen", 5000)
+                    self.statusBar().showMessage(tr("status.uninstall_failed"), 5000)
         elif chosen == act_explorer:
             import subprocess
             mods_path = self._bg3_installer._mods_path
@@ -2783,10 +2780,10 @@ class MainWindow(QMainWindow):
 
         act_uninstall = None
         if mod_type == "data_override" and name:
-            act_uninstall = menu.addAction("Deinstallieren...")
+            act_uninstall = menu.addAction(tr("context.uninstall"))
 
         menu.addSeparator()
-        act_reload = menu.addAction("Neu laden")
+        act_reload = menu.addAction(tr("context.reload"))
 
         chosen = menu.exec(global_pos)
         if not chosen:
@@ -2794,32 +2791,31 @@ class MainWindow(QMainWindow):
 
         if chosen == act_reload:
             self._bg3_reload_mod_list()
-            self.statusBar().showMessage("Mod-Liste neu geladen", 3000)
+            self.statusBar().showMessage(tr("status.mod_list_reloaded"), 3000)
         elif chosen == act_uninstall and name:
             reply = QMessageBox.question(
-                self, "Data-Override deinstallieren",
-                f"Data-Override \"{name}\" wirklich deinstallieren?\n\n"
-                f"Alle zugehörigen Dateien werden aus Data/ gelöscht.",
+                self, tr("dialog.uninstall_data_override_title"),
+                tr("dialog.uninstall_data_override_message", name=name),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.Yes:
                 ok = self._bg3_installer.uninstall_data_override(name)
                 if ok:
                     self._bg3_reload_mod_list()
-                    self.statusBar().showMessage(f"Data-Override deinstalliert: {name}", 5000)
+                    self.statusBar().showMessage(tr("status.data_override_uninstalled", name=name), 5000)
                 else:
-                    self.statusBar().showMessage("Deinstallation fehlgeschlagen", 5000)
+                    self.statusBar().showMessage(tr("status.uninstall_failed"), 5000)
 
     # ── Other slots ───────────────────────────────────────────────────
 
     def _on_about(self):
-        QMessageBox.about(self, "Über Anvil Organizer", f"Anvil Organizer v{APP_VERSION}\n\nPlatzhalter-GUI.")
+        QMessageBox.about(self, tr("menu.about_anvil"), f"Anvil Organizer v{APP_VERSION}\n\nPlaceholder GUI.")
 
     def _on_update_available(self, version: str, url: str):
         """Show toast when a new version is available."""
         toast = Toast(
             self,
-            f"Update verfügbar: {version} — Klick zum Öffnen",
+            tr("status.update_available", version=version),
             duration=8000,
             clickable=True,
         )

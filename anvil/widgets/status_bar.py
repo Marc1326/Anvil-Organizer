@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QStatusBar, QLabel
 
+from anvil.core.translator import tr
+
 
 class StatusBarWidget(QStatusBar):
     def __init__(self, parent=None):
@@ -11,10 +13,10 @@ class StatusBarWidget(QStatusBar):
         self._left_label = QLabel("")
         self.addWidget(self._left_label, 1)
 
-        self._notifications_label = QLabel("\u25b2 Benachrichtigungen")
+        self._notifications_label = QLabel(tr("status.notifications"))
         self.addPermanentWidget(self._notifications_label)
 
-        self._api_label = QLabel("API: not logged in")
+        self._api_label = QLabel(tr("status.api_not_logged_in"))
         self._api_label.setStyleSheet(
             "QLabel { padding: 2px 6px; }"
         )
@@ -27,14 +29,14 @@ class StatusBarWidget(QStatusBar):
         store: str,
     ) -> None:
         """Update the status bar with the active instance info."""
-        store_text = store or "unbekannt"
+        store_text = store or tr("status.unknown")
         self._left_label.setText(
-            f"Instanz: {game_name} | Plugin: {short_name} | Store: {store_text}"
+            tr("status.instance_info", game=game_name, plugin=short_name, store=store_text)
         )
 
     def clear_instance(self) -> None:
         """Clear the instance info."""
-        self._left_label.setText("Keine Instanz ausgewählt")
+        self._left_label.setText(tr("status.no_instance"))
 
     def update_api_status(
         self,
@@ -51,7 +53,7 @@ class StatusBarWidget(QStatusBar):
         - Red: < 200
         """
         if not logged_in or (daily_remaining < 0 and hourly_remaining < 0):
-            self._api_label.setText("API: not logged in")
+            self._api_label.setText(tr("status.api_not_logged_in"))
             self._api_label.setStyleSheet("QLabel { padding: 2px 6px; }")
             return
 

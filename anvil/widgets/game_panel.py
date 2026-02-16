@@ -36,6 +36,7 @@ from anvil.core.mod_deployer import ModDeployer
 from anvil.core.download_manager import DownloadManager
 from anvil.core.persistent_header import PersistentHeader
 from anvil.core import _todo
+from anvil.core.translator import tr
 
 
 class _NumericSortItem(QTableWidgetItem):
@@ -98,7 +99,7 @@ class GamePanel(QWidget):
         if os.path.exists(_exec_icon):
             link_btn.setIcon(QIcon(_exec_icon))
         link_btn.setIconSize(QSize(20, 20))
-        link_btn.setToolTip("Verknüpfung")
+        link_btn.setToolTip(tr("tooltip.link"))
         link_btn.setFixedWidth(32)
         link_btn.clicked.connect(_todo("Verknüpfung"))
         link_btn_row = QHBoxLayout()
@@ -133,7 +134,7 @@ class GamePanel(QWidget):
         arrow_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         top_layout.addWidget(self._game_btn, 0, Qt.AlignmentFlag.AlignHCenter)
 
-        self._game_label = QLabel("Kein Spiel ausgewählt")
+        self._game_label = QLabel(tr("game_panel.no_game_selected"))
         self._game_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         top_layout.addWidget(self._game_label)
 
@@ -146,7 +147,7 @@ class GamePanel(QWidget):
             self._start_btn.setIconSize(QSize(24, 24))
         self._start_btn.setMinimumWidth(140)
         self._start_btn.setFixedHeight(36)
-        self._start_btn.setToolTip("Starten")
+        self._start_btn.setToolTip(tr("game_panel.start"))
         self._start_btn.clicked.connect(self._on_start_clicked)
         top_layout.addWidget(self._start_btn, 0, Qt.AlignmentFlag.AlignHCenter)
 
@@ -168,7 +169,7 @@ class GamePanel(QWidget):
         # ── Daten-Tab ─────────────────────────────────────────────────
         data = QWidget()
         data_layout = QVBoxLayout(data)
-        data_reload_btn = QPushButton("Neu laden")
+        data_reload_btn = QPushButton(tr("game_panel.reload"))
         _refresh_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "refresh.svg")
         if os.path.exists(_refresh_icon):
             data_reload_btn.setIcon(QIcon(_refresh_icon))
@@ -177,7 +178,7 @@ class GamePanel(QWidget):
         data_layout.addWidget(data_reload_btn)
         self._data_tree = QTreeWidget()
         self._data_tree.setColumnCount(5)
-        self._data_tree.setHeaderLabels(["Name", "Mod", "Type", "Größe", "Datum modifiziert"])
+        self._data_tree.setHeaderLabels([tr("game_panel.header_name"), tr("game_panel.header_mod"), tr("game_panel.header_type"), tr("game_panel.header_size"), tr("game_panel.header_date")])
         self._data_tree.setAlternatingRowColors(True)
         data_header = self._data_tree.header()
         data_header.setStretchLastSection(False)
@@ -192,21 +193,21 @@ class GamePanel(QWidget):
         self._ph_data = PersistentHeader(data_header, "data")
         data_layout.addWidget(self._data_tree)
         data_bar = QHBoxLayout()
-        data_bar.addWidget(QCheckBox("Nur Konflikte"))
-        data_bar.addWidget(QCheckBox("Archive"))
+        data_bar.addWidget(QCheckBox(tr("game_panel.conflicts_only")))
+        data_bar.addWidget(QCheckBox(tr("game_panel.archives")))
         data_filter_edit = QLineEdit()
-        data_filter_edit.setPlaceholderText("Filter")
+        data_filter_edit.setPlaceholderText(tr("placeholder.filter"))
         data_bar.addWidget(data_filter_edit)
         data_bar.addStretch()
         data_layout.addLayout(data_bar)
-        tabs.addTab(data, "Daten")
+        tabs.addTab(data, tr("game_panel.data_tab"))
 
         # ── Spielstände-Tab ───────────────────────────────────────────
         saves = QWidget()
         saves_layout = QVBoxLayout(saves)
         self._saves_tree = QTreeWidget()
         self._saves_tree.setColumnCount(2)
-        self._saves_tree.setHeaderLabels(["Name", "Datei"])
+        self._saves_tree.setHeaderLabels([tr("game_panel.header_name"), tr("game_panel.header_file")])
         saves_header = self._saves_tree.header()
         saves_header.setStretchLastSection(False)
         saves_header.setCascadingSectionResizes(True)
@@ -214,12 +215,12 @@ class GamePanel(QWidget):
         saves_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self._ph_saves = PersistentHeader(saves_header, "saves")
         saves_layout.addWidget(self._saves_tree)
-        tabs.addTab(saves, "Spielstände")
+        tabs.addTab(saves, tr("game_panel.saves_tab"))
 
         # ── Downloads-Tab ─────────────────────────────────────────────
         downloads = QWidget()
         dl_layout = QVBoxLayout(downloads)
-        reload_btn = QPushButton("Neu laden")
+        reload_btn = QPushButton(tr("game_panel.reload"))
         _refresh_icon2 = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "refresh.svg")
         if os.path.exists(_refresh_icon2):
             reload_btn.setIcon(QIcon(_refresh_icon2))
@@ -228,7 +229,7 @@ class GamePanel(QWidget):
         dl_layout.addWidget(reload_btn)
         self._dl_table = _DraggableDownloadTable()
         self._dl_table.setColumnCount(4)
-        self._dl_table.setHorizontalHeaderLabels(["Name", "Größe", "Status", "Dateizeit"])
+        self._dl_table.setHorizontalHeaderLabels([tr("game_panel.header_name"), tr("game_panel.header_size"), tr("game_panel.header_status"), tr("game_panel.header_filetime")])
         dl_header = self._dl_table.horizontalHeader()
         dl_header.setStretchLastSection(False)
         dl_header.setCascadingSectionResizes(True)
@@ -252,14 +253,14 @@ class GamePanel(QWidget):
         self._dl_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._dl_table.customContextMenuRequested.connect(self._on_dl_context_menu)
         dl_layout.addWidget(self._dl_table)
-        cb = QCheckBox("versteckte Dateien")
+        cb = QCheckBox(tr("game_panel.hidden_files"))
         cb.stateChanged.connect(lambda s: _todo("versteckte Dateien")())
         dl_layout.addWidget(cb)
         fe = QLineEdit()
-        fe.setPlaceholderText("Filter")
+        fe.setPlaceholderText(tr("placeholder.filter"))
         fe.textChanged.connect(lambda t: _todo("Filter Downloads")())
         dl_layout.addWidget(fe)
-        tabs.addTab(downloads, "Downloads")
+        tabs.addTab(downloads, tr("game_panel.downloads_tab"))
 
         layout.addWidget(tabs)
 
@@ -338,7 +339,7 @@ class GamePanel(QWidget):
             self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns)
 
         # Update label
-        self._game_label.setText(game_name or "Kein Spiel ausgewählt")
+        self._game_label.setText(game_name or tr("game_panel.no_game_selected"))
 
         # Update game button icon (banner or placeholder)
         self._update_game_button_icon(game_name)
@@ -390,7 +391,7 @@ class GamePanel(QWidget):
         self._selected_exe_index = 0
 
         # 1. <Bearbeiten...> — kein Icon, disabled
-        edit_action = self._exe_menu.addAction("<Bearbeiten...>")
+        edit_action = self._exe_menu.addAction(tr("game_panel.edit_executables"))
         edit_action.setEnabled(False)
         self._exe_menu.addSeparator()
 
@@ -418,23 +419,23 @@ class GamePanel(QWidget):
 
             # Disabled-Platzhalter: "skip REDmod deploy", "Manually deploy REDmod"
             if game_name:
-                skip_action = self._exe_menu.addAction(cover_icon, f"{game_name} - skip REDmod deploy")
+                skip_action = self._exe_menu.addAction(cover_icon, tr("game_panel.skip_redmod", name=game_name))
                 skip_action.setEnabled(False)
-                deploy_action = self._exe_menu.addAction("Manually deploy REDmod")
+                deploy_action = self._exe_menu.addAction(tr("game_panel.deploy_redmod"))
                 deploy_action.setEnabled(False)
 
             # Explore Virtual Folder
             self._exe_menu.addSeparator()
             explore_action = self._exe_menu.addAction(
                 self.style().standardIcon(self.style().StandardPixmap.SP_DirIcon),
-                "Explore Virtual Folder",
+                tr("game_panel.explore_virtual"),
             )
             explore_action.triggered.connect(self._on_explore_virtual_folder)
 
         # Select first executable by default
         if self._executables:
             self._selected_exe_index = 0
-            self._start_btn.setToolTip(f"Starten: {self._executables[0]['name']}")
+            self._start_btn.setToolTip(tr("game_panel.start_with_name", name=self._executables[0]['name']))
 
     def _get_small_game_icon(self) -> QIcon:
         """Return small (24x24) game banner icon (cover art), or placeholder."""
@@ -489,7 +490,7 @@ class GamePanel(QWidget):
         """Handle executable selection from the menu."""
         self._selected_exe_index = index
         name = self._executables[index]["name"]
-        self._start_btn.setToolTip(f"Starten: {name}")
+        self._start_btn.setToolTip(tr("game_panel.start_with_name", name=name))
 
     def _on_start_clicked(self) -> None:
         """Start the currently selected executable (deploy already happened)."""
@@ -520,9 +521,8 @@ class GamePanel(QWidget):
                     QProcess.startDetached(steam_bin, args)
                 else:
                     QMessageBox.warning(
-                        self, "Starten",
-                        "Steam wurde nicht im PATH gefunden.\n"
-                        "Bitte Steam installieren oder den PATH anpassen.",
+                        self, tr("game_panel.start"),
+                        tr("game_panel.steam_not_found"),
                     )
                 return
 
@@ -530,16 +530,16 @@ class GamePanel(QWidget):
         game_path = self._current_game_path
         if game_path is None:
             QMessageBox.warning(
-                self, "Starten",
-                "Spielverzeichnis nicht gefunden.",
+                self, tr("game_panel.start"),
+                tr("game_panel.game_dir_not_found"),
             )
             return
 
         binary_path = game_path / binary
         if not binary_path.exists():
             QMessageBox.warning(
-                self, "Starten",
-                f"Executable nicht gefunden:\n{binary_path}",
+                self, tr("game_panel.start"),
+                tr("game_panel.exe_not_found", path=str(binary_path)),
             )
             return
 
@@ -551,23 +551,23 @@ class GamePanel(QWidget):
         self._data_tree.clear()
 
         if game_path is None or not game_path.is_dir():
-            item = QTreeWidgetItem(self._data_tree, ["(Spielverzeichnis nicht verfügbar)", "", "", "", ""])
+            item = QTreeWidgetItem(self._data_tree, [tr("game_panel.dir_not_available"), "", "", "", ""])
             return
 
         try:
             entries = sorted(game_path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
         except OSError:
-            item = QTreeWidgetItem(self._data_tree, ["(Fehler beim Lesen)", "", "", "", ""])
+            item = QTreeWidgetItem(self._data_tree, [tr("game_panel.read_error"), "", "", "", ""])
             return
 
         for entry in entries:
             try:
                 if entry.is_dir():
-                    QTreeWidgetItem(self._data_tree, [entry.name, "", "Folder", "-", "-"])
+                    QTreeWidgetItem(self._data_tree, [entry.name, "", tr("game_panel.folder"), "-", "-"])
                 else:
                     stat = entry.stat()
                     size = self._format_size(stat.st_size)
-                    QTreeWidgetItem(self._data_tree, [entry.name, "<Unmanaged>", "", size, ""])
+                    QTreeWidgetItem(self._data_tree, [entry.name, tr("game_panel.unmanaged"), "", size, ""])
             except OSError:
                 continue
 
@@ -652,7 +652,7 @@ class GamePanel(QWidget):
             # Strip Nexus suffixes like "-12128-1-0-1704653004"
             clean = re.sub(r"-\d+(-\d+)*$", "", stem).strip()
             is_installed = clean.lower() in installed_names or stem.lower() in installed_names
-            status_text = "Installiert" if is_installed else "Nicht installiert"
+            status_text = tr("game_panel.installed") if is_installed else tr("game_panel.not_installed")
             item_status = QTableWidgetItem(status_text)
             if is_installed:
                 item_status.setForeground(QColor("#4CAF50"))
@@ -697,6 +697,8 @@ class GamePanel(QWidget):
 
     def _bulk_delete_by_status(self, filter_status: str | None) -> None:
         """Delete archives filtered by status column. None = all."""
+        installed_text = tr("game_panel.installed")
+        not_installed_text = tr("game_panel.not_installed")
         paths: list[str] = []
         for row in range(self._dl_table.rowCount()):
             if filter_status is not None:
@@ -709,14 +711,14 @@ class GamePanel(QWidget):
         if not paths:
             return
         count = len(paths)
-        if filter_status == "Installiert":
-            msg = f"{count} installierte(s) Archiv(e) wirklich löschen?"
-        elif filter_status == "Nicht installiert":
-            msg = f"{count} deinstallierte(s) Archiv(e) wirklich löschen?"
+        if filter_status == installed_text:
+            msg = tr("game_panel.delete_confirm_installed", count=count)
+        elif filter_status == not_installed_text:
+            msg = tr("game_panel.delete_confirm_uninstalled", count=count)
         else:
-            msg = f"Alle {count} Archive wirklich löschen?"
+            msg = tr("game_panel.delete_confirm_all", count=count)
         answer = QMessageBox.question(
-            self, "Löschen bestätigen", msg,
+            self, tr("game_panel.delete_confirm_title"), msg,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if answer == QMessageBox.StandardButton.Yes:
@@ -746,44 +748,44 @@ class GamePanel(QWidget):
         menu = QMenu(self)
 
         # ── Group 1: Install ──
-        act_install = menu.addAction("Installieren")
+        act_install = menu.addAction(tr("game_panel.install"))
 
         menu.addSeparator()
 
         # ── Group 2: Open / Nexus ──
-        act_nexus = menu.addAction("Auf Nexus besuchen")
+        act_nexus = menu.addAction(tr("game_panel.visit_nexus"))
         act_nexus.setEnabled(mod_id is not None)
-        act_open = menu.addAction("Öffne Datei")
-        act_meta = menu.addAction("Öffne Meta Datei")
+        act_open = menu.addAction(tr("game_panel.open_file"))
+        act_meta = menu.addAction(tr("game_panel.open_meta"))
         act_meta.setEnabled(meta_path is not None)
 
         menu.addSeparator()
 
         # ── Group 3: Show in folder ──
-        act_show = menu.addAction("Zeige im Downloadverzeichnis")
+        act_show = menu.addAction(tr("game_panel.show_in_downloads"))
 
         menu.addSeparator()
 
         # ── Group 4: Delete / Hide ──
-        act_delete = menu.addAction("Löschen...")
-        act_hide = menu.addAction("Verstecken")
+        act_delete = menu.addAction(tr("game_panel.delete"))
+        act_hide = menu.addAction(tr("game_panel.hide"))
         act_hide.setEnabled(False)
 
         menu.addSeparator()
 
         # ── Group 5: Bulk delete ──
-        act_del_installed = menu.addAction("Lösche installierte Downloads...")
-        act_del_uninstalled = menu.addAction("Lösche deinstallierte Downloads")
-        act_del_all = menu.addAction("Lösche alle Downloads")
+        act_del_installed = menu.addAction(tr("game_panel.delete_installed"))
+        act_del_uninstalled = menu.addAction(tr("game_panel.delete_uninstalled"))
+        act_del_all = menu.addAction(tr("game_panel.delete_all"))
 
         menu.addSeparator()
 
         # ── Group 6: Bulk hide (placeholder) ──
-        act_hide_installed = menu.addAction("Verstecke Installierte")
+        act_hide_installed = menu.addAction(tr("game_panel.hide_installed"))
         act_hide_installed.setEnabled(False)
-        act_hide_uninstalled = menu.addAction("Verstecke Deinstallierte")
+        act_hide_uninstalled = menu.addAction(tr("game_panel.hide_uninstalled"))
         act_hide_uninstalled.setEnabled(False)
-        act_hide_all = menu.addAction("Verstecke Alle")
+        act_hide_all = menu.addAction(tr("game_panel.hide_all"))
         act_hide_all.setEnabled(False)
 
         chosen = menu.exec(self._dl_table.viewport().mapToGlobal(pos))
@@ -805,11 +807,11 @@ class GamePanel(QWidget):
         elif chosen == act_delete:
             count = len(paths)
             if count == 1:
-                msg = f"Archiv \"{Path(first).name}\" wirklich löschen?"
+                msg = tr("game_panel.delete_confirm_single", name=Path(first).name)
             else:
-                msg = f"{count} Archive wirklich löschen?"
+                msg = tr("game_panel.delete_confirm_multi", count=count)
             answer = QMessageBox.question(
-                self, "Löschen bestätigen", msg,
+                self, tr("game_panel.delete_confirm_title"), msg,
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if answer == QMessageBox.StandardButton.Yes:
@@ -820,9 +822,9 @@ class GamePanel(QWidget):
                         pass
                 self.refresh_downloads()
         elif chosen == act_del_installed:
-            self._bulk_delete_by_status("Installiert")
+            self._bulk_delete_by_status(tr("game_panel.installed"))
         elif chosen == act_del_uninstalled:
-            self._bulk_delete_by_status("Nicht installiert")
+            self._bulk_delete_by_status(tr("game_panel.not_installed"))
         elif chosen == act_del_all:
             self._bulk_delete_by_status(None)
 
@@ -850,7 +852,7 @@ class GamePanel(QWidget):
         item_size.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._dl_table.setItem(row, 1, item_size)
 
-        item_status = QTableWidgetItem("Downloading...")
+        item_status = QTableWidgetItem(tr("game_panel.downloading"))
         item_status.setForeground(QColor("#42A5F5"))
         self._dl_table.setItem(row, 2, item_status)
 
@@ -887,7 +889,7 @@ class GamePanel(QWidget):
         if row is not None:
             status_item = self._dl_table.item(row, 2)
             if status_item:
-                status_item.setText("Nicht installiert")
+                status_item.setText(tr("game_panel.not_installed"))
                 status_item.setForeground(QColor("#FFFFFF"))
 
             # Update date column
@@ -902,5 +904,5 @@ class GamePanel(QWidget):
         if row is not None:
             status_item = self._dl_table.item(row, 2)
             if status_item:
-                status_item.setText(f"Fehler: {message}")
+                status_item.setText(tr("game_panel.error_prefix", message=message))
                 status_item.setForeground(QColor("#F44336"))

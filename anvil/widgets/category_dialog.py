@@ -18,6 +18,7 @@ from PySide6.QtCore import Qt, QSettings
 from anvil.core.categories import CategoryManager
 from anvil.core.mod_entry import ModEntry
 from anvil.core.mod_metadata import write_meta_ini
+from anvil.core.translator import tr
 
 
 class CategoryDialog(QDialog):
@@ -37,7 +38,7 @@ class CategoryDialog(QDialog):
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Kategorien verwalten")
+        self.setWindowTitle(tr("dialog.categories_title"))
         self.setMinimumSize(1380, 800)
         self.resize(1380, 800)
         self._cat_mgr = category_manager
@@ -52,7 +53,7 @@ class CategoryDialog(QDialog):
 
         # Left: category tree
         self._tree = QTreeWidget()
-        self._tree.setHeaderLabels(["ID", "Name", "Mods", "Quelle", "Nexus Kategorie"])
+        self._tree.setHeaderLabels([tr("label.header_id"), tr("label.name"), tr("label.header_mods"), tr("label.header_source"), tr("label.header_nexus_category")])
         self._tree.setRootIsDecorated(False)
         self._tree.setSelectionMode(QTreeWidget.SelectionMode.SingleSelection)
         self._tree.setAllColumnsShowFocus(True)
@@ -74,9 +75,9 @@ class CategoryDialog(QDialog):
 
         # Right: action buttons
         btn_col = QVBoxLayout()
-        btn_new = QPushButton("Neu")
-        btn_rename = QPushButton("Umbenennen")
-        btn_delete = QPushButton("Löschen")
+        btn_new = QPushButton(tr("button.new"))
+        btn_rename = QPushButton(tr("button.rename"))
+        btn_delete = QPushButton(tr("button.delete"))
         btn_col.addWidget(btn_new)
         btn_col.addWidget(btn_rename)
         btn_col.addWidget(btn_delete)
@@ -86,7 +87,7 @@ class CategoryDialog(QDialog):
         outer.addLayout(body, 1)
 
         # Bottom: close button
-        btn_close = QPushButton("Schließen")
+        btn_close = QPushButton(tr("button.close"))
         btn_close.setDefault(True)
         close_row = QHBoxLayout()
         close_row.addStretch(1)
@@ -140,7 +141,7 @@ class CategoryDialog(QDialog):
         for cat in self._cat_mgr.all_categories():
             cat_id = cat["id"]
             count = self._mod_count(cat_id)
-            source = "Standard" if cat_id in self._default_ids else "Eigene"
+            source = tr("label.source_standard") if cat_id in self._default_ids else tr("label.source_custom")
             item = QTreeWidgetItem()
             item.setData(0, Qt.ItemDataRole.DisplayRole, cat_id)
             item.setText(1, cat["name"])
@@ -163,7 +164,7 @@ class CategoryDialog(QDialog):
 
     def _on_new(self) -> None:
         name, ok = QInputDialog.getText(
-            self, "Neue Kategorie", "Name:"
+            self, tr("dialog.new_category"), tr("label.name") + ":"
         )
         if not ok or not name.strip():
             return
@@ -172,8 +173,8 @@ class CategoryDialog(QDialog):
         if new_id == 0:
             QMessageBox.warning(
                 self,
-                "Kategorie existiert bereits",
-                f"Eine Kategorie mit dem Namen \"{name}\" existiert bereits.",
+                tr("dialog.category_exists"),
+                tr("dialog.category_exists_message", name=name),
             )
             return
         self._refresh_table()
@@ -182,12 +183,12 @@ class CategoryDialog(QDialog):
         cat_id = self._selected_id()
         if cat_id is None:
             QMessageBox.information(
-                self, "Keine Auswahl", "Bitte zuerst eine Kategorie auswählen."
+                self, tr("dialog.no_selection"), tr("dialog.select_category_first")
             )
             return
         old_name = self._cat_mgr.get_name(cat_id)
         new_name, ok = QInputDialog.getText(
-            self, "Kategorie umbenennen", "Neuer Name:", text=old_name
+            self, tr("dialog.rename_category"), tr("dialog.rename_mod_prompt"), text=old_name
         )
         if not ok or not new_name.strip():
             return
@@ -199,8 +200,8 @@ class CategoryDialog(QDialog):
         if existing_id != 0 and existing_id != cat_id:
             QMessageBox.warning(
                 self,
-                "Name vergeben",
-                f"Eine Kategorie mit dem Namen \"{new_name}\" existiert bereits.",
+                tr("dialog.name_taken"),
+                tr("dialog.category_exists_message", name=new_name),
             )
             return
         self._cat_mgr.rename_category(cat_id, new_name)
@@ -210,18 +211,18 @@ class CategoryDialog(QDialog):
         cat_id = self._selected_id()
         if cat_id is None:
             QMessageBox.information(
-                self, "Keine Auswahl", "Bitte zuerst eine Kategorie auswählen."
+                self, tr("dialog.no_selection"), tr("dialog.select_category_first")
             )
             return
         cat_name = self._cat_mgr.get_name(cat_id)
         count = self._mod_count(cat_id)
-        msg = f"Kategorie \"{cat_name}\" wirklich löschen?"
+        msg = tr("dialog.delete_category_confirm", name=cat_name)
         if count > 0:
-            msg += f"\n\nDie Kategorie ist {count} Mod(s) zugewiesen und wird dort entfernt."
+            msg += "\n\n" + tr("dialog.delete_category_with_mods", count=count)
 
         answer = QMessageBox.question(
             self,
-            "Kategorie löschen",
+            tr("dialog.delete_category_title"),
             msg,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,

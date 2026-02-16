@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
+from anvil.core.translator import tr
+
 
 CARD_STYLE_NORMAL = """
     QFrame {
@@ -170,7 +172,7 @@ class BackupDialog(QDialog):
 
     def __init__(self, parent, backups: list[Path]):
         super().__init__(parent)
-        self.setWindowTitle("Sicherung wiederherstellen")
+        self.setWindowTitle(tr("dialog.backup_title"))
         self.setFixedWidth(420)
         self.setMinimumHeight(200)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
@@ -189,7 +191,7 @@ class BackupDialog(QDialog):
         layout.setSpacing(16)
 
         # Title
-        title = QLabel("Sicherung wiederherstellen")
+        title = QLabel(tr("dialog.backup_title"))
         title.setStyleSheet("""
             font-size: 18px;
             font-weight: 600;
@@ -199,7 +201,7 @@ class BackupDialog(QDialog):
         layout.addWidget(title)
 
         # Subtitle
-        subtitle = QLabel("Wähle eine Sicherung zum Wiederherstellen:")
+        subtitle = QLabel(tr("dialog.backup_select"))
         subtitle.setStyleSheet("""
             font-size: 13px;
             color: #808080;
@@ -255,7 +257,7 @@ class BackupDialog(QDialog):
         btn_layout.setSpacing(12)
         btn_layout.addStretch()
 
-        self._btn_cancel = QPushButton("Abbrechen")
+        self._btn_cancel = QPushButton(tr("button.cancel"))
         self._btn_cancel.setFixedHeight(36)
         self._btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_cancel.setStyleSheet("""
@@ -275,7 +277,7 @@ class BackupDialog(QDialog):
         self._btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(self._btn_cancel)
 
-        self._btn_restore = QPushButton("Wiederherstellen")
+        self._btn_restore = QPushButton(tr("button.restore"))
         self._btn_restore.setFixedHeight(36)
         self._btn_restore.setEnabled(False)
         self._btn_restore.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -316,8 +318,8 @@ class BackupDialog(QDialog):
         """Delete a backup after confirmation."""
         reply = QMessageBox.question(
             self.window(),
-            "Sicherung löschen",
-            f"Sicherung wirklich löschen?\n\n{backup_path.name}",
+            tr("dialog.backup_delete_title"),
+            tr("dialog.backup_delete_confirm", name=backup_path.name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
