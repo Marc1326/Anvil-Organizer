@@ -35,12 +35,7 @@ from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.mod_deployer import ModDeployer
 from anvil.core.download_manager import DownloadManager
 from anvil.core.persistent_header import PersistentHeader
-
-
-def _todo(name):
-    def _():
-        print(f"TODO: {name}")
-    return _
+from anvil.core import _todo
 
 
 class _NumericSortItem(QTableWidgetItem):
