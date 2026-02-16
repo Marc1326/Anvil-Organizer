@@ -52,6 +52,7 @@ from anvil.core.conflict_scanner import ConflictScanner
 from anvil.models.mod_list_model import mod_entry_to_row
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 from anvil.widgets.category_dialog import CategoryDialog
+from anvil.widgets.log_panel import LogPanel
 
 
 def _todo(name):
@@ -172,21 +173,16 @@ class MainWindow(QMainWindow):
         splitter.setSizes([780, 420])
         main_layout.addWidget(splitter)
 
-        # ── Log-Panel (collapsible section) ───────────────────────────
+        # ── Log-Panel (collapsible section with card-style panel) ───────
         self._log_container = QWidget()
         self._log_container.setMinimumHeight(28)
-        self._log_container.setMaximumHeight(148)  # 28 bar + 120 text
+        self._log_container.setMaximumHeight(232)  # 28 bar + 204 LogPanel
         log_layout = QVBoxLayout(self._log_container)
         log_layout.setContentsMargins(0, 0, 0, 0)
         log_layout.setSpacing(0)
 
-        self._log_panel = QTextEdit()
-        self._log_panel.setReadOnly(True)
-        self._log_panel.setMaximumHeight(120)
-        self._log_panel.setPlaceholderText("Log-Ausgabe...")
-        self._log_panel.setStyleSheet(
-            "QTextEdit { font-family: monospace; font-size: 12px; }"
-        )
+        self._log_panel = LogPanel()
+        self._log_panel.setMaximumHeight(204)
 
         self._log_bar = CollapsibleSectionBar(
             "Log",
@@ -196,7 +192,7 @@ class MainWindow(QMainWindow):
                   "background: #1a2a3a; border-bottom: 1px solid #333; }",
             container=self._log_container,
             default_collapsed=True,
-            max_expanded_height=148,
+            max_expanded_height=232,
         )
         self._log_bar.toggled.connect(self._on_log_bar_toggled)
         log_layout.addWidget(self._log_bar)
@@ -356,7 +352,7 @@ class MainWindow(QMainWindow):
         # ── Log (Toggle) ──────────────────────────────────────────
         self._act_log = vm.addAction("Log")
         self._act_log.setCheckable(True)
-        self._act_log.setChecked(False)
+        self._act_log.setChecked(False)  # default_collapsed=True
         self._act_log.triggered.connect(self._on_toggle_log)
 
         vm.addSeparator()
@@ -751,6 +747,7 @@ class MainWindow(QMainWindow):
 
         # 1. Title
         self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v0.1.0")
+        self._log_panel.add_log("info", f"Instanz geladen: {game_name}")
 
         # 2. Game panel — real directory contents + executables + icons
         self._game_panel.update_game(game_name, game_path, plugin, self.icon_manager, short_name)
@@ -819,6 +816,10 @@ class MainWindow(QMainWindow):
         # Provide visible entries to proxy for filter logic
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
         self._update_active_count()
+
+        # Log mod count
+        active_count = sum(1 for e in visible_entries if e.enabled)
+        self._log_panel.add_log("info", f"{len(visible_entries)} Mods geladen ({active_count} aktiv)")
 
         # Framework detection (Cyberpunk, etc.)
         if plugin is not None:
