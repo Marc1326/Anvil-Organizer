@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
 )
 from PySide6.QtCore import Qt, QSettings, QUrl, QSize
-from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QKeySequence
+from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
 
 from anvil.styles.dark_theme import load_theme, default_theme
 from anvil.widgets.toolbar import create_toolbar
@@ -85,6 +85,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Anvil Organizer v0.1.0")
+        logo_path = Path(__file__).parent / "resources" / "logo.svg"
+        self.setWindowIcon(QIcon(str(logo_path)))
         self.setMinimumSize(1000, 650)
         self.resize(1200, 750)
         # Theme aus QSettings laden
