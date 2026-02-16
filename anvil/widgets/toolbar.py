@@ -12,14 +12,9 @@ from anvil.widgets.instance_manager_dialog import InstanceManagerDialog
 from anvil.widgets.profile_dialog import ProfileDialog
 from anvil.widgets.executables_dialog import ExecutablesDialog
 from anvil.widgets.settings_dialog import SettingsDialog
+from anvil.core import _todo
 
 _ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
-
-
-def _todo(name):
-    def _():
-        print(f"TODO: {name}")
-    return _
 
 
 def _icon(name: str) -> QIcon:

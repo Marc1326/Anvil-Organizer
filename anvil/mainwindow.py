@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QDialogButtonBox,
 )
-from PySide6.QtCore import Qt, QSettings, QUrl, QSize
+from PySide6.QtCore import Qt, QSettings, QTimer, QUrl, QSize
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
 
 from anvil.styles.dark_theme import load_theme, default_theme
@@ -48,6 +48,8 @@ from anvil.core.mod_list_io import (
     write_global_modlist, migrate_to_global_modlist,
 )
 from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
+from anvil.version import APP_VERSION
+from anvil.core.update_checker import UpdateChecker
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nxm_handler import parse_nxm_url, check_cli_for_nxm
 from anvil.core.conflict_scanner import ConflictScanner
@@ -55,12 +57,7 @@ from anvil.models.mod_list_model import mod_entry_to_row
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 from anvil.widgets.category_dialog import CategoryDialog
 from anvil.widgets.log_panel import LogPanel
-
-
-def _todo(name):
-    def _():
-        print(f"TODO: {name}")
-    return _
+from anvil.core import _todo
 
 
 def _matches_direct_install(name_lower: str, patterns: list[str]) -> bool:
@@ -84,7 +81,7 @@ def _matches_direct_install(name_lower: str, patterns: list[str]) -> bool:
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Anvil Organizer v0.1.0")
+        self.setWindowTitle(f"Anvil Organizer v{APP_VERSION}")
         logo_path = Path(__file__).parent / "resources" / "logo.svg"
         self.setWindowIcon(QIcon(str(logo_path)))
         self.setMinimumSize(1000, 650)
@@ -250,6 +247,11 @@ class MainWindow(QMainWindow):
         # App-weiter Event-Filter für ContextMenu-Events (Wayland-Kompatibilität)
         from PySide6.QtWidgets import QApplication
         QApplication.instance().installEventFilter(self)
+
+        # ── Update-Check (im Hintergrund, 3s nach Start) ────────────
+        self._update_checker = UpdateChecker(self)
+        self._update_checker.update_available.connect(self._on_update_available)
+        QTimer.singleShot(3000, self._update_checker.check)
 
     # ── Menu bar (MO2-Struktur) ─────────────────────────────────────
 
@@ -720,7 +722,7 @@ class MainWindow(QMainWindow):
 
         data = self.instance_manager.load_instance(instance_name)
         if not data:
-            self.setWindowTitle("Anvil Organizer v0.1.0")
+            self.setWindowTitle(f"Anvil Organizer v{APP_VERSION}")
             self._game_panel.update_game("Kein Spiel ausgewählt", None)
             self._mod_list_view.clear_mods()
             self._current_mod_entries = []
@@ -751,7 +753,7 @@ class MainWindow(QMainWindow):
         self._current_game_path = game_path
 
         # 1. Title
-        self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v0.1.0")
+        self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v{APP_VERSION}")
         self._log_panel.add_log("info", f"Instanz geladen: {game_name}")
 
         # 2. Game panel — real directory contents + executables + icons
@@ -2821,4 +2823,14 @@ class MainWindow(QMainWindow):
     # ── Other slots ───────────────────────────────────────────────────
 
     def _on_about(self):
-        QMessageBox.about(self, "Über Anvil Organizer", "Anvil Organizer v0.1.0\n\nPlatzhalter-GUI.")
+        QMessageBox.about(self, "Über Anvil Organizer", f"Anvil Organizer v{APP_VERSION}\n\nPlatzhalter-GUI.")
+
+    def _on_update_available(self, version: str, url: str):
+        """Show toast when a new version is available."""
+        toast = Toast(
+            self,
+            f"Update verfügbar: {version} — Klick zum Öffnen",
+            duration=8000,
+            clickable=True,
+        )
+        toast.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url)))

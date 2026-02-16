@@ -70,7 +70,7 @@ class BackupCard(QFrame):
             with zipfile.ZipFile(backup_path, 'r') as zf:
                 mod_count = len([n for n in zf.namelist()
                                if n.startswith("mods/") and n.endswith("/meta.ini")])
-        except:
+        except Exception:
             pass
 
         size = backup_path.stat().st_size

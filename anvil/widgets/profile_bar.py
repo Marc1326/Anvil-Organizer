@@ -19,13 +19,9 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QSize, Signal, Qt, QTimer, QPoint, QEvent
 
+from anvil.core import _todo
+
 ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "files")
-
-
-def _todo(name):
-    def _():
-        print(f"TODO: {name}")
-    return _
 
 
 BUTTON_STYLE = """
@@ -738,8 +734,10 @@ class ProfileBar(QWidget):
     def _reset_drag_state(self):
         """Drag-State zurücksetzen."""
         if self._drag_tab:
-            if self._drag_active:
-                self._drag_tab.releaseMouse()  # Mouse-Grab aufheben
+            try:
+                self._drag_tab.releaseMouse()  # Mouse-Grab IMMER aufheben
+            except RuntimeError:
+                pass  # Widget bereits gelöscht
             # Style zurücksetzen
             is_active = self._drag_tab.text() == self._active_profile
             if is_active:

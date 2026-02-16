@@ -1,7 +1,6 @@
 """Mod-Detail-Dialog — öffnet bei Doppelklick auf Mod in der Mod-Liste."""
 
 import os
-import subprocess
 
 from PySide6.QtWidgets import (
     QDialog,
@@ -28,11 +27,12 @@ from PySide6.QtWidgets import (
     QComboBox,
     QMenu,
 )
-from PySide6.QtCore import Qt, QRect, QSize, QTimer, QDir
+from PySide6.QtCore import Qt, QRect, QSize, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont, QFontDatabase, QIcon
 
 from anvil.core.conflict_scanner import ConflictScanner
 from anvil.core.mod_metadata import write_meta_ini
+from anvil.core import _todo
 from anvil.widgets.flow_layout import FlowLayout
 
 _MOD_DETAIL_DIALOG_STYLE = """
@@ -136,22 +136,10 @@ QLabel { color: #D3D3D3; }
 """
 
 
-def _todo(name):
-    def _():
-        print(f"TODO: {name}")
-    return _
-
-
 def _icon_path(name):
     """Pfad zu Icon in anvil/styles/icons/files/."""
     base = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base, "..", "styles", "icons", "files", name)
-
-
-def _test_mod_dir():
-    """Pfad zu anvil/test_mod/ (Testdateien für Textdateien-Tab)."""
-    base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, "..", "test_mod")
 
 
 def _code_font():

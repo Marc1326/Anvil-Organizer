@@ -208,7 +208,10 @@ class FilterPanel(QWidget):
     def set_categories(self, categories: list[dict]) -> None:
         """Populate category chips from a list of ``{'id': int, 'name': str}``."""
         for chip in self._cat_chips:
-            chip.toggled.disconnect(self._on_changed)
+            try:
+                chip.toggled.disconnect(self._on_changed)
+            except (RuntimeError, TypeError):
+                pass  # Signal war bereits getrennt
             self._cat_flow.removeWidget(chip)
             chip.deleteLater()
         self._cat_chips.clear()
