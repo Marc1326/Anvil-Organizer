@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -31,13 +32,13 @@ from PySide6.QtWidgets import (
     QSpinBox,
 )
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import Qt, QSettings, QProcess
 
 from anvil.plugins.plugin_loader import PluginLoader, ensure_user_plugin_dir
 from anvil.styles.dark_theme import list_themes, load_theme, get_styles_dir, default_theme
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nexus_sso import NexusSSOLogin
-from anvil.core.translator import Translator
+from anvil.core.translator import Translator, tr
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, plugin_loader: PluginLoader | None = None,
@@ -45,7 +46,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self._plugin_loader = plugin_loader
         self._instance_manager = instance_manager
-        self.setWindowTitle("Einstellungen")
+        self.setWindowTitle(tr("dialog.settings_title"))
         self.setMinimumSize(960, 600)
         self.resize(960, 600)
 
@@ -65,7 +66,7 @@ class SettingsDialog(QDialog):
         scroll_layout = QVBoxLayout(scroll_content)
 
         # Gruppe Sprache
-        lang_grp = QGroupBox("Sprache")
+        lang_grp = QGroupBox(tr("settings.language"))
         lang_layout = QVBoxLayout(lang_grp)
         self._lang_combo = QComboBox()
         # Verfügbare Sprachen aus Translator laden
@@ -76,73 +77,74 @@ class SettingsDialog(QDialog):
             self._lang_codes.append(code)
         # Gespeicherte Sprache auswählen
         saved_lang = self._settings().value("General/language", "de")
+        self._initial_lang = saved_lang  # Für Auto-Restart bei Änderung
         if saved_lang in self._lang_codes:
             self._lang_combo.setCurrentIndex(self._lang_codes.index(saved_lang))
         lang_layout.addWidget(self._lang_combo)
         # Hinweis: Neustart erforderlich
-        lang_hint = QLabel("Änderung erfordert Neustart der Anwendung.")
+        lang_hint = QLabel(tr("settings.language_restart_hint"))
         lang_hint.setStyleSheet("color: #808080; font-style: italic; font-size: 11px;")
         lang_layout.addWidget(lang_hint)
         scroll_layout.addWidget(lang_grp)
 
         # Gruppe Download Liste
-        dl_grp = QGroupBox("Download Liste")
+        dl_grp = QGroupBox(tr("settings.download_list"))
         dl_layout = QVBoxLayout(dl_grp)
-        dl_layout.addWidget(QCheckBox("Zeige Meta Informationen"))
-        dl_layout.addWidget(QCheckBox("Kompakte Liste"))
-        dl_layout.addWidget(QCheckBox("Verstecke Downloads nach Installation"))
+        dl_layout.addWidget(QCheckBox(tr("settings.show_meta_info")))
+        dl_layout.addWidget(QCheckBox(tr("settings.compact_list")))
+        dl_layout.addWidget(QCheckBox(tr("settings.hide_downloads_after_install")))
         scroll_layout.addWidget(dl_grp)
 
         # Gruppe Updates
-        up_grp = QGroupBox("Updates")
+        up_grp = QGroupBox(tr("settings.updates"))
         up_layout = QVBoxLayout(up_grp)
-        cb_updates = QCheckBox("Auf Updates prüfen")
+        cb_updates = QCheckBox(tr("settings.check_for_updates"))
         cb_updates.setChecked(True)
         up_layout.addWidget(cb_updates)
-        cb_beta = QCheckBox("Update auf Beta Version")
+        cb_beta = QCheckBox(tr("settings.update_to_beta"))
         cb_beta.setChecked(False)
         up_layout.addWidget(cb_beta)
         scroll_layout.addWidget(up_grp)
 
         # Gruppe Profil-Standardeinstellungen
-        prof_grp = QGroupBox("Profil-Standardeinstellungen")
+        prof_grp = QGroupBox(tr("settings.profile_defaults"))
         prof_layout = QVBoxLayout(prof_grp)
-        for label in ("Lokale INIs", "Lokale Spielstände", "Automatische Archiv Invalidierung"):
+        for label in (tr("settings.local_inis"), tr("settings.local_saves"), tr("settings.auto_archive_invalidation")):
             cb = QCheckBox(label)
             cb.setChecked(True)
             prof_layout.addWidget(cb)
         scroll_layout.addWidget(prof_grp)
 
         # Gruppe Sonstiges
-        misc_grp = QGroupBox("Sonstiges")
+        misc_grp = QGroupBox(tr("settings.misc"))
         misc_layout = QVBoxLayout(misc_grp)
-        misc_layout.addWidget(QCheckBox("Dialoge immer zentrieren"))
-        cb_inst = QCheckBox("Bestätigung beim Ändern der Instanz anzeigen")
+        misc_layout.addWidget(QCheckBox(tr("settings.center_dialogs")))
+        cb_inst = QCheckBox(tr("settings.confirm_instance_change"))
         cb_inst.setChecked(True)
         misc_layout.addWidget(cb_inst)
-        cb_alt = QCheckBox("Zeigt beim drücken von ALT die Menüleiste")
+        cb_alt = QCheckBox(tr("settings.alt_shows_menubar"))
         cb_alt.setChecked(True)
         misc_layout.addWidget(cb_alt)
-        cb_preview = QCheckBox("Öffnen Sie die Vorschau per Doppelklick")
+        cb_preview = QCheckBox(tr("settings.open_preview_dblclick"))
         cb_preview.setChecked(True)
         misc_layout.addWidget(cb_preview)
         scroll_layout.addWidget(misc_grp)
 
         misc_btn_row = QHBoxLayout()
-        misc_btn_row.addWidget(QPushButton("Dialogoptionen zurücksetzen"))
-        misc_btn_row.addWidget(QPushButton("Mod Kategorien anpassen"))
+        misc_btn_row.addWidget(QPushButton(tr("settings.reset_dialog_options")))
+        misc_btn_row.addWidget(QPushButton(tr("settings.edit_categories")))
         misc_btn_row.addStretch()
         scroll_layout.addLayout(misc_btn_row)
 
         scroll_layout.addStretch()
         scroll.setWidget(scroll_content)
         ag_layout.addWidget(scroll)
-        tabs.addTab(allgemein, "Allgemein")
+        tabs.addTab(allgemein, tr("settings.tab_general"))
 
         # Tab Style
         style_tab = QWidget()
         style_layout = QVBoxLayout(style_tab)
-        stil_grp = QGroupBox("Stil")
+        stil_grp = QGroupBox(tr("settings.style"))
         stil_layout = QHBoxLayout(stil_grp)
         self._stil_combo = QComboBox()
         # Available themes from anvil/styles/*.qss
@@ -157,28 +159,31 @@ class SettingsDialog(QDialog):
         self._previous_theme = self._stil_combo.currentText()
         self._stil_combo.currentTextChanged.connect(self._on_theme_changed)
         stil_layout.addWidget(self._stil_combo)
-        erkunden_btn = QPushButton("Erkunden")
+        erkunden_btn = QPushButton(tr("settings.explore"))
         erkunden_btn.clicked.connect(self._open_styles_folder)
         stil_layout.addWidget(erkunden_btn)
         style_layout.addWidget(stil_grp)
-        farben_grp = QGroupBox("Farben")
+        farben_grp = QGroupBox(tr("settings.colors"))
         farben_layout = QVBoxLayout(farben_grp)
         color_table = QTableWidget(6, 4)
-        color_table.setHorizontalHeaderLabels(
-            ["Beschreibung", "Text-Button", "Icons", "Farbiger Hintergrund"]
-        )
+        color_table.setHorizontalHeaderLabels([
+            tr("settings.color_description"),
+            tr("settings.color_text_button"),
+            tr("settings.color_icons"),
+            tr("settings.color_background"),
+        ])
         color_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         _rows = [
-            ("Wird überschrieben (lose Dateien)", "#2d5a2d"),   # grün
-            ("Überschreibt (lose Dateien)", "#5a2020"),         # dunkelrot
-            ("Wird überschrieben (Archive)", "#006868"),         # teal
-            ("Überschreibt (Archive)", "#5a2020"),               # dunkelrot
-            ("Mod enthält ausgewähltes Plugin", "#4a2d5a"),      # lila
-            ("Plugin ist in ausgewähltem Mod enthalten", "#1a3a5a"),  # blau
+            (tr("settings.color_overwritten_loose"), "#2d5a2d"),
+            (tr("settings.color_overwrites_loose"), "#5a2020"),
+            (tr("settings.color_overwritten_archive"), "#006868"),
+            (tr("settings.color_overwrites_archive"), "#5a2020"),
+            (tr("settings.color_mod_contains_plugin"), "#4a2d5a"),
+            (tr("settings.color_plugin_in_mod"), "#1a3a5a"),
         ]
         for row, (desc, bg_hex) in enumerate(_rows):
             color_table.setItem(row, 0, QTableWidgetItem(desc))
-            color_table.setCellWidget(row, 1, QPushButton("Text"))
+            color_table.setCellWidget(row, 1, QPushButton(tr("settings.color_text")))
             color_table.setItem(row, 2, QTableWidgetItem(""))
             bg_item = QTableWidgetItem("")
             bg_item.setBackground(QColor(bg_hex))
@@ -187,65 +192,65 @@ class SettingsDialog(QDialog):
         style_layout.addWidget(farben_grp)
         reset_row = QHBoxLayout()
         reset_row.addStretch()
-        reset_row.addWidget(QPushButton("Farben zurücksetzen"))
+        reset_row.addWidget(QPushButton(tr("settings.reset_colors")))
         reset_row.addStretch()
         style_layout.addLayout(reset_row)
-        tabs.addTab(style_tab, "Style")
+        tabs.addTab(style_tab, tr("settings.tab_style"))
 
         # Tab Mod Liste
         modliste_tab = QWidget()
         ml_layout = QVBoxLayout(modliste_tab)
-        cb_scroll = QCheckBox("Farbe der Trenner der Modliste in der Bildlaufleiste anzeigen")
+        cb_scroll = QCheckBox(tr("settings.show_separator_colors"))
         cb_scroll.setChecked(True)
         ml_layout.addWidget(cb_scroll)
-        cb_outer = QCheckBox("Zeige Mods die außerhalb von AO installiert wurden")
+        cb_outer = QCheckBox(tr("settings.show_external_mods"))
         cb_outer.setChecked(True)
         ml_layout.addWidget(cb_outer)
-        cb_filter = QCheckBox("Merke ausgewählte Filter nachdem der Anvil Organizer neu gestartet wurde")
+        cb_filter = QCheckBox(tr("settings.remember_filters"))
         cb_filter.setChecked(False)
         ml_layout.addWidget(cb_filter)
-        cb_upd = QCheckBox("Überprüfe auf Updates nach dem Installieren einer Mod")
+        cb_upd = QCheckBox(tr("settings.check_updates_after_install"))
         cb_upd.setChecked(True)
         ml_layout.addWidget(cb_upd)
-        cb_collapse = QCheckBox("Automatisches Einklappen von Objekten beim Ziehen mit dem Mauszeiger")
+        cb_collapse = QCheckBox(tr("settings.auto_collapse_on_drag"))
         cb_collapse.setChecked(False)
         ml_layout.addWidget(cb_collapse)
-        sep_grp = QGroupBox("Zusammenklappbare Trenner")
+        sep_grp = QGroupBox(tr("settings.collapsible_separators"))
         sep_layout = QVBoxLayout(sep_grp)
         sort_row = QHBoxLayout()
-        sort_row.addWidget(QLabel("Aktiviere wenn sortiert wird bei"))
-        cb_asc = QCheckBox("aufsteigende Priorität")
+        sort_row.addWidget(QLabel(tr("label.enable_when_sorted")))
+        cb_asc = QCheckBox(tr("settings.ascending_priority"))
         cb_asc.setChecked(True)
-        cb_desc = QCheckBox("absteigende Priorität")
+        cb_desc = QCheckBox(tr("settings.descending_priority"))
         cb_desc.setChecked(True)
         sort_row.addWidget(cb_asc)
         sort_row.addWidget(cb_desc)
         sort_row.addStretch()
         sep_layout.addLayout(sort_row)
         conflict_row = QHBoxLayout()
-        conflict_row.addWidget(QLabel("Zeige Konflikte und Plugins"))
-        cb_auf = QCheckBox("auf Trenner")
+        conflict_row.addWidget(QLabel(tr("label.show_conflicts_plugins")))
+        cb_auf = QCheckBox(tr("settings.on_separator"))
         cb_auf.setChecked(True)
-        cb_von = QCheckBox("Von Trenner")
+        cb_von = QCheckBox(tr("settings.from_separator"))
         cb_von.setChecked(True)
         conflict_row.addWidget(cb_auf)
         conflict_row.addWidget(cb_von)
         conflict_row.addStretch()
         sep_layout.addLayout(conflict_row)
         symbol_row = QHBoxLayout()
-        symbol_row.addWidget(QLabel("Zeige Symbole auf Trenner"))
-        for lbl in ("Konflikte", "Flaggen", "Inhalt", "Version"):
-            cb = QCheckBox(lbl)
+        symbol_row.addWidget(QLabel(tr("label.show_separator_symbols")))
+        for key in ("settings.symbol_conflicts", "settings.symbol_flags", "settings.symbol_content", "settings.symbol_version"):
+            cb = QCheckBox(tr(key))
             cb.setChecked(True)
             symbol_row.addWidget(cb)
         symbol_row.addStretch()
         sep_layout.addLayout(symbol_row)
         ml_layout.addWidget(sep_grp)
-        cb_profil = QCheckBox("Profil-abhängiger eingeklappter Zustand für Trenner")
+        cb_profil = QCheckBox(tr("settings.profile_dependent_collapse"))
         cb_profil.setChecked(False)
         ml_layout.addWidget(cb_profil)
         ml_layout.addStretch()
-        tabs.addTab(modliste_tab, "Mod Liste")
+        tabs.addTab(modliste_tab, tr("settings.tab_modlist"))
 
         # Tab Pfade
         pfade_tab = QWidget()
@@ -295,23 +300,23 @@ class SettingsDialog(QDialog):
                 _game_path = idata.get("game_path", "")
 
         pf_form = QFormLayout()
-        add_path_row(pf_form, "Basisverzeichnis:", _base_dir, False)
-        add_path_row(pf_form, "Downloads:", _downloads, False)
-        add_path_row(pf_form, "Mods:", _mods, False)
-        add_path_row(pf_form, "Caches:", _caches, False)
-        add_path_row(pf_form, "Profile:", _profiles, False)
-        add_path_row(pf_form, "Overwrite:", _overwrite, False)
+        add_path_row(pf_form, tr("settings.path_base_dir"), _base_dir, False)
+        add_path_row(pf_form, tr("settings.path_downloads"), _downloads, False)
+        add_path_row(pf_form, tr("settings.path_mods"), _mods, False)
+        add_path_row(pf_form, tr("settings.path_caches"), _caches, False)
+        add_path_row(pf_form, tr("settings.path_profiles"), _profiles, False)
+        add_path_row(pf_form, tr("settings.path_overwrite"), _overwrite, False)
         pf_content_layout.addLayout(pf_form)
-        pf_content_layout.addWidget(QLabel("Verwenden Sie %BASE_DIR%, um auf das Basisverzeichnis zu verweisen."))
+        pf_content_layout.addWidget(QLabel(tr("label.base_dir_hint")))
         pf_content_layout.addSpacing(16)
         pf_game_form = QFormLayout()
-        add_path_row(pf_game_form, "Verwaltetes Spiel:", _game_path, False)
+        add_path_row(pf_game_form, tr("settings.path_managed_game"), _game_path, False)
         pf_content_layout.addLayout(pf_game_form)
         pf_content_layout.addStretch()
-        pf_content_layout.addWidget(QLabel("Alle Verzeichnisse müssen beschreibbar sein."))
+        pf_content_layout.addWidget(QLabel(tr("label.writable_dirs_hint")))
         pf_scroll.setWidget(pf_content)
         pf_layout.addWidget(pf_scroll)
-        tabs.addTab(pfade_tab, "Pfade")
+        tabs.addTab(pfade_tab, tr("settings.tab_paths"))
 
         # Tab Nexus
         nexus_tab = QWidget()
@@ -323,48 +328,48 @@ class SettingsDialog(QDialog):
         nx_content_layout = QVBoxLayout(nx_content)
 
         # ── Nexus-Konto (read-only, populated after validation) ──────
-        konto_grp = QGroupBox("Nexus-Konto")
+        konto_grp = QGroupBox(tr("settings.nexus_account"))
         konto_layout = QHBoxLayout(konto_grp)
         konto_left = QFormLayout()
         self._nx_uid = QLineEdit()
         self._nx_uid.setReadOnly(True)
         self._nx_uid.setPlaceholderText("—")
-        konto_left.addRow("User ID:", self._nx_uid)
+        konto_left.addRow(tr("settings.nexus_user_id"), self._nx_uid)
         self._nx_name = QLineEdit()
         self._nx_name.setReadOnly(True)
         self._nx_name.setPlaceholderText("—")
-        konto_left.addRow("Name:", self._nx_name)
+        konto_left.addRow(tr("settings.nexus_name"), self._nx_name)
         self._nx_account = QLineEdit()
         self._nx_account.setReadOnly(True)
         self._nx_account.setPlaceholderText("—")
-        konto_left.addRow("Konto:", self._nx_account)
+        konto_left.addRow(tr("settings.nexus_account_type"), self._nx_account)
         konto_layout.addLayout(konto_left)
         konto_layout.addSpacing(24)
         stats = QFormLayout()
         self._nx_daily = QLineEdit()
         self._nx_daily.setReadOnly(True)
         self._nx_daily.setPlaceholderText("—")
-        stats.addRow("Tägliche Anfragen:", self._nx_daily)
+        stats.addRow(tr("settings.nexus_daily_requests"), self._nx_daily)
         self._nx_hourly = QLineEdit()
         self._nx_hourly.setReadOnly(True)
         self._nx_hourly.setPlaceholderText("—")
-        stats.addRow("Stündliche Anfragen:", self._nx_hourly)
+        stats.addRow(tr("settings.nexus_hourly_requests"), self._nx_hourly)
         konto_layout.addLayout(stats)
         nx_content_layout.addWidget(konto_grp)
 
         # ── Nexus-Verbindung (MO2 layout: log + 3 buttons) ────────
-        verb_grp = QGroupBox("Nexus-Verbindung")
+        verb_grp = QGroupBox(tr("settings.nexus_connection"))
         verb_layout = QHBoxLayout(verb_grp)
 
         # Left: buttons
         btn_col = QVBoxLayout()
-        self._btn_connect = QPushButton("Verbinde zu Nexus")
+        self._btn_connect = QPushButton(tr("button.connect_nexus"))
         self._btn_connect.clicked.connect(self._nx_connect_sso)
         btn_col.addWidget(self._btn_connect)
-        self._btn_api_key = QPushButton("Gebe API-Schlüssel manuell ein")
+        self._btn_api_key = QPushButton(tr("settings.nexus_enter_api_key"))
         self._btn_api_key.clicked.connect(self._nx_enter_api_key)
         btn_col.addWidget(self._btn_api_key)
-        self._btn_disconnect = QPushButton("Trennen Sie die Verbindung zum Nexus")
+        self._btn_disconnect = QPushButton(tr("settings.nexus_disconnect"))
         self._btn_disconnect.clicked.connect(self._nx_disconnect)
         btn_col.addWidget(self._btn_disconnect)
         btn_col.addStretch()
@@ -372,7 +377,7 @@ class SettingsDialog(QDialog):
 
         # Right: status label + log list
         log_col = QVBoxLayout()
-        self._nx_status_label = QLabel("Nicht verbunden.")
+        self._nx_status_label = QLabel(tr("status.not_connected"))
         log_col.addWidget(self._nx_status_label)
         self._nx_log = QListWidget()
         self._nx_log.setMaximumHeight(80)
@@ -383,32 +388,32 @@ class SettingsDialog(QDialog):
         nx_content_layout.addWidget(verb_grp)
 
         # ── Optionen ─────────────────────────────────────────────────
-        opt_grp = QGroupBox("Optionen")
+        opt_grp = QGroupBox(tr("settings.options"))
         opt_layout = QHBoxLayout(opt_grp)
         opt_left = QVBoxLayout()
-        for lbl, checked in (
-            ("Endorsement Integration", True),
-            ("Integration zur Beobachtung von Mods", True),
-            ("Nexus-Kategoriezuordnungen verwenden", True),
-            ("API-Anforderungszähler ausblenden", False),
+        for key, checked in (
+            ("settings.nexus_endorsement", True),
+            ("settings.nexus_tracking", True),
+            ("settings.nexus_category_mapping", True),
+            ("settings.nexus_hide_api_counter", False),
         ):
-            cb = QCheckBox(lbl)
+            cb = QCheckBox(tr(key))
             cb.setChecked(checked)
             opt_left.addWidget(cb)
         opt_layout.addLayout(opt_left)
         opt_right = QVBoxLayout()
-        btn_link = QPushButton("Mit MOD MANAGER DOWNLOAD-Links verknüpfen")
+        btn_link = QPushButton(tr("settings.nexus_link_nxm"))
         btn_link.clicked.connect(self._nx_register_nxm_handler)
         opt_right.addWidget(btn_link)
-        opt_right.addWidget(QPushButton("Cache leeren"))
+        opt_right.addWidget(QPushButton(tr("settings.nexus_clear_cache")))
         opt_right.addStretch()
         opt_layout.addLayout(opt_right)
         nx_content_layout.addWidget(opt_grp)
 
         # ── Server ───────────────────────────────────────────────────
-        server_grp = QGroupBox("Server")
+        server_grp = QGroupBox(tr("settings.nexus_server"))
         server_layout = QHBoxLayout(server_grp)
-        known_lbl = QLabel("Bekannte Server (aktualisiert bei Download)")
+        known_lbl = QLabel(tr("label.known_servers"))
         server_left = QVBoxLayout()
         server_left.addWidget(known_lbl)
         known_list = QListWidget()
@@ -416,7 +421,7 @@ class SettingsDialog(QDialog):
             known_list.addItem(QListWidgetItem(city))
         server_left.addWidget(known_list)
         server_layout.addLayout(server_left)
-        pref_lbl = QLabel("Bevorzugte Server (Drag & Drop)")
+        pref_lbl = QLabel(tr("label.preferred_servers"))
         server_right = QVBoxLayout()
         server_right.addWidget(pref_lbl)
         pref_list = QListWidget()
@@ -428,7 +433,7 @@ class SettingsDialog(QDialog):
         nx_content_layout.addStretch()
         nx_scroll.setWidget(nx_content)
         nx_layout.addWidget(nx_scroll)
-        tabs.addTab(nexus_tab, "Nexus")
+        tabs.addTab(nexus_tab, tr("settings.tab_nexus"))
 
         # ── Init Nexus API, SSO, and load saved key ─────────────────
         self._nexus_api = NexusAPI(self)
@@ -442,7 +447,7 @@ class SettingsDialog(QDialog):
             self._nx_log_add("API-Schlüssel überprüfen...")
             self._nexus_api.validate_key()
         else:
-            self._nx_log_add("Nicht verbunden.")
+            self._nx_log_add(tr("status.not_connected"))
 
         # Tab Plugins
         plugins_tab = QWidget()
@@ -451,14 +456,14 @@ class SettingsDialog(QDialog):
         # ── Left: Plugin tree + filter + open-folder button ────────
         pl_left = QVBoxLayout()
         self._pl_tree = QTreeWidget()
-        self._pl_tree.setHeaderLabels(["Plugin", "Version"])
+        self._pl_tree.setHeaderLabels([tr("label.header_plugin"), tr("label.header_version")])
         self._pl_tree.setMinimumWidth(280)
         self._pl_tree.setColumnWidth(0, 220)
 
         _italic_font = QFont()
         _italic_font.setItalic(True)
 
-        games_root = QTreeWidgetItem(self._pl_tree, ["Spiele", ""])
+        games_root = QTreeWidgetItem(self._pl_tree, [tr("settings.plugins_games"), ""])
         games_root.setExpanded(True)
 
         self._plugin_items: dict[str, object] = {}  # short_name → BaseGame
@@ -475,11 +480,11 @@ class SettingsDialog(QDialog):
 
         pl_left.addWidget(self._pl_tree)
         pl_filter = QLineEdit()
-        pl_filter.setPlaceholderText("Filter")
+        pl_filter.setPlaceholderText(tr("placeholder.filter"))
         pl_filter.textChanged.connect(self._filter_plugins)
         pl_left.addWidget(pl_filter)
 
-        open_folder_btn = QPushButton("Plugin-Ordner öffnen")
+        open_folder_btn = QPushButton(tr("settings.plugins_open_folder"))
         open_folder_btn.clicked.connect(self._open_plugin_folder)
         pl_left.addWidget(open_folder_btn)
 
@@ -490,23 +495,23 @@ class SettingsDialog(QDialog):
         self._pl_detail = QFormLayout()
         self._pl_author = QLineEdit()
         self._pl_author.setReadOnly(True)
-        self._pl_detail.addRow("Autor:", self._pl_author)
+        self._pl_detail.addRow(tr("settings.plugins_author"), self._pl_author)
         self._pl_version = QLineEdit()
         self._pl_version.setReadOnly(True)
-        self._pl_detail.addRow("Version:", self._pl_version)
+        self._pl_detail.addRow(tr("settings.plugins_version"), self._pl_version)
         self._pl_game_name = QLineEdit()
         self._pl_game_name.setReadOnly(True)
-        self._pl_detail.addRow("Spiel:", self._pl_game_name)
+        self._pl_detail.addRow(tr("settings.plugins_game"), self._pl_game_name)
         self._pl_store = QLineEdit()
         self._pl_store.setReadOnly(True)
-        self._pl_detail.addRow("Store:", self._pl_store)
+        self._pl_detail.addRow(tr("settings.plugins_store"), self._pl_store)
         self._pl_path = QLineEdit()
         self._pl_path.setReadOnly(True)
-        self._pl_detail.addRow("Spielpfad:", self._pl_path)
+        self._pl_detail.addRow(tr("settings.plugins_game_path"), self._pl_path)
         self._pl_prefix = QLineEdit()
         self._pl_prefix.setReadOnly(True)
-        self._pl_detail.addRow("Proton-Prefix:", self._pl_prefix)
-        self._pl_cb_active = QCheckBox("Aktiviert")
+        self._pl_detail.addRow(tr("settings.plugins_proton_prefix"), self._pl_prefix)
+        self._pl_cb_active = QCheckBox(tr("settings.plugins_enabled"))
         self._pl_cb_active.setChecked(True)
         self._pl_detail.addRow(self._pl_cb_active)
         pl_right.addLayout(self._pl_detail)
@@ -522,14 +527,14 @@ class SettingsDialog(QDialog):
         if self._plugin_loader:
             count = self._plugin_loader.plugin_count()
             installed = self._plugin_loader.installed_count()
-            summary = QLabel(f"{count} Plugins geladen, {installed} Spiele erkannt")
+            summary = QLabel(tr("settings.plugins_summary", count=count, installed=installed))
         else:
-            summary = QLabel("Plugin-Loader nicht verfügbar")
+            summary = QLabel(tr("label.plugin_loader_not_available"))
         summary.setStyleSheet("color: #808080; font-style: italic;")
         pl_right.addWidget(summary)
 
         pl_layout.addLayout(pl_right, 1)
-        tabs.addTab(plugins_tab, "Plugins")
+        tabs.addTab(plugins_tab, tr("settings.tab_plugins"))
 
         # Connect selection change + select first plugin
         self._pl_tree.currentItemChanged.connect(self._on_plugin_selected)
@@ -546,30 +551,30 @@ class SettingsDialog(QDialog):
         wa_scroll.setFrameShape(QFrame.Shape.NoFrame)
         wa_content = QWidget()
         wa_content_layout = QVBoxLayout(wa_content)
-        opt_wa_grp = QGroupBox("Optionen")
+        opt_wa_grp = QGroupBox(tr("settings.options"))
         opt_wa_layout = QVBoxLayout(opt_wa_grp)
-        cb_load = QCheckBox("Laden von benötigten Spieldateien erzwingen")
+        cb_load = QCheckBox(tr("settings.wa_force_load_game_files"))
         cb_load.setChecked(True)
         opt_wa_layout.addWidget(cb_load)
-        cb_arch = QCheckBox("Aktiviere Archiv Parsing (experimentell)")
+        cb_arch = QCheckBox(tr("settings.wa_archive_parsing"))
         cb_arch.setChecked(False)
         opt_wa_layout.addWidget(cb_arch)
-        cb_lock = QCheckBox("Sperre das GUI, wenn das Spiel ausgeführt wird")
+        cb_lock = QCheckBox(tr("settings.wa_lock_gui"))
         cb_lock.setChecked(True)
         opt_wa_layout.addWidget(cb_lock)
         wa_content_layout.addWidget(opt_wa_grp)
         steam_grp = QGroupBox("Steam")
         steam_layout = QFormLayout(steam_grp)
-        steam_layout.addRow("Steam AppID:", QLineEdit("1091500"))
-        steam_layout.addRow("Nutzername:", QLineEdit())
-        steam_layout.addRow("Kennwort:", QLineEdit())
+        steam_layout.addRow(tr("settings.wa_steam_appid"), QLineEdit("1091500"))
+        steam_layout.addRow(tr("settings.wa_steam_username"), QLineEdit())
+        steam_layout.addRow(tr("settings.wa_steam_password"), QLineEdit())
         wa_content_layout.addWidget(steam_grp)
-        net_grp = QGroupBox("Netzwerk")
+        net_grp = QGroupBox(tr("settings.wa_network"))
         net_layout = QVBoxLayout(net_grp)
-        net_layout.addWidget(QCheckBox("Offline Modus"))
-        net_layout.addWidget(QCheckBox("Nutze Systems HTTP Proxy"))
+        net_layout.addWidget(QCheckBox(tr("settings.wa_offline_mode")))
+        net_layout.addWidget(QCheckBox(tr("settings.wa_system_proxy")))
         browser_row = QHBoxLayout()
-        cb_browser = QCheckBox("Benutzerdefinierter Browser")
+        cb_browser = QCheckBox(tr("settings.wa_custom_browser"))
         cb_browser.setChecked(False)
         browser_row.addWidget(cb_browser)
         browser_row.addWidget(QLineEdit())
@@ -577,17 +582,17 @@ class SettingsDialog(QDialog):
         net_layout.addLayout(browser_row)
         wa_content_layout.addWidget(net_grp)
         btn_row_wa = QHBoxLayout()
-        btn_row_wa.addWidget(QPushButton("Fenstergeometrien zurücksetzen"))
-        btn_row_wa.addWidget(QPushButton("BSAs zurückdatieren"))
-        btn_row_wa.addWidget(QPushButton("Anwendungen Blockliste"))
-        btn_row_wa.addWidget(QPushButton("Datei-Endungen überspringen"))
-        btn_row_wa.addWidget(QPushButton("Verzeichnisse überspringen"))
+        btn_row_wa.addWidget(QPushButton(tr("settings.wa_reset_geometry")))
+        btn_row_wa.addWidget(QPushButton(tr("settings.wa_backdate_bsa")))
+        btn_row_wa.addWidget(QPushButton(tr("settings.wa_app_blocklist")))
+        btn_row_wa.addWidget(QPushButton(tr("settings.wa_skip_extensions")))
+        btn_row_wa.addWidget(QPushButton(tr("settings.wa_skip_directories")))
         wa_content_layout.addLayout(btn_row_wa)
         wa_content_layout.addStretch()
-        wa_content_layout.addWidget(QLabel("Dies sind Workarounds für Probleme mit Anvil Organizer. Bitte lesen Sie unbedingt die Hilfetexte bevor Sie hier etwas ändern."))
+        wa_content_layout.addWidget(QLabel(tr("label.workarounds_hint")))
         wa_scroll.setWidget(wa_content)
         wa_layout.addWidget(wa_scroll)
-        tabs.addTab(workarounds_tab, "Workarounds")
+        tabs.addTab(workarounds_tab, tr("settings.tab_workarounds"))
 
         # Tab Diagnose
         diagnose_tab = QWidget()
@@ -597,44 +602,40 @@ class SettingsDialog(QDialog):
         diag_scroll.setFrameShape(QFrame.Shape.NoFrame)
         diag_content = QWidget()
         diag_content_layout = QVBoxLayout(diag_content)
-        logs_grp = QGroupBox("Logs und Abstürze")
+        logs_grp = QGroupBox(tr("settings.diag_logs_crashes"))
         logs_layout = QFormLayout(logs_grp)
         log_combo = QComboBox()
-        log_combo.addItem("Info (empfohlen)")
-        logs_layout.addRow("Log Stufe:", log_combo)
+        log_combo.addItem(tr("label.log_level_info"))
+        logs_layout.addRow(tr("settings.diag_log_level"), log_combo)
         crash_combo = QComboBox()
-        crash_combo.addItem("Mini (empfohlen)")
-        logs_layout.addRow("Absturzabbildung:", crash_combo)
+        crash_combo.addItem(tr("label.crash_dump_mini"))
+        logs_layout.addRow(tr("settings.diag_crash_dump"), crash_combo)
         crash_spin = QSpinBox()
         crash_spin.setValue(5)
-        logs_layout.addRow("Maximale Absturzabbilder zu behalten:", crash_spin)
+        logs_layout.addRow(tr("settings.diag_max_crash_dumps"), crash_spin)
         diag_content_layout.addWidget(logs_grp)
-        loot_grp = QGroupBox("Integriertes LOOT")
+        loot_grp = QGroupBox(tr("settings.diag_integrated_loot"))
         loot_layout = QFormLayout(loot_grp)
         loot_combo = QComboBox()
-        loot_combo.addItem("Info (empfohlen)")
-        loot_layout.addRow("LOOT Log Stufe:", loot_combo)
+        loot_combo.addItem(tr("label.log_level_info"))
+        loot_layout.addRow(tr("settings.diag_loot_log_level"), loot_combo)
         diag_content_layout.addWidget(loot_grp)
-        diag_hint = QLabel(
-            "Protokolle und Absturzabbilder werden unter Ihrer aktuellen Instanz in den Verzeichnissen logs und crashDumps gespeichert. "
-            "Das Senden von Protokollen und/oder Absturzabbildern an die Entwickler kann bei der Untersuchung von Problemen hilfreich sein. "
-            "Es wird empfohlen, vor dem Senden große Protokoll- und DMP-Dateien zu komprimieren."
-        )
+        diag_hint = QLabel(tr("settings.diag_hint"))
         diag_hint.setWordWrap(True)
         diag_content_layout.addWidget(diag_hint)
         diag_content_layout.addStretch()
         diag_scroll.setWidget(diag_content)
         diag_layout.addWidget(diag_scroll)
-        tabs.addTab(diagnose_tab, "Diagnose")
+        tabs.addTab(diagnose_tab, tr("settings.tab_diagnostics"))
 
         layout.addWidget(tabs)
 
         # Unten rechts: OK, Abbrechen
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        ok_btn = QPushButton("OK")
+        ok_btn = QPushButton(tr("button.ok"))
         ok_btn.clicked.connect(self.accept)
-        cancel_btn = QPushButton("Abbrechen")
+        cancel_btn = QPushButton(tr("button.cancel"))
         cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(ok_btn)
         btn_row.addWidget(cancel_btn)
@@ -717,8 +718,17 @@ class SettingsDialog(QDialog):
         settings.setValue("style/theme", self._stil_combo.currentText())
         # Sprache speichern
         lang_idx = self._lang_combo.currentIndex()
-        if 0 <= lang_idx < len(self._lang_codes):
-            settings.setValue("General/language", self._lang_codes[lang_idx])
+        new_lang = self._lang_codes[lang_idx] if 0 <= lang_idx < len(self._lang_codes) else self._initial_lang
+        settings.setValue("General/language", new_lang)
+        settings.sync()  # Sicherstellen dass Änderungen geschrieben werden
+
+        # Auto-Restart wenn Sprache geändert wurde
+        if new_lang != self._initial_lang:
+            super().accept()
+            QProcess.startDetached(sys.executable, sys.argv)
+            QApplication.quit()
+            return
+
         super().accept()
 
     def reject(self):
@@ -744,14 +754,14 @@ class SettingsDialog(QDialog):
         # Cancel existing SSO if active
         if self._sso_login and self._sso_login.is_active():
             self._sso_login.cancel()
-            self._btn_connect.setText("Verbinde zu Nexus")
+            self._btn_connect.setText(tr("button.connect_nexus"))
             return
 
         self._nx_log.clear()
         self._sso_login = NexusSSOLogin(self)
         self._sso_login.state_changed.connect(self._nx_on_sso_state)
         self._sso_login.key_changed.connect(self._nx_on_sso_key)
-        self._btn_connect.setText("Abbrechen")
+        self._btn_connect.setText(tr("button.cancel"))
         self._sso_login.start()
 
     def _nx_on_sso_state(self, state: int, detail: str) -> None:
@@ -764,33 +774,31 @@ class SettingsDialog(QDialog):
                      NexusSSOLogin.State.CLOSED_BY_REMOTE,
                      NexusSSOLogin.State.CANCELLED,
                      NexusSSOLogin.State.ERROR):
-            self._btn_connect.setText("Verbinde zu Nexus")
+            self._btn_connect.setText(tr("button.connect_nexus"))
 
     def _nx_on_sso_key(self, api_key: str) -> None:
         """Handle API key received from SSO."""
-        self._nx_log_add("API-Schlüssel erhalten.")
+        self._nx_log_add(tr("settings.nexus_key_received"))
         self._nexus_api.set_api_key(api_key)
         settings = self._settings()
         settings.setValue("nexus/api_key", api_key)
-        self._nx_log_add("API-Schlüssel überprüfen...")
+        self._nx_log_add(tr("settings.nexus_key_validating"))
         self._nexus_api.validate_key()
 
     def _nx_enter_api_key(self) -> None:
         """Prompt the user to enter their Nexus API key manually."""
         from PySide6.QtWidgets import QInputDialog
         key, ok = QInputDialog.getText(
-            self, "API-Schlüssel eingeben",
-            "Nexus Mods API-Schlüssel:\n\n"
-            "Den Schlüssel findest du unter:\n"
-            "https://www.nexusmods.com/users/myaccount?tab=api+access",
+            self, tr("settings.nexus_enter_key_title"),
+            tr("settings.nexus_enter_key_prompt"),
         )
         if ok and key.strip():
             self._nx_log.clear()
-            self._nx_log_add("Manueller API-Schlüssel eingegeben.")
+            self._nx_log_add(tr("settings.nexus_key_manual"))
             self._nexus_api.set_api_key(key.strip())
             settings = self._settings()
             settings.setValue("nexus/api_key", key.strip())
-            self._nx_log_add("API-Schlüssel überprüfen...")
+            self._nx_log_add(tr("settings.nexus_key_validating"))
             self._nx_status_label.setStyleSheet("")
             self._nexus_api.validate_key()
 
@@ -799,7 +807,7 @@ class SettingsDialog(QDialog):
         # Cancel active SSO
         if self._sso_login and self._sso_login.is_active():
             self._sso_login.cancel()
-            self._btn_connect.setText("Verbinde zu Nexus")
+            self._btn_connect.setText(tr("button.connect_nexus"))
 
         settings = self._settings()
         settings.remove("nexus/api_key")
@@ -810,8 +818,8 @@ class SettingsDialog(QDialog):
         self._nx_daily.clear()
         self._nx_hourly.clear()
         self._nx_log.clear()
-        self._nx_log_add("Getrennt.")
-        self._nx_status_label.setText("Getrennt.")
+        self._nx_log_add(tr("status.disconnected"))
+        self._nx_status_label.setText(tr("status.disconnected"))
         self._nx_status_label.setStyleSheet("")
 
     def _nx_on_validated(self, user_info: dict) -> None:
@@ -827,16 +835,16 @@ class SettingsDialog(QDialog):
         else:
             account_type = "Standard"
         self._nx_account.setText(account_type)
-        self._nx_log_add("Benutzerkontoinformationen erhalten.")
-        self._nx_log_add("Erfolgreich mit Nexus verknüpft.")
-        self._nx_status_label.setText("Verbunden.")
+        self._nx_log_add(tr("settings.nexus_account_received"))
+        self._nx_log_add(tr("settings.nexus_connected_success"))
+        self._nx_status_label.setText(tr("status.connected"))
         self._nx_status_label.setStyleSheet("color: #4CAF50;")
 
     def _nx_on_error(self, tag: str, message: str) -> None:
         """Handle API request error."""
         if tag == "validate":
-            self._nx_log_add(f"Fehler: {message}")
-            self._nx_status_label.setText(f"Fehler: {message}")
+            self._nx_log_add(tr("settings.nexus_error", message=message))
+            self._nx_status_label.setText(tr("settings.nexus_error", message=message))
             self._nx_status_label.setStyleSheet("color: #F44336;")
 
     def _nx_on_rate_limit(self, daily: int, hourly: int) -> None:
@@ -857,14 +865,12 @@ class SettingsDialog(QDialog):
         if success:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.information(
-                self, "nxm:// Handler",
-                "Anvil Organizer wurde als nxm:// Handler registriert.\n"
-                "Nexus Mods Download-Links werden jetzt von Anvil verarbeitet.",
+                self, tr("settings.nxm_handler_title"),
+                tr("settings.nxm_handler_success"),
             )
         else:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(
-                self, "nxm:// Handler",
-                "Registrierung fehlgeschlagen.\n"
-                "Bitte manuell die .desktop-Datei konfigurieren.",
+                self, tr("settings.nxm_handler_title"),
+                tr("settings.nxm_handler_failed"),
             )

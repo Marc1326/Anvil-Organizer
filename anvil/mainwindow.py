@@ -1112,8 +1112,12 @@ class MainWindow(QMainWindow):
 
     # ── Other slots ───────────────────────────────────────────────────
 
-    def _on_mod_double_click(self):
-        mod_name = self._mod_list_view.get_current_mod_name()
+    def _on_mod_double_click(self, index=None):
+        # Index aus dem doubleClicked Signal verwenden (falls vorhanden)
+        if index is not None and index.isValid():
+            mod_name = self._mod_list_view.get_mod_name_from_index(index)
+        else:
+            mod_name = self._mod_list_view.get_current_mod_name()
         if mod_name:
             mod_path = str(self._current_instance_path / ".mods" / mod_name)
             all_mods = [

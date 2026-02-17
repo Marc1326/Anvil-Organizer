@@ -14,6 +14,8 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QIcon
 
+from anvil.core.translator import tr
+
 # ── Conflict icons (reuse from standard model) ──────────────────────
 
 _ICON_DIR = os.path.join(
@@ -173,14 +175,14 @@ class BG3ModListModel(QAbstractItemModel):
                 win_mods = r.conflicts.get("win_mods", 0)
                 lose_mods = r.conflicts.get("lose_mods", 0)
                 if ctype == "win":
-                    return f"Überschreibt {wins} Datei(en) in {win_mods} Mod(s)"
+                    return tr("tooltip.conflict_overwrites", wins=wins, win_mods=win_mods)
                 if ctype == "lose":
-                    return f"Wird überschrieben von {lose_mods} Mod(s) bei {losses} Datei(en)"
+                    return tr("tooltip.conflict_overwritten", losses=losses, lose_mods=lose_mods)
                 if ctype == "both":
-                    return f"Gewinnt {wins}, verliert {losses} Konflikte"
+                    return tr("tooltip.conflict_both", wins=wins, losses=losses)
             if c == COL_NAME and r.dependencies:
                 dep_names = [d.get("name", d.get("uuid", "?")) for d in r.dependencies]
-                return f"Abhängigkeiten: {', '.join(dep_names)}"
+                return tr("tooltip.dependencies", deps=", ".join(dep_names))
 
         if role == ROLE_UUID:
             return r.uuid
@@ -215,8 +217,16 @@ class BG3ModListModel(QAbstractItemModel):
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         if orientation != Qt.Orientation.Horizontal or role != Qt.ItemDataRole.DisplayRole:
             return None
-        if 0 <= section < len(HEADERS):
-            return HEADERS[section]
+        # Headers mit tr() zur Laufzeit übersetzen
+        headers = [
+            " ",
+            tr("label.header_mod_name"),
+            tr("label.header_conflicts"),
+            tr("label.header_version"),
+            tr("label.header_author"),
+        ]
+        if 0 <= section < len(headers):
+            return headers[section]
         return None
 
     # ── Drag & Drop (reorder only) ────────────────────────────────

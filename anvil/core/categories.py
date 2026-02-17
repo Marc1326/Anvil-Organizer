@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from anvil.core.translator import tr
+
 
 # MO2-inspired default categories (sorted alphabetically).
 _DEFAULT_CATEGORIES: list[dict[str, Any]] = [
@@ -35,27 +37,25 @@ _DEFAULT_CATEGORIES: list[dict[str, Any]] = [
     {"id": 17, "name": "Weapons"},
 ]
 
-# German translations for category names (display only, internal names stay English)
-CATEGORY_TRANSLATIONS: dict[str, dict[str, str]] = {
-    "de": {
-        "Animations": "Animationen",
-        "Armor & Clothing": "Rüstung & Kleidung",
-        "Audio": "Audio",
-        "Bug Fixes": "Fehlerbehebungen",
-        "Gameplay": "Spielmechanik",
-        "Graphics": "Grafik",
-        "Hair & Face": "Haare & Gesicht",
-        "Items": "Gegenstände",
-        "Miscellaneous": "Verschiedenes",
-        "Models & Textures": "Modelle & Texturen",
-        "NPC": "NPCs",
-        "Overhauls": "Überarbeitungen",
-        "Patches": "Patches",
-        "Player Homes": "Spielerunterkünfte",
-        "UI": "Benutzeroberfläche",
-        "Utilities": "Werkzeuge",
-        "Weapons": "Waffen",
-    }
+# Mapping from internal name to translation key
+_CATEGORY_KEYS: dict[str, str] = {
+    "Animations": "category.animations",
+    "Armor & Clothing": "category.armor_clothing",
+    "Audio": "category.audio",
+    "Bug Fixes": "category.bug_fixes",
+    "Gameplay": "category.gameplay",
+    "Graphics": "category.graphics",
+    "Hair & Face": "category.hair_face",
+    "Items": "category.items",
+    "Miscellaneous": "category.miscellaneous",
+    "Models & Textures": "category.models_textures",
+    "NPC": "category.npc",
+    "Overhauls": "category.overhauls",
+    "Patches": "category.patches",
+    "Player Homes": "category.player_homes",
+    "UI": "category.ui",
+    "Utilities": "category.utilities",
+    "Weapons": "category.weapons",
 }
 
 
@@ -64,13 +64,18 @@ def get_display_name(name: str, lang: str = "de") -> str:
 
     Args:
         name: Internal category name (English).
-        lang: Language code (default: "de").
+        lang: Language code (ignored, tr() uses current app language).
 
     Returns:
         Translated name if available, otherwise original name.
     """
-    translations = CATEGORY_TRANSLATIONS.get(lang, {})
-    return translations.get(name, name)
+    key = _CATEGORY_KEYS.get(name)
+    if key:
+        translated = tr(key)
+        # tr() returns the key if not found - fall back to original name
+        if translated != key:
+            return translated
+    return name
 
 
 class CategoryManager:

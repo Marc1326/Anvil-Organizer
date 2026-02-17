@@ -471,6 +471,14 @@ class ModListView(QWidget):
         name = self._source_model.data(self._source_model.index(source_idx.row(), COL_NAME), Qt.ItemDataRole.DisplayRole)
         return name if name is not None else None
 
+    def get_mod_name_from_index(self, proxy_idx):
+        """Liefert den Mod-Namen für einen gegebenen Proxy-Index oder None."""
+        if not proxy_idx.isValid() or proxy_idx.row() < 0:
+            return None
+        source_idx = self._proxy_model.mapToSource(proxy_idx)
+        name = self._source_model.data(self._source_model.index(source_idx.row(), COL_NAME), Qt.ItemDataRole.DisplayRole)
+        return name if name is not None else None
+
     def get_selected_source_rows(self) -> list[int]:
         """Return sorted list of selected source-model row indices."""
         rows = set()
