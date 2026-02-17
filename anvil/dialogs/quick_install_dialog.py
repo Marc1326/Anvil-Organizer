@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from pathlib import Path
 
+from anvil.core.translator import tr
+
 _ARROW_SVG = str(Path(__file__).resolve().parent.parent / "resources" / "arrow_down.svg").replace("\\", "/")
 
 _STYLE = f"""
@@ -77,7 +79,7 @@ class QuickInstallDialog(QDialog):
             parent: Parent widget.
         """
         super().__init__(parent)
-        self.setWindowTitle("Schnellinstallation")
+        self.setWindowTitle(tr("dialog.quick_install"))
         self.setMinimumWidth(420)
         self.setWindowFlags(
             self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint
@@ -92,7 +94,7 @@ class QuickInstallDialog(QDialog):
         name_row = QHBoxLayout()
         name_row.setContentsMargins(7, 7, 7, 7)
         name_row.setSpacing(6)
-        label = QLabel("Name")
+        label = QLabel(tr("label.name"))
         name_row.addWidget(label)
 
         self._name_combo = QComboBox()
@@ -129,21 +131,19 @@ class QuickInstallDialog(QDialog):
         btn_row.setContentsMargins(7, 7, 7, 7)
         btn_row.setSpacing(6)
 
-        btn_manual = QPushButton("Manuell")
+        btn_manual = QPushButton(tr("button.manual"))
         btn_manual.setEnabled(False)
-        btn_manual.setToolTip(
-            "Öffnet einen Dialog für manuelle Anpassungen."
-        )
+        btn_manual.setToolTip(tr("tooltip.manual_install"))
         btn_row.addWidget(btn_manual)
 
         btn_row.addStretch()
 
-        btn_ok = QPushButton("OK")
+        btn_ok = QPushButton(tr("button.ok"))
         btn_ok.setDefault(True)
         btn_ok.clicked.connect(self.accept)
         btn_row.addWidget(btn_ok)
 
-        btn_cancel = QPushButton("Abbrechen")
+        btn_cancel = QPushButton(tr("button.cancel"))
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_cancel)
 

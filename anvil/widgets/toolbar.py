@@ -113,8 +113,8 @@ def create_toolbar(parent=None):
     # Deploy-Button (BG3-spezifisch, standardmäßig unsichtbar)
     deploy_btn = QToolButton(bar)
     deploy_btn.setIcon(_icon("check.svg"))
-    deploy_btn.setToolTip("Deploy")
-    deploy_btn.setText("Deploy")
+    deploy_btn.setToolTip(tr("toolbar.deploy"))
+    deploy_btn.setText(tr("toolbar.deploy"))
     deploy_action = bar.addWidget(deploy_btn)
     deploy_action.setVisible(False)
 

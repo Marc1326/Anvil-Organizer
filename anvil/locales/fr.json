@@ -120,6 +120,10 @@
     "instance_wizard_title": "Créer une nouvelle instance",
     "quick_install_title": "Installation rapide",
     "mod_exists_title": "Le Mod existe déjà",
+    "mod_exists_description": "Choisissez une action : Fusionner ajoute de nouveaux fichiers, Remplacer supprime d'abord l'ancien mod, Renommer permet un nouveau nom.",
+    "mod_exists": "Le Mod existe déjà",
+    "mod_details": "Détails du Mod : {name}",
+    "quick_install": "Installation rapide",
 
     "info_title": "Informations : {name}",
 
@@ -218,7 +222,14 @@
     "rename": "Renommer",
     "delete": "Supprimer",
     "copy": "Copier",
-    "select": "Sélectionner"
+    "select": "Sélectionner",
+    "merge": "Fusionner",
+    "replace": "Remplacer",
+    "back": "Retour",
+    "next": "Suivant",
+    "manual": "Manuel",
+    "open_in_explorer": "Ouvrir le Mod dans l'explorateur",
+    "folder": "Dossier"
   },
 
   "tooltip": {
@@ -241,7 +252,11 @@
     "conflict_overwritten": "Remplacé par {lose_mods} mod(s) dans {losses} fichier(s)",
     "conflict_both": "Gagne {wins}, perd {losses} conflits",
     "direct_install": "Installation directe : Copié dans le répertoire du jeu",
-    "dependencies": "Dépendances : {deps}"
+    "dependencies": "Dépendances : {deps}",
+    "manual_install": "Installation manuelle — contrôle total sur l'installation",
+    "save_ctrl_s": "Enregistrer (Ctrl+S)",
+    "move_to_optional": "Désactiver les plugins sélectionnés (déplacer vers optional/)",
+    "move_to_active": "Activer les plugins sélectionnés (retour à la racine du mod)"
   },
 
   "label": {
@@ -326,7 +341,9 @@
     "overwrites_mod": "Remplace le Mod",
     "overwritten_by": "Remplacé par le Mod",
 
-    "plugin_loader_not_available": "Chargeur de Plugin non disponible"
+    "plugin_loader_not_available": "Chargeur de Plugin non disponible",
+    "file": "Fichier",
+    "filter": "Filtre"
   },
 
   "placeholder": {
@@ -642,23 +659,40 @@
     "nxm_handler_failed": "Enregistrement échoué.\nVeuillez configurer manuellement le fichier .desktop."
   },
 
-  "category": {
-    "animations": "Animations",
-    "armor_clothing": "Armure et Vêtements",
-    "audio": "Audio",
-    "bug_fixes": "Corrections de Bugs",
-    "gameplay": "Gameplay",
-    "graphics": "Graphismes",
-    "hair_face": "Cheveux et Visage",
-    "items": "Objets",
-    "miscellaneous": "Divers",
-    "models_textures": "Modèles et Textures",
-    "npc": "PNJ",
-    "overhauls": "Refontes",
-    "patches": "Patchs",
-    "player_homes": "Maisons du Joueur",
-    "ui": "Interface",
-    "utilities": "Utilitaires",
-    "weapons": "Armes"
+  "mod_detail": {
+    "tab_textfiles": "Fichiers Texte",
+    "tab_ini": "Fichiers INI",
+    "tab_images": "Images",
+    "tab_optional_esps": "ESPs Optionnels",
+    "tab_conflicts": "Conflits",
+    "tab_categories": "Catégories",
+    "tab_nexus": "Info Nexus",
+    "tab_filetree": "Arborescence",
+    "placeholder_images": "Espace réservé – Images",
+    "placeholder_nexus": "Espace réservé – Info Nexus",
+    "label_textfiles": "Fichiers Texte",
+    "label_ini_files": "Fichiers INI",
+    "no_file_selected": "Aucun fichier sélectionné",
+    "select_file": "Sélectionner un fichier …",
+    "select_ini_file": "Sélectionner un fichier INI …",
+    "saved": "Enregistré !",
+    "optional_esps_disabled": "ESPs Optionnels (désactivés)",
+    "active_esps": "ESPs Actifs (dans le mod)",
+    "no_mod_folder": "Pas de dossier de mod",
+    "mod_dir_not_found": "Répertoire du mod introuvable.",
+    "conflict_detection_unavailable": "Détection des conflits non disponible.",
+    "no_conflicts": "Aucun conflit trouvé",
+    "overwrites_mod": "Écrase le mod",
+    "overwritten_by_mod": "Écrasé par le mod",
+    "categories_unavailable": "Catégories non disponibles.",
+    "no_primary": "— Aucune —",
+    "primary_category": "Catégorie principale :"
+  },
+
+  "filetree": {
+    "name": "Nom",
+    "size": "Taille",
+    "type": "Type",
+    "date_modified": "Date de modification"
   }
 }

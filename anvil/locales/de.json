@@ -120,6 +120,10 @@
     "instance_wizard_title": "Neue Instanz erstellen",
     "quick_install_title": "Schnellinstallation",
     "mod_exists_title": "Mod existiert bereits",
+    "mod_exists_description": "Wähle eine Aktion: Zusammenführen fügt neue Dateien hinzu, Ersetzen löscht die alte Mod zuerst, Umbenennen erlaubt einen neuen Namen.",
+    "mod_exists": "Mod existiert bereits",
+    "mod_details": "Mod-Details: {name}",
+    "quick_install": "Schnellinstallation",
 
     "info_title": "Informationen: {name}",
 
@@ -218,7 +222,14 @@
     "rename": "Umbenennen",
     "delete": "Löschen",
     "copy": "Kopieren",
-    "select": "Auswählen"
+    "select": "Auswählen",
+    "merge": "Zusammenführen",
+    "replace": "Ersetzen",
+    "back": "Zurück",
+    "next": "Weiter",
+    "manual": "Manuell",
+    "open_in_explorer": "Mod im Explorer öffnen",
+    "folder": "Ordner"
   },
 
   "tooltip": {
@@ -241,7 +252,11 @@
     "conflict_overwritten": "Wird überschrieben von {lose_mods} Mod(s) bei {losses} Datei(en)",
     "conflict_both": "Gewinnt {wins}, verliert {losses} Konflikte",
     "direct_install": "Direkt-Install: Wird ins Spielverzeichnis kopiert",
-    "dependencies": "Abhängigkeiten: {deps}"
+    "dependencies": "Abhängigkeiten: {deps}",
+    "manual_install": "Manuell installieren — volle Kontrolle über die Installation",
+    "save_ctrl_s": "Speichern (Strg+S)",
+    "move_to_optional": "Ausgewählte Plugins deaktivieren (nach optional/ verschieben)",
+    "move_to_active": "Ausgewählte Plugins aktivieren (zurück in Mod-Root)"
   },
 
   "label": {
@@ -326,7 +341,9 @@
     "overwrites_mod": "Überschreibt Mod",
     "overwritten_by": "Überschrieben von Mod",
 
-    "plugin_loader_not_available": "Plugin-Loader nicht verfügbar"
+    "plugin_loader_not_available": "Plugin-Loader nicht verfügbar",
+    "file": "Datei",
+    "filter": "Filter"
   },
 
   "placeholder": {
@@ -642,23 +659,40 @@
     "nxm_handler_failed": "Registrierung fehlgeschlagen.\nBitte manuell die .desktop-Datei konfigurieren."
   },
 
-  "category": {
-    "animations": "Animationen",
-    "armor_clothing": "Rüstung & Kleidung",
-    "audio": "Audio",
-    "bug_fixes": "Fehlerbehebungen",
-    "gameplay": "Gameplay",
-    "graphics": "Grafik",
-    "hair_face": "Haare & Gesicht",
-    "items": "Gegenstände",
-    "miscellaneous": "Verschiedenes",
-    "models_textures": "Modelle & Texturen",
-    "npc": "NPCs",
-    "overhauls": "Überarbeitungen",
-    "patches": "Patches",
-    "player_homes": "Spielerheime",
-    "ui": "Benutzeroberfläche",
-    "utilities": "Werkzeuge",
-    "weapons": "Waffen"
+  "mod_detail": {
+    "tab_textfiles": "Textdateien",
+    "tab_ini": "INI Dateien",
+    "tab_images": "Bilder",
+    "tab_optional_esps": "Optionale ESPs",
+    "tab_conflicts": "Konflikte",
+    "tab_categories": "Kategorien",
+    "tab_nexus": "Nexus Info",
+    "tab_filetree": "Verzeichnisbaum",
+    "placeholder_images": "Platzhalter – Bilder",
+    "placeholder_nexus": "Platzhalter – Nexus Info",
+    "label_textfiles": "Textdateien",
+    "label_ini_files": "INI Dateien",
+    "no_file_selected": "Keine Datei ausgewählt",
+    "select_file": "Datei auswählen …",
+    "select_ini_file": "INI-Datei auswählen …",
+    "saved": "Gespeichert!",
+    "optional_esps_disabled": "Optionale ESPs (deaktiviert)",
+    "active_esps": "Aktive ESPs (im Mod)",
+    "no_mod_folder": "Kein Mod-Ordner",
+    "mod_dir_not_found": "Mod-Verzeichnis nicht gefunden.",
+    "conflict_detection_unavailable": "Konflikterkennung nicht verfügbar.",
+    "no_conflicts": "Keine Konflikte gefunden",
+    "overwrites_mod": "Überschreibt Mod",
+    "overwritten_by_mod": "Überschrieben von Mod",
+    "categories_unavailable": "Kategorien nicht verfügbar.",
+    "no_primary": "— Keine —",
+    "primary_category": "Primäre Kategorie:"
+  },
+
+  "filetree": {
+    "name": "Name",
+    "size": "Größe",
+    "type": "Typ",
+    "date_modified": "Änderungsdatum"
   }
 }

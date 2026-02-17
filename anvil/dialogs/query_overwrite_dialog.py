@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
+from anvil.core.translator import tr
+
 _STYLE = """
 QDialog { background: #1C1C1C; color: #D3D3D3; }
 QLabel { color: #D3D3D3; }
@@ -46,7 +48,7 @@ class QueryOverwriteDialog(QDialog):
 
     def __init__(self, mod_name: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Mod existiert bereits")
+        self.setWindowTitle(tr("dialog.mod_exists"))
         self.setMinimumWidth(460)
         self.setStyleSheet(_STYLE)
         self._action = OverwriteAction.NONE
@@ -62,21 +64,11 @@ class QueryOverwriteDialog(QDialog):
         frame_layout.setContentsMargins(16, 14, 16, 14)
         frame_layout.setSpacing(10)
 
-        msg = QLabel(
-            f"Der Mod <b>\"{mod_name}\"</b> scheint bereits installiert zu sein.\n"
-            "Was möchten Sie tun?"
-        )
+        msg = QLabel(tr("dialog.mod_exists_message", mod_name=mod_name))
         msg.setWordWrap(True)
         frame_layout.addWidget(msg)
 
-        desc = QLabel(
-            "<b>Zusammenführen:</b> Dateien aus diesem Archiv hinzufügen, "
-            "vorhandene überschreiben.<br>"
-            "<b>Ersetzen:</b> Den vorhandenen Mod komplett ersetzen "
-            "(alte Dateien werden gelöscht).<br>"
-            "<b>Umbenennen:</b> Als separaten Mod mit neuem Namen installieren "
-            "<i>(empfohlen)</i>."
-        )
+        desc = QLabel(tr("dialog.mod_exists_description"))
         desc.setWordWrap(True)
         frame_layout.addWidget(desc)
 
@@ -89,21 +81,21 @@ class QueryOverwriteDialog(QDialog):
 
         btn_row.addStretch()
 
-        btn_merge = QPushButton("Zusammenführen")
+        btn_merge = QPushButton(tr("button.merge"))
         btn_merge.clicked.connect(self._on_merge)
         btn_row.addWidget(btn_merge)
 
-        btn_replace = QPushButton("Ersetzen")
+        btn_replace = QPushButton(tr("button.replace"))
         btn_replace.clicked.connect(self._on_replace)
         btn_row.addWidget(btn_replace)
 
-        btn_rename = QPushButton("Umbenennen")
+        btn_rename = QPushButton(tr("button.rename"))
         btn_rename.setObjectName("renameBtn")
         btn_rename.setDefault(True)
         btn_rename.clicked.connect(self._on_rename)
         btn_row.addWidget(btn_rename)
 
-        btn_cancel = QPushButton("Abbrechen")
+        btn_cancel = QPushButton(tr("button.cancel"))
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_cancel)
 

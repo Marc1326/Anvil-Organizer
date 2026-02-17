@@ -32,6 +32,7 @@ from PySide6.QtGui import QPainter, QColor, QFont, QFontDatabase, QIcon
 
 from anvil.core.conflict_scanner import ConflictScanner
 from anvil.core.mod_metadata import write_meta_ini
+from anvil.core.translator import tr
 from anvil.core import _todo
 from anvil.widgets.flow_layout import FlowLayout
 
@@ -219,7 +220,7 @@ class CodeEditor(QPlainTextEdit):
         painter.end()
 
 
-def _build_textfiles_tab():
+def _build_textfiles_tab(mod_path: str):
     """Tab wie MO2: Splitter; links Label + Liste + Filter, rechts Toolbar + Editor."""
     page = QWidget()
     page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -235,15 +236,14 @@ def _build_textfiles_tab():
     left_layout = QVBoxLayout(left_pane)
     left_layout.setContentsMargins(0, 0, 0, 0)
     left_layout.setSpacing(6)
-    left_layout.addWidget(QLabel("Textdateien"))
+    left_layout.addWidget(QLabel(tr("mod_detail.label_textfiles")))
     file_list = QListWidget()
     file_list.setObjectName("textFileList")
     file_list.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
     file_list.setMinimumWidth(120)
 
-    test_mod = _test_mod_dir()
-    if os.path.isdir(test_mod):
-        for name in sorted(os.listdir(test_mod)):
+    if mod_path and os.path.isdir(mod_path):
+        for name in sorted(os.listdir(mod_path)):
             if name.endswith(".txt"):
                 file_list.addItem(QListWidgetItem(name))
     if file_list.count() == 0:
@@ -254,7 +254,7 @@ def _build_textfiles_tab():
 
     left_layout.addWidget(file_list)
     filter_edit = QLineEdit()
-    filter_edit.setPlaceholderText("Filter")
+    filter_edit.setPlaceholderText(tr("placeholder.filter"))
     filter_edit.textChanged.connect(lambda t: _todo("Textdateien-Filter")())
     left_layout.addWidget(filter_edit)
     splitter.addWidget(left_pane)
@@ -276,29 +276,29 @@ def _build_textfiles_tab():
     btn_save = QPushButton()
     btn_save.setObjectName("toolbarIconBtn")
     btn_save.setIcon(QIcon(_icon_path("diskette (1).png")))
-    btn_save.setToolTip("Speichern")
+    btn_save.setToolTip(tr("tooltip.save"))
     toolbar_layout.addWidget(btn_save)
 
-    btn_ordner = QPushButton("Ordner")
+    btn_ordner = QPushButton(tr("button.folder"))
     toolbar_layout.addWidget(btn_ordner)
 
     btn_wrap = QPushButton()
     btn_wrap.setObjectName("toolbarIconBtn")
     btn_wrap.setIcon(QIcon(_icon_path("zeilenumbruch (1).png")))
-    btn_wrap.setToolTip("Zeilenumbruch ein/aus")
+    btn_wrap.setToolTip(tr("tooltip.word_wrap"))
     btn_wrap.setCheckable(True)
     toolbar_layout.addWidget(btn_wrap)
 
     path_edit = QLineEdit()
     path_edit.setReadOnly(True)
-    path_edit.setPlaceholderText("Keine Datei ausgewählt")
+    path_edit.setPlaceholderText(tr("mod_detail.no_file_selected"))
     path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
     toolbar_layout.addWidget(path_edit, 1)
     right_layout.addWidget(toolbar_widget)
 
     editor = CodeEditor()
     editor.setFont(_code_font())
-    editor.setPlaceholderText("Datei auswählen …")
+    editor.setPlaceholderText(tr("mod_detail.select_file"))
     editor.setPlainText("")
     editor.setReadOnly(False)
     editor.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -311,18 +311,18 @@ def _build_textfiles_tab():
         if not item:
             current_path[0] = None
             path_edit.clear()
-            path_edit.setPlaceholderText("Keine Datei ausgewählt")
+            path_edit.setPlaceholderText(tr("mod_detail.no_file_selected"))
             editor.setPlainText("")
             return
         name = item.text()
-        path = os.path.join(test_mod, name)
+        path = os.path.join(mod_path, name)
         current_path[0] = path
         path_edit.setText(path)
         try:
             with open(path, encoding="utf-8") as f:
                 editor.setPlainText(f.read())
         except Exception as e:
-            editor.setPlainText(f"Fehler beim Laden: {e}")
+            editor.setPlainText(tr("mod_detail.error_loading", error=str(e)))
 
     def on_save():
         path = current_path[0]
@@ -331,14 +331,14 @@ def _build_textfiles_tab():
         try:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(editor.toPlainText())
-            path_edit.setText("Gespeichert!")
+            path_edit.setText(tr("mod_detail.saved"))
             path_edit.setStyleSheet("color: #4CAF50; background: #1C1C1C; border: none;")
             def restore():
                 path_edit.setText(path)
                 path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
             QTimer.singleShot(2000, restore)
         except Exception as e:
-            path_edit.setText(f"Fehler: {e}")
+            path_edit.setText(tr("mod_detail.error", error=str(e)))
 
     def on_wrap_toggled(checked):
         mode = QPlainTextEdit.LineWrapMode.WidgetWidth if checked else QPlainTextEdit.LineWrapMode.NoWrap
@@ -389,7 +389,7 @@ def _build_ini_tab(mod_path: str):
     left_layout = QVBoxLayout(left_pane)
     left_layout.setContentsMargins(0, 0, 0, 0)
     left_layout.setSpacing(6)
-    left_layout.addWidget(QLabel("INI Dateien"))
+    left_layout.addWidget(QLabel(tr("mod_detail.label_ini_files")))
 
     file_list = QListWidget()
     file_list.setObjectName("iniFileList")
@@ -418,7 +418,7 @@ def _build_ini_tab(mod_path: str):
     left_layout.addWidget(file_list)
 
     # Info-Label für Anzahl
-    info_label = QLabel(f"{len(ini_files)} INI-Datei(en) gefunden")
+    info_label = QLabel(tr("mod_detail.ini_files_found", count=len(ini_files)))
     info_label.setStyleSheet("color: #808080; font-size: 11px;")
     left_layout.addWidget(info_label)
 
@@ -442,29 +442,29 @@ def _build_ini_tab(mod_path: str):
     btn_save = QPushButton()
     btn_save.setObjectName("toolbarIconBtn")
     btn_save.setIcon(QIcon(_icon_path("diskette (1).png")))
-    btn_save.setToolTip("Speichern (Strg+S)")
+    btn_save.setToolTip(tr("tooltip.save_ctrl_s"))
     toolbar_layout.addWidget(btn_save)
 
     btn_reload = QPushButton()
     btn_reload.setObjectName("toolbarIconBtn")
     btn_reload.setIcon(QIcon(_icon_path("aktualisieren.png")))
-    btn_reload.setToolTip("Neu laden")
+    btn_reload.setToolTip(tr("tooltip.reload"))
     toolbar_layout.addWidget(btn_reload)
 
-    btn_ordner = QPushButton("Ordner")
-    btn_ordner.setToolTip("Ordner im Dateimanager öffnen")
+    btn_ordner = QPushButton(tr("button.folder"))
+    btn_ordner.setToolTip(tr("tooltip.open_folder"))
     toolbar_layout.addWidget(btn_ordner)
 
     btn_wrap = QPushButton()
     btn_wrap.setObjectName("toolbarIconBtn")
     btn_wrap.setIcon(QIcon(_icon_path("zeilenumbruch (1).png")))
-    btn_wrap.setToolTip("Zeilenumbruch ein/aus")
+    btn_wrap.setToolTip(tr("tooltip.word_wrap"))
     btn_wrap.setCheckable(True)
     toolbar_layout.addWidget(btn_wrap)
 
     path_edit = QLineEdit()
     path_edit.setReadOnly(True)
-    path_edit.setPlaceholderText("Keine Datei ausgewählt")
+    path_edit.setPlaceholderText(tr("mod_detail.no_file_selected"))
     path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
     toolbar_layout.addWidget(path_edit, 1)
 
@@ -473,7 +473,7 @@ def _build_ini_tab(mod_path: str):
     # Editor
     editor = CodeEditor()
     editor.setFont(_code_font())
-    editor.setPlaceholderText("INI-Datei auswählen …")
+    editor.setPlaceholderText(tr("mod_detail.select_ini_file"))
     editor.setPlainText("")
     editor.setReadOnly(False)
     editor.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -495,7 +495,7 @@ def _build_ini_tab(mod_path: str):
         if not item:
             current_path[0] = None
             path_edit.clear()
-            path_edit.setPlaceholderText("Keine Datei ausgewählt")
+            path_edit.setPlaceholderText(tr("mod_detail.no_file_selected"))
             editor.setPlainText("")
             has_changes[0] = False
             return
@@ -510,7 +510,7 @@ def _build_ini_tab(mod_path: str):
             with open(path, encoding="utf-8", errors="replace") as f:
                 editor.setPlainText(f.read())
         except Exception as e:
-            editor.setPlainText(f"Fehler beim Laden: {e}")
+            editor.setPlainText(tr("mod_detail.error_loading", error=str(e)))
 
     def on_save():
         path = current_path[0]
@@ -527,7 +527,7 @@ def _build_ini_tab(mod_path: str):
                 path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
             QTimer.singleShot(1500, restore)
         except Exception as e:
-            path_edit.setText(f"Fehler: {e}")
+            path_edit.setText(tr("mod_detail.error", error=str(e)))
             path_edit.setStyleSheet("color: #F44336; background: #1C1C1C; border: none;")
 
     def on_reload():
@@ -594,7 +594,7 @@ def _build_optional_esps_tab(mod_path: str):
     left_layout.setContentsMargins(0, 0, 0, 0)
     left_layout.setSpacing(6)
 
-    left_label = QLabel("Optionale ESPs (deaktiviert)")
+    left_label = QLabel(tr("mod_detail.optional_esps_disabled"))
     left_label.setStyleSheet("font-weight: bold;")
     left_layout.addWidget(left_label)
 
@@ -604,7 +604,7 @@ def _build_optional_esps_tab(mod_path: str):
     optional_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     left_layout.addWidget(optional_list)
 
-    optional_count = QLabel("0 Plugins")
+    optional_count = QLabel(tr("mod_detail.plugins_count", count=0))
     optional_count.setStyleSheet("color: #808080; font-size: 11px;")
     left_layout.addWidget(optional_count)
 
@@ -619,12 +619,12 @@ def _build_optional_esps_tab(mod_path: str):
 
     btn_to_optional = QPushButton("←")
     btn_to_optional.setFixedSize(40, 30)
-    btn_to_optional.setToolTip("Ausgewählte Plugins deaktivieren (nach optional/ verschieben)")
+    btn_to_optional.setToolTip(tr("tooltip.move_to_optional"))
     button_layout.addWidget(btn_to_optional)
 
     btn_to_active = QPushButton("→")
     btn_to_active.setFixedSize(40, 30)
-    btn_to_active.setToolTip("Ausgewählte Plugins aktivieren (zurück in Mod-Root)")
+    btn_to_active.setToolTip(tr("tooltip.move_to_active"))
     button_layout.addWidget(btn_to_active)
 
     button_layout.addStretch()
@@ -636,7 +636,7 @@ def _build_optional_esps_tab(mod_path: str):
     right_layout.setContentsMargins(0, 0, 0, 0)
     right_layout.setSpacing(6)
 
-    right_label = QLabel("Aktive ESPs (im Mod)")
+    right_label = QLabel(tr("mod_detail.active_esps"))
     right_label.setStyleSheet("font-weight: bold;")
     right_layout.addWidget(right_label)
 
@@ -646,7 +646,7 @@ def _build_optional_esps_tab(mod_path: str):
     active_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     right_layout.addWidget(active_list)
 
-    active_count = QLabel("0 Plugins")
+    active_count = QLabel(tr("mod_detail.plugins_count", count=0))
     active_count.setStyleSheet("color: #808080; font-size: 11px;")
     right_layout.addWidget(active_count)
 
@@ -659,8 +659,8 @@ def _build_optional_esps_tab(mod_path: str):
         active_list.clear()
 
         if not mod_root or not mod_root.is_dir():
-            optional_count.setText("Kein Mod-Ordner")
-            active_count.setText("Kein Mod-Ordner")
+            optional_count.setText(tr("mod_detail.no_mod_folder"))
+            active_count.setText(tr("mod_detail.no_mod_folder"))
             return
 
         # Aktive Plugins (nur Root-Ebene, nicht rekursiv)
@@ -689,8 +689,8 @@ def _build_optional_esps_tab(mod_path: str):
             optional_list.addItem(item)
 
         # Counts aktualisieren
-        optional_count.setText(f"{len(opt_plugins)} Plugin(s)")
-        active_count.setText(f"{len(active_plugins)} Plugin(s)")
+        optional_count.setText(tr("mod_detail.plugins_count", count=len(opt_plugins)))
+        active_count.setText(tr("mod_detail.plugins_count", count=len(active_plugins)))
 
     def move_to_optional():
         """Verschiebt ausgewählte aktive Plugins nach optional/."""
@@ -755,6 +755,23 @@ def _build_optional_esps_tab(mod_path: str):
     return page
 
 
+class TranslatedFileSystemModel(QFileSystemModel):
+    """QFileSystemModel mit übersetzten Spalten-Headers."""
+
+    _HEADERS = {
+        0: "filetree.name",
+        1: "filetree.size",
+        2: "filetree.type",
+        3: "filetree.date_modified",
+    }
+
+    def headerData(self, section: int, orientation, role=Qt.ItemDataRole.DisplayRole):
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+            if section in self._HEADERS:
+                return tr(self._HEADERS[section])
+        return super().headerData(section, orientation, role)
+
+
 def _build_filetree_tab(mod_path: str):
     """Verzeichnisbaum-Tab wie MO2: QFileSystemModel + QTreeView.
 
@@ -769,7 +786,7 @@ def _build_filetree_tab(mod_path: str):
 
     # "Mod im Explorer öffnen" Button (wie MO2: openInExplorer)
     btn_row = QHBoxLayout()
-    btn_explore = QPushButton("Mod im Explorer öffnen")
+    btn_explore = QPushButton(tr("button.open_in_explorer"))
     btn_explore.clicked.connect(
         lambda: subprocess.Popen(["xdg-open", mod_path]) if os.path.isdir(mod_path) else None
     )
@@ -778,12 +795,12 @@ def _build_filetree_tab(mod_path: str):
     layout.addLayout(btn_row)
 
     if not mod_path or not os.path.isdir(mod_path):
-        layout.addWidget(QLabel("Mod-Verzeichnis nicht gefunden."))
+        layout.addWidget(QLabel(tr("mod_detail.mod_dir_not_found")))
         layout.addStretch()
         return page
 
     # QFileSystemModel (wie MO2: m_fs = new QFileSystemModel)
-    fs_model = QFileSystemModel()
+    fs_model = TranslatedFileSystemModel()
     fs_model.setRootPath(mod_path)
     fs_model.setReadOnly(True)  # MO2 uses false, we start read-only
 
@@ -836,7 +853,7 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
 
     # Fallback: keine Mod-Daten verfügbar
     if not all_mods or not mod_name:
-        layout.addWidget(QLabel("Konflikterkennung nicht verfügbar."))
+        layout.addWidget(QLabel(tr("mod_detail.conflict_detection_unavailable")))
         layout.addStretch()
         return page
 
@@ -860,27 +877,27 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
 
     # Keine Konflikte
     if not wins and not losses:
-        no_conflict = QLabel("Keine Konflikte gefunden")
+        no_conflict = QLabel(tr("mod_detail.no_conflicts"))
         no_conflict.setStyleSheet("color: #4CAF50; font-size: 14px; padding: 20px;")
         no_conflict.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(no_conflict)
         layout.addStretch()
         ignored_count = len(result["ignored"])
         if ignored_count > 0:
-            info = QLabel(f"{ignored_count} harmlose Übereinstimmungen ignoriert")
+            info = QLabel(tr("mod_detail.ignored_matches", count=ignored_count))
             info.setStyleSheet("color: #808080; font-size: 11px;")
             info.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(info)
         return page
 
     # --- Gewinnt Konflikte (oben) ---
-    win_label = QLabel(f"Gewinnt Konflikte: ({len(wins)})")
+    win_label = QLabel(tr("mod_detail.wins_conflicts", count=len(wins)))
     win_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 12px;")
     layout.addWidget(win_label)
 
     win_tree = QTreeWidget()
     win_tree.setObjectName("conflictTree")
-    win_tree.setHeaderLabels(["Datei", "Überschreibt Mod"])
+    win_tree.setHeaderLabels([tr("label.file"), tr("mod_detail.overwrites_mod")])
     win_tree.setColumnCount(2)
     win_tree.setAlternatingRowColors(True)
     win_tree.setRootIsDecorated(False)
@@ -897,13 +914,13 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
     layout.addWidget(win_tree, 1)
 
     # --- Verliert Konflikte (unten) ---
-    lose_label = QLabel(f"Verliert Konflikte: ({len(losses)})")
+    lose_label = QLabel(tr("mod_detail.loses_conflicts", count=len(losses)))
     lose_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12px;")
     layout.addWidget(lose_label)
 
     lose_tree = QTreeWidget()
     lose_tree.setObjectName("conflictTree")
-    lose_tree.setHeaderLabels(["Datei", "Überschrieben von Mod"])
+    lose_tree.setHeaderLabels([tr("label.file"), tr("mod_detail.overwritten_by_mod")])
     lose_tree.setColumnCount(2)
     lose_tree.setAlternatingRowColors(True)
     lose_tree.setRootIsDecorated(False)
@@ -922,9 +939,10 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
     # --- Info-Zeile ---
     total = len(wins) + len(losses)
     ignored = len(result["ignored"])
-    info_text = f"{total} Konflikte"
     if ignored > 0:
-        info_text += f", {ignored} ignoriert"
+        info_text = tr("mod_detail.conflicts_with_ignored", total=total, ignored=ignored)
+    else:
+        info_text = tr("mod_detail.conflicts_count", count=total)
     info = QLabel(info_text)
     info.setStyleSheet("color: #808080; font-size: 11px;")
     layout.addWidget(info)
@@ -1007,7 +1025,7 @@ def _build_categories_tab(category_manager, mod_entry, mod_path):
 
     # Fallback wenn keine Daten
     if not category_manager:
-        layout.addWidget(QLabel("Kategorien nicht verfügbar."))
+        layout.addWidget(QLabel(tr("mod_detail.categories_unavailable")))
         layout.addStretch()
         return page
 
@@ -1027,7 +1045,7 @@ def _build_categories_tab(category_manager, mod_entry, mod_path):
         nonlocal primary_id
         primary_combo.blockSignals(True)
         primary_combo.clear()
-        primary_combo.addItem("— Keine —", 0)
+        primary_combo.addItem(tr("mod_detail.no_primary"), 0)
         for cat_id in assigned_ids:
             name = category_manager.get_name(cat_id)
             if name:
@@ -1164,7 +1182,7 @@ def _build_categories_tab(category_manager, mod_entry, mod_path):
 
     # Primär-ComboBox
     primary_row = QHBoxLayout()
-    primary_label = QLabel("Primäre Kategorie:")
+    primary_label = QLabel(tr("mod_detail.primary_category"))
     primary_label.setStyleSheet("color: #aaaaaa; font-size: 12px;")
     primary_row.addWidget(primary_label)
 
@@ -1212,7 +1230,7 @@ class ModDetailDialog(QDialog):
                  all_mods=None, game_plugin=None,
                  category_manager=None, mod_entry=None):
         super().__init__(parent)
-        self.setWindowTitle(mod_name or "Mod-Details")
+        self.setWindowTitle(mod_name or tr("dialog.mod_details"))
         self.setMinimumSize(1280, 720)
         self.resize(1300, 750)
         self.setStyleSheet(_MOD_DETAIL_DIALOG_STYLE)
@@ -1224,28 +1242,28 @@ class ModDetailDialog(QDialog):
         self.tab_widget = QTabWidget()
 
         # Tab 0: Textdateien
-        self.tab_widget.addTab(_build_textfiles_tab(), "Textdateien")
+        self.tab_widget.addTab(_build_textfiles_tab(mod_path), tr("mod_detail.tab_textfiles"))
         # Tab 1: INI Dateien
-        self.tab_widget.addTab(_build_ini_tab(mod_path), "INI Dateien")
+        self.tab_widget.addTab(_build_ini_tab(mod_path), tr("mod_detail.tab_ini"))
 
         # Tab 2: Bilder (Platzhalter, deaktiviert)
         bilder_page = QWidget()
         bilder_layout = QVBoxLayout(bilder_page)
-        bilder_layout.addWidget(QLabel("Platzhalter – Bilder"))
-        self.tab_widget.addTab(bilder_page, "Bilder")
+        bilder_layout.addWidget(QLabel(tr("mod_detail.placeholder_images")))
+        self.tab_widget.addTab(bilder_page, tr("mod_detail.tab_images"))
         self.tab_widget.setTabEnabled(2, False)
 
         # Tab 3: Optionale ESPs
-        self.tab_widget.addTab(_build_optional_esps_tab(mod_path), "Optionale ESPs")
+        self.tab_widget.addTab(_build_optional_esps_tab(mod_path), tr("mod_detail.tab_optional_esps"))
 
         # Tab 4: Konflikte (wie MO2: ConflictsTab)
         self.tab_widget.addTab(
-            _build_conflicts_tab(mod_name, all_mods, game_plugin), "Konflikte",
+            _build_conflicts_tab(mod_name, all_mods, game_plugin), tr("mod_detail.tab_conflicts"),
         )
 
         # Tab 5: Kategorien
         self._categories_page = _build_categories_tab(category_manager, mod_entry, mod_path)
-        self.tab_widget.addTab(self._categories_page, "Kategorien")
+        self.tab_widget.addTab(self._categories_page, tr("mod_detail.tab_categories"))
 
         # Layout-Update wenn Kategorien-Tab sichtbar wird
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
@@ -1253,12 +1271,12 @@ class ModDetailDialog(QDialog):
         # Tab 6: Nexus Info (Platzhalter, deaktiviert)
         nexus_page = QWidget()
         nexus_layout = QVBoxLayout(nexus_page)
-        nexus_layout.addWidget(QLabel("Platzhalter – Nexus Info"))
-        self.tab_widget.addTab(nexus_page, "Nexus Info")
+        nexus_layout.addWidget(QLabel(tr("mod_detail.placeholder_nexus")))
+        self.tab_widget.addTab(nexus_page, tr("mod_detail.tab_nexus"))
         self.tab_widget.setTabEnabled(6, False)
 
         # Tab 7: Verzeichnisbaum (wie MO2: FileTreeTab)
-        self.tab_widget.addTab(_build_filetree_tab(mod_path), "Verzeichnisbaum")
+        self.tab_widget.addTab(_build_filetree_tab(mod_path), tr("mod_detail.tab_filetree"))
 
         tab_bar = self.tab_widget.tabBar()
         tab_bar.setExpanding(False)
@@ -1277,14 +1295,14 @@ class ModDetailDialog(QDialog):
 
         # Unten: Zurück/Weiter links, Schliessen rechts
         btn_row = QHBoxLayout()
-        btn_back = QPushButton("Zurück")
+        btn_back = QPushButton(tr("button.back"))
         btn_back.clicked.connect(_todo("Mod-Navigation Zurück"))
-        btn_next = QPushButton("Weiter")
+        btn_next = QPushButton(tr("button.next"))
         btn_next.clicked.connect(_todo("Mod-Navigation Weiter"))
         btn_row.addWidget(btn_back)
         btn_row.addWidget(btn_next)
         btn_row.addStretch()
-        btn_close = QPushButton("Schliessen")
+        btn_close = QPushButton(tr("button.close"))
         btn_close.clicked.connect(self.accept)
         btn_row.addWidget(btn_close)
         layout.addLayout(btn_row)

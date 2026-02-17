@@ -120,6 +120,10 @@
     "instance_wizard_title": "Create New Instance",
     "quick_install_title": "Quick Install",
     "mod_exists_title": "Mod Already Exists",
+    "mod_exists_description": "Choose an action: Merge adds new files, Replace deletes the old mod first, Rename allows a new name.",
+    "mod_exists": "Mod Already Exists",
+    "mod_details": "Mod Details: {name}",
+    "quick_install": "Quick Install",
 
     "info_title": "Information: {name}",
 
@@ -218,7 +222,14 @@
     "rename": "Rename",
     "delete": "Delete",
     "copy": "Copy",
-    "select": "Select"
+    "select": "Select",
+    "merge": "Merge",
+    "replace": "Replace",
+    "back": "Back",
+    "next": "Next",
+    "manual": "Manual",
+    "open_in_explorer": "Open Mod in Explorer",
+    "folder": "Folder"
   },
 
   "tooltip": {
@@ -241,7 +252,11 @@
     "conflict_overwritten": "Overwritten by {lose_mods} mod(s) in {losses} file(s)",
     "conflict_both": "Wins {wins}, loses {losses} conflicts",
     "direct_install": "Direct-Install: Copied to game directory",
-    "dependencies": "Dependencies: {deps}"
+    "dependencies": "Dependencies: {deps}",
+    "manual_install": "Manual install — full control over the installation",
+    "save_ctrl_s": "Save (Ctrl+S)",
+    "move_to_optional": "Deactivate selected plugins (move to optional/)",
+    "move_to_active": "Activate selected plugins (back to mod root)"
   },
 
   "label": {
@@ -326,7 +341,9 @@
     "overwrites_mod": "Overwrites Mod",
     "overwritten_by": "Overwritten by Mod",
 
-    "plugin_loader_not_available": "Plugin loader not available"
+    "plugin_loader_not_available": "Plugin loader not available",
+    "file": "File",
+    "filter": "Filter"
   },
 
   "placeholder": {
@@ -644,23 +661,40 @@
     "nxm_handler_failed": "Registration failed.\nPlease manually configure the .desktop file."
   },
 
-  "category": {
-    "animations": "Animations",
-    "armor_clothing": "Armor & Clothing",
-    "audio": "Audio",
-    "bug_fixes": "Bug Fixes",
-    "gameplay": "Gameplay",
-    "graphics": "Graphics",
-    "hair_face": "Hair & Face",
-    "items": "Items",
-    "miscellaneous": "Miscellaneous",
-    "models_textures": "Models & Textures",
-    "npc": "NPC",
-    "overhauls": "Overhauls",
-    "patches": "Patches",
-    "player_homes": "Player Homes",
-    "ui": "UI",
-    "utilities": "Utilities",
-    "weapons": "Weapons"
+  "mod_detail": {
+    "tab_textfiles": "Text Files",
+    "tab_ini": "INI Files",
+    "tab_images": "Images",
+    "tab_optional_esps": "Optional ESPs",
+    "tab_conflicts": "Conflicts",
+    "tab_categories": "Categories",
+    "tab_nexus": "Nexus Info",
+    "tab_filetree": "File Tree",
+    "placeholder_images": "Placeholder – Images",
+    "placeholder_nexus": "Placeholder – Nexus Info",
+    "label_textfiles": "Text Files",
+    "label_ini_files": "INI Files",
+    "no_file_selected": "No file selected",
+    "select_file": "Select file …",
+    "select_ini_file": "Select INI file …",
+    "saved": "Saved!",
+    "optional_esps_disabled": "Optional ESPs (disabled)",
+    "active_esps": "Active ESPs (in mod)",
+    "no_mod_folder": "No mod folder",
+    "mod_dir_not_found": "Mod directory not found.",
+    "conflict_detection_unavailable": "Conflict detection unavailable.",
+    "no_conflicts": "No conflicts found",
+    "overwrites_mod": "Overwrites mod",
+    "overwritten_by_mod": "Overwritten by mod",
+    "categories_unavailable": "Categories unavailable.",
+    "no_primary": "— None —",
+    "primary_category": "Primary category:"
+  },
+
+  "filetree": {
+    "name": "Name",
+    "size": "Size",
+    "type": "Type",
+    "date_modified": "Date Modified"
   }
 }

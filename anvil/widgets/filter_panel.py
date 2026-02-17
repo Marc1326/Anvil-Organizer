@@ -518,7 +518,7 @@ class FilterToggleBar(QWidget):
 
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        label = "\u25c0 Filter" if self._open else "Filter \u25b6"
+        label = f"\u25c0 {tr('label.filter')}" if self._open else f"{tr('label.filter')} \u25b6"
 
         font = painter.font()
         font.setPointSize(9)

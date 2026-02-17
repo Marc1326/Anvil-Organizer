@@ -120,6 +120,10 @@
     "instance_wizard_title": "Crear nueva instancia",
     "quick_install_title": "Instalación rápida",
     "mod_exists_title": "El Mod ya existe",
+    "mod_exists_description": "Elige una acción: Fusionar añade nuevos archivos, Reemplazar elimina el mod antiguo primero, Renombrar permite un nuevo nombre.",
+    "mod_exists": "El Mod ya existe",
+    "mod_details": "Detalles del Mod: {name}",
+    "quick_install": "Instalación rápida",
 
     "info_title": "Información: {name}",
 
@@ -218,7 +222,14 @@
     "rename": "Renombrar",
     "delete": "Eliminar",
     "copy": "Copiar",
-    "select": "Seleccionar"
+    "select": "Seleccionar",
+    "merge": "Fusionar",
+    "replace": "Reemplazar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "manual": "Manual",
+    "open_in_explorer": "Abrir Mod en el explorador",
+    "folder": "Carpeta"
   },
 
   "tooltip": {
@@ -241,7 +252,11 @@
     "conflict_overwritten": "Sobrescrito por {lose_mods} mod(s) en {losses} archivo(s)",
     "conflict_both": "Gana {wins}, pierde {losses} conflictos",
     "direct_install": "Instalación directa: Copiado al directorio del juego",
-    "dependencies": "Dependencias: {deps}"
+    "dependencies": "Dependencias: {deps}",
+    "manual_install": "Instalación manual — control total sobre la instalación",
+    "save_ctrl_s": "Guardar (Ctrl+S)",
+    "move_to_optional": "Desactivar plugins seleccionados (mover a optional/)",
+    "move_to_active": "Activar plugins seleccionados (volver a raíz del mod)"
   },
 
   "label": {
@@ -326,7 +341,9 @@
     "overwrites_mod": "Sobrescribe Mod",
     "overwritten_by": "Sobrescrito por Mod",
 
-    "plugin_loader_not_available": "Cargador de Plugin no disponible"
+    "plugin_loader_not_available": "Cargador de Plugin no disponible",
+    "file": "Archivo",
+    "filter": "Filtro"
   },
 
   "placeholder": {
@@ -642,23 +659,40 @@
     "nxm_handler_failed": "Registro fallido.\nPor favor configura manualmente el archivo .desktop."
   },
 
-  "category": {
-    "animations": "Animaciones",
-    "armor_clothing": "Armadura y Ropa",
-    "audio": "Audio",
-    "bug_fixes": "Correcciones de Errores",
-    "gameplay": "Jugabilidad",
-    "graphics": "Gráficos",
-    "hair_face": "Cabello y Rostro",
-    "items": "Objetos",
-    "miscellaneous": "Misceláneos",
-    "models_textures": "Modelos y Texturas",
-    "npc": "NPCs",
-    "overhauls": "Revisiones",
-    "patches": "Parches",
-    "player_homes": "Hogares del Jugador",
-    "ui": "Interfaz",
-    "utilities": "Utilidades",
-    "weapons": "Armas"
+  "mod_detail": {
+    "tab_textfiles": "Archivos de Texto",
+    "tab_ini": "Archivos INI",
+    "tab_images": "Imágenes",
+    "tab_optional_esps": "ESPs Opcionales",
+    "tab_conflicts": "Conflictos",
+    "tab_categories": "Categorías",
+    "tab_nexus": "Info Nexus",
+    "tab_filetree": "Árbol de Archivos",
+    "placeholder_images": "Marcador – Imágenes",
+    "placeholder_nexus": "Marcador – Info Nexus",
+    "label_textfiles": "Archivos de Texto",
+    "label_ini_files": "Archivos INI",
+    "no_file_selected": "Ningún archivo seleccionado",
+    "select_file": "Seleccionar archivo …",
+    "select_ini_file": "Seleccionar archivo INI …",
+    "saved": "¡Guardado!",
+    "optional_esps_disabled": "ESPs Opcionales (desactivados)",
+    "active_esps": "ESPs Activos (en mod)",
+    "no_mod_folder": "Sin carpeta de mod",
+    "mod_dir_not_found": "Directorio del mod no encontrado.",
+    "conflict_detection_unavailable": "Detección de conflictos no disponible.",
+    "no_conflicts": "No se encontraron conflictos",
+    "overwrites_mod": "Sobrescribe mod",
+    "overwritten_by_mod": "Sobrescrito por mod",
+    "categories_unavailable": "Categorías no disponibles.",
+    "no_primary": "— Ninguna —",
+    "primary_category": "Categoría principal:"
+  },
+
+  "filetree": {
+    "name": "Nombre",
+    "size": "Tamaño",
+    "type": "Tipo",
+    "date_modified": "Fecha de modificación"
   }
 }
