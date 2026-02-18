@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from anvil.core.mod_list_io import read_modlist
+from anvil.core.mod_list_io import read_global_modlist, read_active_mods
 
 # Files inside mod folders that are metadata, not game content.
 _SKIP_FILES = {"meta.ini", "codes.txt"}
@@ -64,11 +64,13 @@ class ModDeployer:
         instance_path: Path,
         game_path: Path,
         direct_install_patterns: list[str] | None = None,
+        profile_name: str = "Default",
     ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
         self._mods_path = instance_path / ".mods"
-        self._profile_path = instance_path / ".profiles" / "Default"
+        self._profiles_dir = instance_path / ".profiles"
+        self._profile_path = self._profiles_dir / profile_name
         self._manifest_path = instance_path / self.MANIFEST_NAME
         self._direct_patterns = [p.lower() for p in (direct_install_patterns or [])]
 
@@ -111,11 +113,12 @@ class ModDeployer:
                 )
                 return result
 
-        # Read modlist for enabled mods in priority order
-        modlist = read_modlist(self._profile_path)
+        # Read global modlist for order + profile's active mods
+        global_order = read_global_modlist(self._profiles_dir)
+        active_mods = read_active_mods(self._profile_path)
         enabled_mods = [
-            (name, idx) for idx, (name, enabled) in enumerate(modlist)
-            if enabled
+            (name, idx) for idx, name in enumerate(global_order)
+            if name in active_mods
         ]
 
         if not enabled_mods:

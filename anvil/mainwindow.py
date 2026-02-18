@@ -890,15 +890,22 @@ class MainWindow(QMainWindow):
 
     def _on_mod_toggled(self, row: int, enabled: bool) -> None:
         """A mod checkbox was toggled — update entries and persist."""
-        if 0 <= row < len(self._current_mod_entries):
-            self._current_mod_entries[row].enabled = enabled
+        model = self._mod_list_view.source_model()
+        if 0 <= row < len(model._rows):
+            row_data = model._rows[row]
+            # Find matching entry by display name (model shows visible_entries only)
+            for entry in self._current_mod_entries:
+                display = entry.display_name or entry.name
+                if display == row_data.name:
+                    entry.enabled = enabled
+                    break
         self._write_current_modlist()
         self._update_active_count()
 
     def _on_mods_reordered(self) -> None:
         """Mods were reordered via drag & drop — sync entries and persist."""
         model = self._mod_list_view.source_model()
-        # Rebuild _current_mod_entries from the model's new order
+        # Rebuild visible entries from the model's new order
         new_entries = []
         for i in range(model.rowCount()):
             row_data = model._rows[i]
@@ -909,7 +916,9 @@ class MainWindow(QMainWindow):
                     entry.priority = i
                     new_entries.append(entry)
                     break
-        self._current_mod_entries = new_entries
+        # Preserve framework/direct-install mods (not in model)
+        framework_entries = [e for e in self._current_mod_entries if e.is_direct_install]
+        self._current_mod_entries = new_entries + framework_entries
         self._write_current_modlist()
         self._update_active_count()
         # Recompute conflict icons (priorities changed → winner may differ)
@@ -2722,10 +2731,11 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
 
         if has_mod:
+            act_activate = None
+            act_deactivate = None
             if section == "inactive":
                 act_activate = menu.addAction(tr("context.activate"))
             else:
-                act_activate = None
                 act_deactivate = menu.addAction(tr("context.deactivate"))
 
             menu.addSeparator()
