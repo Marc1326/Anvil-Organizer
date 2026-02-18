@@ -1,6 +1,8 @@
 {
   "_language_name": "Deutsch",
 
+  "label.filter": "Filter",
+
   "menu": {
     "file": "Datei",
     "view": "Ansicht",
