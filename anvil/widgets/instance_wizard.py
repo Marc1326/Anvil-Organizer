@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QStackedWidget,
     QLabel, QLineEdit, QListView, QCheckBox, QRadioButton,
     QPushButton, QWidget, QFrame, QButtonGroup, QAbstractItemView,
+    QFileDialog, QStyle,
 )
 from PySide6.QtGui import QFont, QIcon, QStandardItemModel, QStandardItem
 from PySide6.QtCore import Qt, QSortFilterProxyModel, QSettings
@@ -50,6 +51,18 @@ QPushButton#createBtn {
     font-weight: bold;
 }
 QPushButton#createBtn:hover { background: #008585; }
+QPushButton#exploreBtn {
+    background: transparent;
+    border: none;
+    padding: 2px;
+    min-width: 32px;
+    max-width: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    font-size: 18px;
+    color: #E8B84B;
+}
+QPushButton#exploreBtn:hover { background: #3D3D3D; }
 QCheckBox, QRadioButton { background: transparent; spacing: 6px; }
 QCheckBox::indicator, QRadioButton::indicator {
     width: 16px; height: 16px;
@@ -174,6 +187,7 @@ class CreateInstanceWizard(QDialog):
         nav_layout.addWidget(self._cancel_btn)
 
         self._next_btn = QPushButton(tr("wizard.btn_next"))
+        self._next_btn.setObjectName("createBtn")
         self._next_btn.clicked.connect(self._on_next)
         nav_layout.addWidget(self._next_btn)
 
@@ -378,25 +392,53 @@ class CreateInstanceWizard(QDialog):
         paths_layout = QFormLayout(self._paths_form)
         paths_layout.setSpacing(12)
 
+        # Mods path with browse button
+        mods_row = QHBoxLayout()
+        mods_row.setSpacing(8)
         self._mods_path_edit = QLineEdit()
         self._mods_path_edit.setPlaceholderText("%BASE_DIR%/.mods")
-        paths_layout.addRow(tr("wizard.label_mods_path"), self._mods_path_edit)
+        mods_row.addWidget(self._mods_path_edit, 1)
+        self._mods_browse_btn = QPushButton()
+        self._mods_browse_btn.setObjectName("exploreBtn")
+        self._mods_browse_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
+        self._mods_browse_btn.clicked.connect(lambda: self._browse_path(self._mods_path_edit))
+        mods_row.addWidget(self._mods_browse_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        paths_layout.addRow(tr("wizard.label_mods_path"), mods_row)
 
+        # Downloads path with browse button
+        downloads_row = QHBoxLayout()
+        downloads_row.setSpacing(8)
         self._downloads_path_edit = QLineEdit()
         self._downloads_path_edit.setPlaceholderText("%BASE_DIR%/.downloads")
-        paths_layout.addRow(tr("wizard.label_downloads_path"), self._downloads_path_edit)
+        downloads_row.addWidget(self._downloads_path_edit, 1)
+        self._downloads_browse_btn = QPushButton()
+        self._downloads_browse_btn.setObjectName("exploreBtn")
+        self._downloads_browse_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
+        self._downloads_browse_btn.clicked.connect(lambda: self._browse_path(self._downloads_path_edit))
+        downloads_row.addWidget(self._downloads_browse_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        paths_layout.addRow(tr("wizard.label_downloads_path"), downloads_row)
 
+        # Overwrite path with browse button
+        overwrite_row = QHBoxLayout()
+        overwrite_row.setSpacing(8)
         self._overwrite_path_edit = QLineEdit()
         self._overwrite_path_edit.setPlaceholderText("%BASE_DIR%/.overwrite")
-        paths_layout.addRow(tr("wizard.label_overwrite_path"), self._overwrite_path_edit)
+        overwrite_row.addWidget(self._overwrite_path_edit, 1)
+        self._overwrite_browse_btn = QPushButton()
+        self._overwrite_browse_btn.setObjectName("exploreBtn")
+        self._overwrite_browse_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
+        self._overwrite_browse_btn.clicked.connect(lambda: self._browse_path(self._overwrite_path_edit))
+        overwrite_row.addWidget(self._overwrite_browse_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        paths_layout.addRow(tr("wizard.label_overwrite_path"), overwrite_row)
 
         self._paths_form.hide()
         layout.addWidget(self._paths_form)
 
-        paths_hint = QLabel(tr("wizard.paths_hint"))
-        paths_hint.setStyleSheet("color: #808080; font-size: 12px;")
-        paths_hint.setWordWrap(True)
-        layout.addWidget(paths_hint)
+        self._paths_hint = QLabel(tr("wizard.paths_hint"))
+        self._paths_hint.setStyleSheet("color: #808080; font-size: 12px;")
+        self._paths_hint.setWordWrap(True)
+        self._paths_hint.hide()
+        layout.addWidget(self._paths_hint)
 
         layout.addStretch()
         self._stack.addWidget(page)
@@ -623,8 +665,19 @@ class CreateInstanceWizard(QDialog):
         self._update_nav_buttons()
 
     def _on_advanced_paths_toggled(self, checked: bool) -> None:
-        """Show/hide advanced path fields."""
+        """Show/hide advanced path fields and hint."""
         self._paths_form.setVisible(checked)
+        self._paths_hint.setVisible(checked)
+
+    def _browse_path(self, line_edit: QLineEdit) -> None:
+        """Open folder picker and set path to line edit."""
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            tr("wizard.browse_folder_title"),
+            str(Path.home()),
+        )
+        if folder:
+            line_edit.setText(folder)
 
     # ── Helpers ───────────────────────────────────────────────────────
 

@@ -779,6 +779,7 @@
     "dirs_created": "Se crearan las siguientes carpetas:\n  .mods/  .downloads/  .profiles/Default/  .overwrite/",
     "no_games": "No se encontraron juegos compatibles.",
     "not_detected": "no detectado",
-    "create_error": "No se pudo crear la instancia:\n{error}"
+    "create_error": "No se pudo crear la instancia:\n{error}",
+    "browse_folder_title": "Seleccionar carpeta"
   }
 }

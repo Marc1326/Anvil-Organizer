@@ -779,6 +779,7 @@
     "dirs_created": "As seguintes pastas serao criadas:\n  .mods/  .downloads/  .profiles/Default/  .overwrite/",
     "no_games": "Nenhum jogo suportado encontrado.",
     "not_detected": "nao detetado",
-    "create_error": "Nao foi possivel criar a instancia:\n{error}"
+    "create_error": "Nao foi possivel criar a instancia:\n{error}",
+    "browse_folder_title": "Selecionar pasta"
   }
 }

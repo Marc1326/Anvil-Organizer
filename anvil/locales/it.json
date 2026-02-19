@@ -779,6 +779,7 @@
     "dirs_created": "Verranno create le seguenti cartelle:\n  .mods/  .downloads/  .profiles/Default/  .overwrite/",
     "no_games": "Nessun gioco supportato trovato.",
     "not_detected": "non rilevato",
-    "create_error": "Impossibile creare l'istanza:\n{error}"
+    "create_error": "Impossibile creare l'istanza:\n{error}",
+    "browse_folder_title": "Seleziona cartella"
   }
 }

@@ -5,9 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QSplitter,
+    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter,
     QListView, QLineEdit, QPushButton, QLabel, QWidget, QFrame,
-    QAbstractItemView, QInputDialog, QMessageBox,
+    QAbstractItemView, QInputDialog, QMessageBox, QStyle,
 )
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon, QDesktopServices
 from PySide6.QtCore import Qt, QSortFilterProxyModel, QSettings, QModelIndex, QUrl
@@ -22,12 +22,19 @@ _ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
 _DIALOG_STYLE = """
 QDialog { background: #1C1C1C; }
 QWidget { background: #1C1C1C; color: #D3D3D3; }
-QLineEdit, QListView, QPushButton {
+QLineEdit, QPushButton {
     background: #1C1C1C;
     color: #D3D3D3;
     border: 1px solid #3D3D3D;
     border-radius: 2px;
     padding: 4px;
+}
+QListView {
+    background: #141414;
+    alternate-background-color: #1C1C1C;
+    border-radius: 6px;
+    border: none;
+    color: #D3D3D3;
 }
 QListView::item { padding: 4px; }
 QListView::item:selected { background: #3D3D3D; color: #D3D3D3; }
@@ -37,12 +44,22 @@ QPushButton#exploreBtn {
     background: transparent;
     border: none;
     padding: 2px;
-    min-width: 24px;
-    max-width: 24px;
+    min-width: 32px;
+    max-width: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    font-size: 18px;
+    color: #E8B84B;
 }
 QPushButton#exploreBtn:hover { background: #3D3D3D; }
 QSplitter::handle { background: #3D3D3D; }
 QSplitter::handle:horizontal { width: 3px; }
+QPushButton#createBtn {
+    background: #006868;
+    color: #FFF;
+    font-weight: bold;
+}
+QPushButton#createBtn:hover { background: #008585; }
 """
 
 
@@ -88,19 +105,24 @@ class InstanceManagerDialog(QDialog):
             self._welcome_label.setWordWrap(True)
             layout.addWidget(self._welcome_label)
 
+        # Top bar with "New Instance" button (above splitter)
+        top_bar = QHBoxLayout()
+        top_bar.setSpacing(8)
+        self._new_btn = QPushButton("+ " + tr("instance.btn_new"))
+        self._new_btn.setObjectName("createBtn")
+        self._new_btn.clicked.connect(self._on_new_instance)
+        top_bar.addWidget(self._new_btn)
+        top_bar.addStretch()
+        layout.addLayout(top_bar)
+
         # Main splitter
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Left panel: Filter + List
+        # Left panel: List + Filter
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(6)
-
-        self._filter_edit = QLineEdit()
-        self._filter_edit.setPlaceholderText(tr("instance.filter_placeholder"))
-        self._filter_edit.textChanged.connect(self._on_filter_changed)
-        left_layout.addWidget(self._filter_edit)
 
         self._model = QStandardItemModel()
         self._proxy_model = QSortFilterProxyModel()
@@ -115,6 +137,12 @@ class InstanceManagerDialog(QDialog):
         self._list_view.doubleClicked.connect(self._on_switch)
         left_layout.addWidget(self._list_view)
 
+        # Filter field (below list)
+        self._filter_edit = QLineEdit()
+        self._filter_edit.setPlaceholderText(tr("instance.filter_placeholder"))
+        self._filter_edit.textChanged.connect(self._on_filter_changed)
+        left_layout.addWidget(self._filter_edit)
+
         self._splitter.addWidget(left_widget)
 
         # Right panel: Details
@@ -127,60 +155,73 @@ class InstanceManagerDialog(QDialog):
         self._details_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 8px;")
         right_layout.addWidget(self._details_label)
 
-        form = QFormLayout()
+        form = QGridLayout()
         form.setSpacing(8)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setColumnStretch(1, 1)  # Spalte 1 (LineEdits) stretcht
 
-        # Name (editable for inactive instances)
+        # Zeile 0: Name
+        name_label = QLabel(tr("instance.label_name"))
+        form.addWidget(name_label, 0, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._name_edit = QLineEdit()
         self._name_edit.setReadOnly(True)
-        form.addRow(tr("instance.label_name"), self._name_edit)
+        form.addWidget(self._name_edit, 0, 1)
+        self._rename_btn = QPushButton(tr("instance.btn_rename"))
+        self._rename_btn.clicked.connect(self._on_rename)
+        form.addWidget(self._rename_btn, 0, 2)
 
-        # Type
-        self._type_label = QLabel()
-        form.addRow(tr("instance.label_type"), self._type_label)
-
-        # Location + Explore
-        loc_row = QHBoxLayout()
+        # Zeile 1: Speicherort
+        loc_label = QLabel(tr("instance.label_location"))
+        form.addWidget(loc_label, 1, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._location_edit = QLineEdit()
         self._location_edit.setReadOnly(True)
-        loc_row.addWidget(self._location_edit)
-        self._location_btn = QPushButton("\U0001F4C1")
+        form.addWidget(self._location_edit, 1, 1)
+        self._location_btn = QPushButton()
+        self._location_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
         self._location_btn.setObjectName("exploreBtn")
+        self._location_btn.setStyleSheet("color: #E8B84B;")
         self._location_btn.setToolTip(tr("instance.explore_location"))
         self._location_btn.clicked.connect(lambda: self._on_explore("location"))
-        loc_row.addWidget(self._location_btn)
-        form.addRow(tr("instance.label_location"), loc_row)
+        form.addWidget(self._location_btn, 1, 2)
 
-        # Base Directory + Explore
-        base_row = QHBoxLayout()
+        # Zeile 2: Basisverzeichnis
+        base_label = QLabel(tr("instance.label_base"))
+        form.addWidget(base_label, 2, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._base_edit = QLineEdit()
         self._base_edit.setReadOnly(True)
-        base_row.addWidget(self._base_edit)
-        self._base_btn = QPushButton("\U0001F4C1")
+        form.addWidget(self._base_edit, 2, 1)
+        self._base_btn = QPushButton()
+        self._base_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
         self._base_btn.setObjectName("exploreBtn")
+        self._base_btn.setStyleSheet("color: #E8B84B;")
         self._base_btn.setToolTip(tr("instance.explore_base"))
         self._base_btn.clicked.connect(lambda: self._on_explore("base"))
-        base_row.addWidget(self._base_btn)
-        form.addRow(tr("instance.label_base"), base_row)
+        form.addWidget(self._base_btn, 2, 2)
 
-        # Game
-        self._game_label = QLabel()
-        form.addRow(tr("instance.label_game"), self._game_label)
-
-        # Game Location + Explore
-        game_row = QHBoxLayout()
+        # Zeile 3: Spielpfad
+        game_label = QLabel(tr("instance.label_game_path"))
+        form.addWidget(game_label, 3, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._game_path_edit = QLineEdit()
         self._game_path_edit.setReadOnly(True)
-        game_row.addWidget(self._game_path_edit)
-        self._game_path_btn = QPushButton("\U0001F4C1")
+        form.addWidget(self._game_path_edit, 3, 1)
+        self._game_path_btn = QPushButton()
+        self._game_path_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
         self._game_path_btn.setObjectName("exploreBtn")
+        self._game_path_btn.setStyleSheet("color: #E8B84B;")
         self._game_path_btn.setToolTip(tr("instance.explore_game"))
         self._game_path_btn.clicked.connect(lambda: self._on_explore("game"))
-        game_row.addWidget(self._game_path_btn)
-        form.addRow(tr("instance.label_game_path"), game_row)
+        form.addWidget(self._game_path_btn, 3, 2)
 
         right_layout.addLayout(form)
+
+        # Delete button at bottom of details section
+        actions_row = QHBoxLayout()
+        self._delete_btn = QPushButton("\u2715 " + tr("instance.btn_delete"))
+        self._delete_btn.setObjectName("deleteInstance")
+        self._delete_btn.clicked.connect(self._on_delete)
+        actions_row.addWidget(self._delete_btn)
+        actions_row.addStretch()
+        right_layout.addLayout(actions_row)
+
         right_layout.addStretch()
 
         self._splitter.addWidget(right_widget)
@@ -193,26 +234,18 @@ class InstanceManagerDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
 
-        self._new_btn = QPushButton(tr("instance.btn_new"))
-        self._new_btn.clicked.connect(self._on_new_instance)
-        btn_layout.addWidget(self._new_btn)
-
-        self._rename_btn = QPushButton(tr("instance.btn_rename"))
-        self._rename_btn.clicked.connect(self._on_rename)
-        btn_layout.addWidget(self._rename_btn)
-
-        self._delete_btn = QPushButton(tr("instance.btn_delete"))
-        self._delete_btn.setObjectName("deleteInstance")
-        self._delete_btn.clicked.connect(self._on_delete)
-        btn_layout.addWidget(self._delete_btn)
-
         btn_layout.addStretch()
 
         self._switch_btn = QPushButton(tr("instance.btn_switch"))
+        self._switch_btn.setMinimumHeight(32)
+        self._switch_btn.setMinimumWidth(100)
         self._switch_btn.clicked.connect(self._on_switch)
         btn_layout.addWidget(self._switch_btn)
 
         self._ok_btn = QPushButton(tr("button.ok"))
+        self._ok_btn.setObjectName("createBtn")
+        self._ok_btn.setMinimumHeight(32)
+        self._ok_btn.setMinimumWidth(80)
         self._ok_btn.clicked.connect(self.accept)
         btn_layout.addWidget(self._ok_btn)
 
@@ -303,22 +336,15 @@ class InstanceManagerDialog(QDialog):
         self._name_edit.setText(name)
         self._name_edit.setReadOnly(self._is_active_selected())
 
-        # Type: Global or Portable
-        inst_type = self._im.get_instance_type(name) if self._im else "global"
-        self._type_label.setText(tr(f"instance.type_{inst_type}"))
-
         self._location_edit.setText(str(self._im.instances_path() / name))
         self._base_edit.setText(str(self._im.instances_path() / name))
-        self._game_label.setText(data.get("game_name", ""))
         self._game_path_edit.setText(data.get("game_path", "") or "\u2014")
 
     def _clear_details(self) -> None:
         """Clear the details panel."""
         self._name_edit.clear()
-        self._type_label.clear()
         self._location_edit.clear()
         self._base_edit.clear()
-        self._game_label.clear()
         self._game_path_edit.clear()
 
     def _on_new_instance(self) -> None:
@@ -327,7 +353,17 @@ class InstanceManagerDialog(QDialog):
         wizard = CreateInstanceWizard(self, self._im, self._pl, self._icons)
         if wizard.exec() == QDialog.DialogCode.Accepted and wizard.created_instance:
             self._refresh_list()
+            self._select_instance(wizard.created_instance)
             self.switched_to = wizard.created_instance
+
+    def _select_instance(self, name: str) -> None:
+        """Select an instance by name in the list."""
+        for row in range(self._model.rowCount()):
+            idx = self._model.index(row, 0)
+            if idx.data(Qt.ItemDataRole.UserRole) == name:
+                proxy_idx = self._proxy_model.mapFromSource(idx)
+                self._list_view.setCurrentIndex(proxy_idx)
+                return
 
     def _on_rename(self) -> None:
         """Renames inactive instance."""

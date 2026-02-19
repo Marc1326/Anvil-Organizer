@@ -779,6 +779,7 @@
     "dirs_created": "Folgende Ordner werden erstellt:\n  .mods/  .downloads/  .profiles/Default/  .overwrite/",
     "no_games": "Keine unterstützten Spiele gefunden.",
     "not_detected": "nicht erkannt",
-    "create_error": "Instanz konnte nicht erstellt werden:\n{error}"
+    "create_error": "Instanz konnte nicht erstellt werden:\n{error}",
+    "browse_folder_title": "Ordner wählen"
   }
 }
