@@ -81,6 +81,14 @@ class InstanceManager:
         self,
         game_plugin: BaseGame,
         name: str | None = None,
+        *,
+        portable: bool = False,
+        local_inis: bool = False,
+        local_saves: bool = False,
+        auto_archive: bool = False,
+        mods_path: str | None = None,
+        downloads_path: str | None = None,
+        overwrite_path: str | None = None,
     ) -> Path:
         """Create a new instance for *game_plugin*.
 
@@ -119,9 +127,49 @@ class InstanceManager:
 
         # Write .anvil.ini
         ini_path = instance_dir / ".anvil.ini"
-        self._write_ini(ini_path, game_plugin, instance_dir)
+        self._write_ini(
+            ini_path,
+            game_plugin,
+            instance_dir,
+            portable=portable,
+            local_inis=local_inis,
+            local_saves=local_saves,
+            auto_archive=auto_archive,
+            mods_path=mods_path,
+            downloads_path=downloads_path,
+            overwrite_path=overwrite_path,
+        )
 
         return instance_dir
+
+    # ── Rename ─────────────────────────────────────────────────────────
+
+    def rename_instance(self, old_name: str, new_name: str) -> bool:
+        """Rename an instance directory.
+
+        Args:
+            old_name: Current instance name.
+            new_name: New instance name.
+
+        Returns:
+            True if renamed, False if failed or name collision.
+        """
+        old_dir = self._base / old_name
+        new_dir = self._base / new_name
+
+        if not old_dir.is_dir() or new_dir.exists():
+            return False
+
+        try:
+            old_dir.rename(new_dir)
+        except OSError:
+            return False
+
+        # Update .current if needed
+        if self.current_instance() == old_name:
+            self.set_current_instance(new_name)
+
+        return True
 
     # ── Delete ────────────────────────────────────────────────────────
 
@@ -153,6 +201,68 @@ class InstanceManager:
             self._current_file().unlink(missing_ok=True)
 
         return True
+
+    def get_objects_for_deletion(self, name: str) -> list[tuple[str, int]]:
+        """Return list of (path, size) for deletion confirmation dialog.
+
+        Args:
+            name: Instance name.
+
+        Returns:
+            List of tuples (path_str, size_bytes) for each sub-directory
+            and the .anvil.ini file.
+        """
+        instance_dir = self._base / name
+        if not instance_dir.is_dir():
+            return []
+
+        result: list[tuple[str, int]] = []
+
+        for sub in _SUBDIRS:
+            sub_path = instance_dir / sub
+            if sub_path.is_dir():
+                size = sum(
+                    f.stat().st_size for f in sub_path.rglob("*") if f.is_file()
+                )
+                result.append((str(sub_path), size))
+
+        ini = instance_dir / ".anvil.ini"
+        if ini.is_file():
+            result.append((str(ini), ini.stat().st_size))
+
+        return result
+
+    # ── Instance Type ──────────────────────────────────────────────────
+
+    def is_portable(self, name: str) -> bool:
+        """Check if instance is portable (stored in app directory).
+
+        Args:
+            name: Instance name.
+
+        Returns:
+            True if portable, False if global.
+        """
+        # Check .anvil.ini for portable flag
+        ini = self._base / name / ".anvil.ini"
+        if ini.is_file():
+            s = QSettings(str(ini), QSettings.Format.IniFormat)
+            s.beginGroup("General")
+            portable = s.value("portable", False, type=bool)
+            s.endGroup()
+            return portable
+        return False
+
+    def get_instance_type(self, name: str) -> str:
+        """Return 'portable' or 'global' for the given instance.
+
+        Args:
+            name: Instance name.
+
+        Returns:
+            'portable' or 'global'.
+        """
+        return "portable" if self.is_portable(name) else "global"
 
     # ── Load ──────────────────────────────────────────────────────────
 
@@ -238,6 +348,14 @@ class InstanceManager:
         ini_path: Path,
         game_plugin: BaseGame,
         instance_dir: Path,
+        *,
+        portable: bool = False,
+        local_inis: bool = False,
+        local_saves: bool = False,
+        auto_archive: bool = False,
+        mods_path: str | None = None,
+        downloads_path: str | None = None,
+        overwrite_path: str | None = None,
     ) -> None:
         """Write .anvil.ini with QSettings."""
         s = QSettings(str(ini_path), QSettings.Format.IniFormat)
@@ -250,13 +368,20 @@ class InstanceManager:
         s.setValue("detected_store", game_plugin.detectedStore() or "")
         s.setValue("selected_profile", "Default")
         s.setValue("created", datetime.now(timezone.utc).isoformat())
+        s.setValue("portable", portable)
+        s.endGroup()
+
+        s.beginGroup("Profile")
+        s.setValue("local_inis", local_inis)
+        s.setValue("local_saves", local_saves)
+        s.setValue("auto_archive", auto_archive)
         s.endGroup()
 
         s.beginGroup("Paths")
-        s.setValue("mods_directory", "%INSTANCE_DIR%/.mods")
-        s.setValue("downloads_directory", "%INSTANCE_DIR%/.downloads")
+        s.setValue("mods_directory", mods_path or "%INSTANCE_DIR%/.mods")
+        s.setValue("downloads_directory", downloads_path or "%INSTANCE_DIR%/.downloads")
         s.setValue("profiles_directory", "%INSTANCE_DIR%/.profiles")
-        s.setValue("overwrite_directory", "%INSTANCE_DIR%/.overwrite")
+        s.setValue("overwrite_directory", overwrite_path or "%INSTANCE_DIR%/.overwrite")
         s.endGroup()
 
         s.sync()
