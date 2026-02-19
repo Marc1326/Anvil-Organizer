@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QFileDialog, QStyle,
 )
 from PySide6.QtGui import QFont, QIcon, QStandardItemModel, QStandardItem
-from PySide6.QtCore import Qt, QSortFilterProxyModel, QSettings
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QSettings, QSize
 
 from anvil.core.instance_manager import InstanceManager
 from anvil.core.icon_manager import IconManager, placeholder_game_icon
@@ -399,9 +399,9 @@ class CreateInstanceWizard(QDialog):
         self._mods_path_edit.setPlaceholderText("%BASE_DIR%/.mods")
         mods_row.addWidget(self._mods_path_edit, 1)
         self._mods_browse_btn = QPushButton()
-        self._mods_browse_btn.setText("📂")
+        self._mods_browse_btn.setIcon(QIcon("/home/mob/Projekte/anvil-organizer-icons/icons/Icons/ordner.png"))
+        self._mods_browse_btn.setIconSize(QSize(24, 24))
         self._mods_browse_btn.setObjectName("exploreBtn")
-        self._mods_browse_btn.setStyleSheet("color: #E8B84B; font-size: 20px; border: none;")
         self._mods_browse_btn.clicked.connect(lambda: self._browse_path(self._mods_path_edit))
         mods_row.addWidget(self._mods_browse_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         paths_layout.addRow(tr("wizard.label_mods_path"), mods_row)
@@ -413,9 +413,9 @@ class CreateInstanceWizard(QDialog):
         self._downloads_path_edit.setPlaceholderText("%BASE_DIR%/.downloads")
         downloads_row.addWidget(self._downloads_path_edit, 1)
         self._downloads_browse_btn = QPushButton()
-        self._downloads_browse_btn.setText("📂")
+        self._downloads_browse_btn.setIcon(QIcon("/home/mob/Projekte/anvil-organizer-icons/icons/Icons/ordner.png"))
+        self._downloads_browse_btn.setIconSize(QSize(24, 24))
         self._downloads_browse_btn.setObjectName("exploreBtn")
-        self._downloads_browse_btn.setStyleSheet("color: #E8B84B; font-size: 20px; border: none;")
         self._downloads_browse_btn.clicked.connect(lambda: self._browse_path(self._downloads_path_edit))
         downloads_row.addWidget(self._downloads_browse_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         paths_layout.addRow(tr("wizard.label_downloads_path"), downloads_row)
@@ -427,9 +427,9 @@ class CreateInstanceWizard(QDialog):
         self._overwrite_path_edit.setPlaceholderText("%BASE_DIR%/.overwrite")
         overwrite_row.addWidget(self._overwrite_path_edit, 1)
         self._overwrite_browse_btn = QPushButton()
-        self._overwrite_browse_btn.setText("📂")
+        self._overwrite_browse_btn.setIcon(QIcon("/home/mob/Projekte/anvil-organizer-icons/icons/Icons/ordner.png"))
+        self._overwrite_browse_btn.setIconSize(QSize(24, 24))
         self._overwrite_browse_btn.setObjectName("exploreBtn")
-        self._overwrite_browse_btn.setStyleSheet("color: #E8B84B; font-size: 20px; border: none;")
         self._overwrite_browse_btn.clicked.connect(lambda: self._browse_path(self._overwrite_path_edit))
         overwrite_row.addWidget(self._overwrite_browse_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         paths_layout.addRow(tr("wizard.label_overwrite_path"), overwrite_row)
