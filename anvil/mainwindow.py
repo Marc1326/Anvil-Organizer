@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QTextEdit,
     QDialogButtonBox,
+    QLineEdit,
 )
 from PySide6.QtCore import Qt, QSettings, QTimer, QUrl, QSize
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
@@ -140,6 +141,14 @@ class MainWindow(QMainWindow):
         self._profile_bar.profile_delete_requested.connect(self._on_profile_deleted)
         self._profile_bar.profiles_reordered.connect(self._on_profiles_reordered)
         left_layout.addWidget(self._profile_bar)
+
+        # ── Mod-Suche (immer sichtbar, auch bei geschlossenem FilterPanel) ──
+        self._mod_search = QLineEdit()
+        self._mod_search.setPlaceholderText(tr("filter.search_placeholder"))
+        self._mod_search.setClearButtonEnabled(True)
+        self._mod_search.textChanged.connect(self._on_filter_changed)
+        left_layout.addWidget(self._mod_search)
+
         self._mod_list_view = ModListView()
         self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
         self._mod_list_view.context_menu_requested.connect(self._on_mod_context_menu)
@@ -904,10 +913,10 @@ class MainWindow(QMainWindow):
         self._profile_bar.update_active_count(active, total)
 
     def _on_filter_changed(self) -> None:
-        """FilterPanel chip/text changed — update proxy filter."""
+        """Mod search or FilterPanel chip changed — update proxy filter."""
         proxy = self._mod_list_view._proxy_model
         proxy.set_filter_state(
-            self._filter_panel.search_text(),
+            self._mod_search.text().strip().lower(),
             self._filter_panel.active_property_ids(),
             self._filter_panel.active_category_ids(),
         )

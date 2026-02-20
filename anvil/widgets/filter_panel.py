@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
     QHBoxLayout,
     QScrollArea,
@@ -87,13 +86,6 @@ class FilterPanel(QWidget):
         content_layout = QVBoxLayout(self._content_widget)
         content_layout.setContentsMargins(4, 4, 4, 4)
         content_layout.setSpacing(4)
-
-        # ── Search field ──────────────────────────────────────────
-        self._search = QLineEdit()
-        self._search.setPlaceholderText(tr("filter.search_placeholder"))
-        self._search.setClearButtonEnabled(True)
-        self._search.textChanged.connect(self._on_changed)
-        content_layout.addWidget(self._search)
 
         # ── Scrollable chip area ──────────────────────────────────
         self._scroll_area = QScrollArea()
@@ -220,10 +212,6 @@ class FilterPanel(QWidget):
             chip.show()  # Explizit sichtbar machen für FlowLayout
             self._cat_chips.append(chip)
 
-    def search_text(self) -> str:
-        """Return current search text (lowered, stripped)."""
-        return self._search.text().strip().lower()
-
     def active_property_ids(self) -> set[int]:
         """Return set of checked property chip IDs."""
         return {c.chip_id for c in self._prop_chips if c.isChecked()}
@@ -233,9 +221,7 @@ class FilterPanel(QWidget):
         return {c.chip_id for c in self._cat_chips if c.isChecked()}
 
     def has_active_filters(self) -> bool:
-        """Return True if any filter is active."""
-        if self._search.text().strip():
-            return True
+        """Return True if any chip filter is active."""
         if any(c.isChecked() for c in self._prop_chips):
             return True
         if any(c.isChecked() for c in self._cat_chips):
@@ -243,10 +229,7 @@ class FilterPanel(QWidget):
         return False
 
     def reset_all(self) -> None:
-        """Uncheck all chips and clear the search field."""
-        self._search.blockSignals(True)
-        self._search.clear()
-        self._search.blockSignals(False)
+        """Uncheck all chips."""
         for chip in self._prop_chips + self._cat_chips:
             chip.blockSignals(True)
             chip.setChecked(False)
