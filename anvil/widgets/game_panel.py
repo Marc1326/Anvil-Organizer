@@ -450,9 +450,11 @@ class GamePanel(QWidget):
         return self._placeholder_icon()
 
     def _get_small_redmod_icon(self) -> QIcon:
-        """Return small (24x24) game icon (game.png / Red Bird), or placeholder."""
+        """Return small (24x24) REDmod icon (red bird), or placeholder."""
         if self._icon_manager and self._current_short_name:
-            pix = self._icon_manager.get_game_icon(self._current_short_name)
+            pix = self._icon_manager.get_executable_icon(
+                self._current_short_name, "redMod.exe"
+            )
             if pix is not None:
                 return QIcon(pix.scaled(
                     QSize(24, 24),
