@@ -13,6 +13,7 @@ Signals:
 """
 
 from PySide6.QtWidgets import (
+    QApplication,
     QWidget,
     QVBoxLayout,
     QLabel,
@@ -216,8 +217,10 @@ class FilterPanel(QWidget):
             except (RuntimeError, TypeError):
                 pass  # Signal war bereits getrennt
             self._cat_flow.removeWidget(chip)
+            chip.setParent(None)
             chip.deleteLater()
         self._cat_chips.clear()
+        QApplication.processEvents()
 
         for cat in categories:
             # Display translated name, keep internal name for reference
