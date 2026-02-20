@@ -86,6 +86,7 @@
     "clear_all": "Clear All",
 
     "add": "Add",
+    "rename": "Rename",
     "delete": "Delete",
     "delete_nexus": "Delete Nexus",
     "delete_profile": "Delete Profile"
@@ -156,6 +157,11 @@
     "delete_category_confirm": "Really delete category \"{name}\"?\n\nThe category will be removed from all mods.",
     "delete_category_message": "The category will be removed from all mods.",
     "delete_category_with_mods": "The category is assigned to {count} mod(s) and will be removed from them.",
+
+    "add_category_title": "Add Category",
+    "add_category_label": "Category name:",
+    "rename_category_title": "Rename Category",
+    "rename_category_label": "New name:",
 
     "uninstall_mod_title": "Uninstall Mod",
     "uninstall_mod_message": "Really uninstall mod \"{name}\"?\n\nThe .pak file will be deleted and the entry\nremoved from the mod list.",

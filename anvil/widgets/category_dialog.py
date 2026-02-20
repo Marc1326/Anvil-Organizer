@@ -243,3 +243,86 @@ class CategoryDialog(QDialog):
 
         self._cat_mgr.remove_category(cat_id)
         self._refresh_table()
+
+
+class CategoryNameDialog(QDialog):
+    """Einfacher Dialog für Kategorie-Name Eingabe (Add/Rename im FilterPanel)."""
+
+    def __init__(
+        self,
+        parent=None,
+        title: str = "",
+        label_text: str = "",
+        existing_names: set[str] | None = None,
+        initial_text: str = "",
+    ):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setMinimumWidth(300)
+        self.setModal(True)
+
+        self._existing_names = existing_names or set()
+        self._initial_text = initial_text.lower()
+
+        from PySide6.QtWidgets import QLabel, QLineEdit
+
+        layout = QVBoxLayout(self)
+
+        # Label
+        lbl = QLabel(label_text)
+        layout.addWidget(lbl)
+
+        # Name-Eingabe
+        self._name_edit = QLineEdit()
+        self._name_edit.setText(initial_text)
+        self._name_edit.textChanged.connect(self._on_text_changed)
+        layout.addWidget(self._name_edit)
+
+        # Hinweistext für Duplikate
+        self._hint_label = QLabel()
+        self._hint_label.setObjectName("dialogHintLabel")
+        self._hint_label.setVisible(False)
+        layout.addWidget(self._hint_label)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch(1)
+
+        self._cancel_btn = QPushButton(tr("button.cancel"))
+        self._cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(self._cancel_btn)
+
+        self._ok_btn = QPushButton(tr("button.ok"))
+        self._ok_btn.setObjectName("createBtn")  # Teal-Farbe aus QSS
+        self._ok_btn.setDefault(True)
+        self._ok_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(self._ok_btn)
+
+        layout.addLayout(btn_layout)
+
+        # Initial validation
+        self._on_text_changed(initial_text)
+
+    def _on_text_changed(self, text: str) -> None:
+        """Validate input and enable/disable OK button."""
+        name = text.strip().lower()
+
+        # Leer?
+        if not name:
+            self._ok_btn.setEnabled(False)
+            self._hint_label.setVisible(False)
+            return
+
+        # Duplikat? (aber nicht der eigene Name beim Rename)
+        if name in self._existing_names and name != self._initial_text:
+            self._ok_btn.setEnabled(False)
+            self._hint_label.setText(tr("dialog.category_exists"))
+            self._hint_label.setVisible(True)
+            return
+
+        self._ok_btn.setEnabled(True)
+        self._hint_label.setVisible(False)
+
+    def get_name(self) -> str:
+        """Return the entered name (stripped)."""
+        return self._name_edit.text().strip()

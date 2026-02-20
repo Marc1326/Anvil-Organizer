@@ -152,7 +152,6 @@ class MainWindow(QMainWindow):
         self._filter_panel = FilterPanel()
         self._filter_panel.filter_changed.connect(self._on_filter_changed)
         self._filter_panel.panel_toggled.connect(self._on_filter_panel_toggled)
-        self._filter_panel.category_delete_requested.connect(self._on_category_delete)
 
         self._filter_splitter = QSplitter(Qt.Orientation.Horizontal)
         self._filter_splitter.addWidget(self._filter_panel)
@@ -208,6 +207,7 @@ class MainWindow(QMainWindow):
 
         # ── Category manager ────────────────────────────────────────────
         self._category_manager = CategoryManager()
+        self._filter_panel.set_category_manager(self._category_manager)
 
         # ── Nexus API ────────────────────────────────────────────────
         self._nexus_api = NexusAPI(self)
@@ -467,44 +467,6 @@ class MainWindow(QMainWindow):
         self._act_filter_panel.blockSignals(True)
         self._act_filter_panel.setChecked(is_open)
         self._act_filter_panel.blockSignals(False)
-
-    def _on_category_add(self, name: str) -> None:
-        """Inline add: create a new category and refresh chips."""
-        if not self._current_instance_path:
-            return
-        cat_id = self._category_manager.add_category(name)
-        if cat_id == 0:
-            # Kategorie existiert bereits
-            self.statusBar().showMessage(
-                tr("status.category_exists", name=name), 3000
-            )
-            return
-        self._filter_panel.set_categories(self._category_manager.all_categories())
-        self.statusBar().showMessage(tr("status.category_created", name=name), 3000)
-
-    def _on_category_rename(self, cat_id: int, new_name: str) -> None:
-        """Inline rename: rename an existing category and refresh chips."""
-        if not self._current_instance_path:
-            return
-        self._category_manager.rename_category(cat_id, new_name)
-        self._filter_panel.set_categories(self._category_manager.all_categories())
-        self.statusBar().showMessage(tr("status.category_renamed", name=new_name), 3000)
-
-    def _on_category_delete(self, cat_id: int) -> None:
-        """Delete a category after confirmation and refresh chips."""
-        if not self._current_instance_path:
-            return
-        name = self._category_manager.get_name(cat_id) or str(cat_id)
-        reply = QMessageBox.question(
-            self, tr("dialog.delete_category_title"),
-            tr("dialog.delete_category_confirm", name=name),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        self._category_manager.remove_category(cat_id)
-        self._filter_panel.set_categories(self._category_manager.all_categories())
-        self.statusBar().showMessage(tr("status.category_deleted", name=name), 3000)
 
     def _on_toggle_log(self, checked: bool) -> None:
         """Ansicht → Log (Toggle) — sync with CollapsibleSectionBar."""

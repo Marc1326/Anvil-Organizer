@@ -7,8 +7,9 @@ Sections:
 Signals:
   filter_changed() — emitted whenever any chip or the text field changes.
   panel_toggled(bool) — emitted when the toggle bar is clicked (True=open, False=close).
-  category_delete_requested(int) — user chose "Loeschen" in context menu.
 """
+
+from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -20,13 +21,15 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QMenu,
     QSizePolicy,
+    QMessageBox,
+    QDialog,
 )
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QPainter, QFontMetrics
 
 from anvil.widgets.flow_layout import FlowLayout
 from anvil.widgets.filter_chip import FilterChip
-from anvil.core.categories import get_display_name
+from anvil.core.categories import get_display_name, CategoryManager
 from anvil.core.translator import tr
 
 
@@ -65,11 +68,11 @@ class FilterPanel(QWidget):
 
     filter_changed = Signal()
     panel_toggled = Signal(bool)  # True = open request, False = close request
-    category_delete_requested = Signal(int)
 
-    def __init__(self, parent=None):
+    def __init__(self, category_manager: CategoryManager | None = None, parent=None):
         super().__init__(parent)
         self.setObjectName("filterPanel")
+        self._category_manager = category_manager
         self._open = False
         self._splitter = None          # set via set_splitter()
         self._saved_sizes: list[int] | None = None
@@ -190,6 +193,10 @@ class FilterPanel(QWidget):
         """Store reference to the parent QSplitter for size sync."""
         self._splitter = splitter
 
+    def set_category_manager(self, manager: CategoryManager) -> None:
+        """Set the CategoryManager reference (for Add/Rename/Delete)."""
+        self._category_manager = manager
+
     def set_categories(self, categories: list[dict]) -> None:
         """Populate category chips from a list of ``{'id': int, 'name': str}``."""
         for chip in self._cat_chips:
@@ -278,12 +285,15 @@ class FilterPanel(QWidget):
             menu.setStyleSheet(CONTEXT_MENU_STYLE)
 
             if chip:
-                # Chip-Menü (2 Einträge - Umbenennen kommt in Phase 3)
+                # Chip-Menü: Umbenennen | Löschen
                 act_add = menu.addAction(tr("context.add"))
+                act_rename = menu.addAction(tr("context.rename"))
                 act_delete = menu.addAction(tr("context.delete"))
                 chosen = menu.exec(global_pos)
                 if chosen == act_add:
                     self._add_category()
+                elif chosen == act_rename:
+                    self._rename_category(chip)
                 elif chosen == act_delete:
                     self._delete_category(chip)
             else:
@@ -309,12 +319,62 @@ class FilterPanel(QWidget):
             menu.exec(global_pos)
 
     def _add_category(self):
-        """Platzhalter für Phase 3 (Dialog)."""
-        pass
+        """Open dialog to add a new category."""
+        if self._category_manager is None:
+            return
+
+        from anvil.widgets.category_dialog import CategoryNameDialog
+
+        existing = {c["name"].lower() for c in self._category_manager.all_categories()}
+        dlg = CategoryNameDialog(
+            parent=self,
+            title=tr("dialog.add_category_title"),
+            label_text=tr("dialog.add_category_label"),
+            existing_names=existing,
+        )
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            name = dlg.get_name()
+            if name:
+                self._category_manager.add_category(name)
+                self.set_categories(self._category_manager.all_categories())
+
+    def _rename_category(self, chip) -> None:
+        """Open dialog to rename a category."""
+        if self._category_manager is None:
+            return
+
+        from anvil.widgets.category_dialog import CategoryNameDialog
+
+        old_name = getattr(chip, "_internal_name", chip.text())
+        existing = {c["name"].lower() for c in self._category_manager.all_categories()}
+        dlg = CategoryNameDialog(
+            parent=self,
+            title=tr("dialog.rename_category_title"),
+            label_text=tr("dialog.rename_category_label"),
+            existing_names=existing,
+            initial_text=old_name,
+        )
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            new_name = dlg.get_name()
+            if new_name and new_name.lower() != old_name.lower():
+                self._category_manager.rename_category(chip.chip_id, new_name)
+                self.set_categories(self._category_manager.all_categories())
 
     def _delete_category(self, chip):
-        """Emit delete signal for MainWindow to handle."""
-        self.category_delete_requested.emit(chip.chip_id)
+        """Confirm and delete a category."""
+        if self._category_manager is None:
+            return
+
+        name = self._category_manager.get_name(chip.chip_id) or str(chip.chip_id)
+        reply = QMessageBox.question(
+            self,
+            tr("dialog.delete_category_title"),
+            tr("dialog.delete_category_confirm", name=name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self._category_manager.remove_category(chip.chip_id)
+            self.set_categories(self._category_manager.all_categories())
 
     # ── Internal ──────────────────────────────────────────────────
 

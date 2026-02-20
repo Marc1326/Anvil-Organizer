@@ -86,6 +86,7 @@
     "clear_all": "Alles löschen",
 
     "add": "Hinzufügen",
+    "rename": "Umbenennen",
     "delete": "Löschen",
     "delete_nexus": "Nexus löschen",
     "delete_profile": "Profil löschen"
@@ -156,6 +157,11 @@
     "delete_category_confirm": "Kategorie \"{name}\" wirklich löschen?\n\nDie Kategorie wird von allen Mods entfernt.",
     "delete_category_message": "Die Kategorie wird von allen Mods entfernt.",
     "delete_category_with_mods": "Die Kategorie ist {count} Mod(s) zugewiesen und wird dort entfernt.",
+
+    "add_category_title": "Kategorie hinzufügen",
+    "add_category_label": "Name der Kategorie:",
+    "rename_category_title": "Kategorie umbenennen",
+    "rename_category_label": "Neuer Name:",
 
     "uninstall_mod_title": "Mod deinstallieren",
     "uninstall_mod_message": "Mod \"{name}\" wirklich deinstallieren?\n\nDie .pak-Datei wird gelöscht und der Eintrag aus\nder Mod-Liste entfernt.",
