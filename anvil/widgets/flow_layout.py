@@ -47,8 +47,17 @@ class FlowLayout(QLayout):
 
     def takeAt(self, index):
         if 0 <= index < len(self._items):
-            return self._items.pop(index)
+            item = self._items.pop(index)
+            self.invalidate()
+            return item
         return None
+
+    def removeWidget(self, widget):
+        """Remove a widget from the layout."""
+        for i, item in enumerate(self._items):
+            if item.widget() is widget:
+                self.takeAt(i)
+                return
 
     def expandingDirections(self):
         return Qt.Orientation(0)
