@@ -142,12 +142,11 @@ class MainWindow(QMainWindow):
         self._profile_bar.profiles_reordered.connect(self._on_profiles_reordered)
         left_layout.addWidget(self._profile_bar)
 
-        # ── Mod-Suche (immer sichtbar, auch bei geschlossenem FilterPanel) ──
+        # ── Mod-Suche ──
         self._mod_search = QLineEdit()
         self._mod_search.setPlaceholderText(tr("filter.search_placeholder"))
         self._mod_search.setClearButtonEnabled(True)
         self._mod_search.textChanged.connect(self._on_filter_changed)
-        left_layout.addWidget(self._mod_search)
 
         self._mod_list_view = ModListView()
         self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
@@ -157,6 +156,14 @@ class MainWindow(QMainWindow):
         self._mod_list_stack = QStackedWidget()
         self._mod_list_stack.addWidget(self._mod_list_view)
 
+        # Wrapper: Suche + ModList (nur über Mod-Liste, nicht über FilterPanel)
+        mod_list_wrapper = QWidget()
+        mod_list_layout = QVBoxLayout(mod_list_wrapper)
+        mod_list_layout.setContentsMargins(0, 0, 0, 0)
+        mod_list_layout.setSpacing(4)
+        mod_list_layout.addWidget(self._mod_search)
+        mod_list_layout.addWidget(self._mod_list_stack)
+
         # ── FilterPanel + ModList ────────────────────────────────────
         self._filter_panel = FilterPanel()
         self._filter_panel.filter_changed.connect(self._on_filter_changed)
@@ -164,7 +171,7 @@ class MainWindow(QMainWindow):
 
         self._filter_splitter = QSplitter(Qt.Orientation.Horizontal)
         self._filter_splitter.addWidget(self._filter_panel)
-        self._filter_splitter.addWidget(self._mod_list_stack)
+        self._filter_splitter.addWidget(mod_list_wrapper)
         self._filter_splitter.setStretchFactor(0, 0)
         self._filter_splitter.setStretchFactor(1, 1)
         self._filter_splitter.setSizes([220, 560])
