@@ -217,6 +217,7 @@ class FilterPanel(QWidget):
             chip._internal_name = cat["name"]  # Store for rename/reference
             chip.toggled.connect(self._on_changed)
             self._cat_flow.addWidget(chip)
+            chip.show()  # Explizit sichtbar machen für FlowLayout
             self._cat_chips.append(chip)
 
     def search_text(self) -> str:
@@ -346,17 +347,18 @@ class FilterPanel(QWidget):
         from anvil.widgets.category_dialog import CategoryNameDialog
 
         old_name = getattr(chip, "_internal_name", chip.text())
+        display_name = get_display_name(old_name)
         existing = {c["name"].lower() for c in self._category_manager.all_categories()}
         dlg = CategoryNameDialog(
             parent=self,
             title=tr("dialog.rename_category_title"),
             label_text=tr("dialog.rename_category_label"),
             existing_names=existing,
-            initial_text=old_name,
+            initial_text=display_name,
         )
         if dlg.exec() == QDialog.DialogCode.Accepted:
             new_name = dlg.get_name()
-            if new_name and new_name.lower() != old_name.lower():
+            if new_name and new_name.lower() != display_name.lower():
                 self._category_manager.rename_category(chip.chip_id, new_name)
                 self.set_categories(self._category_manager.all_categories())
 
