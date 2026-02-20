@@ -22,6 +22,7 @@ class FlowLayout(QLayout):
 
     def addItem(self, item):
         self._items.append(item)
+        self.invalidate()
 
     def insertWidget(self, index: int, widget) -> None:
         """Insert a widget at a specific position in the layout."""
