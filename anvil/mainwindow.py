@@ -152,8 +152,6 @@ class MainWindow(QMainWindow):
         self._filter_panel = FilterPanel()
         self._filter_panel.filter_changed.connect(self._on_filter_changed)
         self._filter_panel.panel_toggled.connect(self._on_filter_panel_toggled)
-        self._filter_panel.category_add_requested.connect(self._on_category_add)
-        self._filter_panel.category_rename_requested.connect(self._on_category_rename)
         self._filter_panel.category_delete_requested.connect(self._on_category_delete)
 
         self._filter_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -474,7 +472,13 @@ class MainWindow(QMainWindow):
         """Inline add: create a new category and refresh chips."""
         if not self._current_instance_path:
             return
-        self._category_manager.add_category(name)
+        cat_id = self._category_manager.add_category(name)
+        if cat_id == 0:
+            # Kategorie existiert bereits
+            self.statusBar().showMessage(
+                tr("status.category_exists", name=name), 3000
+            )
+            return
         self._filter_panel.set_categories(self._category_manager.all_categories())
         self.statusBar().showMessage(tr("status.category_created", name=name), 3000)
 

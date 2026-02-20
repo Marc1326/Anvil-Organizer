@@ -7,13 +7,10 @@ Sections:
 Signals:
   filter_changed() — emitted whenever any chip or the text field changes.
   panel_toggled(bool) — emitted when the toggle bar is clicked (True=open, False=close).
-  category_add_requested(str) — user confirmed a new category name inline.
-  category_rename_requested(int, str) — user confirmed a rename inline.
   category_delete_requested(int) — user chose "Loeschen" in context menu.
 """
 
 from PySide6.QtWidgets import (
-    QApplication,
     QWidget,
     QVBoxLayout,
     QLabel,
@@ -24,7 +21,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QSizePolicy,
 )
-from PySide6.QtCore import Signal, Qt, QEvent
+from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QPainter, QFontMetrics
 
 from anvil.widgets.flow_layout import FlowLayout
@@ -68,8 +65,6 @@ class FilterPanel(QWidget):
 
     filter_changed = Signal()
     panel_toggled = Signal(bool)  # True = open request, False = close request
-    category_add_requested = Signal(str)
-    category_rename_requested = Signal(int, str)
     category_delete_requested = Signal(int)
 
     def __init__(self, parent=None):
@@ -78,10 +73,6 @@ class FilterPanel(QWidget):
         self._open = False
         self._splitter = None          # set via set_splitter()
         self._saved_sizes: list[int] | None = None
-        # Inline rename state (same pattern as profile_bar.py)
-        self._rename_edit: QLineEdit | None = None
-        self._rename_chip: FilterChip | None = None
-        self._rename_confirmed = False
 
         outer = QHBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -146,16 +137,6 @@ class FilterPanel(QWidget):
         )
         self._inner_layout.addWidget(lbl_cats)
 
-        # Eingabefeld für neue Kategorie (versteckt bis "Hinzufügen")
-        self._cat_add_edit = QLineEdit()
-        self._cat_add_edit.setObjectName("filterChip")
-        self._cat_add_edit.setFixedHeight(26)
-        self._cat_add_edit.setPlaceholderText(tr("filter.category_placeholder"))
-        self._cat_add_edit.setVisible(False)
-        self._cat_add_edit.returnPressed.connect(self._confirm_add)
-        self._cat_add_edit.installEventFilter(self)
-        self._inner_layout.addWidget(self._cat_add_edit)
-
         self._cat_flow = FlowLayout(h_spacing=4, v_spacing=4)
         self._cat_container = QWidget()
         self._cat_container.setLayout(self._cat_flow)
@@ -216,11 +197,11 @@ class FilterPanel(QWidget):
                 chip.toggled.disconnect(self._on_changed)
             except (RuntimeError, TypeError):
                 pass  # Signal war bereits getrennt
+            chip.hide()  # SOFORT verstecken vor deleteLater
             self._cat_flow.removeWidget(chip)
             chip.setParent(None)
             chip.deleteLater()
         self._cat_chips.clear()
-        QApplication.processEvents()
 
         for cat in categories:
             # Display translated name, keep internal name for reference
@@ -228,8 +209,6 @@ class FilterPanel(QWidget):
             chip = FilterChip(display_name, chip_id=cat["id"])
             chip._internal_name = cat["name"]  # Store for rename/reference
             chip.toggled.connect(self._on_changed)
-            chip.rename_started.connect(self._start_inline_rename)
-            # Kontextmenü wird vom _cat_container gehandelt, nicht vom Chip
             self._cat_flow.addWidget(chip)
             self._cat_chips.append(chip)
 
@@ -299,11 +278,9 @@ class FilterPanel(QWidget):
             menu.setStyleSheet(CONTEXT_MENU_STYLE)
 
             if chip:
-                # Chip-Menü (3 Einträge)
+                # Chip-Menü (2 Einträge - Umbenennen kommt in Phase 3)
                 act_add = menu.addAction(tr("context.add"))
                 act_delete = menu.addAction(tr("context.delete"))
-                act_nexus = menu.addAction(tr("context.delete_nexus"))
-                act_nexus.setEnabled(False)
                 chosen = menu.exec(global_pos)
                 if chosen == act_add:
                     self._add_category()
@@ -332,122 +309,12 @@ class FilterPanel(QWidget):
             menu.exec(global_pos)
 
     def _add_category(self):
-        self._start_inline_add()
+        """Platzhalter für Phase 3 (Dialog)."""
+        pass
 
     def _delete_category(self, chip):
+        """Emit delete signal for MainWindow to handle."""
         self.category_delete_requested.emit(chip.chip_id)
-
-    # ── Inline editing ───────────────────────────────────────────
-
-    def _start_inline_add(self) -> None:
-        """Show the category add input field."""
-        self._cat_add_edit.clear()
-        self._cat_add_edit.setVisible(True)
-        self._cat_add_edit.setFocus()
-
-    def _confirm_add(self) -> None:
-        """User pressed Enter in the add field."""
-        name = self._cat_add_edit.text().strip()
-        self._cat_add_edit.setVisible(False)
-        if name:
-            self.category_add_requested.emit(name)
-
-    def _hide_add_edit(self) -> None:
-        """Hide the category add input field."""
-        self._cat_add_edit.setVisible(False)
-
-    def _start_inline_rename(self, chip_id: int, current_name: str) -> None:
-        """Show inline input for renaming a category.
-
-        Input is placed AS CHILD of the chip (overlay), not inserted into layout.
-        This preserves FlowLayout positioning.
-        """
-        if self._rename_edit is not None:
-            return  # Already renaming
-
-        chip = self._find_chip(chip_id)
-        if chip is None:
-            return
-
-        self._rename_confirmed = False
-        old_name = current_name
-
-        # Create input AS CHILD of chip (overlay, no layout manipulation)
-        edit = QLineEdit(chip)  # Parent = chip
-        edit.setObjectName("categoryInlineInput")
-        edit.setText(old_name)
-        edit.setGeometry(chip.rect())  # Same size/position as chip
-        edit.setStyleSheet("""
-            QLineEdit#categoryInlineInput {
-                background: #1a1a1a;
-                border: 1px solid #006868;
-                border-radius: 4px;
-                color: #FFFFFF;
-                padding: 2px 6px;
-                font-size: 12px;
-            }
-        """)
-
-        edit.show()
-        edit.setFocus()
-        edit.selectAll()
-        edit.returnPressed.connect(lambda: self._finish_inline_rename(edit, chip, old_name))
-        edit.editingFinished.connect(lambda: self._cancel_inline_rename(edit, chip))
-
-        self._rename_edit = edit
-        self._rename_chip = chip
-
-    def _finish_inline_rename(self, edit: QLineEdit, chip: FilterChip, old_name: str):
-        """Handle Enter press - rename the category."""
-        new_name = edit.text().strip()
-
-        # If empty or same name, cancel
-        if not new_name or new_name == old_name:
-            self._cancel_inline_rename(edit, chip)
-            return
-
-        self._rename_confirmed = True
-
-        # Remove input (it's a child of chip, just delete it)
-        edit.deleteLater()
-        self._rename_edit = None
-        self._rename_chip = None
-
-        # Emit signal (chip was never hidden)
-        self.category_rename_requested.emit(chip.chip_id, new_name)
-
-    def _cancel_inline_rename(self, edit: QLineEdit, chip: FilterChip):
-        """Handle Escape or focus loss - cancel rename."""
-        if self._rename_confirmed:
-            return  # Already confirmed via Enter
-
-        if self._rename_edit is None:
-            return  # Already cleaned up
-
-        # Remove input (it's a child of chip, just delete it)
-        edit.deleteLater()
-        self._rename_edit = None
-        self._rename_chip = None
-
-    def _find_chip(self, chip_id: int) -> FilterChip | None:
-        for chip in self._cat_chips:
-            if chip.chip_id == chip_id:
-                return chip
-        return None
-
-    def eventFilter(self, obj, event) -> bool:
-        """Handle Escape and Focus-Lost for inline edit fields."""
-        # Kategorie-Hinzufügen Feld
-        if obj is self._cat_add_edit:
-            if event.type() == QEvent.Type.KeyPress:
-                if event.key() == Qt.Key.Key_Escape:
-                    self._hide_add_edit()
-                    return True
-            elif event.type() == QEvent.Type.FocusOut:
-                from PySide6.QtCore import QTimer
-                QTimer.singleShot(0, self._hide_add_edit)
-                return False
-        return super().eventFilter(obj, event)
 
     # ── Internal ──────────────────────────────────────────────────
 
