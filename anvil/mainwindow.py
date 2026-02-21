@@ -544,11 +544,15 @@ class MainWindow(QMainWindow):
     def _on_menu_settings(self) -> None:
         """Werkzeuge → Einstellungen... (Strg+S)."""
         from anvil.widgets.settings_dialog import SettingsDialog
-        SettingsDialog(
+        dlg = SettingsDialog(
             self,
             self.plugin_loader,
             self.instance_manager,
-        ).exec()
+        )
+        if dlg.exec() == SettingsDialog.DialogCode.Accepted:
+            # Reload current instance to apply changed paths
+            if self.instance_manager.current_instance():
+                self._apply_instance(self.instance_manager.current_instance())
 
     def _on_menu_help(self) -> None:
         """Hilfe → Hilfe (Strg+H)."""
@@ -745,11 +749,16 @@ class MainWindow(QMainWindow):
         self._current_instance_path = self.instance_manager.instances_path() / instance_name
         instance_path = self._current_instance_path
 
-        # 4. Downloads tab
-        self._game_panel.set_downloads_path(
-            instance_path / ".downloads", instance_path / ".mods",
-        )
-        self._game_panel.download_manager().set_downloads_dir(instance_path / ".downloads")
+        # 4. Downloads tab — Pfade aus Instance-Config lesen
+        def resolve_path(val: str) -> Path:
+            resolved = val.replace("%INSTANCE_DIR%", str(instance_path))
+            return Path(resolved)
+
+        downloads_dir = resolve_path(data.get("path_downloads_directory", "%INSTANCE_DIR%/.downloads"))
+        mods_dir = resolve_path(data.get("path_mods_directory", "%INSTANCE_DIR%/.mods"))
+
+        self._game_panel.set_downloads_path(downloads_dir, mods_dir)
+        self._game_panel.download_manager().set_downloads_dir(downloads_dir)
 
         # ── BG3-specific path ─────────────────────────────────────
         if short_name == "baldursgate3":
