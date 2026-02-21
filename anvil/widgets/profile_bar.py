@@ -223,6 +223,8 @@ class ProfileBar(QWidget):
 
         self._scroll_area.setWidget(self._tabs_widget)
         self._tabs_widget.installEventFilter(self)
+        self._tab_container.installEventFilter(self)
+        self._scroll_area.viewport().installEventFilter(self)
         container_layout.addWidget(self._scroll_area)
 
         # Fade edges
@@ -645,8 +647,15 @@ class ProfileBar(QWidget):
         return len(self._tabs) - 1
 
     def eventFilter(self, obj, event: QEvent) -> bool:
-        """Handle drag & drop events on tabs."""
-        # Nur Events von Tabs verarbeiten
+        """Handle drag & drop events on tabs and focus management."""
+        # Klick auf freie Fläche → Eingabefelder schließen
+        if event.type() == QEvent.Type.MouseButtonPress:
+            if self._inline_input is not None and obj != self._inline_input:
+                self._inline_input.clearFocus()
+            if self._rename_input is not None and obj != self._rename_input:
+                self._rename_input.clearFocus()
+
+        # Nur Events von Tabs verarbeiten (für Drag & Drop)
         if obj not in self._tabs:
             return super().eventFilter(obj, event)
 

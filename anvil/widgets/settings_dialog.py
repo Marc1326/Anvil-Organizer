@@ -9,6 +9,7 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
+    QFileDialog,
     QVBoxLayout,
     QHBoxLayout,
     QTabWidget,
@@ -267,9 +268,19 @@ class SettingsDialog(QDialog):
                 le.setPlaceholderText(text_or_placeholder)
             else:
                 le.setText(text_or_placeholder)
+
+            def browse(line_edit=le, title=label):
+                path = QFileDialog.getExistingDirectory(self, title, line_edit.text())
+                if path:
+                    line_edit.setText(path)
+
+            btn = QPushButton("...")
+            btn.setFixedWidth(30)
+            btn.clicked.connect(browse)
+
             row = QHBoxLayout()
             row.addWidget(le)
-            row.addWidget(QPushButton("..."))
+            row.addWidget(btn)
             form.addRow(label, row)
 
         # ── Resolve paths from the active instance ──────────────
