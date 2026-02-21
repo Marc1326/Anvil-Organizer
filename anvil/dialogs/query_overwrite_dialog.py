@@ -64,7 +64,7 @@ class QueryOverwriteDialog(QDialog):
         frame_layout.setContentsMargins(16, 14, 16, 14)
         frame_layout.setSpacing(10)
 
-        msg = QLabel(tr("dialog.mod_exists_message", mod_name=mod_name))
+        msg = QLabel(tr("dialog.mod_exists_message", name=mod_name))
         msg.setWordWrap(True)
         frame_layout.addWidget(msg)
 
