@@ -269,21 +269,25 @@ class SettingsDialog(QDialog):
                     line_edit.setText(path)
             return browse
 
-        def add_path_row(form, label, text_or_placeholder, is_placeholder=True):
+        def add_path_row(form, label, text_or_placeholder, is_placeholder=True, readonly=False):
             le = QLineEdit()
             if is_placeholder:
                 le.setPlaceholderText(text_or_placeholder)
             else:
                 le.setText(text_or_placeholder)
+            le.setReadOnly(readonly)
 
             btn = QPushButton("...")
-            btn.setFixedWidth(30)
-            btn.clicked.connect(make_browse(le, label))
+            btn.setFixedWidth(40)
+            btn.setEnabled(not readonly)
+            if not readonly:
+                btn.clicked.connect(make_browse(le, label))
 
             row = QHBoxLayout()
             row.addWidget(le)
             row.addWidget(btn)
             form.addRow(label, row)
+            return le
 
         # ── Resolve paths from the active instance ──────────────
         _base_dir = ""
@@ -313,17 +317,17 @@ class SettingsDialog(QDialog):
                 _game_path = idata.get("game_path", "")
 
         pf_form = QFormLayout()
-        add_path_row(pf_form, tr("settings.path_base_dir"), _base_dir, False)
-        add_path_row(pf_form, tr("settings.path_downloads"), _downloads, False)
-        add_path_row(pf_form, tr("settings.path_mods"), _mods, False)
-        add_path_row(pf_form, tr("settings.path_caches"), _caches, False)
-        add_path_row(pf_form, tr("settings.path_profiles"), _profiles, False)
-        add_path_row(pf_form, tr("settings.path_overwrite"), _overwrite, False)
+        add_path_row(pf_form, tr("settings.path_base_dir"), _base_dir, False, readonly=True)
+        self._le_downloads = add_path_row(pf_form, tr("settings.path_downloads"), _downloads, False)
+        self._le_mods = add_path_row(pf_form, tr("settings.path_mods"), _mods, False)
+        add_path_row(pf_form, tr("settings.path_caches"), _caches, False, readonly=True)
+        self._le_profiles = add_path_row(pf_form, tr("settings.path_profiles"), _profiles, False)
+        self._le_overwrite = add_path_row(pf_form, tr("settings.path_overwrite"), _overwrite, False)
         pf_content_layout.addLayout(pf_form)
         pf_content_layout.addWidget(QLabel(tr("label.base_dir_hint")))
         pf_content_layout.addSpacing(16)
         pf_game_form = QFormLayout()
-        add_path_row(pf_game_form, tr("settings.path_managed_game"), _game_path, False)
+        self._le_game_path = add_path_row(pf_game_form, tr("settings.path_managed_game"), _game_path, False)
         pf_content_layout.addLayout(pf_game_form)
         pf_content_layout.addStretch()
         pf_content_layout.addWidget(QLabel(tr("label.writable_dirs_hint")))
@@ -726,7 +730,7 @@ class SettingsDialog(QDialog):
         subprocess.Popen(["xdg-open", str(get_styles_dir())])
 
     def accept(self):
-        """Save theme and language selection to QSettings and close."""
+        """Save theme, language, and path settings, then close."""
         settings = self._settings()
         settings.setValue("style/theme", self._stil_combo.currentText())
         # Sprache speichern
@@ -734,6 +738,18 @@ class SettingsDialog(QDialog):
         new_lang = self._lang_codes[lang_idx] if 0 <= lang_idx < len(self._lang_codes) else self._initial_lang
         settings.setValue("General/language", new_lang)
         settings.sync()  # Sicherstellen dass Änderungen geschrieben werden
+
+        # Pfade in Instanz-Config speichern
+        if self._instance_manager is not None:
+            cur = self._instance_manager.current_instance()
+            if cur:
+                idata = self._instance_manager.load_instance(cur)
+                idata["path_downloads_directory"] = self._le_downloads.text()
+                idata["path_mods_directory"] = self._le_mods.text()
+                idata["path_profiles_directory"] = self._le_profiles.text()
+                idata["path_overwrite_directory"] = self._le_overwrite.text()
+                idata["game_path"] = self._le_game_path.text()
+                self._instance_manager.save_instance(cur, idata)
 
         # Auto-Restart wenn Sprache geändert wurde
         if new_lang != self._initial_lang:

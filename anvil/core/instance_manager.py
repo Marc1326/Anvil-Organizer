@@ -299,6 +299,19 @@ class InstanceManager:
         s.beginGroup("General")
         if "selected_profile" in data:
             s.setValue("selected_profile", data["selected_profile"])
+        if "game_path" in data:
+            s.setValue("game_path", data["game_path"])
+        s.endGroup()
+
+        s.beginGroup("Paths")
+        if "path_downloads_directory" in data:
+            s.setValue("downloads_directory", data["path_downloads_directory"])
+        if "path_mods_directory" in data:
+            s.setValue("mods_directory", data["path_mods_directory"])
+        if "path_profiles_directory" in data:
+            s.setValue("profiles_directory", data["path_profiles_directory"])
+        if "path_overwrite_directory" in data:
+            s.setValue("overwrite_directory", data["path_overwrite_directory"])
         s.endGroup()
 
         s.sync()
