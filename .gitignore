@@ -2,3 +2,8 @@
 __pycache__/
 *.pyc
 *.pyo
+
+# Claude Agent System
+CLAUDE.md
+HOW_TO_USE_AGENTS.md
+.claude/
