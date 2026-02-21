@@ -2400,6 +2400,17 @@ class MainWindow(QMainWindow):
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
         self._update_active_count()
 
+        # Refresh framework status (nach Framework-Installation)
+        if self._current_plugin is not None:
+            fw_list = []
+            for fw, installed in self._current_plugin.get_installed_frameworks():
+                fw_list.append({
+                    "name": fw.name,
+                    "description": fw.description,
+                    "installed": installed,
+                })
+            self._mod_list_view.load_frameworks(fw_list)
+
     # ── Nexus API integration ─────────────────────────────────────────
 
     def _handle_nxm_link(self, nxm_link) -> None:
