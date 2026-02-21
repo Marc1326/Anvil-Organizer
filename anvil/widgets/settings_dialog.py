@@ -262,6 +262,13 @@ class SettingsDialog(QDialog):
         pf_content = QWidget()
         pf_content_layout = QVBoxLayout(pf_content)
 
+        def make_browse(line_edit, title):
+            def browse():
+                path = QFileDialog.getExistingDirectory(self, title, line_edit.text())
+                if path:
+                    line_edit.setText(path)
+            return browse
+
         def add_path_row(form, label, text_or_placeholder, is_placeholder=True):
             le = QLineEdit()
             if is_placeholder:
@@ -269,14 +276,9 @@ class SettingsDialog(QDialog):
             else:
                 le.setText(text_or_placeholder)
 
-            def browse(line_edit=le, title=label):
-                path = QFileDialog.getExistingDirectory(self, title, line_edit.text())
-                if path:
-                    line_edit.setText(path)
-
             btn = QPushButton("...")
             btn.setFixedWidth(30)
-            btn.clicked.connect(browse)
+            btn.clicked.connect(make_browse(le, label))
 
             row = QHBoxLayout()
             row.addWidget(le)
