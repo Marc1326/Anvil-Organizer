@@ -1052,11 +1052,38 @@ class MainWindow(QMainWindow):
         - Name berechnen, prüfen ob .mods/{name} existiert
         - NEIN → direkt installieren, kein Dialog
         - JA  → QuickInstallDialog → QueryOverwriteDialog falls nötig
+
+        Framework mods are detected and installed directly into the game directory.
         """
         installer = ModInstaller(self._current_instance_path)
         installed = []
+        frameworks_installed = []
 
         for archive in archives:
+            # 1. Extract to temp
+            temp_dir = installer.extract_to_temp(archive)
+            if temp_dir is None:
+                continue
+
+            # 2. Check if this is a framework mod
+            if self._current_plugin is not None:
+                file_list = [
+                    str(f.relative_to(temp_dir))
+                    for f in temp_dir.rglob("*") if f.is_file()
+                ]
+                fw = self._current_plugin.is_framework_mod(file_list)
+                if fw is not None:
+                    game_path = getattr(self._current_plugin, "_game_path", None)
+                    if game_path:
+                        result = installer.install_framework(temp_dir, fw, game_path)
+                        if result:
+                            frameworks_installed.append(result["name"])
+                        continue
+                    else:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        continue
+
+            # 3. Normal mod installation
             best, variants = installer.suggest_names(archive)
             mod_name = best
             dest = installer.mods_path / mod_name
@@ -1088,27 +1115,35 @@ class MainWindow(QMainWindow):
                     break
 
             if not mod_name:
+                shutil.rmtree(temp_dir, ignore_errors=True)
                 continue  # user cancelled
 
-            # Install
-            mod_path = installer.install_from_archive(archive, mod_name)
+            # Install from extracted temp dir
+            mod_path = installer.install_from_extracted(temp_dir, mod_name)
             if mod_path:
                 add_mod_to_modlist(self._current_profile_path, mod_path.name)
                 installed.append(mod_path.name)
             else:
+                shutil.rmtree(temp_dir, ignore_errors=True)
                 QMessageBox.warning(
                     self, tr("error.install_failed_title"),
                     tr("error.install_failed_message", name=mod_name),
                 )
 
-        if not installed:
+        # Show status messages
+        if frameworks_installed:
+            names = ", ".join(frameworks_installed)
+            self.statusBar().showMessage(tr("status.framework_installed", names=names), 5000)
+
+        if not installed and not frameworks_installed:
             return
 
         # Reload mod list (reuses _reload_mod_list which handles framework filtering)
         self._reload_mod_list()
 
-        names = ", ".join(installed)
-        self.statusBar().showMessage(tr("status.installed", names=names), 5000)
+        if installed:
+            names = ", ".join(installed)
+            self.statusBar().showMessage(tr("status.installed", names=names), 5000)
 
     # ── Other slots ───────────────────────────────────────────────────
 

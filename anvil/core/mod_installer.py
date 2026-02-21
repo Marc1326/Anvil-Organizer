@@ -19,6 +19,11 @@ from pathlib import Path
 
 from anvil.core.mod_metadata import create_default_meta_ini
 
+# Type hint only - avoid circular import
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from anvil.plugins.framework_mod import FrameworkMod
+
 SUPPORTED_EXTENSIONS = {".zip", ".rar", ".7z"}
 
 
@@ -180,6 +185,108 @@ class ModInstaller:
             # Clean up temp dir if it still exists (move failed)
             if tmp.is_dir():
                 shutil.rmtree(tmp, ignore_errors=True)
+
+    def extract_to_temp(self, archive_path: Path) -> Path | None:
+        """Extract archive to a temporary directory.
+
+        Returns:
+            Path to temp directory, or None on failure.
+            Caller must clean up the temp directory!
+        """
+        if not archive_path.is_file():
+            print(f"mod_installer: file not found: {archive_path}", file=sys.stderr)
+            return None
+
+        tmp = Path(tempfile.mkdtemp(prefix="anvil_install_"))
+        if not self._extract(archive_path, tmp):
+            shutil.rmtree(tmp, ignore_errors=True)
+            return None
+
+        self._flatten_single_subfolder(tmp)
+
+        if not any(tmp.iterdir()):
+            print(f"mod_installer: archive is empty: {archive_path}", file=sys.stderr)
+            shutil.rmtree(tmp, ignore_errors=True)
+            return None
+
+        return tmp
+
+    def install_from_extracted(self, temp_dir: Path, mod_name: str) -> Path | None:
+        """Install mod from an already-extracted temp directory.
+
+        Args:
+            temp_dir: Path to extracted files (will be moved, not copied).
+            mod_name: Display / folder name for the mod.
+
+        Returns:
+            Path to the installed mod folder, or None on failure.
+        """
+        try:
+            self.mods_path.mkdir(parents=True, exist_ok=True)
+            dest = self.mods_path / mod_name
+            shutil.move(str(temp_dir), str(dest))
+            create_default_meta_ini(dest, mod_name)
+            return dest
+        except OSError as exc:
+            print(f"mod_installer: failed to install: {exc}", file=sys.stderr)
+            return None
+
+    def install_framework(
+        self,
+        temp_dir: Path,
+        framework: "FrameworkMod",
+        game_path: Path,
+    ) -> dict | None:
+        """Install a framework mod into the game directory.
+
+        Args:
+            temp_dir: Path to extracted framework files.
+            framework: FrameworkMod with pattern and target info.
+            game_path: Path to the game installation directory.
+
+        Returns:
+            Dict with installation info, or None on failure.
+        """
+        target_dir = game_path / framework.target if framework.target else game_path
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        installed_files: list[str] = []
+        for src_file in temp_dir.rglob("*"):
+            if not src_file.is_file():
+                continue
+
+            name_lower = src_file.name.lower()
+            matched = any(
+                pat.lower() in name_lower or name_lower == pat.lower()
+                for pat in framework.pattern
+            )
+
+            if matched:
+                dest = target_dir / src_file.name
+                shutil.copy2(src_file, dest)
+                installed_files.append(str(dest.relative_to(game_path)))
+            else:
+                # Copy sibling files (e.g. .ini configs next to main DLL)
+                for pat in framework.pattern:
+                    pat_files = list(temp_dir.rglob(pat))
+                    if pat_files:
+                        pat_parent = pat_files[0].parent
+                        if src_file.parent == pat_parent:
+                            dest = target_dir / src_file.name
+                            shutil.copy2(src_file, dest)
+                            installed_files.append(str(dest.relative_to(game_path)))
+                            break
+
+        # Clean up temp dir
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+        return {
+            "name": framework.name,
+            "type": "framework",
+            "target": framework.target,
+            "files": installed_files,
+            "status": "installed",
+        }
 
     # ── Extraction ─────────────────────────────────────────────────────
 

@@ -401,6 +401,7 @@
     "started": "Avviato: {name}",
     "installed": "Installato: {names}",
     "installed_inactive": "Installato (inattivo): {names}",
+    "framework_installed": "Framework installato: {names}",
     "install_failed": "Installazione fallita: {name}",
     "separator_created": "Separatore creato: {name}",
     "separators_collapsed": "Tutti i separatori compressi ({count})",
