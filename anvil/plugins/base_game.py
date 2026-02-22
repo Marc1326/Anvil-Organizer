@@ -10,6 +10,7 @@ Proton prefix support, .exe-agnostic binary lookup).
 
 from __future__ import annotations
 
+import fnmatch
 from pathlib import Path
 from typing import Any
 
@@ -206,7 +207,10 @@ class BaseGame:
         if self._detected_store != "steam":
             return None
 
-        steam_root = Path.home() / ".local" / "share" / "Steam"
+        from anvil.stores.steam_utils import find_steam_path
+        steam_root = find_steam_path()
+        if steam_root is None:
+            return None
         for steam_id in _as_list(self.GameSteamId):
             prefix = steam_root / "steamapps" / "compatdata" / str(steam_id) / "pfx"
             if prefix.is_dir():
@@ -262,9 +266,19 @@ class BaseGame:
             installed = False
             if self._game_path is not None:
                 for det_path in fw.detect_installed:
-                    if (self._game_path / det_path).exists():
-                        installed = True
-                        break
+                    if '*' in det_path or '?' in det_path:
+                        parent = (self._game_path / det_path).parent
+                        pattern = Path(det_path).name
+                        if parent.is_dir() and any(
+                            fnmatch.fnmatch(f.name, pattern)
+                            for f in parent.iterdir()
+                        ):
+                            installed = True
+                            break
+                    else:
+                        if (self._game_path / det_path).exists():
+                            installed = True
+                            break
             result.append((fw, installed))
         return result
 
