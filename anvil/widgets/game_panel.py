@@ -505,28 +505,31 @@ class GamePanel(QWidget):
         if not binary:
             return
 
-        # Steam-Launch für das Hauptspiel (erster Eintrag mit SteamId)
+        # Steam-Spiel → IMMER über Steam starten (Linux/Proton)
         plugin = self._current_plugin
         if plugin and hasattr(plugin, "GameSteamId") and plugin.GameSteamId:
-            # Hauptspiel (GameBinary) → über Steam CLI starten
-            if hasattr(plugin, "GameBinary") and binary == plugin.GameBinary:
-                import shutil
-                steam_bin = shutil.which("steam")
-                if steam_bin:
-                    from PySide6.QtCore import QProcess
-                    steam_id = plugin.GameSteamId
-                    if isinstance(steam_id, list):
-                        steam_id = steam_id[0]
-                    args = ["-applaunch", str(steam_id)]
-                    if hasattr(plugin, "GameLaunchArgs"):
-                        args.extend(plugin.GameLaunchArgs)
-                    QProcess.startDetached(steam_bin, args)
-                else:
+            import shutil
+            steam_bin = shutil.which("steam")
+            if steam_bin:
+                from PySide6.QtCore import QProcess
+                steam_id = plugin.GameSteamId
+                if isinstance(steam_id, list):
+                    steam_id = steam_id[0]
+                args = ["-applaunch", str(steam_id)]
+                if hasattr(plugin, "GameLaunchArgs"):
+                    args.extend(plugin.GameLaunchArgs)
+                success, pid = QProcess.startDetached(steam_bin, args)
+                if not success:
                     QMessageBox.warning(
                         self, tr("game_panel.start"),
                         tr("game_panel.steam_not_found"),
                     )
-                return
+            else:
+                QMessageBox.warning(
+                    self, tr("game_panel.start"),
+                    tr("game_panel.steam_not_found"),
+                )
+            return
 
         # Direkter Start für alle anderen Executables
         game_path = self._current_game_path

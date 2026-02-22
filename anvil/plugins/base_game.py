@@ -197,13 +197,7 @@ class BaseGame:
         return self._detected_store
 
     def protonPrefix(self) -> Path | None:
-        """Return the Proton/Wine compatibility-data prefix for Steam games.
-
-        Path pattern: ``~/.local/share/Steam/steamapps/compatdata/{appid}/pfx/``
-
-        Only returns a path for Steam games where a compatdata folder exists.
-        Returns None for non-Steam games or when no prefix is found.
-        """
+        """Return the Proton prefix path for this game, or None."""
         if self._detected_store != "steam":
             return None
 
@@ -211,10 +205,27 @@ class BaseGame:
         steam_root = find_steam_path()
         if steam_root is None:
             return None
-        for steam_id in _as_list(self.GameSteamId):
-            prefix = steam_root / "steamapps" / "compatdata" / str(steam_id) / "pfx"
-            if prefix.is_dir():
-                return prefix
+
+        # Alle Steam Library Folders sammeln (inkl. externe Platten)
+        libraries = [steam_root]
+        vdf = steam_root / "steamapps" / "libraryfolders.vdf"
+        if vdf.is_file():
+            try:
+                import re
+                text = vdf.read_text(encoding="utf-8")
+                for match in re.finditer(r'"path"\s+"([^"]+)"', text):
+                    lib = Path(match.group(1))
+                    if lib.is_dir() and lib not in libraries:
+                        libraries.append(lib)
+            except OSError:
+                pass
+
+        # In allen Libraries nach Compatdata suchen
+        for lib in libraries:
+            for steam_id in _as_list(self.GameSteamId):
+                prefix = lib / "steamapps" / "compatdata" / str(steam_id) / "pfx"
+                if prefix.is_dir():
+                    return prefix
 
         return None
 

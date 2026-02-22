@@ -754,7 +754,7 @@ class SettingsDialog(QDialog):
         # Auto-Restart wenn Sprache geändert wurde
         if new_lang != self._initial_lang:
             super().accept()
-            QProcess.startDetached(sys.executable, sys.argv)
+            success, pid = QProcess.startDetached(sys.executable, sys.argv)
             QApplication.quit()
             return
 

@@ -1027,7 +1027,7 @@ class MainWindow(QMainWindow):
     def _on_start_game(self, binary_path: str, working_dir: str) -> None:
         """Launch the selected game executable."""
         from PySide6.QtCore import QProcess
-        success = QProcess.startDetached(binary_path, [], working_dir)
+        success, pid = QProcess.startDetached(binary_path, [], working_dir)
         if success:
             self.statusBar().showMessage(
                 tr("status.started", name=Path(binary_path).name), 5000,
