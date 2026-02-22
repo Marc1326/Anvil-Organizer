@@ -258,10 +258,14 @@ class BaseGame:
                               (e.g. from zipfile.namelist()).
         """
         lower_contents = [f.lower().replace("\\", "/") for f in archive_contents]
+        print(f"DEBUG is_framework_mod: checking {len(archive_contents)} files", flush=True)
+        print(f"DEBUG is_framework_mod: lower_contents={lower_contents[:10]}", flush=True)
         for fw in self.get_framework_mods():
             for pattern in fw.pattern:
                 pat = pattern.lower().replace("\\", "/")
-                if any(pat in entry for entry in lower_contents):
+                matched = any(pat in entry for entry in lower_contents)
+                print(f"DEBUG is_framework_mod: fw={fw.name}, pattern={pat}, matched={matched}", flush=True)
+                if matched:
                     return fw
         return None
 

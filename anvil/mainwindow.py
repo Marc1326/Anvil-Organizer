@@ -1040,7 +1040,9 @@ class MainWindow(QMainWindow):
 
     def _on_downloads_install(self, paths: list) -> None:
         """Handle install request from the Downloads tab."""
+        print(f"DEBUG _on_downloads_install: paths={paths}", flush=True)
         if not self._current_instance_path:
+            print("DEBUG _on_downloads_install: NO instance_path, RETURNING", flush=True)
             return
         self._install_archives([Path(p) for p in paths])
         self._game_panel.refresh_downloads()
@@ -1055,15 +1057,18 @@ class MainWindow(QMainWindow):
 
         Framework mods are detected and installed directly into the game directory.
         """
-        installer = ModInstaller(self._current_instance_path)
+        flatten = getattr(self._current_plugin, "GameFlattenArchive", True) if self._current_plugin else True
+        installer = ModInstaller(self._current_instance_path, flatten=flatten)
         installed = []
         frameworks_installed = []
 
         for archive in archives:
+            print(f"DEBUG _install_archives: archive={archive.name}", flush=True)
             # 1. Extract to temp
             temp_dir = installer.extract_to_temp(archive)
             if temp_dir is None:
                 continue
+            print(f"DEBUG _install_archives: temp_dir={temp_dir}", flush=True)
 
             # 2. Check if this is a framework mod
             if self._current_plugin is not None:
@@ -1071,9 +1076,12 @@ class MainWindow(QMainWindow):
                     str(f.relative_to(temp_dir))
                     for f in temp_dir.rglob("*") if f.is_file()
                 ]
+                print(f"DEBUG _install_archives: file_list={file_list[:10]}", flush=True)
                 fw = self._current_plugin.is_framework_mod(file_list)
+                print(f"DEBUG _install_archives: fw={fw}", flush=True)
                 if fw is not None:
-                    game_path = getattr(self._current_plugin, "_game_path", None)
+                    game_path = self._current_game_path
+                    print(f"DEBUG _install_archives: game_path={game_path}", flush=True)
                     if game_path:
                         result = installer.install_framework(temp_dir, fw, game_path)
                         if result:
@@ -1900,7 +1908,8 @@ class MainWindow(QMainWindow):
             return
 
         archive_path = Path(path)
-        installer = ModInstaller(self._current_instance_path)
+        flatten = getattr(self._current_plugin, "GameFlattenArchive", True) if self._current_plugin else True
+        installer = ModInstaller(self._current_instance_path, flatten=flatten)
         result = installer.install_from_archive(archive_path)
 
         if result:

@@ -30,9 +30,10 @@ SUPPORTED_EXTENSIONS = {".zip", ".rar", ".7z"}
 class ModInstaller:
     """Extract archives and install them into an instance's ``.mods/`` folder."""
 
-    def __init__(self, instance_path: Path) -> None:
+    def __init__(self, instance_path: Path, flatten: bool = True) -> None:
         self.instance_path = instance_path
         self.mods_path = instance_path / ".mods"
+        self._flatten = flatten
 
     # ── Public API ─────────────────────────────────────────────────────
 
@@ -153,8 +154,9 @@ class ModInstaller:
             if not self._extract(archive_path, tmp):
                 return None
 
-            # 3. Flatten single-subfolder archives
-            self._flatten_single_subfolder(tmp)
+            # 3. Flatten single-subfolder archives (skip for games like Witcher 3)
+            if self._flatten:
+                self._flatten_single_subfolder(tmp)
 
             # 4. Check that we actually got files
             if not any(tmp.iterdir()):
@@ -202,7 +204,8 @@ class ModInstaller:
             shutil.rmtree(tmp, ignore_errors=True)
             return None
 
-        self._flatten_single_subfolder(tmp)
+        if self._flatten:
+            self._flatten_single_subfolder(tmp)
 
         if not any(tmp.iterdir()):
             print(f"mod_installer: archive is empty: {archive_path}", file=sys.stderr)
@@ -250,32 +253,22 @@ class ModInstaller:
         target_dir = game_path / framework.target if framework.target else game_path
         target_dir.mkdir(parents=True, exist_ok=True)
 
+        # Find the actual directory containing the framework files.
+        # Archives often wrap files in subdirectories (e.g. bin/ or
+        # ModLoader/) that must be stripped when installing.
+        install_root = self._find_install_root(temp_dir, framework.pattern)
+        print(f"DEBUG install_framework: install_root={install_root}")
+
         installed_files: list[str] = []
-        for src_file in temp_dir.rglob("*"):
+        for src_file in install_root.rglob("*"):
             if not src_file.is_file():
                 continue
-
-            name_lower = src_file.name.lower()
-            matched = any(
-                pat.lower() in name_lower or name_lower == pat.lower()
-                for pat in framework.pattern
-            )
-
-            if matched:
-                dest = target_dir / src_file.name
-                shutil.copy2(src_file, dest)
-                installed_files.append(str(dest.relative_to(game_path)))
-            else:
-                # Copy sibling files (e.g. .ini configs next to main DLL)
-                for pat in framework.pattern:
-                    pat_files = list(temp_dir.rglob(pat))
-                    if pat_files:
-                        pat_parent = pat_files[0].parent
-                        if src_file.parent == pat_parent:
-                            dest = target_dir / src_file.name
-                            shutil.copy2(src_file, dest)
-                            installed_files.append(str(dest.relative_to(game_path)))
-                            break
+            rel = src_file.relative_to(install_root)
+            dest = target_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_file, dest)
+            installed_files.append(str(dest.relative_to(game_path)))
+        print(f"DEBUG install_framework: files={installed_files}")
 
         # Clean up temp dir
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -287,6 +280,48 @@ class ModInstaller:
             "files": installed_files,
             "status": "installed",
         }
+
+    @staticmethod
+    def _find_install_root(temp_dir: Path, patterns: list[str]) -> Path:
+        """Find the directory containing the framework files.
+
+        Archives often wrap framework files in a subdirectory:
+
+        - ``ScriptHookRDR2.zip``: ``bin/ScriptHookRDR2.dll``
+        - ``LML``: ``ModLoader/vfs.asi``, ``ModLoader/lml/``
+
+        This method locates where the pattern files actually live and
+        returns their parent directory as the install root.  Files are
+        then copied relative to this root, effectively stripping the
+        wrapper directory.
+
+        Falls back to *temp_dir* itself if patterns match at the root.
+        """
+        for pat in patterns:
+            pat_lower = pat.lower().rstrip("/")
+            if not pat_lower:
+                continue
+            for item in temp_dir.rglob("*"):
+                rel = item.relative_to(temp_dir)
+                rel_str = str(rel).replace("\\", "/")
+                rel_lower = rel_str.lower()
+                idx = rel_lower.find(pat_lower)
+                if idx >= 0:
+                    print(f"DEBUG _find_install_root: pat={pat}, rel={rel_str}, idx={idx}")
+                if idx < 0:
+                    continue
+                # Pattern at root level — no wrapper to strip
+                if idx == 0:
+                    return temp_dir
+                # Pattern nested in wrapper dir — strip it
+                prefix_str = rel_str[:idx].rstrip("/")
+                if prefix_str:
+                    result = temp_dir / prefix_str
+                    print(f"DEBUG _find_install_root: result={result}")
+                    return result
+                print(f"DEBUG _find_install_root: result={temp_dir} (no prefix)")
+                return temp_dir
+        return temp_dir
 
     # ── Extraction ─────────────────────────────────────────────────────
 

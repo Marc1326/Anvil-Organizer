@@ -65,9 +65,13 @@ class ModDeployer:
         game_path: Path,
         direct_install_patterns: list[str] | None = None,
         profile_name: str = "Default",
+        data_path: str = "",
+        nest_under_mod_name: bool = False,
     ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
+        self._data_path = data_path
+        self._nest_under_mod_name = nest_under_mod_name
         self._mods_path = instance_path / ".mods"
         self._profiles_dir = instance_path / ".profiles"
         self._profile_path = self._profiles_dir / profile_name
@@ -156,6 +160,22 @@ class ModDeployer:
                 except ValueError:
                     continue
 
+                # Direct-install mods skip data_path (frameworks go into game root)
+                is_direct = self.is_direct_install(mod_name)
+
+                # Prepend data_path (e.g. "Data" for Bethesda games)
+                # Skip for direct-install mods — they deploy into game root
+                if self._data_path and not is_direct:
+                    data_prefix = Path(self._data_path)
+                    try:
+                        rel.relative_to(data_prefix)
+                        # rel beginnt bereits mit Data/ → nicht nochmal
+                    except ValueError:
+                        if self._nest_under_mod_name:
+                            rel = data_prefix / mod_name / rel
+                        else:
+                            rel = data_prefix / rel
+
                 target = self._game_path / rel
 
                 # Safety: never overwrite a real (non-symlink) game file
@@ -196,9 +216,6 @@ class ModDeployer:
                             f"unlink {target}: {exc}"
                         )
                         continue
-
-                # Direct-install mods: COPY instead of symlink
-                is_direct = self.is_direct_install(mod_name)
 
                 if is_direct:
                     try:

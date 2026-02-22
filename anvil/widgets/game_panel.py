@@ -335,8 +335,10 @@ class GamePanel(QWidget):
 
         # Re-init deployer if instance_path already set
         direct_patterns = getattr(game_plugin, "GameDirectInstallMods", []) if game_plugin else []
+        data_path = getattr(game_plugin, "GameDataPath", "") if game_plugin else ""
+        nest = getattr(game_plugin, "GameNestModsUnderName", False) if game_plugin else False
         if self._instance_path and game_path:
-            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns)
+            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, data_path=data_path, nest_under_mod_name=nest)
 
         # Update label
         self._game_label.setText(game_name or tr("game_panel.no_game_selected"))
@@ -505,31 +507,32 @@ class GamePanel(QWidget):
         if not binary:
             return
 
-        # Steam-Spiel → IMMER über Steam starten (Linux/Proton)
+        # Steam-Spiel → NUR Hauptspiel über Steam starten (Linux/Proton)
         plugin = self._current_plugin
         if plugin and hasattr(plugin, "GameSteamId") and plugin.GameSteamId:
-            import shutil
-            steam_bin = shutil.which("steam")
-            if steam_bin:
-                from PySide6.QtCore import QProcess
-                steam_id = plugin.GameSteamId
-                if isinstance(steam_id, list):
-                    steam_id = steam_id[0]
-                args = ["-applaunch", str(steam_id)]
-                if hasattr(plugin, "GameLaunchArgs"):
-                    args.extend(plugin.GameLaunchArgs)
-                success, pid = QProcess.startDetached(steam_bin, args)
-                if not success:
+            if hasattr(plugin, "GameBinary") and binary == plugin.GameBinary:
+                import shutil
+                steam_bin = shutil.which("steam")
+                if steam_bin:
+                    from PySide6.QtCore import QProcess
+                    steam_id = plugin.GameSteamId
+                    if isinstance(steam_id, list):
+                        steam_id = steam_id[0]
+                    args = ["-applaunch", str(steam_id)]
+                    if hasattr(plugin, "GameLaunchArgs"):
+                        args.extend(plugin.GameLaunchArgs)
+                    success, pid = QProcess.startDetached(steam_bin, args)
+                    if not success:
+                        QMessageBox.warning(
+                            self, tr("game_panel.start"),
+                            tr("game_panel.steam_not_found"),
+                        )
+                else:
                     QMessageBox.warning(
                         self, tr("game_panel.start"),
                         tr("game_panel.steam_not_found"),
                     )
-            else:
-                QMessageBox.warning(
-                    self, tr("game_panel.start"),
-                    tr("game_panel.steam_not_found"),
-                )
-            return
+                return
 
         # Direkter Start für alle anderen Executables
         game_path = self._current_game_path
@@ -597,8 +600,10 @@ class GamePanel(QWidget):
         """Set instance path and initialize the deployer."""
         self._instance_path = instance_path
         direct_patterns = getattr(self._current_plugin, "GameDirectInstallMods", []) if self._current_plugin else []
+        data_path = getattr(self._current_plugin, "GameDataPath", "") if self._current_plugin else ""
+        nest = getattr(self._current_plugin, "GameNestModsUnderName", False) if self._current_plugin else False
         if self._current_game_path and instance_path:
-            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns)
+            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, data_path=data_path, nest_under_mod_name=nest)
         else:
             self._deployer = None
 

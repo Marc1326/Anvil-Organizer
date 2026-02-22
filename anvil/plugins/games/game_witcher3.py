@@ -51,6 +51,9 @@ class Witcher3Game(BaseGame):
 
     GameLauncher = ""  # No separate launcher
 
+    GameFlattenArchive = False        # Keep modXXX/content/ structure intact
+    GameNestModsUnderName = True      # Deploy: Mods/modXXX/content/ not Mods/content/
+
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()
     GameSavesDirectory = ""     # resolved dynamically via gameSavesDirectory()
     GameSaveExtension = "sav"
