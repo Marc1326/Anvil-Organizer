@@ -744,10 +744,18 @@ class SettingsDialog(QDialog):
             cur = self._instance_manager.current_instance()
             if cur:
                 idata = self._instance_manager.load_instance(cur)
-                idata["path_downloads_directory"] = self._le_downloads.text()
-                idata["path_mods_directory"] = self._le_mods.text()
-                idata["path_profiles_directory"] = self._le_profiles.text()
-                idata["path_overwrite_directory"] = self._le_overwrite.text()
+                ipath = str(self._instance_manager.instances_path() / cur)
+
+                # Absolute Pfade zurück in %INSTANCE_DIR% konvertieren
+                def _unresolve(val: str) -> str:
+                    if val.startswith(ipath):
+                        return val.replace(ipath, "%INSTANCE_DIR%", 1)
+                    return val
+
+                idata["path_downloads_directory"] = _unresolve(self._le_downloads.text())
+                idata["path_mods_directory"] = _unresolve(self._le_mods.text())
+                idata["path_profiles_directory"] = _unresolve(self._le_profiles.text())
+                idata["path_overwrite_directory"] = _unresolve(self._le_overwrite.text())
                 idata["game_path"] = self._le_game_path.text()
                 self._instance_manager.save_instance(cur, idata)
 

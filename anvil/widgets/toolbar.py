@@ -11,7 +11,6 @@ from PySide6.QtCore import Qt, QSize
 from anvil.widgets.instance_manager_dialog import InstanceManagerDialog
 from anvil.widgets.profile_dialog import ProfileDialog
 from anvil.widgets.executables_dialog import ExecutablesDialog
-from anvil.widgets.settings_dialog import SettingsDialog
 from anvil.core import _todo
 from anvil.core.translator import tr
 
@@ -99,13 +98,13 @@ def create_toolbar(parent=None):
     tools_btn.clicked.connect(_todo("Tools"))
 
     settings_btn = _add_btn("settings.svg", tr("menu.settings"))
-    settings_btn.clicked.connect(
-        lambda: SettingsDialog(
-            bar.window(),
-            getattr(bar.window(), "plugin_loader", None),
-            getattr(bar.window(), "instance_manager", None),
-        ).exec()
-    )
+
+    def _on_settings():
+        win = bar.window()
+        if win and hasattr(win, "_on_menu_settings"):
+            win._on_menu_settings()
+
+    settings_btn.clicked.connect(_on_settings)
 
     deploy_sep = bar.addSeparator()
     deploy_sep.setVisible(False)
