@@ -242,6 +242,8 @@ class _DropTreeView(QTreeView):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._collapsed_separators: set[str] = set()
+        self._collapsible_asc: bool = True
+        self._collapsible_dsc: bool = True
 
     def _apply_separator_filter(self):
         """Recalculate which rows to hide based on collapsed separators."""
@@ -250,6 +252,20 @@ class _DropTreeView(QTreeView):
             return
         source = proxy.sourceModel()
         if not source:
+            return
+
+        # Guard: Collapsible nur bei Prioritäts-Sortierung (COL_CHECK)
+        sort_col = proxy.sortColumn()
+        if sort_col > COL_CHECK:
+            proxy.set_hidden_rows(set())
+            return
+
+        sort_order = proxy.sortOrder()
+        if sort_order == Qt.SortOrder.AscendingOrder and not self._collapsible_asc:
+            proxy.set_hidden_rows(set())
+            return
+        if sort_order == Qt.SortOrder.DescendingOrder and not self._collapsible_dsc:
+            proxy.set_hidden_rows(set())
             return
 
         hidden: set[int] = set()

@@ -236,6 +236,18 @@ class FilterPanel(QWidget):
             chip.blockSignals(False)
         self.filter_changed.emit()
 
+    def restore_state(self, prop_ids: set[int], cat_ids: set[int]) -> None:
+        """Restore previously saved filter chip states."""
+        for chip in self._prop_chips:
+            chip.blockSignals(True)
+            chip.setChecked(chip.chip_id in prop_ids)
+            chip.blockSignals(False)
+        for chip in self._cat_chips:
+            chip.blockSignals(True)
+            chip.setChecked(chip.chip_id in cat_ids)
+            chip.blockSignals(False)
+        self.filter_changed.emit()
+
     # ── Context menu (für Kategorien-Bereich) ───────────────────────
 
     _ctx_in_progress = False

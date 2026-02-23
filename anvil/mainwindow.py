@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import configparser
 import json
 import shutil
 
@@ -96,6 +97,17 @@ def _center_on_parent(dialog):
     x = pg.center().x() - dialog.width() // 2
     y = pg.center().y() - dialog.height() // 2
     dialog.move(x, y)
+
+
+def _ensure_list(val) -> list:
+    """QSettings gibt bei 1 Element einen String statt Liste zurück."""
+    if val is None:
+        return []
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        return [val]
+    return list(val)
 
 
 class MainWindow(QMainWindow):
@@ -905,6 +917,43 @@ class MainWindow(QMainWindow):
         # 7. Restore saved column widths / splitter (after data is populated)
         self._restore_ui_state()
 
+        # 8. Mod-Liste Settings anwenden
+        s = self._settings()
+
+        # Collapsible asc/dsc flags
+        tree = self._mod_list_view._tree
+        tree._collapsible_asc = s.value("ModList/collapsible_asc", True, type=bool)
+        tree._collapsible_dsc = s.value("ModList/collapsible_dsc", True, type=bool)
+
+        # Collapsed separators wiederherstellen
+        if s.value("ModList/collapse_per_profile", False, type=bool) and self._current_profile_path:
+            ui_state_file = self._current_profile_path / "ui_state.json"
+            if ui_state_file.is_file():
+                try:
+                    ui_state = json.loads(ui_state_file.read_text())
+                    saved_collapsed = ui_state.get("collapsed_separators", [])
+                except (json.JSONDecodeError, OSError):
+                    saved_collapsed = []
+            else:
+                saved_collapsed = []
+        else:
+            saved_collapsed = _ensure_list(s.value("ModList/collapsed_separators", []))
+
+        if isinstance(saved_collapsed, list) and saved_collapsed:
+            tree._collapsed_separators = set(str(x) for x in saved_collapsed)
+        else:
+            tree._collapsed_separators.clear()
+        tree._apply_separator_filter()
+
+        # Filter-Chips wiederherstellen
+        if s.value("ModList/remember_filters", False, type=bool):
+            saved_props = _ensure_list(s.value("ModList/saved_filter_props", []))
+            saved_cats = _ensure_list(s.value("ModList/saved_filter_cats", []))
+            prop_set = {int(x) for x in saved_props if x != "" and x is not None}
+            cat_set = {int(x) for x in saved_cats if x != "" and x is not None}
+            if prop_set or cat_set:
+                self._filter_panel.restore_state(prop_set, cat_set)
+
     # ── Mod list persistence ─────────────────────────────────────────
 
     def _write_current_modlist(self) -> None:
@@ -1064,12 +1113,14 @@ class MainWindow(QMainWindow):
             return
 
         self._install_archives([Path(f) for f in files])
+        self._game_panel.refresh_downloads()
 
     def _on_archives_dropped(self, paths: list) -> None:
         """Handle archives dropped onto the mod list."""
         if not self._current_instance_path:
             return
         self._install_archives([Path(p) for p in paths])
+        self._game_panel.refresh_downloads()
 
     def _on_start_game(self, binary_path: str, working_dir: str) -> None:
         """Launch the selected game executable."""
@@ -1180,6 +1231,29 @@ class MainWindow(QMainWindow):
             if mod_path:
                 add_mod_to_modlist(self._current_profile_path, mod_path.name)
                 installed.append(mod_path.name)
+                # Mark as installed in .meta (MO2: markInstalled)
+                downloads_dir = self._current_instance_path / ".downloads"
+                if archive.parent == downloads_dir:
+                    self._write_install_meta(archive, mod_path.name)
+                    # Auto-hide: removed=true in Meta wenn Setting aktiv
+                    s = self._settings()
+                    if s.value("Interface/hide_downloads_after_install", False, type=bool):
+                        meta_path = Path(str(archive) + ".meta")
+                        cp = configparser.ConfigParser()
+                        cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
+                        if meta_path.is_file():
+                            try:
+                                cp.read(str(meta_path), encoding="utf-8")
+                            except Exception:
+                                pass
+                        if not cp.has_section("General"):
+                            cp.add_section("General")
+                        cp.set("General", "removed", "true")
+                        try:
+                            with open(meta_path, "w", encoding="utf-8") as f:
+                                cp.write(f)
+                        except OSError:
+                            pass
             else:
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 QMessageBox.warning(
@@ -1201,6 +1275,72 @@ class MainWindow(QMainWindow):
         if installed:
             names = ", ".join(installed)
             self.statusBar().showMessage(tr("status.installed", names=names), 5000)
+
+    def _write_install_meta(self, archive: Path, mod_name: str) -> None:
+        """Write installed=true and installationFile=mod_name to the archive's .meta file."""
+        meta_path = Path(str(archive) + ".meta")
+        cp = configparser.ConfigParser()
+        cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
+        if meta_path.is_file():
+            try:
+                cp.read(str(meta_path), encoding="utf-8")
+            except Exception:
+                pass
+        if not cp.has_section("General"):
+            cp.add_section("General")
+        cp.set("General", "installed", "true")
+        cp.set("General", "installationFile", mod_name)
+        try:
+            with open(meta_path, "w", encoding="utf-8") as f:
+                cp.write(f)
+        except OSError:
+            pass
+
+    def _clear_install_meta(self, mod_name: str) -> None:
+        """Find the .meta file that references mod_name and set installed=false."""
+        if not self._current_instance_path:
+            return
+        downloads_path = self._current_instance_path / ".downloads"
+        if not downloads_path.is_dir():
+            return
+        for meta_file in downloads_path.glob("*.meta"):
+            cp = configparser.ConfigParser()
+            cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
+            try:
+                cp.read(str(meta_file), encoding="utf-8")
+            except Exception:
+                continue
+            if cp.get("General", "installationFile", fallback="") == mod_name:
+                cp.set("General", "installed", "false")
+                try:
+                    with open(meta_file, "w", encoding="utf-8") as f:
+                        cp.write(f)
+                except OSError:
+                    pass
+                break
+
+    def _update_install_meta_name(self, old_name: str, new_name: str) -> None:
+        """Update installationFile in the .meta file when a mod is renamed."""
+        if not self._current_instance_path:
+            return
+        downloads_path = self._current_instance_path / ".downloads"
+        if not downloads_path.is_dir():
+            return
+        for meta_file in downloads_path.glob("*.meta"):
+            cp = configparser.ConfigParser()
+            cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
+            try:
+                cp.read(str(meta_file), encoding="utf-8")
+            except Exception:
+                continue
+            if cp.get("General", "installationFile", fallback="") == old_name:
+                cp.set("General", "installationFile", new_name)
+                try:
+                    with open(meta_file, "w", encoding="utf-8") as f:
+                        cp.write(f)
+                except OSError:
+                    pass
+                break
 
     # ── Other slots ───────────────────────────────────────────────────
 
@@ -1817,6 +1957,16 @@ class MainWindow(QMainWindow):
             active_mods = {e.name for e in self._current_mod_entries if e.enabled}
             write_active_mods(self._current_profile_path, active_mods)
 
+        # 1b. Save collapsed separators to OLD profile before switching
+        s = self._settings()
+        if s.value("ModList/collapse_per_profile", False, type=bool) and self._current_profile_path:
+            collapsed_list = sorted(self._mod_list_view._tree._collapsed_separators)
+            old_ui_state = self._current_profile_path / "ui_state.json"
+            try:
+                old_ui_state.write_text(json.dumps({"collapsed_separators": collapsed_list}))
+            except OSError:
+                pass
+
         # 2. Update profile path
         self._current_profile_path = new_profile_path
 
@@ -1831,6 +1981,24 @@ class MainWindow(QMainWindow):
         # 4. Load active mods from new profile and update checkboxes only
         new_active = read_active_mods(self._current_profile_path)
         self._apply_active_state(new_active)
+
+        # 5. Collapsed separators für neues Profil laden
+        if s.value("ModList/collapse_per_profile", False, type=bool) and self._current_profile_path:
+            ui_state_file = self._current_profile_path / "ui_state.json"
+            if ui_state_file.is_file():
+                try:
+                    ui_state = json.loads(ui_state_file.read_text())
+                    saved_collapsed = ui_state.get("collapsed_separators", [])
+                except (json.JSONDecodeError, OSError):
+                    saved_collapsed = []
+            else:
+                saved_collapsed = []
+            tree = self._mod_list_view._tree
+            if isinstance(saved_collapsed, list) and saved_collapsed:
+                tree._collapsed_separators = set(str(x) for x in saved_collapsed)
+            else:
+                tree._collapsed_separators.clear()
+            tree._apply_separator_filter()
 
     def _apply_active_state(self, active_mods: set[str]) -> None:
         """Update checkbox state for all mods without reloading.
@@ -2307,7 +2475,9 @@ class MainWindow(QMainWindow):
             return
 
         rename_mod_in_modlist(self._current_profile_path, old_name, new_name)
+        self._update_install_meta_name(old_name, new_name)
         self._reload_mod_list()
+        self._game_panel.refresh_downloads()
         self.statusBar().showMessage(tr("status.renamed", old=old_name, new=new_name), 5000)
 
     def _ctx_reinstall_mod(self, row: int) -> None:
@@ -2341,6 +2511,7 @@ class MainWindow(QMainWindow):
             return
 
         self._install_archives([archive])
+        self._game_panel.refresh_downloads()
 
     def _ctx_remove_mods(self, rows: list[int]) -> None:
         """Remove selected mods (folder + modlist.txt entry)."""
@@ -2369,8 +2540,10 @@ class MainWindow(QMainWindow):
             if mod_path.is_dir():
                 shutil.rmtree(mod_path)
             remove_mod_from_modlist(self._current_profile_path, name)
+            self._clear_install_meta(name)
 
         self._reload_mod_list()
+        self._game_panel.refresh_downloads()
         self.statusBar().showMessage(tr("status.removed", names=", ".join(names)), 5000)
 
     def _ctx_open_explorer(self, row: int) -> None:
@@ -2601,6 +2774,28 @@ class MainWindow(QMainWindow):
         # Log state is persisted by CollapsibleSectionBar (log/collapsed)
         s.setValue("view/filter_panel_open", self._filter_panel.is_open())
         s.setValue("view/filter_splitter_state", self._filter_splitter.saveState())
+
+        # Collapsed separators
+        try:
+            collapsed_list = sorted(self._mod_list_view._tree._collapsed_separators)
+        except AttributeError:
+            collapsed_list = []
+        if s.value("ModList/collapse_per_profile", False, type=bool) and self._current_profile_path:
+            ui_state_file = self._current_profile_path / "ui_state.json"
+            ui_state_file.write_text(json.dumps({"collapsed_separators": collapsed_list}))
+        else:
+            s.setValue("ModList/collapsed_separators", collapsed_list)
+
+        # Filter merken
+        if s.value("ModList/remember_filters", False, type=bool):
+            prop_ids = [int(x) for x in self._filter_panel.active_property_ids()]
+            cat_ids = [int(x) for x in self._filter_panel.active_category_ids()]
+            s.setValue("ModList/saved_filter_props", prop_ids)
+            s.setValue("ModList/saved_filter_cats", cat_ids)
+        else:
+            s.remove("ModList/saved_filter_props")
+            s.remove("ModList/saved_filter_cats")
+
         # Icon size → index (0=small, 1=medium, 2=large)
         cur_size = self._toolbar.iconSize()
         size_idx = 1  # default medium
