@@ -49,6 +49,9 @@ class ModEntry:
     is_separator: bool = False             # True for _separator dirs
     is_direct_install: bool = False        # True for framework mods (copy, not symlink)
 
+    # Separator color (from meta.ini, MO2-compatible)
+    color: str = ""                        # Hex color e.g. "#FF0000", empty = no custom color
+
     # Computed from filesystem
     file_count: int = 0
     total_size: int = 0                    # Bytes
@@ -114,6 +117,13 @@ def _build_entry(
                     pass
     primary_cat = cat_ids[0] if cat_ids else 0
 
+    # Read separator color from meta.ini (MO2-compatible: "color" key)
+    sep_color = ""
+    if is_sep:
+        raw_color = meta.get("color", "")
+        if raw_color:
+            sep_color = raw_color
+
     return ModEntry(
         name=name,
         enabled=enabled,
@@ -130,6 +140,7 @@ def _build_entry(
         url=meta.get("url", ""),
         install_date=meta.get("installDate", ""),
         is_separator=is_sep,
+        color=sep_color,
         file_count=file_count,
         total_size=total_size,
     )
@@ -138,6 +149,7 @@ def _build_entry(
 def scan_mods_directory(
     instance_path: Path,
     profile_path: Path,
+    include_external: bool = True,
 ) -> list[ModEntry]:
     """Scan an instance's mods and return a sorted list of ModEntry.
 
@@ -148,7 +160,8 @@ def scan_mods_directory(
     3. Scan ``.mods/`` under *instance_path* for actual mod folders.
     4. For each mod in ``modlist.txt`` that exists on disk: build entry.
     5. For each mod on disk **not** in ``modlist.txt``: append at end
-       (newly installed, enabled by default).
+       (newly installed, enabled by default).  Skipped when
+       *include_external* is ``False``.
     6. Mods in ``modlist.txt`` but **not** on disk are skipped (deleted).
 
     Falls back to legacy per-profile modlist.txt if no global modlist exists.
@@ -158,6 +171,8 @@ def scan_mods_directory(
                        (e.g. ``~/.anvil-organizer/instances/Cyberpunk 2077/``).
         profile_path: Profile folder
                       (e.g. ``instance_path/.profiles/Default/``).
+        include_external: When ``False``, mods on disk but not in
+                          ``modlist.txt`` are excluded from the result.
 
     Returns:
         List of :class:`ModEntry`, ordered by priority
@@ -208,9 +223,11 @@ def scan_mods_directory(
 
     # 4. Append new mods (on disk but not in modlist)
     # New mods default to enabled
-    new_mods = sorted(on_disk - seen)
-    for name in new_mods:
-        result.append(_build_entry(name, True, priority, mods_dir))
-        priority += 1
+    # When include_external=False, skip mods not listed in modlist.txt
+    if include_external:
+        new_mods = sorted(on_disk - seen)
+        for name in new_mods:
+            result.append(_build_entry(name, True, priority, mods_dir))
+            priority += 1
 
     return result

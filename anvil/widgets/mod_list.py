@@ -10,15 +10,114 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QStyledItemDelegate,
     QHeaderView,
+    QScrollBar,
+    QStyleOptionSlider,
 )
-from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect, Signal, QPoint
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect, Signal, QPoint, QTimer, QItemSelection
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.translator import tr
 from anvil.core.persistent_header import PersistentHeader
 from anvil.widgets.collapsible_bar import CollapsibleSectionBar
-from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME
+from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME, ROLE_SEP_COLOR
+
+
+class SeparatorMarkingScrollBar(QScrollBar):
+    """Custom vertical scrollbar that draws colored markers at separator positions.
+
+    When enabled, iterates over the source model to find separator rows,
+    reads their color (ROLE_SEP_COLOR), and paints small rectangles on top
+    of the normal scrollbar at proportional positions.  Respects the QSS
+    theme by only painting markers, not the scrollbar background.
+    """
+
+    _DEFAULT_COLOR = QColor("#4FC3F7")
+
+    def __init__(self, parent=None):
+        super().__init__(Qt.Orientation.Vertical, parent)
+        self._marking_enabled: bool = False
+        self._tree_view = None  # Set by _DropTreeView after init
+
+    def set_tree_view(self, tree_view):
+        """Store a reference to the tree view (needed to access the model)."""
+        self._tree_view = tree_view
+
+    def set_marking_enabled(self, enabled: bool) -> None:
+        """Enable or disable separator color markings on the scrollbar."""
+        self._marking_enabled = enabled
+        self.update()
+
+    def paintEvent(self, event):
+        """Paint the normal scrollbar first, then overlay separator markers."""
+        super().paintEvent(event)
+
+        if not self._marking_enabled or self._tree_view is None:
+            return
+
+        proxy = self._tree_view.model()
+        if proxy is None:
+            return
+
+        # Get source model through proxy
+        source = None
+        if hasattr(proxy, "sourceModel"):
+            source = proxy.sourceModel()
+        if source is None:
+            return
+
+        total_rows = source.rowCount()
+        if total_rows == 0:
+            return
+
+        # Calculate the groove area (where the scrollbar handle moves)
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        style = self.style()
+        groove_rect = style.subControlRect(
+            style.ComplexControl.CC_ScrollBar, opt,
+            style.SubControl.SC_ScrollBarGroove, self,
+        )
+
+        if groove_rect.height() <= 0:
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+
+        marker_height = max(3, groove_rect.height() // max(total_rows, 1))
+        marker_height = min(marker_height, 6)
+
+        for row in range(total_rows):
+            idx = source.index(row, 0)
+            if not source.data(idx, ROLE_IS_SEPARATOR):
+                continue
+
+            # Get separator color
+            color_str = source.data(idx, ROLE_SEP_COLOR) or ""
+            if color_str:
+                color = QColor(color_str)
+                if not color.isValid():
+                    color = self._DEFAULT_COLOR
+            else:
+                color = self._DEFAULT_COLOR
+
+            # Calculate Y position proportional to row position
+            y = groove_rect.y() + int(
+                (row / total_rows) * groove_rect.height()
+            )
+
+            # Draw marker rectangle
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(color))
+            painter.drawRect(
+                groove_rect.x() + 2,
+                y,
+                groove_rect.width() - 4,
+                marker_height,
+            )
+
+        painter.end()
 
 
 class CheckboxDelegate(QStyledItemDelegate):
@@ -245,6 +344,22 @@ class _DropTreeView(QTreeView):
         self._collapsible_asc: bool = True
         self._collapsible_dsc: bool = True
 
+        # Install custom scrollbar for separator markings
+        self._sep_scrollbar = SeparatorMarkingScrollBar(self)
+        self._sep_scrollbar.set_tree_view(self)
+        self.setVerticalScrollBar(self._sep_scrollbar)
+
+        # ── Setting 4: Auto-Collapse bei Drag & Drop ──
+        self._auto_collapse_on_drag: bool = False
+        self._collapse_timer = QTimer(self)
+        self._collapse_timer.setSingleShot(True)
+        self._collapse_timer.setInterval(500)
+        self._collapse_timer.timeout.connect(self._on_collapse_timer)
+        self._collapse_hover_index: QModelIndex = QModelIndex()
+
+        # ── Setting 6: Konflikte VON Trenner ──
+        self._conflicts_from_separator: bool = False
+
     def _apply_separator_filter(self):
         """Recalculate which rows to hide based on collapsed separators."""
         proxy = self.model()
@@ -253,6 +368,9 @@ class _DropTreeView(QTreeView):
         source = proxy.sourceModel()
         if not source:
             return
+
+        # Sync collapsed state to source model for data() queries (Settings 5, 7-10)
+        source._collapsed_separators = set(self._collapsed_separators)
 
         # Guard: Collapsible nur bei Prioritäts-Sortierung (COL_CHECK)
         sort_col = proxy.sortColumn()
@@ -283,6 +401,34 @@ class _DropTreeView(QTreeView):
 
         proxy.set_hidden_rows(hidden)
 
+    # ── Setting 4: Auto-Collapse timer logic ──────────────────────
+
+    def _on_collapse_timer(self) -> None:
+        """Timer fired: collapse the separator we've been hovering over."""
+        if not self._collapse_hover_index.isValid():
+            return
+        proxy = self.model()
+        if not isinstance(proxy, ModListProxyModel):
+            return
+        source = proxy.sourceModel()
+        if not source:
+            return
+        source_idx = proxy.mapToSource(self._collapse_hover_index)
+        if not source_idx.isValid():
+            return
+        folder = source.data(source.index(source_idx.row(), 0), ROLE_FOLDER_NAME) or ""
+        if folder and folder not in self._collapsed_separators:
+            self._collapsed_separators.add(folder)
+            self._apply_separator_filter()
+        self._collapse_hover_index = QModelIndex()
+
+    def _stop_collapse_timer(self) -> None:
+        """Stop the auto-collapse timer and clear the hover index."""
+        self._collapse_timer.stop()
+        self._collapse_hover_index = QModelIndex()
+
+    # ── Drag & Drop events ────────────────────────────────────────
+
     def dragEnterEvent(self, event):
         super().dragEnterEvent(event)
         if event.mimeData().hasUrls():
@@ -298,7 +444,53 @@ class _DropTreeView(QTreeView):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
+        # Setting 4: Auto-Collapse logic
+        if not self._auto_collapse_on_drag:
+            return
+
+        proxy_idx = self.indexAt(event.position().toPoint())
+        if not proxy_idx.isValid():
+            self._stop_collapse_timer()
+            return
+
+        proxy = self.model()
+        if not isinstance(proxy, ModListProxyModel):
+            return
+        source = proxy.sourceModel()
+        if not source:
+            return
+        source_idx = proxy.mapToSource(proxy_idx)
+        if not source_idx.isValid():
+            self._stop_collapse_timer()
+            return
+
+        is_sep = source.data(source.index(source_idx.row(), 0), ROLE_IS_SEPARATOR)
+        if not is_sep:
+            self._stop_collapse_timer()
+            return
+
+        folder = source.data(source.index(source_idx.row(), 0), ROLE_FOLDER_NAME) or ""
+        # Only trigger for expanded (not yet collapsed) separators
+        if folder in self._collapsed_separators:
+            self._stop_collapse_timer()
+            return
+
+        # Check if we're still hovering over the same separator
+        if self._collapse_hover_index.isValid() and self._collapse_hover_index == proxy_idx:
+            # Timer already running for this separator, keep going
+            return
+
+        # New separator: start timer
+        self._stop_collapse_timer()
+        self._collapse_hover_index = proxy_idx
+        self._collapse_timer.start()
+
+    def dragLeaveEvent(self, event):
+        self._stop_collapse_timer()
+        super().dragLeaveEvent(event)
+
     def dropEvent(self, event):
+        self._stop_collapse_timer()
         if event.mimeData().hasUrls():
             paths = []
             for url in event.mimeData().urls():
@@ -312,6 +504,80 @@ class _DropTreeView(QTreeView):
                 return
         # Internal DnD (mod reorder)
         super().dropEvent(event)
+
+    # ── Setting 6: Selection-based conflict highlighting ──────────
+
+    def selectionChanged(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        """Override to handle Setting 6: highlight conflicting mods when a collapsed separator is selected."""
+        super().selectionChanged(selected, deselected)
+
+        if not self._conflicts_from_separator:
+            return
+
+        proxy = self.model()
+        if not isinstance(proxy, ModListProxyModel):
+            return
+        source = proxy.sourceModel()
+        if not source:
+            return
+
+        # Check if exactly one separator is selected
+        sel_model = self.selectionModel()
+        if sel_model is None:
+            return
+        selected_indexes = sel_model.selectedRows()
+        if len(selected_indexes) != 1:
+            source.set_highlighted_rows(set())
+            return
+
+        proxy_idx = selected_indexes[0]
+        source_idx = proxy.mapToSource(proxy_idx)
+        if not source_idx.isValid():
+            source.set_highlighted_rows(set())
+            return
+
+        row = source_idx.row()
+        if row >= len(source._rows):
+            source.set_highlighted_rows(set())
+            return
+
+        r = source._rows[row]
+        if not r.is_separator:
+            source.set_highlighted_rows(set())
+            return
+
+        # Only for collapsed separators
+        if r.folder_name not in self._collapsed_separators:
+            source.set_highlighted_rows(set())
+            return
+
+        # Collect folder_names of mods that conflict with children
+        child_conflict_mods: set[str] = set()
+        children = source._get_separator_children(row)
+        for child_row in children:
+            child = source._rows[child_row]
+            if isinstance(child.conflicts, dict) and child.conflicts.get("type", ""):
+                # Collect mods this child conflicts with (from win_mods_list / lose_mods_list)
+                for mod_name in child.conflicts.get("win_mods_list", []):
+                    child_conflict_mods.add(mod_name)
+                for mod_name in child.conflicts.get("lose_mods_list", []):
+                    child_conflict_mods.add(mod_name)
+
+        if not child_conflict_mods:
+            source.set_highlighted_rows(set())
+            return
+
+        # Find source rows outside this separator that match conflicting mod names
+        children_set = set(children)
+        children_set.add(row)  # Exclude the separator itself
+        highlighted: set[int] = set()
+        for i, mod_row in enumerate(source._rows):
+            if i in children_set:
+                continue
+            if mod_row.folder_name in child_conflict_mods:
+                highlighted.add(i)
+
+        source.set_highlighted_rows(highlighted)
 
 
 class ModListView(QWidget):
@@ -348,6 +614,13 @@ class ModListView(QWidget):
         self._tree.header().setSectionsClickable(True)
         self._tree.header().sortIndicatorChanged.connect(self._proxy_model.sort)
         self._model = self._proxy_model  # Für Kompatibilität
+
+        # Connect model signals to update scrollbar separator markings
+        self._source_model.dataChanged.connect(self._update_scrollbar_markings)
+        self._source_model.layoutChanged.connect(self._update_scrollbar_markings)
+        self._source_model.modelReset.connect(self._update_scrollbar_markings)
+        self._source_model.rowsMoved.connect(self._update_scrollbar_markings)
+
         # Custom delegate for checkbox column
         self._check_delegate = CheckboxDelegate(self._tree)
         self._tree.setItemDelegateForColumn(COL_CHECK, self._check_delegate)
@@ -502,3 +775,13 @@ class ModListView(QWidget):
             source_idx = self._proxy_model.mapToSource(proxy_idx)
             rows.add(source_idx.row())
         return sorted(rows)
+
+    # ── Scrollbar separator markings ─────────────────────────────────
+
+    def set_scrollbar_marking_enabled(self, enabled: bool) -> None:
+        """Enable or disable separator color markings on the scrollbar."""
+        self._tree._sep_scrollbar.set_marking_enabled(enabled)
+
+    def _update_scrollbar_markings(self, *args) -> None:
+        """Trigger a repaint of the scrollbar separator markings."""
+        self._tree._sep_scrollbar.update()

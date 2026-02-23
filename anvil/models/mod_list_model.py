@@ -34,12 +34,14 @@ MIME_MOD_ROWS = "application/x-anvil-mod-rows"
 # Custom roles
 ROLE_IS_SEPARATOR = Qt.ItemDataRole.UserRole + 1
 ROLE_FOLDER_NAME = Qt.ItemDataRole.UserRole + 2
+ROLE_IS_COLLAPSED = Qt.ItemDataRole.UserRole + 3  # Whether separator is collapsed (set by view)
+ROLE_SEP_COLOR = Qt.ItemDataRole.UserRole + 4     # Separator color string (hex, e.g. "#FF0000")
 
 
 class ModRow:
-    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name")
+    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name", "color", "file_count")
 
-    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name=""):
+    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name="", color="", file_count=0):
         self.enabled = enabled
         self.name = name
         self.conflicts = conflicts
@@ -51,6 +53,8 @@ class ModRow:
         self.is_error = is_error
         self.is_separator = is_separator
         self.folder_name = folder_name
+        self.color = color
+        self.file_count = file_count
 
 
 def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None) -> ModRow:
@@ -76,6 +80,8 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None) -> ModR
         is_error=False,
         is_separator=entry.is_separator,
         folder_name=entry.name,
+        color=entry.color,
+        file_count=getattr(entry, "file_count", 0),
     )
 
 
@@ -89,9 +95,97 @@ class ModListModel(QAbstractItemModel):
         self._drop_in_progress = False
         self._category_manager = None  # Set by MainWindow
 
+        # ── Settings flags (set by mainwindow._apply_modlist_settings) ──
+        self._conflicts_on_separator: bool = False    # Setting 5
+        self._symbol_conflicts: bool = False           # Setting 7
+        self._symbol_flags: bool = False               # Setting 8
+        self._symbol_content: bool = False             # Setting 9
+        self._symbol_version: bool = False             # Setting 10
+
+        # ── Highlighting for "Konflikte VON Trenner" (Setting 6) ──
+        self._highlighted_rows: set[int] = set()       # Source row indices to highlight
+        self._highlight_color: QColor = QColor("#3a2a14")  # Warm orange-brown tint
+
+        # ── Collapsed separators reference (set by view) ──
+        self._collapsed_separators: set[str] = set()
+
     def set_category_manager(self, manager) -> None:
         """Set CategoryManager reference for resolving category names."""
         self._category_manager = manager
+
+    def set_highlighted_rows(self, rows: set[int]) -> None:
+        """Set which source rows should be highlighted (Setting 6: conflicts from separator).
+
+        Emits dataChanged for the full range so the view repaints.
+        """
+        old = self._highlighted_rows
+        self._highlighted_rows = rows
+        # Notify view about changed rows (union of old and new)
+        changed = old | rows
+        if changed and self._rows:
+            self.dataChanged.emit(
+                self.index(0, 0),
+                self.index(len(self._rows) - 1, COL_COUNT - 1),
+                [Qt.ItemDataRole.BackgroundRole],
+            )
+
+    def _is_separator_collapsed(self, folder_name: str) -> bool:
+        """Check if a separator is currently collapsed."""
+        return folder_name in self._collapsed_separators
+
+    def _get_separator_children(self, sep_row: int) -> list[int]:
+        """Return list of source row indices that belong to the separator at sep_row.
+
+        Children are all non-separator rows after sep_row until the next separator
+        or end of list.
+        """
+        children = []
+        for i in range(sep_row + 1, len(self._rows)):
+            if self._rows[i].is_separator:
+                break
+            children.append(i)
+        return children
+
+    def _aggregate_separator_conflicts(self, sep_row: int) -> int:
+        """Count total conflicts among children of separator at sep_row."""
+        count = 0
+        for child_row in self._get_separator_children(sep_row):
+            r = self._rows[child_row]
+            if isinstance(r.conflicts, dict) and r.conflicts.get("type", ""):
+                count += 1
+        return count
+
+    def _any_child_has_conflicts(self, sep_row: int) -> bool:
+        """Check if any child of separator has conflicts."""
+        for child_row in self._get_separator_children(sep_row):
+            r = self._rows[child_row]
+            if isinstance(r.conflicts, dict) and r.conflicts.get("type", ""):
+                return True
+        return False
+
+    def _any_child_has_markers(self, sep_row: int) -> bool:
+        """Check if any child of separator has markers/flags."""
+        for child_row in self._get_separator_children(sep_row):
+            r = self._rows[child_row]
+            if r.markers:
+                return True
+        return False
+
+    def _any_child_has_version(self, sep_row: int) -> bool:
+        """Check if any child of separator has a non-empty version."""
+        for child_row in self._get_separator_children(sep_row):
+            r = self._rows[child_row]
+            if r.version:
+                return True
+        return False
+
+    def _any_child_has_content(self, sep_row: int) -> bool:
+        """Check if any child of separator has actual file content."""
+        for child_row in self._get_separator_children(sep_row):
+            r = self._rows[child_row]
+            if r.file_count > 0:
+                return True
+        return False
 
     def clear(self) -> None:
         """Remove all mods from the model."""
@@ -132,6 +226,11 @@ class ModListModel(QAbstractItemModel):
             if c == COL_NAME:
                 return r.name
             if c == COL_CONFLICTS:
+                # Setting 5: Show aggregated conflict count on collapsed separators
+                if r.is_separator and self._conflicts_on_separator and self._is_separator_collapsed(r.folder_name):
+                    count = self._aggregate_separator_conflicts(index.row())
+                    if count > 0:
+                        return str(count)
                 return ""  # Icon only, no text
             if c == COL_MARKERS:
                 return r.markers
@@ -141,9 +240,30 @@ class ModListModel(QAbstractItemModel):
                 return r.version
             if c == COL_PRIORITY:
                 return str(r.priority)
-        if role == Qt.ItemDataRole.DecorationRole and c == COL_CONFLICTS:
-            if isinstance(r.conflicts, dict):
-                return _get_conflict_icon(r.conflicts.get("type", ""))
+        if role == Qt.ItemDataRole.DecorationRole:
+            # Normal mod conflict icons
+            if c == COL_CONFLICTS and not r.is_separator:
+                if isinstance(r.conflicts, dict):
+                    return _get_conflict_icon(r.conflicts.get("type", ""))
+            # Separator symbol icons (only when collapsed)
+            if r.is_separator and self._is_separator_collapsed(r.folder_name):
+                row_idx = index.row()
+                # Setting 5 + 7: Conflict symbol on separator
+                if c == COL_CONFLICTS:
+                    if (self._conflicts_on_separator or self._symbol_conflicts) and self._any_child_has_conflicts(row_idx):
+                        return _get_conflict_icon("both")  # Generic warning icon
+                # Setting 8: Flags/markers symbol on separator
+                if c == COL_MARKERS and self._symbol_flags:
+                    if self._any_child_has_markers(row_idx):
+                        return QIcon.fromTheme("flag")  # System theme fallback
+                # Setting 9: Content symbol on separator (category column as proxy)
+                if c == COL_CATEGORY and self._symbol_content:
+                    if self._any_child_has_content(row_idx):
+                        return QIcon.fromTheme("document-open")
+                # Setting 10: Version symbol on separator
+                if c == COL_VERSION and self._symbol_version:
+                    if self._any_child_has_version(row_idx):
+                        return QIcon.fromTheme("software-update-available")
         if role == Qt.ItemDataRole.SizeHintRole:
             return QSize(0, 28)
         if role == Qt.ItemDataRole.CheckStateRole and c == COL_CHECK:
@@ -162,21 +282,31 @@ class ModListModel(QAbstractItemModel):
                 font.setItalic(True)
                 return font
         if role == Qt.ItemDataRole.ToolTipRole:
-            if c == COL_CONFLICTS and isinstance(r.conflicts, dict):
-                ctype = r.conflicts.get("type", "")
-                wins = r.conflicts.get("wins", 0)
-                losses = r.conflicts.get("losses", 0)
-                win_mods = r.conflicts.get("win_mods", 0)
-                lose_mods = r.conflicts.get("lose_mods", 0)
-                if ctype == "win":
-                    return tr("tooltip.conflict_overwrites", wins=wins, win_mods=win_mods)
-                if ctype == "lose":
-                    return tr("tooltip.conflict_overwritten", losses=losses, lose_mods=lose_mods)
-                if ctype == "both":
-                    return tr("tooltip.conflict_both", wins=wins, losses=losses)
+            if c == COL_CONFLICTS:
+                # Setting 5: Tooltip for separator showing aggregated conflict count
+                if r.is_separator and self._conflicts_on_separator and self._is_separator_collapsed(r.folder_name):
+                    count = self._aggregate_separator_conflicts(index.row())
+                    if count > 0:
+                        return f"{count} Mod(s) with conflicts"
+                # Normal mod conflict tooltip
+                if isinstance(r.conflicts, dict):
+                    ctype = r.conflicts.get("type", "")
+                    wins = r.conflicts.get("wins", 0)
+                    losses = r.conflicts.get("losses", 0)
+                    win_mods = r.conflicts.get("win_mods", 0)
+                    lose_mods = r.conflicts.get("lose_mods", 0)
+                    if ctype == "win":
+                        return tr("tooltip.conflict_overwrites", wins=wins, win_mods=win_mods)
+                    if ctype == "lose":
+                        return tr("tooltip.conflict_overwritten", losses=losses, lose_mods=lose_mods)
+                    if ctype == "both":
+                        return tr("tooltip.conflict_both", wins=wins, losses=losses)
             if r.is_framework and c == COL_NAME:
                 return tr("tooltip.direct_install")
         if role == Qt.ItemDataRole.BackgroundRole:
+            # Setting 6: Highlight mods that conflict with selected separator's children
+            if index.row() in self._highlighted_rows:
+                return QBrush(self._highlight_color)
             if r.is_error:
                 return QBrush(QColor("#3a1414"))
             if r.is_framework:
@@ -185,6 +315,8 @@ class ModListModel(QAbstractItemModel):
             return r.is_separator
         if role == ROLE_FOLDER_NAME:
             return r.folder_name
+        if role == ROLE_SEP_COLOR:
+            return r.color if r.is_separator else ""
         return None
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):

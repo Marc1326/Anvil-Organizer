@@ -236,26 +236,26 @@ class SettingsDialog(QDialog):
         # Tab Mod Liste
         modliste_tab = QWidget()
         ml_layout = QVBoxLayout(modliste_tab)
-        cb_scroll = QCheckBox(tr("settings.show_separator_colors"))
-        cb_scroll.setChecked(True)
-        _disabled(cb_scroll)
-        ml_layout.addWidget(cb_scroll)
-        cb_outer = QCheckBox(tr("settings.show_external_mods"))
-        cb_outer.setChecked(True)
-        _disabled(cb_outer)
-        ml_layout.addWidget(cb_outer)
+        self._cb_separator_colors = QCheckBox(tr("settings.show_separator_colors"))
+        self._cb_separator_colors.setChecked(
+            settings.value("ModList/show_separator_colors", True, type=bool))
+        ml_layout.addWidget(self._cb_separator_colors)
+        self._cb_external_mods = QCheckBox(tr("settings.show_external_mods"))
+        self._cb_external_mods.setChecked(
+            settings.value("ModList/show_external_mods", True, type=bool))
+        ml_layout.addWidget(self._cb_external_mods)
         self._cb_remember_filters = QCheckBox(tr("settings.remember_filters"))
         self._cb_remember_filters.setChecked(
             settings.value("ModList/remember_filters", False, type=bool))
         ml_layout.addWidget(self._cb_remember_filters)
-        cb_upd = QCheckBox(tr("settings.check_updates_after_install"))
-        cb_upd.setChecked(True)
-        _disabled(cb_upd)
-        ml_layout.addWidget(cb_upd)
-        cb_collapse = QCheckBox(tr("settings.auto_collapse_on_drag"))
-        cb_collapse.setChecked(False)
-        _disabled(cb_collapse)
-        ml_layout.addWidget(cb_collapse)
+        self._cb_check_updates_install = QCheckBox(tr("settings.check_updates_after_install"))
+        self._cb_check_updates_install.setChecked(
+            settings.value("ModList/check_updates_after_install", True, type=bool))
+        ml_layout.addWidget(self._cb_check_updates_install)
+        self._cb_auto_collapse_drag = QCheckBox(tr("settings.auto_collapse_on_drag"))
+        self._cb_auto_collapse_drag.setChecked(
+            settings.value("ModList/auto_collapse_on_drag", False, type=bool))
+        ml_layout.addWidget(self._cb_auto_collapse_drag)
         sep_grp = QGroupBox(tr("settings.collapsible_separators"))
         sep_layout = QVBoxLayout(sep_grp)
         sort_row = QHBoxLayout()
@@ -272,23 +272,34 @@ class SettingsDialog(QDialog):
         sep_layout.addLayout(sort_row)
         conflict_row = QHBoxLayout()
         conflict_row.addWidget(QLabel(tr("label.show_conflicts_plugins")))
-        cb_auf = QCheckBox(tr("settings.on_separator"))
-        cb_auf.setChecked(True)
-        _disabled(cb_auf)
-        cb_von = QCheckBox(tr("settings.from_separator"))
-        cb_von.setChecked(True)
-        _disabled(cb_von)
-        conflict_row.addWidget(cb_auf)
-        conflict_row.addWidget(cb_von)
+        self._cb_conflicts_on_sep = QCheckBox(tr("settings.on_separator"))
+        self._cb_conflicts_on_sep.setChecked(
+            settings.value("ModList/conflicts_on_separator", True, type=bool))
+        self._cb_conflicts_from_sep = QCheckBox(tr("settings.from_separator"))
+        self._cb_conflicts_from_sep.setChecked(
+            settings.value("ModList/conflicts_from_separator", True, type=bool))
+        conflict_row.addWidget(self._cb_conflicts_on_sep)
+        conflict_row.addWidget(self._cb_conflicts_from_sep)
         conflict_row.addStretch()
         sep_layout.addLayout(conflict_row)
         symbol_row = QHBoxLayout()
         symbol_row.addWidget(QLabel(tr("label.show_separator_symbols")))
-        for key in ("settings.symbol_conflicts", "settings.symbol_flags", "settings.symbol_content", "settings.symbol_version"):
-            cb = QCheckBox(tr(key))
-            cb.setChecked(True)
-            _disabled(cb)
-            symbol_row.addWidget(cb)
+        self._cb_sym_conflicts = QCheckBox(tr("settings.symbol_conflicts"))
+        self._cb_sym_conflicts.setChecked(
+            settings.value("ModList/symbol_conflicts", True, type=bool))
+        symbol_row.addWidget(self._cb_sym_conflicts)
+        self._cb_sym_flags = QCheckBox(tr("settings.symbol_flags"))
+        self._cb_sym_flags.setChecked(
+            settings.value("ModList/symbol_flags", True, type=bool))
+        symbol_row.addWidget(self._cb_sym_flags)
+        self._cb_sym_content = QCheckBox(tr("settings.symbol_content"))
+        self._cb_sym_content.setChecked(
+            settings.value("ModList/symbol_content", True, type=bool))
+        symbol_row.addWidget(self._cb_sym_content)
+        self._cb_sym_version = QCheckBox(tr("settings.symbol_version"))
+        self._cb_sym_version.setChecked(
+            settings.value("ModList/symbol_version", True, type=bool))
+        symbol_row.addWidget(self._cb_sym_version)
         symbol_row.addStretch()
         sep_layout.addLayout(symbol_row)
         ml_layout.addWidget(sep_grp)
@@ -296,6 +307,10 @@ class SettingsDialog(QDialog):
         self._cb_collapse_per_profile.setChecked(
             settings.value("ModList/collapse_per_profile", False, type=bool))
         ml_layout.addWidget(self._cb_collapse_per_profile)
+        # Signal-Verbindungen fuer Gruppen-Deaktivierung (MO2-Verhalten)
+        self._cb_collapsible_asc.toggled.connect(self._update_separator_group)
+        self._cb_collapsible_dsc.toggled.connect(self._update_separator_group)
+        self._update_separator_group()  # Initialer Zustand
         ml_layout.addStretch()
         self._tabs.addTab(modliste_tab, tr("settings.tab_modlist"))
 
@@ -774,6 +789,22 @@ class SettingsDialog(QDialog):
         path = ensure_user_plugin_dir()
         subprocess.Popen(["xdg-open", str(path)])
 
+    # ── Mod-Liste-Tab helpers ────────────────────────────────────────
+
+    def _update_separator_group(self) -> None:
+        """Enable/disable separator sub-widgets based on Asc/Dsc checkboxes.
+
+        MO2-Verhalten: Wenn weder Asc noch Dsc aktiviert sind, werden die
+        Konflikte- und Symbol-Checkboxen innerhalb der Separator-Gruppe
+        deaktiviert, da sie ohne einklappbare Separatoren keinen Sinn haben.
+        """
+        enabled = (self._cb_collapsible_asc.isChecked()
+                   or self._cb_collapsible_dsc.isChecked())
+        for w in (self._cb_conflicts_on_sep, self._cb_conflicts_from_sep,
+                  self._cb_sym_conflicts, self._cb_sym_flags,
+                  self._cb_sym_content, self._cb_sym_version):
+            w.setEnabled(enabled)
+
     # ── Style-Tab helpers ─────────────────────────────────────────────
 
     @staticmethod
@@ -822,6 +853,17 @@ class SettingsDialog(QDialog):
         settings.setValue("ModList/collapsible_asc", self._cb_collapsible_asc.isChecked())
         settings.setValue("ModList/collapsible_dsc", self._cb_collapsible_dsc.isChecked())
         settings.setValue("ModList/collapse_per_profile", self._cb_collapse_per_profile.isChecked())
+        # Tab Mod Liste — 10 neue Settings
+        settings.setValue("ModList/show_separator_colors", self._cb_separator_colors.isChecked())
+        settings.setValue("ModList/show_external_mods", self._cb_external_mods.isChecked())
+        settings.setValue("ModList/check_updates_after_install", self._cb_check_updates_install.isChecked())
+        settings.setValue("ModList/auto_collapse_on_drag", self._cb_auto_collapse_drag.isChecked())
+        settings.setValue("ModList/conflicts_on_separator", self._cb_conflicts_on_sep.isChecked())
+        settings.setValue("ModList/conflicts_from_separator", self._cb_conflicts_from_sep.isChecked())
+        settings.setValue("ModList/symbol_conflicts", self._cb_sym_conflicts.isChecked())
+        settings.setValue("ModList/symbol_flags", self._cb_sym_flags.isChecked())
+        settings.setValue("ModList/symbol_content", self._cb_sym_content.isChecked())
+        settings.setValue("ModList/symbol_version", self._cb_sym_version.isChecked())
         # Tab-Index merken
         settings.setValue("SettingsDialog/tab_index", self._tabs.currentIndex())
         settings.sync()  # Sicherstellen dass Änderungen geschrieben werden

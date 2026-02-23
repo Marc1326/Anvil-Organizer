@@ -643,6 +643,53 @@ class MainWindow(QMainWindow):
         # Log: CollapsibleSectionBar restores its own state; sync menu check
         self._act_log.setChecked(not self._log_bar.collapsed)
 
+    # ── Mod-Liste Settings (Backend-Logik) ──────────────────────────
+
+    def _apply_modlist_settings(self) -> None:
+        """Read all 10 ModList/ QSettings keys and apply them to Model/View.
+
+        Called after Settings-Dialog OK and after instance load.
+        Settings 1-3 have full backend logic; settings 4-10 set
+        attributes on Model/View for the parallel dev-agent.
+        """
+        s = self._settings()
+        tree = self._mod_list_view._tree
+        model = self._mod_list_view.source_model()
+
+        # Setting 1: Separator colors on scrollbar
+        show_sep_colors = s.value("ModList/show_separator_colors", True, type=bool)
+        self._mod_list_view.set_scrollbar_marking_enabled(show_sep_colors)
+
+        # Setting 2: Show external mods (applied during scan, stored for re-scan)
+        # The actual filtering happens in scan_mods_directory(include_external=...)
+        # which is called from _apply_instance and _reload_mod_list.
+
+        # Setting 3: Check updates after install (flag read in _install_archives)
+        # No runtime attribute needed — read directly from QSettings at install time.
+
+        # Setting 4: Auto-collapse on drag (attribute for drag handler)
+        tree._auto_collapse_on_drag = s.value(
+            "ModList/auto_collapse_on_drag", False, type=bool)
+
+        # Setting 5: Conflicts ON separator (aggregated in collapsed separator row)
+        model._conflicts_on_separator = s.value(
+            "ModList/conflicts_on_separator", True, type=bool)
+
+        # Setting 6: Conflicts FROM separator (highlight external conflicting mods)
+        # Note: This flag is checked in _DropTreeView.selectionChanged(), not in the model
+        tree._conflicts_from_separator = s.value(
+            "ModList/conflicts_from_separator", True, type=bool)
+
+        # Settings 7-10: Symbol icons on collapsed separators
+        model._symbol_conflicts = s.value(
+            "ModList/symbol_conflicts", True, type=bool)
+        model._symbol_flags = s.value(
+            "ModList/symbol_flags", True, type=bool)
+        model._symbol_content = s.value(
+            "ModList/symbol_content", True, type=bool)
+        model._symbol_version = s.value(
+            "ModList/symbol_version", True, type=bool)
+
     def _show_view_recovery_menu(self, global_pos) -> None:
         """Show the view/toolbar recovery context menu at *global_pos*.
 
@@ -872,7 +919,11 @@ class MainWindow(QMainWindow):
 
         self._profile_bar.set_profiles(profile_folders, active=profile_name)
         self._current_profile_path = instance_path / ".profiles" / profile_name
-        self._current_mod_entries = scan_mods_directory(instance_path, self._current_profile_path)
+        include_ext = self._settings().value("ModList/show_external_mods", True, type=bool)
+        self._current_mod_entries = scan_mods_directory(
+            instance_path, self._current_profile_path,
+            include_external=include_ext,
+        )
         # Mark direct-install (framework) mods
         direct_patterns = getattr(plugin, "GameDirectInstallMods", []) if plugin else []
         if direct_patterns:
@@ -944,6 +995,9 @@ class MainWindow(QMainWindow):
         else:
             tree._collapsed_separators.clear()
         tree._apply_separator_filter()
+
+        # Apply all 10 ModList settings (scrollbar markings, flags, etc.)
+        self._apply_modlist_settings()
 
         # Filter-Chips wiederherstellen
         if s.value("ModList/remember_filters", False, type=bool):
@@ -1081,6 +1135,8 @@ class MainWindow(QMainWindow):
                 "losses": losses,
                 "win_mods": len(info["win_mods"]),
                 "lose_mods": len(info["lose_mods"]),
+                "win_mods_list": list(info["win_mods"]),
+                "lose_mods_list": list(info["lose_mods"]),
             }
         return result_data
 
@@ -1271,6 +1327,20 @@ class MainWindow(QMainWindow):
 
         # Reload mod list (reuses _reload_mod_list which handles framework filtering)
         self._reload_mod_list()
+
+        # Setting 3: Update-Check stub after installation
+        if installed and self._settings().value(
+            "ModList/check_updates_after_install", True, type=bool
+        ):
+            for mod_folder_name in installed:
+                # Find the matching ModEntry to check for nexus_id
+                for entry in self._current_mod_entries:
+                    if entry.name == mod_folder_name and entry.nexus_id > 0:
+                        display = entry.display_name or entry.name
+                        msg = f"Update-Check: {display} — Nexus-ID: {entry.nexus_id}"
+                        print(f"DEBUG {msg}", flush=True)
+                        self._log_panel.add_log("info", msg)
+                        break
 
         if installed:
             names = ", ".join(installed)
@@ -2616,8 +2686,10 @@ class MainWindow(QMainWindow):
         if self._bg3_installer is not None:
             self._bg3_reload_mod_list()
             return
+        include_ext = self._settings().value("ModList/show_external_mods", True, type=bool)
         self._current_mod_entries = scan_mods_directory(
             self._current_instance_path, self._current_profile_path,
+            include_external=include_ext,
         )
         # Re-mark direct-install mods
         plugin = self._current_plugin
