@@ -55,7 +55,23 @@ class SettingsDialog(QDialog):
         layout.setSpacing(10)
         layout.setContentsMargins(12, 12, 12, 12)
 
-        tabs = QTabWidget()
+        settings = self._settings()
+        self._tabs = QTabWidget()
+
+        # Load instance data (used by multiple tabs)
+        self._idata = {}
+        self._instance_path = None
+        if self._instance_manager is not None:
+            cur = self._instance_manager.current_instance()
+            if cur:
+                self._idata = self._instance_manager.load_instance(cur)
+                self._instance_path = self._instance_manager.instances_path() / cur
+
+        # Helper: Widget deaktivieren + Tooltip setzen
+        def _disabled(w):
+            w.setEnabled(False)
+            w.setToolTip(tr("settings.coming_soon"))
+            return w
 
         # Tab Allgemein
         allgemein = QWidget()
@@ -77,7 +93,7 @@ class SettingsDialog(QDialog):
             self._lang_combo.addItem(name)
             self._lang_codes.append(code)
         # Gespeicherte Sprache auswählen
-        saved_lang = self._settings().value("General/language", "de")
+        saved_lang = settings.value("General/language", "de")
         self._initial_lang = saved_lang  # Für Auto-Restart bei Änderung
         if saved_lang in self._lang_codes:
             self._lang_combo.setCurrentIndex(self._lang_codes.index(saved_lang))
@@ -91,56 +107,72 @@ class SettingsDialog(QDialog):
         # Gruppe Download Liste
         dl_grp = QGroupBox(tr("settings.download_list"))
         dl_layout = QVBoxLayout(dl_grp)
-        dl_layout.addWidget(QCheckBox(tr("settings.show_meta_info")))
-        dl_layout.addWidget(QCheckBox(tr("settings.compact_list")))
-        dl_layout.addWidget(QCheckBox(tr("settings.hide_downloads_after_install")))
+        dl_layout.addWidget(_disabled(QCheckBox(tr("settings.show_meta_info"))))
+        dl_layout.addWidget(_disabled(QCheckBox(tr("settings.compact_list"))))
+        dl_layout.addWidget(_disabled(QCheckBox(tr("settings.hide_downloads_after_install"))))
+
         scroll_layout.addWidget(dl_grp)
 
         # Gruppe Updates
         up_grp = QGroupBox(tr("settings.updates"))
         up_layout = QVBoxLayout(up_grp)
-        cb_updates = QCheckBox(tr("settings.check_for_updates"))
-        cb_updates.setChecked(True)
-        up_layout.addWidget(cb_updates)
-        cb_beta = QCheckBox(tr("settings.update_to_beta"))
-        cb_beta.setChecked(False)
-        up_layout.addWidget(cb_beta)
+        self._cb_check_updates = QCheckBox(tr("settings.check_for_updates"))
+        self._cb_check_updates.setChecked(
+            settings.value("General/check_for_updates", True, type=bool))
+        up_layout.addWidget(self._cb_check_updates)
+        self._cb_use_prereleases = QCheckBox(tr("settings.update_to_beta"))
+        self._cb_use_prereleases.setChecked(
+            settings.value("General/use_prereleases", False, type=bool))
+        up_layout.addWidget(self._cb_use_prereleases)
         scroll_layout.addWidget(up_grp)
 
         # Gruppe Profil-Standardeinstellungen
         prof_grp = QGroupBox(tr("settings.profile_defaults"))
         prof_layout = QVBoxLayout(prof_grp)
-        for label in (tr("settings.local_inis"), tr("settings.local_saves"), tr("settings.auto_archive_invalidation")):
-            cb = QCheckBox(label)
-            cb.setChecked(True)
-            prof_layout.addWidget(cb)
+        self._cb_local_inis = QCheckBox(tr("settings.local_inis"))
+        self._cb_local_inis.setChecked(
+            str(self._idata.get("local_inis", "true")).lower() in ("true", "1"))
+        prof_layout.addWidget(self._cb_local_inis)
+        self._cb_local_saves = QCheckBox(tr("settings.local_saves"))
+        self._cb_local_saves.setChecked(
+            str(self._idata.get("local_saves", "false")).lower() in ("true", "1"))
+        prof_layout.addWidget(self._cb_local_saves)
+        prof_layout.addWidget(_disabled(QCheckBox(tr("settings.auto_archive_invalidation"))))
         scroll_layout.addWidget(prof_grp)
 
         # Gruppe Sonstiges
         misc_grp = QGroupBox(tr("settings.misc"))
         misc_layout = QVBoxLayout(misc_grp)
-        misc_layout.addWidget(QCheckBox(tr("settings.center_dialogs")))
-        cb_inst = QCheckBox(tr("settings.confirm_instance_change"))
-        cb_inst.setChecked(True)
-        misc_layout.addWidget(cb_inst)
-        cb_alt = QCheckBox(tr("settings.alt_shows_menubar"))
-        cb_alt.setChecked(True)
-        misc_layout.addWidget(cb_alt)
+        self._cb_center_dialogs = QCheckBox(tr("settings.center_dialogs"))
+        self._cb_center_dialogs.setChecked(
+            settings.value("Interface/center_dialogs", False, type=bool))
+        misc_layout.addWidget(self._cb_center_dialogs)
+        self._cb_confirm_instance = QCheckBox(tr("settings.confirm_instance_change"))
+        self._cb_confirm_instance.setChecked(
+            settings.value("Interface/confirm_instance_change", True, type=bool))
+        misc_layout.addWidget(self._cb_confirm_instance)
+        self._cb_alt_menubar = QCheckBox(tr("settings.alt_shows_menubar"))
+        self._cb_alt_menubar.setChecked(
+            settings.value("Interface/show_menubar_on_alt", True, type=bool))
+        misc_layout.addWidget(self._cb_alt_menubar)
         cb_preview = QCheckBox(tr("settings.open_preview_dblclick"))
         cb_preview.setChecked(True)
+        _disabled(cb_preview)
         misc_layout.addWidget(cb_preview)
         scroll_layout.addWidget(misc_grp)
 
         misc_btn_row = QHBoxLayout()
-        misc_btn_row.addWidget(QPushButton(tr("settings.reset_dialog_options")))
-        misc_btn_row.addWidget(QPushButton(tr("settings.edit_categories")))
+        btn_reset_dialogs = QPushButton(tr("settings.reset_dialog_options"))
+        btn_reset_dialogs.clicked.connect(lambda checked=False: self._reset_dialog_options())
+        misc_btn_row.addWidget(btn_reset_dialogs)
+        misc_btn_row.addWidget(_disabled(QPushButton(tr("settings.edit_categories"))))
         misc_btn_row.addStretch()
         scroll_layout.addLayout(misc_btn_row)
 
         scroll_layout.addStretch()
         scroll.setWidget(scroll_content)
         ag_layout.addWidget(scroll)
-        tabs.addTab(allgemein, tr("settings.tab_general"))
+        self._tabs.addTab(allgemein, tr("settings.tab_general"))
 
         # Tab Style
         style_tab = QWidget()
@@ -152,7 +184,6 @@ class SettingsDialog(QDialog):
         themes = list_themes()
         self._stil_combo.addItems(themes)
         # Load saved theme from QSettings
-        settings = self._settings()
         saved = settings.value("style/theme", default_theme())
         idx = self._stil_combo.findText(saved)
         if idx >= 0:
@@ -184,7 +215,7 @@ class SettingsDialog(QDialog):
         ]
         for row, (desc, bg_hex) in enumerate(_rows):
             color_table.setItem(row, 0, QTableWidgetItem(desc))
-            color_table.setCellWidget(row, 1, QPushButton(tr("settings.color_text")))
+            color_table.setCellWidget(row, 1, _disabled(QPushButton(tr("settings.color_text"))))
             color_table.setItem(row, 2, QTableWidgetItem(""))
             bg_item = QTableWidgetItem("")
             bg_item.setBackground(QColor(bg_hex))
@@ -193,28 +224,33 @@ class SettingsDialog(QDialog):
         style_layout.addWidget(farben_grp)
         reset_row = QHBoxLayout()
         reset_row.addStretch()
-        reset_row.addWidget(QPushButton(tr("settings.reset_colors")))
+        reset_row.addWidget(_disabled(QPushButton(tr("settings.reset_colors"))))
         reset_row.addStretch()
         style_layout.addLayout(reset_row)
-        tabs.addTab(style_tab, tr("settings.tab_style"))
+        self._tabs.addTab(style_tab, tr("settings.tab_style"))
 
         # Tab Mod Liste
         modliste_tab = QWidget()
         ml_layout = QVBoxLayout(modliste_tab)
         cb_scroll = QCheckBox(tr("settings.show_separator_colors"))
         cb_scroll.setChecked(True)
+        _disabled(cb_scroll)
         ml_layout.addWidget(cb_scroll)
         cb_outer = QCheckBox(tr("settings.show_external_mods"))
         cb_outer.setChecked(True)
+        _disabled(cb_outer)
         ml_layout.addWidget(cb_outer)
         cb_filter = QCheckBox(tr("settings.remember_filters"))
         cb_filter.setChecked(False)
+        _disabled(cb_filter)
         ml_layout.addWidget(cb_filter)
         cb_upd = QCheckBox(tr("settings.check_updates_after_install"))
         cb_upd.setChecked(True)
+        _disabled(cb_upd)
         ml_layout.addWidget(cb_upd)
         cb_collapse = QCheckBox(tr("settings.auto_collapse_on_drag"))
         cb_collapse.setChecked(False)
+        _disabled(cb_collapse)
         ml_layout.addWidget(cb_collapse)
         sep_grp = QGroupBox(tr("settings.collapsible_separators"))
         sep_layout = QVBoxLayout(sep_grp)
@@ -222,8 +258,10 @@ class SettingsDialog(QDialog):
         sort_row.addWidget(QLabel(tr("label.enable_when_sorted")))
         cb_asc = QCheckBox(tr("settings.ascending_priority"))
         cb_asc.setChecked(True)
+        _disabled(cb_asc)
         cb_desc = QCheckBox(tr("settings.descending_priority"))
         cb_desc.setChecked(True)
+        _disabled(cb_desc)
         sort_row.addWidget(cb_asc)
         sort_row.addWidget(cb_desc)
         sort_row.addStretch()
@@ -232,8 +270,10 @@ class SettingsDialog(QDialog):
         conflict_row.addWidget(QLabel(tr("label.show_conflicts_plugins")))
         cb_auf = QCheckBox(tr("settings.on_separator"))
         cb_auf.setChecked(True)
+        _disabled(cb_auf)
         cb_von = QCheckBox(tr("settings.from_separator"))
         cb_von.setChecked(True)
+        _disabled(cb_von)
         conflict_row.addWidget(cb_auf)
         conflict_row.addWidget(cb_von)
         conflict_row.addStretch()
@@ -243,15 +283,17 @@ class SettingsDialog(QDialog):
         for key in ("settings.symbol_conflicts", "settings.symbol_flags", "settings.symbol_content", "settings.symbol_version"):
             cb = QCheckBox(tr(key))
             cb.setChecked(True)
+            _disabled(cb)
             symbol_row.addWidget(cb)
         symbol_row.addStretch()
         sep_layout.addLayout(symbol_row)
         ml_layout.addWidget(sep_grp)
         cb_profil = QCheckBox(tr("settings.profile_dependent_collapse"))
         cb_profil.setChecked(False)
+        _disabled(cb_profil)
         ml_layout.addWidget(cb_profil)
         ml_layout.addStretch()
-        tabs.addTab(modliste_tab, tr("settings.tab_modlist"))
+        self._tabs.addTab(modliste_tab, tr("settings.tab_modlist"))
 
         # Tab Pfade
         pfade_tab = QWidget()
@@ -298,23 +340,19 @@ class SettingsDialog(QDialog):
         _overwrite = ""
         _game_path = ""
 
-        if self._instance_manager is not None:
-            cur = self._instance_manager.current_instance()
-            if cur:
-                idata = self._instance_manager.load_instance(cur)
-                ipath = self._instance_manager.instances_path() / cur
-                _base_dir = str(ipath)
+        if self._instance_path is not None:
+            ipath = self._instance_path
+            _base_dir = str(ipath)
 
-                # Resolve %INSTANCE_DIR% in stored paths
-                def _resolve(val: str) -> str:
-                    return val.replace("%INSTANCE_DIR%", str(ipath))
+            def _resolve(val: str) -> str:
+                return val.replace("%INSTANCE_DIR%", str(ipath))
 
-                _downloads = _resolve(idata.get("path_downloads_directory", ""))
-                _mods = _resolve(idata.get("path_mods_directory", ""))
-                _profiles = _resolve(idata.get("path_profiles_directory", ""))
-                _overwrite = _resolve(idata.get("path_overwrite_directory", ""))
-                _caches = str(ipath / ".webcache")
-                _game_path = idata.get("game_path", "")
+            _downloads = _resolve(self._idata.get("path_downloads_directory", ""))
+            _mods = _resolve(self._idata.get("path_mods_directory", ""))
+            _profiles = _resolve(self._idata.get("path_profiles_directory", ""))
+            _overwrite = _resolve(self._idata.get("path_overwrite_directory", ""))
+            _caches = str(ipath / ".webcache")
+            _game_path = self._idata.get("game_path", "")
 
         pf_form = QFormLayout()
         add_path_row(pf_form, tr("settings.path_base_dir"), _base_dir, False, readonly=True)
@@ -333,7 +371,7 @@ class SettingsDialog(QDialog):
         pf_content_layout.addWidget(QLabel(tr("label.writable_dirs_hint")))
         pf_scroll.setWidget(pf_content)
         pf_layout.addWidget(pf_scroll)
-        tabs.addTab(pfade_tab, tr("settings.tab_paths"))
+        self._tabs.addTab(pfade_tab, tr("settings.tab_paths"))
 
         # Tab Nexus
         nexus_tab = QWidget()
@@ -382,12 +420,15 @@ class SettingsDialog(QDialog):
         btn_col = QVBoxLayout()
         self._btn_connect = QPushButton(tr("button.connect_nexus"))
         self._btn_connect.clicked.connect(self._nx_connect_sso)
+        _disabled(self._btn_connect)
         btn_col.addWidget(self._btn_connect)
         self._btn_api_key = QPushButton(tr("settings.nexus_enter_api_key"))
         self._btn_api_key.clicked.connect(self._nx_enter_api_key)
+        _disabled(self._btn_api_key)
         btn_col.addWidget(self._btn_api_key)
         self._btn_disconnect = QPushButton(tr("settings.nexus_disconnect"))
         self._btn_disconnect.clicked.connect(self._nx_disconnect)
+        _disabled(self._btn_disconnect)
         btn_col.addWidget(self._btn_disconnect)
         btn_col.addStretch()
         verb_layout.addLayout(btn_col)
@@ -416,13 +457,15 @@ class SettingsDialog(QDialog):
         ):
             cb = QCheckBox(tr(key))
             cb.setChecked(checked)
+            _disabled(cb)
             opt_left.addWidget(cb)
         opt_layout.addLayout(opt_left)
         opt_right = QVBoxLayout()
         btn_link = QPushButton(tr("settings.nexus_link_nxm"))
         btn_link.clicked.connect(self._nx_register_nxm_handler)
+        _disabled(btn_link)
         opt_right.addWidget(btn_link)
-        opt_right.addWidget(QPushButton(tr("settings.nexus_clear_cache")))
+        opt_right.addWidget(_disabled(QPushButton(tr("settings.nexus_clear_cache"))))
         opt_right.addStretch()
         opt_layout.addLayout(opt_right)
         nx_content_layout.addWidget(opt_grp)
@@ -436,6 +479,7 @@ class SettingsDialog(QDialog):
         known_list = QListWidget()
         for city in ("Amsterdam", "Prague", "Chicago", "Los Angeles", "Miami", "Dallas"):
             known_list.addItem(QListWidgetItem(city))
+        _disabled(known_list)
         server_left.addWidget(known_list)
         server_layout.addLayout(server_left)
         pref_lbl = QLabel(tr("label.preferred_servers"))
@@ -443,6 +487,7 @@ class SettingsDialog(QDialog):
         server_right.addWidget(pref_lbl)
         pref_list = QListWidget()
         pref_list.addItem(QListWidgetItem("Nexus CDN (58.45 MB/s)"))
+        _disabled(pref_list)
         server_right.addWidget(pref_list)
         server_layout.addLayout(server_right)
         nx_content_layout.addWidget(server_grp)
@@ -450,7 +495,7 @@ class SettingsDialog(QDialog):
         nx_content_layout.addStretch()
         nx_scroll.setWidget(nx_content)
         nx_layout.addWidget(nx_scroll)
-        tabs.addTab(nexus_tab, tr("settings.tab_nexus"))
+        self._tabs.addTab(nexus_tab, tr("settings.tab_nexus"))
 
         # ── Init Nexus API, SSO, and load saved key ─────────────────
         self._nexus_api = NexusAPI(self)
@@ -530,6 +575,7 @@ class SettingsDialog(QDialog):
         self._pl_detail.addRow(tr("settings.plugins_proton_prefix"), self._pl_prefix)
         self._pl_cb_active = QCheckBox(tr("settings.plugins_enabled"))
         self._pl_cb_active.setChecked(True)
+        _disabled(self._pl_cb_active)
         self._pl_detail.addRow(self._pl_cb_active)
         pl_right.addLayout(self._pl_detail)
 
@@ -551,7 +597,7 @@ class SettingsDialog(QDialog):
         pl_right.addWidget(summary)
 
         pl_layout.addLayout(pl_right, 1)
-        tabs.addTab(plugins_tab, tr("settings.tab_plugins"))
+        self._tabs.addTab(plugins_tab, tr("settings.tab_plugins"))
 
         # Connect selection change + select first plugin
         self._pl_tree.currentItemChanged.connect(self._on_plugin_selected)
@@ -572,44 +618,49 @@ class SettingsDialog(QDialog):
         opt_wa_layout = QVBoxLayout(opt_wa_grp)
         cb_load = QCheckBox(tr("settings.wa_force_load_game_files"))
         cb_load.setChecked(True)
+        _disabled(cb_load)
         opt_wa_layout.addWidget(cb_load)
         cb_arch = QCheckBox(tr("settings.wa_archive_parsing"))
         cb_arch.setChecked(False)
+        _disabled(cb_arch)
         opt_wa_layout.addWidget(cb_arch)
         cb_lock = QCheckBox(tr("settings.wa_lock_gui"))
         cb_lock.setChecked(True)
+        _disabled(cb_lock)
         opt_wa_layout.addWidget(cb_lock)
         wa_content_layout.addWidget(opt_wa_grp)
         steam_grp = QGroupBox("Steam")
         steam_layout = QFormLayout(steam_grp)
-        steam_layout.addRow(tr("settings.wa_steam_appid"), QLineEdit("1091500"))
-        steam_layout.addRow(tr("settings.wa_steam_username"), QLineEdit())
-        steam_layout.addRow(tr("settings.wa_steam_password"), QLineEdit())
+        steam_layout.addRow(tr("settings.wa_steam_appid"), _disabled(QLineEdit("1091500")))
+        steam_layout.addRow(tr("settings.wa_steam_username"), _disabled(QLineEdit()))
+        steam_layout.addRow(tr("settings.wa_steam_password"), _disabled(QLineEdit()))
         wa_content_layout.addWidget(steam_grp)
         net_grp = QGroupBox(tr("settings.wa_network"))
         net_layout = QVBoxLayout(net_grp)
-        net_layout.addWidget(QCheckBox(tr("settings.wa_offline_mode")))
-        net_layout.addWidget(QCheckBox(tr("settings.wa_system_proxy")))
+        net_layout.addWidget(_disabled(QCheckBox(tr("settings.wa_offline_mode"))))
+        net_layout.addWidget(_disabled(QCheckBox(tr("settings.wa_system_proxy"))))
         browser_row = QHBoxLayout()
         cb_browser = QCheckBox(tr("settings.wa_custom_browser"))
         cb_browser.setChecked(False)
+        _disabled(cb_browser)
         browser_row.addWidget(cb_browser)
-        browser_row.addWidget(QLineEdit())
-        browser_row.addWidget(QPushButton("..."))
+        browser_row.addWidget(_disabled(QLineEdit()))
+        browser_row.addWidget(_disabled(QPushButton("...")))
         net_layout.addLayout(browser_row)
         wa_content_layout.addWidget(net_grp)
         btn_row_wa = QHBoxLayout()
-        btn_row_wa.addWidget(QPushButton(tr("settings.wa_reset_geometry")))
-        btn_row_wa.addWidget(QPushButton(tr("settings.wa_backdate_bsa")))
-        btn_row_wa.addWidget(QPushButton(tr("settings.wa_app_blocklist")))
-        btn_row_wa.addWidget(QPushButton(tr("settings.wa_skip_extensions")))
-        btn_row_wa.addWidget(QPushButton(tr("settings.wa_skip_directories")))
+        btn_row_wa.addWidget(_disabled(QPushButton(tr("settings.wa_reset_geometry"))))
+        btn_row_wa.addWidget(_disabled(QPushButton(tr("settings.wa_backdate_bsa"))))
+        btn_row_wa.addWidget(_disabled(QPushButton(tr("settings.wa_app_blocklist"))))
+        btn_row_wa.addWidget(_disabled(QPushButton(tr("settings.wa_skip_extensions"))))
+        btn_row_wa.addWidget(_disabled(QPushButton(tr("settings.wa_skip_directories"))))
+
         wa_content_layout.addLayout(btn_row_wa)
         wa_content_layout.addStretch()
         wa_content_layout.addWidget(QLabel(tr("label.workarounds_hint")))
         wa_scroll.setWidget(wa_content)
         wa_layout.addWidget(wa_scroll)
-        tabs.addTab(workarounds_tab, tr("settings.tab_workarounds"))
+        self._tabs.addTab(workarounds_tab, tr("settings.tab_workarounds"))
 
         # Tab Diagnose
         diagnose_tab = QWidget()
@@ -623,18 +674,22 @@ class SettingsDialog(QDialog):
         logs_layout = QFormLayout(logs_grp)
         log_combo = QComboBox()
         log_combo.addItem(tr("label.log_level_info"))
+        _disabled(log_combo)
         logs_layout.addRow(tr("settings.diag_log_level"), log_combo)
         crash_combo = QComboBox()
         crash_combo.addItem(tr("label.crash_dump_mini"))
+        _disabled(crash_combo)
         logs_layout.addRow(tr("settings.diag_crash_dump"), crash_combo)
         crash_spin = QSpinBox()
         crash_spin.setValue(5)
+        _disabled(crash_spin)
         logs_layout.addRow(tr("settings.diag_max_crash_dumps"), crash_spin)
         diag_content_layout.addWidget(logs_grp)
         loot_grp = QGroupBox(tr("settings.diag_integrated_loot"))
         loot_layout = QFormLayout(loot_grp)
         loot_combo = QComboBox()
         loot_combo.addItem(tr("label.log_level_info"))
+        _disabled(loot_combo)
         loot_layout.addRow(tr("settings.diag_loot_log_level"), loot_combo)
         diag_content_layout.addWidget(loot_grp)
         diag_hint = QLabel(tr("settings.diag_hint"))
@@ -643,9 +698,13 @@ class SettingsDialog(QDialog):
         diag_content_layout.addStretch()
         diag_scroll.setWidget(diag_content)
         diag_layout.addWidget(diag_scroll)
-        tabs.addTab(diagnose_tab, tr("settings.tab_diagnostics"))
+        self._tabs.addTab(diagnose_tab, tr("settings.tab_diagnostics"))
 
-        layout.addWidget(tabs)
+        layout.addWidget(self._tabs)
+
+        # Letzten Tab-Index wiederherstellen (MO2-Pattern)
+        saved_tab = settings.value("SettingsDialog/tab_index", 0, type=int)
+        self._tabs.setCurrentIndex(saved_tab)
 
         # Unten rechts: OK, Abbrechen
         btn_row = QHBoxLayout()
@@ -725,18 +784,35 @@ class SettingsDialog(QDialog):
         if app:
             app.setStyleSheet(qss)
 
+    def _reset_dialog_options(self):
+        """Reset all 'don't show again' dialog choices."""
+        from PySide6.QtWidgets import QMessageBox
+        s = self._settings()
+        s.remove("DialogChoices")
+        QMessageBox.information(
+            self, tr("dialog.settings_title"),
+            tr("settings.dialog_reset_done"))
+
     def _open_styles_folder(self):
         """Open the styles directory in the file manager."""
         subprocess.Popen(["xdg-open", str(get_styles_dir())])
 
     def accept(self):
-        """Save theme, language, and path settings, then close."""
+        """Save all settings, then close."""
         settings = self._settings()
         settings.setValue("style/theme", self._stil_combo.currentText())
         # Sprache speichern
         lang_idx = self._lang_combo.currentIndex()
         new_lang = self._lang_codes[lang_idx] if 0 <= lang_idx < len(self._lang_codes) else self._initial_lang
         settings.setValue("General/language", new_lang)
+        # Tab Allgemein — QSettings
+        settings.setValue("General/check_for_updates", self._cb_check_updates.isChecked())
+        settings.setValue("General/use_prereleases", self._cb_use_prereleases.isChecked())
+        settings.setValue("Interface/center_dialogs", self._cb_center_dialogs.isChecked())
+        settings.setValue("Interface/confirm_instance_change", self._cb_confirm_instance.isChecked())
+        settings.setValue("Interface/show_menubar_on_alt", self._cb_alt_menubar.isChecked())
+        # Tab-Index merken
+        settings.setValue("SettingsDialog/tab_index", self._tabs.currentIndex())
         settings.sync()  # Sicherstellen dass Änderungen geschrieben werden
 
         # Pfade in Instanz-Config speichern
@@ -757,6 +833,8 @@ class SettingsDialog(QDialog):
                 idata["path_profiles_directory"] = _unresolve(self._le_profiles.text())
                 idata["path_overwrite_directory"] = _unresolve(self._le_overwrite.text())
                 idata["game_path"] = self._le_game_path.text()
+                idata["local_inis"] = self._cb_local_inis.isChecked()
+                idata["local_saves"] = self._cb_local_saves.isChecked()
                 self._instance_manager.save_instance(cur, idata)
 
         # Auto-Restart wenn Sprache geändert wurde
@@ -775,6 +853,9 @@ class SettingsDialog(QDialog):
             app = QApplication.instance()
             if app:
                 app.setStyleSheet(qss)
+        # Tab-Index merken auch bei Abbrechen
+        s = self._settings()
+        s.setValue("SettingsDialog/tab_index", self._tabs.currentIndex())
         super().reject()
 
     # ── Nexus-Tab helpers ─────────────────────────────────────────────

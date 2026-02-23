@@ -560,6 +560,7 @@
     "alt_shows_menubar": "Afficher la barre de menu en appuyant sur ALT",
     "open_preview_dblclick": "Ouvrir l'aperçu en double-cliquant",
     "reset_dialog_options": "Réinitialiser les options de dialogue",
+    "dialog_reset_done": "Toutes les options de dialogue ont été réinitialisées.",
     "edit_categories": "Modifier les catégories de mods",
     "tab_general": "Général",
     "style": "Style",
@@ -665,7 +666,8 @@
     "nexus_error": "Erreur : {message}",
     "nxm_handler_title": "Gestionnaire nxm://",
     "nxm_handler_success": "Anvil Organizer a été enregistré comme gestionnaire nxm://.\nLes liens de téléchargement Nexus Mods seront traités par Anvil.",
-    "nxm_handler_failed": "Enregistrement échoué.\nVeuillez configurer manuellement le fichier .desktop."
+    "nxm_handler_failed": "Enregistrement échoué.\nVeuillez configurer manuellement le fichier .desktop.",
+    "coming_soon": "Pas encore disponible"
   },
 
   "mod_detail": {

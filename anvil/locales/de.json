@@ -560,6 +560,7 @@
     "alt_shows_menubar": "Zeigt beim drücken von ALT die Menüleiste",
     "open_preview_dblclick": "Öffnen Sie die Vorschau per Doppelklick",
     "reset_dialog_options": "Dialogoptionen zurücksetzen",
+    "dialog_reset_done": "Alle Dialogoptionen wurden zurückgesetzt.",
     "edit_categories": "Mod Kategorien anpassen",
     "tab_general": "Allgemein",
     "style": "Stil",
@@ -665,7 +666,8 @@
     "nexus_error": "Fehler: {message}",
     "nxm_handler_title": "nxm:// Handler",
     "nxm_handler_success": "Anvil Organizer wurde als nxm:// Handler registriert.\nNexus Mods Download-Links werden jetzt von Anvil verarbeitet.",
-    "nxm_handler_failed": "Registrierung fehlgeschlagen.\nBitte manuell die .desktop-Datei konfigurieren."
+    "nxm_handler_failed": "Registrierung fehlgeschlagen.\nBitte manuell die .desktop-Datei konfigurieren.",
+    "coming_soon": "Noch nicht verfügbar"
   },
 
   "mod_detail": {

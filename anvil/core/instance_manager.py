@@ -301,6 +301,10 @@ class InstanceManager:
             s.setValue("selected_profile", data["selected_profile"])
         if "game_path" in data:
             s.setValue("game_path", data["game_path"])
+        if "local_inis" in data:
+            s.setValue("local_inis", data["local_inis"])
+        if "local_saves" in data:
+            s.setValue("local_saves", data["local_saves"])
         s.endGroup()
 
         s.beginGroup("Paths")
