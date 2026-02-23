@@ -212,6 +212,8 @@
     "not_detected": "não detetado",
     "no_instance_title": "Sem Instância",
     "no_instance_message": "Por favor, selecione primeiro uma instância.",
+    "confirm_instance_change_title": "Mudar Instância",
+    "confirm_instance_change_text": "Deseja mudar para a instância \"{name}\"?",
     "about_text": "Anvil Organizer v{version}"
   },
 
@@ -462,6 +464,8 @@
     "hide_installed": "Ocultar instalados",
     "hide_uninstalled": "Ocultar desinstalados",
     "hide_all": "Ocultar tudo",
+    "unhide": "Mostrar",
+    "unhide_all": "Mostrar tudo",
     "no_game_selected": "Nenhum jogo selecionado",
     "reload": "Recarregar",
     "start": "Iniciar",

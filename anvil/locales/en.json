@@ -212,6 +212,8 @@
     "not_detected": "not detected",
     "no_instance_title": "No Instance",
     "no_instance_message": "Please select an instance first.",
+    "confirm_instance_change_title": "Change Instance",
+    "confirm_instance_change_text": "Do you want to switch to the instance \"{name}\"?",
     "about_text": "Anvil Organizer v{version}"
   },
 
@@ -464,6 +466,8 @@
     "hide_installed": "Hide Installed",
     "hide_uninstalled": "Hide Uninstalled",
     "hide_all": "Hide All",
+    "unhide": "Un-Hide",
+    "unhide_all": "Un-Hide All",
     "no_game_selected": "No game selected",
     "reload": "Reload",
     "start": "Start",

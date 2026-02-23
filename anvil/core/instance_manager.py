@@ -386,9 +386,6 @@ class InstanceManager:
         s.setValue("selected_profile", "Default")
         s.setValue("created", datetime.now(timezone.utc).isoformat())
         s.setValue("portable", portable)
-        s.endGroup()
-
-        s.beginGroup("Profile")
         s.setValue("local_inis", local_inis)
         s.setValue("local_saves", local_saves)
         s.setValue("auto_archive", auto_archive)

@@ -212,6 +212,8 @@
     "not_detected": "non rilevato",
     "no_instance_title": "Nessuna Istanza",
     "no_instance_message": "Seleziona prima un'istanza.",
+    "confirm_instance_change_title": "Cambia Istanza",
+    "confirm_instance_change_text": "Vuoi passare all'istanza \"{name}\"?",
     "about_text": "Anvil Organizer v{version}"
   },
 
@@ -462,6 +464,8 @@
     "hide_installed": "Nascondi installati",
     "hide_uninstalled": "Nascondi disinstallati",
     "hide_all": "Nascondi tutto",
+    "unhide": "Mostra",
+    "unhide_all": "Mostra tutto",
     "no_game_selected": "Nessun gioco selezionato",
     "reload": "Ricarica",
     "start": "Avvia",

@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont, QDesktopServices
-from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl, QMimeData
+from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl, QMimeData, QSettings
 
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.mod_deployer import ModDeployer
@@ -253,9 +253,9 @@ class GamePanel(QWidget):
         self._dl_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._dl_table.customContextMenuRequested.connect(self._on_dl_context_menu)
         dl_layout.addWidget(self._dl_table)
-        cb = QCheckBox(tr("game_panel.hidden_files"))
-        cb.stateChanged.connect(lambda s: _todo("versteckte Dateien")())
-        dl_layout.addWidget(cb)
+        self._cb_hidden = QCheckBox(tr("game_panel.hidden_files"))
+        self._cb_hidden.stateChanged.connect(self._on_toggle_hidden)
+        dl_layout.addWidget(self._cb_hidden)
         fe = QLineEdit()
         fe.setPlaceholderText(tr("placeholder.filter"))
         fe.textChanged.connect(lambda t: _todo("Filter Downloads")())
@@ -275,6 +275,8 @@ class GamePanel(QWidget):
         self._deployer: ModDeployer | None = None
         # Map row index → archive Path for installation
         self._dl_archives: list[Path] = []
+        # Hidden downloads toggle (MO2: showHidden)
+        self._show_hidden: bool = False
 
         # Download manager for active Nexus downloads
         self._download_manager = DownloadManager(self)
@@ -624,12 +626,22 @@ class GamePanel(QWidget):
         import re
         from datetime import datetime
 
-        archives: list[tuple[str, int, float, Path]] = []
+        archives: list[tuple[str, int, float, Path, bool]] = []
         for entry in self._downloads_path.iterdir():
             if entry.is_file() and entry.suffix.lower() in SUPPORTED_EXTENSIONS:
                 try:
                     stat = entry.stat()
-                    archives.append((entry.name, stat.st_size, stat.st_mtime, entry))
+                    # Read "removed" flag from .meta file (MO2 compatible)
+                    is_hidden = False
+                    meta = Path(str(entry) + ".meta")
+                    if meta.is_file():
+                        cp = configparser.ConfigParser()
+                        try:
+                            cp.read(str(meta), encoding="utf-8")
+                            is_hidden = cp.getboolean("General", "removed", fallback=False)
+                        except Exception:
+                            pass
+                    archives.append((entry.name, stat.st_size, stat.st_mtime, entry, is_hidden))
                 except OSError:
                     continue
 
@@ -642,7 +654,7 @@ class GamePanel(QWidget):
 
         self._dl_table.setSortingEnabled(False)
         self._dl_table.setRowCount(len(archives))
-        for row, (name, size, mtime, path) in enumerate(archives):
+        for row, (name, size, mtime, path, is_hidden) in enumerate(archives):
             self._dl_archives.append(path)
 
             # Name — store archive path in UserRole for install after sort
@@ -672,7 +684,34 @@ class GamePanel(QWidget):
             date_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
             self._dl_table.setItem(row, 3, QTableWidgetItem(date_str))
 
+            # Hidden: grey text + hide row if not showing hidden (MO2 style)
+            if is_hidden:
+                grey = QColor("#808080")
+                for col in range(4):
+                    ci = self._dl_table.item(row, col)
+                    if ci:
+                        ci.setForeground(grey)
+                if not self._show_hidden:
+                    self._dl_table.setRowHidden(row, True)
+
         self._dl_table.setSortingEnabled(True)
+
+        # ── Apply QSettings for downloads display ────────────────────
+        s = QSettings(
+            str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf"),
+            QSettings.Format.IniFormat,
+        )
+
+        # Setting: show/hide meta columns (Size + Date)
+        show_meta = s.value("Interface/show_meta_info", False, type=bool)
+        self._dl_table.setColumnHidden(1, not show_meta)   # Size
+        self._dl_table.setColumnHidden(3, not show_meta)   # Date
+
+        # Setting: compact list (smaller row height)
+        if s.value("Interface/compact_list", False, type=bool):
+            self._dl_table.verticalHeader().setDefaultSectionSize(24)
+        else:
+            self._dl_table.verticalHeader().setDefaultSectionSize(46)
 
     def _get_dl_archive_path(self, row: int) -> str | None:
         """Get archive path from the name column's UserRole data."""
@@ -739,6 +778,59 @@ class GamePanel(QWidget):
                     pass
             self.refresh_downloads()
 
+    # ── Hide/Un-Hide (MO2 style) ─────────────────────────────────
+
+    def _on_toggle_hidden(self, state: int) -> None:
+        """Toggle visibility of hidden downloads."""
+        self._show_hidden = bool(state)
+        self.refresh_downloads()
+
+    def _is_row_hidden(self, row: int) -> bool:
+        """Check if a download row is marked as hidden in its .meta file."""
+        path = self._get_dl_archive_path(row)
+        if not path:
+            return False
+        meta = Path(path + ".meta")
+        if not meta.is_file():
+            return False
+        cp = configparser.ConfigParser()
+        try:
+            cp.read(str(meta), encoding="utf-8")
+            return cp.getboolean("General", "removed", fallback=False)
+        except Exception:
+            return False
+
+    def _set_hidden(self, row: int, hidden: bool) -> None:
+        """Write removed=true/false to .meta file and update row visibility."""
+        path = self._get_dl_archive_path(row)
+        if not path:
+            return
+        meta_path = Path(path + ".meta")
+        cp = configparser.ConfigParser()
+        if meta_path.is_file():
+            try:
+                cp.read(str(meta_path), encoding="utf-8")
+            except Exception:
+                pass
+        if not cp.has_section("General"):
+            cp.add_section("General")
+        cp.set("General", "removed", str(hidden).lower())
+        try:
+            with open(meta_path, "w", encoding="utf-8") as f:
+                cp.write(f)
+        except OSError:
+            pass
+
+    def _bulk_hide_by_status(self, filter_status: str | None, hidden: bool) -> None:
+        """Batch hide/unhide downloads filtered by status column."""
+        for row in range(self._dl_table.rowCount()):
+            if filter_status is not None:
+                status_item = self._dl_table.item(row, 2)
+                if not status_item or status_item.text() != filter_status:
+                    continue
+            self._set_hidden(row, hidden)
+        self.refresh_downloads()
+
     def _on_dl_context_menu(self, pos) -> None:
         """Right-click context menu on downloads table (MO2 style)."""
         # Collect all selected archive paths
@@ -776,10 +868,14 @@ class GamePanel(QWidget):
 
         menu.addSeparator()
 
-        # ── Group 4: Delete / Hide ──
+        # ── Group 4: Delete / Hide/Un-Hide ──
         act_delete = menu.addAction(tr("game_panel.delete"))
-        act_hide = menu.addAction(tr("game_panel.hide"))
-        act_hide.setEnabled(False)
+        first_hidden = self._is_row_hidden(selected_rows[0])
+        act_hide = act_unhide = None
+        if first_hidden:
+            act_unhide = menu.addAction(tr("game_panel.unhide"))
+        else:
+            act_hide = menu.addAction(tr("game_panel.hide"))
 
         menu.addSeparator()
 
@@ -790,13 +886,14 @@ class GamePanel(QWidget):
 
         menu.addSeparator()
 
-        # ── Group 6: Bulk hide (placeholder) ──
+        # ── Group 6: Bulk hide/unhide ──
+        act_hide_installed = act_hide_uninstalled = act_hide_all = None
+        act_unhide_all = None
+        if self._show_hidden:
+            act_unhide_all = menu.addAction(tr("game_panel.unhide_all"))
         act_hide_installed = menu.addAction(tr("game_panel.hide_installed"))
-        act_hide_installed.setEnabled(False)
         act_hide_uninstalled = menu.addAction(tr("game_panel.hide_uninstalled"))
-        act_hide_uninstalled.setEnabled(False)
         act_hide_all = menu.addAction(tr("game_panel.hide_all"))
-        act_hide_all.setEnabled(False)
 
         chosen = menu.exec(self._dl_table.viewport().mapToGlobal(pos))
         if chosen is None:
@@ -831,12 +928,28 @@ class GamePanel(QWidget):
                     except OSError:
                         pass
                 self.refresh_downloads()
+        elif chosen == act_hide:
+            for r in selected_rows:
+                self._set_hidden(r, True)
+            self.refresh_downloads()
+        elif chosen == act_unhide:
+            for r in selected_rows:
+                self._set_hidden(r, False)
+            self.refresh_downloads()
         elif chosen == act_del_installed:
             self._bulk_delete_by_status(tr("game_panel.installed"))
         elif chosen == act_del_uninstalled:
             self._bulk_delete_by_status(tr("game_panel.not_installed"))
         elif chosen == act_del_all:
             self._bulk_delete_by_status(None)
+        elif chosen == act_hide_installed:
+            self._bulk_hide_by_status(tr("game_panel.installed"), True)
+        elif chosen == act_hide_uninstalled:
+            self._bulk_hide_by_status(tr("game_panel.not_installed"), True)
+        elif chosen == act_hide_all:
+            self._bulk_hide_by_status(None, True)
+        elif chosen == act_unhide_all:
+            self._bulk_hide_by_status(None, False)
 
     # ── Download manager integration ──────────────────────────────────
 

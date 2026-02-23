@@ -107,9 +107,18 @@ class SettingsDialog(QDialog):
         # Gruppe Download Liste
         dl_grp = QGroupBox(tr("settings.download_list"))
         dl_layout = QVBoxLayout(dl_grp)
-        dl_layout.addWidget(_disabled(QCheckBox(tr("settings.show_meta_info"))))
-        dl_layout.addWidget(_disabled(QCheckBox(tr("settings.compact_list"))))
-        dl_layout.addWidget(_disabled(QCheckBox(tr("settings.hide_downloads_after_install"))))
+        self._cb_show_meta = QCheckBox(tr("settings.show_meta_info"))
+        self._cb_show_meta.setChecked(
+            settings.value("Interface/show_meta_info", False, type=bool))
+        dl_layout.addWidget(self._cb_show_meta)
+        self._cb_compact_list = QCheckBox(tr("settings.compact_list"))
+        self._cb_compact_list.setChecked(
+            settings.value("Interface/compact_list", False, type=bool))
+        dl_layout.addWidget(self._cb_compact_list)
+        self._cb_hide_downloads = QCheckBox(tr("settings.hide_downloads_after_install"))
+        self._cb_hide_downloads.setChecked(
+            settings.value("Interface/hide_downloads_after_install", False, type=bool))
+        dl_layout.addWidget(self._cb_hide_downloads)
 
         scroll_layout.addWidget(dl_grp)
 
@@ -811,6 +820,9 @@ class SettingsDialog(QDialog):
         settings.setValue("Interface/center_dialogs", self._cb_center_dialogs.isChecked())
         settings.setValue("Interface/confirm_instance_change", self._cb_confirm_instance.isChecked())
         settings.setValue("Interface/show_menubar_on_alt", self._cb_alt_menubar.isChecked())
+        settings.setValue("Interface/show_meta_info", self._cb_show_meta.isChecked())
+        settings.setValue("Interface/compact_list", self._cb_compact_list.isChecked())
+        settings.setValue("Interface/hide_downloads_after_install", self._cb_hide_downloads.isChecked())
         # Tab-Index merken
         settings.setValue("SettingsDialog/tab_index", self._tabs.currentIndex())
         settings.sync()  # Sicherstellen dass Änderungen geschrieben werden

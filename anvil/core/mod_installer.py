@@ -260,14 +260,16 @@ class ModInstaller:
         print(f"DEBUG install_framework: install_root={install_root}")
 
         installed_files: list[str] = []
-        for src_file in install_root.rglob("*"):
-            if not src_file.is_file():
-                continue
-            rel = src_file.relative_to(install_root)
+        for src_item in install_root.rglob("*"):
+            rel = src_item.relative_to(install_root)
             dest = target_dir / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_file, dest)
-            installed_files.append(str(dest.relative_to(game_path)))
+            if src_item.is_dir():
+                # Create all directories — including empty ones like lml/
+                dest.mkdir(parents=True, exist_ok=True)
+            elif src_item.is_file():
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_item, dest)
+                installed_files.append(str(dest.relative_to(game_path)))
         print(f"DEBUG install_framework: files={installed_files}")
 
         # Clean up temp dir

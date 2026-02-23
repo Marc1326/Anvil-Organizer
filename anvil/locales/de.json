@@ -212,6 +212,8 @@
     "not_detected": "nicht erkannt",
     "no_instance_title": "Keine Instanz",
     "no_instance_message": "Bitte zuerst eine Instanz auswählen.",
+    "confirm_instance_change_title": "Instanz wechseln",
+    "confirm_instance_change_text": "Möchten Sie zur Instanz \"{name}\" wechseln?",
     "about_text": "Anvil Organizer v{version}"
   },
 
@@ -462,6 +464,8 @@
     "hide_installed": "Verstecke Installierte",
     "hide_uninstalled": "Verstecke Deinstallierte",
     "hide_all": "Verstecke Alle",
+    "unhide": "Einblenden",
+    "unhide_all": "Alle einblenden",
     "no_game_selected": "Kein Spiel ausgewählt",
     "reload": "Neu laden",
     "start": "Starten",

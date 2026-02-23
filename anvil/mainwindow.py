@@ -80,6 +80,24 @@ def _matches_direct_install(name_lower: str, patterns: list[str]) -> bool:
     return False
 
 
+def _center_on_parent(dialog):
+    """Center a QDialog on its parent if Interface/center_dialogs is enabled."""
+    s = QSettings(
+        str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf"),
+        QSettings.Format.IniFormat,
+    )
+    if not s.value("Interface/center_dialogs", False, type=bool):
+        return
+    parent = dialog.parent()
+    if parent is None:
+        return
+    dialog.adjustSize()
+    pg = parent.frameGeometry()
+    x = pg.center().x() - dialog.width() // 2
+    y = pg.center().y() - dialog.height() // 2
+    dialog.move(x, y)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -452,6 +470,7 @@ class MainWindow(QMainWindow):
             self, self.instance_manager, self.plugin_loader,
             self.icon_manager,
         )
+        _center_on_parent(dlg)
         dlg.exec()
         if dlg.switched_to:
             self.switch_instance(dlg.switched_to)
@@ -531,15 +550,30 @@ class MainWindow(QMainWindow):
         self._act_text_only.setChecked(cur_style == Qt.ToolButtonStyle.ToolButtonTextOnly)
         self._act_icons_text.setChecked(cur_style == Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
 
+    def keyPressEvent(self, event):
+        """Toggle menubar visibility on Alt key press."""
+        if event.key() == Qt.Key.Key_Alt and not event.isAutoRepeat():
+            s = self._settings()
+            if s.value("Interface/show_menubar_on_alt", True, type=bool):
+                mb = self.menuBar()
+                mb.setVisible(not mb.isVisible())
+                if hasattr(self, "_act_menubar"):
+                    self._act_menubar.setChecked(mb.isVisible())
+        super().keyPressEvent(event)
+
     def _on_menu_profiles(self) -> None:
         """Werkzeuge → Profile... (Strg+P)."""
         from anvil.widgets.profile_dialog import ProfileDialog
-        ProfileDialog(self).exec()
+        dlg = ProfileDialog(self)
+        _center_on_parent(dlg)
+        dlg.exec()
 
     def _on_menu_executables(self) -> None:
         """Werkzeuge → Executables... (Strg+E)."""
         from anvil.widgets.executables_dialog import ExecutablesDialog
-        ExecutablesDialog(self).exec()
+        dlg = ExecutablesDialog(self)
+        _center_on_parent(dlg)
+        dlg.exec()
 
     def _on_menu_settings(self) -> None:
         """Werkzeuge → Einstellungen... (Strg+S)."""
@@ -549,6 +583,7 @@ class MainWindow(QMainWindow):
             self.plugin_loader,
             self.instance_manager,
         )
+        _center_on_parent(dlg)
         if dlg.exec() == SettingsDialog.DialogCode.Accepted:
             # Reload current instance to apply changed paths
             if self.instance_manager.current_instance():
@@ -642,6 +677,7 @@ class MainWindow(QMainWindow):
                 self, self.instance_manager, self.plugin_loader,
                 self.icon_manager,
             )
+            _center_on_parent(wizard)
             wizard.exec()
             if wizard.created_instance:
                 self.switch_instance(wizard.created_instance)
@@ -691,6 +727,17 @@ class MainWindow(QMainWindow):
         Args:
             instance_name: Name of the instance to switch to.
         """
+        s = self._settings()
+        if s.value("Interface/confirm_instance_change", True, type=bool):
+            reply = QMessageBox.question(
+                self,
+                tr("dialog.confirm_instance_change_title"),
+                tr("dialog.confirm_instance_change_text", name=instance_name),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
         self.instance_manager.set_current_instance(instance_name)
         self._apply_instance(instance_name)
 
@@ -1100,6 +1147,7 @@ class MainWindow(QMainWindow):
             if dest.exists():
                 while True:
                     dlg = QuickInstallDialog(variants, mod_name, self)
+                    _center_on_parent(dlg)
                     if dlg.exec() != QDialog.DialogCode.Accepted:
                         mod_name = None
                         break
@@ -1111,6 +1159,7 @@ class MainWindow(QMainWindow):
                         break  # neuer Name, kein Konflikt mehr
                     # Immer noch Duplikat → QueryOverwriteDialog
                     ovr = QueryOverwriteDialog(mod_name, self)
+                    _center_on_parent(ovr)
                     if ovr.exec() != QDialog.DialogCode.Accepted:
                         mod_name = None
                         break
@@ -1172,12 +1221,14 @@ class MainWindow(QMainWindow):
                 (e for e in self._current_mod_entries if e.name == mod_name),
                 None
             )
-            ModDetailDialog(
+            dlg = ModDetailDialog(
                 self, mod_name=mod_name, mod_path=mod_path,
                 all_mods=all_mods, game_plugin=self._current_plugin,
                 category_manager=self._category_manager,
                 mod_entry=mod_entry,
-            ).exec()
+            )
+            _center_on_parent(dlg)
+            dlg.exec()
 
     # ── Mod list context menu ──────────────────────────────────────
 
@@ -1672,6 +1723,7 @@ class MainWindow(QMainWindow):
 
         # Show card-based dialog
         dialog = BackupDialog(self, backups)
+        _center_on_parent(dialog)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -2380,6 +2432,7 @@ class MainWindow(QMainWindow):
         # Größe NACH Layout setzen — Wayland braucht das vor exec()
         dlg.setMinimumSize(750, 600)
         dlg.resize(750, 600)
+        _center_on_parent(dlg)
         dlg.exec()
 
     def _reload_mod_list(self) -> None:
