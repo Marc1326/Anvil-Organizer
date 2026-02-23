@@ -546,7 +546,9 @@
 
   "settings": {
     "language": "Lingua",
-    "language_restart_hint": "Il cambio di lingua richiede il riavvio dell'applicazione.",
+    "language_restart_hint": "Lingua cambiata — alcuni testi verranno aggiornati dopo il riavvio.",
+    "language_changed_title": "Lingua cambiata",
+    "language_changed_message": "Anvil deve essere riavviato per cambiare la lingua.\nRiavviare ora?",
     "download_list": "Lista download",
     "show_meta_info": "Mostra meta informazioni",
     "compact_list": "Lista compatta",

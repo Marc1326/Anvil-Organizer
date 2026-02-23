@@ -363,6 +363,31 @@ QLabel {
   font-size: 15px;
   font-family: monospace; }
 
+/* ── QMessageBox ───────────────────────────────────────── */
+
+QMessageBox {
+  background: #242424; }
+
+QMessageBox QLabel {
+  color: #D3D3D3;
+  font-size: 13px;
+  background: transparent; }
+
+QMessageBox QPushButton {
+  background: #141414;
+  color: #D3D3D3;
+  border: 2px solid #3D3D3D;
+  border-radius: 6px;
+  padding: 6px 20px;
+  font-size: 13px;
+  min-width: 80px; }
+  QMessageBox QPushButton:hover {
+    background: #3D3D3D; }
+  QMessageBox QPushButton:default {
+    border-color: #006868;
+    background: #006868;
+    color: #FFF; }
+
 /* ── FilterPanel ──────────────────────────────────────── */
 
 #filterPanel {

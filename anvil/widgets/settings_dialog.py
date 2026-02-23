@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -33,7 +32,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
 )
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtCore import Qt, QSettings, QProcess
+from PySide6.QtCore import Qt, QSettings
 
 from anvil.plugins.plugin_loader import PluginLoader, ensure_user_plugin_dir
 from anvil.styles.dark_theme import list_themes, load_theme, get_styles_dir, default_theme
@@ -129,10 +128,6 @@ class SettingsDialog(QDialog):
         self._cb_check_updates.setChecked(
             settings.value("General/check_for_updates", True, type=bool))
         up_layout.addWidget(self._cb_check_updates)
-        self._cb_use_prereleases = QCheckBox(tr("settings.update_to_beta"))
-        self._cb_use_prereleases.setChecked(
-            settings.value("General/use_prereleases", False, type=bool))
-        up_layout.addWidget(self._cb_use_prereleases)
         scroll_layout.addWidget(up_grp)
 
         # Gruppe Profil-Standardeinstellungen
@@ -816,7 +811,6 @@ class SettingsDialog(QDialog):
         settings.setValue("General/language", new_lang)
         # Tab Allgemein — QSettings
         settings.setValue("General/check_for_updates", self._cb_check_updates.isChecked())
-        settings.setValue("General/use_prereleases", self._cb_use_prereleases.isChecked())
         settings.setValue("Interface/center_dialogs", self._cb_center_dialogs.isChecked())
         settings.setValue("Interface/confirm_instance_change", self._cb_confirm_instance.isChecked())
         settings.setValue("Interface/show_menubar_on_alt", self._cb_alt_menubar.isChecked())
@@ -849,14 +843,28 @@ class SettingsDialog(QDialog):
                 idata["local_saves"] = self._cb_local_saves.isChecked()
                 self._instance_manager.save_instance(cur, idata)
 
-        # Auto-Restart wenn Sprache geändert wurde
-        if new_lang != self._initial_lang:
-            super().accept()
-            success, pid = QProcess.startDetached(sys.executable, sys.argv)
-            QApplication.quit()
-            return
-
         super().accept()
+
+        # Sprachwechsel: Bestätigung + Neustart
+        if new_lang != self._initial_lang:
+            Translator.instance().load(new_lang)
+            from PySide6.QtWidgets import QMessageBox
+            main_win = None
+            for w in QApplication.topLevelWidgets():
+                if hasattr(w, 'statusBar'):
+                    main_win = w
+                    break
+            msg = QMessageBox(main_win)
+            msg.setWindowTitle(tr("settings.language_changed_title"))
+            msg.setText(tr("settings.language_changed_message"))
+            msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            msg.setDefaultButton(QMessageBox.StandardButton.Yes)
+            if msg.exec() == QMessageBox.StandardButton.Yes:
+                import sys
+                from PySide6.QtCore import QProcess
+                QProcess.startDetached(sys.executable, sys.argv)
+                QApplication.quit()
+                return
 
     def reject(self):
         """Revert theme to previous selection and close."""

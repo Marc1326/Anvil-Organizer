@@ -284,6 +284,30 @@ LinkLabel {
 #displayCategoriesBtn {
   min-width: 12px; }
 
+/* ── QMessageBox ───────────────────────────────────────── */
+
+QMessageBox {
+  background: #191919; }
+
+QMessageBox QLabel {
+  color: #DEDEDE;
+  font-size: 12px;
+  background: transparent; }
+
+QMessageBox QPushButton {
+  background: #2B2B2B;
+  color: #FFF;
+  border: 1px solid #535353;
+  padding: 6px 20px;
+  font-size: 12px;
+  min-width: 80px; }
+  QMessageBox QPushButton:hover {
+    background: #4D4D4D; }
+  QMessageBox QPushButton:default {
+    border-color: #0078D7;
+    background: #0078D7;
+    color: #FFF; }
+
 /* ── FilterPanel ──────────────────────────────────────── */
 
 #filterPanel {

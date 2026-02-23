@@ -546,7 +546,9 @@
 
   "settings": {
     "language": "Sprache",
-    "language_restart_hint": "Änderung erfordert Neustart der Anwendung.",
+    "language_restart_hint": "Sprache geändert — einige Texte werden erst nach Neustart aktualisiert.",
+    "language_changed_title": "Sprache geändert",
+    "language_changed_message": "Anvil muss neu gestartet werden um die Sprache zu wechseln.\nJetzt neu starten?",
     "download_list": "Download Liste",
     "show_meta_info": "Zeige Meta Informationen",
     "compact_list": "Kompakte Liste",
