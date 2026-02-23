@@ -626,22 +626,27 @@ class GamePanel(QWidget):
         import re
         from datetime import datetime
 
-        archives: list[tuple[str, int, float, Path, bool]] = []
+        archives: list[tuple[str, int, float, Path, bool, bool, str]] = []
         for entry in self._downloads_path.iterdir():
             if entry.is_file() and entry.suffix.lower() in SUPPORTED_EXTENSIONS:
                 try:
                     stat = entry.stat()
-                    # Read "removed" flag from .meta file (MO2 compatible)
+                    # Read status flags from .meta file (MO2 compatible)
                     is_hidden = False
+                    meta_installed = False
+                    meta_install_file = ""
                     meta = Path(str(entry) + ".meta")
                     if meta.is_file():
                         cp = configparser.ConfigParser()
+                        cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
                         try:
                             cp.read(str(meta), encoding="utf-8")
                             is_hidden = cp.getboolean("General", "removed", fallback=False)
+                            meta_installed = cp.getboolean("General", "installed", fallback=False)
+                            meta_install_file = cp.get("General", "installationFile", fallback="")
                         except Exception:
                             pass
-                    archives.append((entry.name, stat.st_size, stat.st_mtime, entry, is_hidden))
+                    archives.append((entry.name, stat.st_size, stat.st_mtime, entry, is_hidden, meta_installed, meta_install_file))
                 except OSError:
                     continue
 
@@ -652,9 +657,14 @@ class GamePanel(QWidget):
         if self._mods_path and self._mods_path.is_dir():
             installed_names = {d.name.lower() for d in self._mods_path.iterdir() if d.is_dir()}
 
+        s = QSettings(
+            str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf"),
+            QSettings.Format.IniFormat,
+        )
+
         self._dl_table.setSortingEnabled(False)
         self._dl_table.setRowCount(len(archives))
-        for row, (name, size, mtime, path, is_hidden) in enumerate(archives):
+        for row, (name, size, mtime, path, is_hidden, meta_installed, meta_install_file) in enumerate(archives):
             self._dl_archives.append(path)
 
             # Name — store archive path in UserRole for install after sort
@@ -669,16 +679,32 @@ class GamePanel(QWidget):
             item_size.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self._dl_table.setItem(row, 1, item_size)
 
-            # Status — check if a mod folder derived from this archive name exists
-            stem = path.stem
-            # Strip Nexus suffixes like "-12128-1-0-1704653004"
-            clean = re.sub(r"-\d+(-\d+)*$", "", stem).strip()
-            is_installed = clean.lower() in installed_names or stem.lower() in installed_names
+            # MO2-Muster: Meta ist die Wahrheit
+            if meta_installed:
+                is_installed = True
+            elif meta_install_file:
+                # installationFile vorhanden aber installed=false → prüfe ob Ordner existiert
+                is_installed = meta_install_file.lower() in installed_names
+            else:
+                # Kein Meta-Status → Fallback: verbesserte Namens-Heuristik
+                stem = path.stem
+                clean = re.sub(r"-\d+(-\d+)*$", "", stem).strip()
+                clean = clean.replace("_", " ")
+                clean = clean.strip(". ")
+                clean = re.sub(r"\s*\(\d+\)$", "", clean)
+                clean = re.sub(r"\.zip$", "", clean, flags=re.I)
+                is_installed = clean.lower() in installed_names or stem.lower() in installed_names
             status_text = tr("game_panel.installed") if is_installed else tr("game_panel.not_installed")
             item_status = QTableWidgetItem(status_text)
             if is_installed:
                 item_status.setForeground(QColor("#4CAF50"))
             self._dl_table.setItem(row, 2, item_status)
+
+            # Auto-hide installed downloads if setting is active
+            if is_installed and not is_hidden:
+                hide_after = s.value("Interface/hide_downloads_after_install", False, type=bool)
+                if hide_after and not self._show_hidden:
+                    self._dl_table.setRowHidden(row, True)
 
             # Date
             date_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
@@ -695,12 +721,6 @@ class GamePanel(QWidget):
                     self._dl_table.setRowHidden(row, True)
 
         self._dl_table.setSortingEnabled(True)
-
-        # ── Apply QSettings for downloads display ────────────────────
-        s = QSettings(
-            str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf"),
-            QSettings.Format.IniFormat,
-        )
 
         # Setting: show/hide meta columns (Size + Date)
         show_meta = s.value("Interface/show_meta_info", False, type=bool)
@@ -776,6 +796,12 @@ class GamePanel(QWidget):
                     os.remove(p)
                 except OSError:
                     pass
+                # Also remove .meta file
+                meta = p + ".meta"
+                try:
+                    os.remove(meta)
+                except OSError:
+                    pass
             self.refresh_downloads()
 
     # ── Hide/Un-Hide (MO2 style) ─────────────────────────────────
@@ -807,6 +833,7 @@ class GamePanel(QWidget):
             return
         meta_path = Path(path + ".meta")
         cp = configparser.ConfigParser()
+        cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
         if meta_path.is_file():
             try:
                 cp.read(str(meta_path), encoding="utf-8")
@@ -925,6 +952,12 @@ class GamePanel(QWidget):
                 for p in paths:
                     try:
                         os.remove(p)
+                    except OSError:
+                        pass
+                    # Also remove .meta file
+                    meta = p + ".meta"
+                    try:
+                        os.remove(meta)
                     except OSError:
                         pass
                 self.refresh_downloads()
