@@ -256,9 +256,9 @@ class GamePanel(QWidget):
         self._cb_hidden = QCheckBox(tr("game_panel.hidden_files"))
         self._cb_hidden.stateChanged.connect(self._on_toggle_hidden)
         dl_layout.addWidget(self._cb_hidden)
-        fe = QLineEdit()
+        self._dl_filter_edit = fe = QLineEdit()
         fe.setPlaceholderText(tr("placeholder.filter"))
-        fe.textChanged.connect(lambda t: _todo("Filter Downloads")())
+        fe.textChanged.connect(self._on_dl_filter_changed)
         dl_layout.addWidget(fe)
         tabs.addTab(downloads, tr("game_panel.downloads_tab"))
 
@@ -720,6 +720,9 @@ class GamePanel(QWidget):
                 if not self._show_hidden:
                     self._dl_table.setRowHidden(row, True)
 
+            # Base-Hidden-Flag für Text-Filter-Interop
+            item_name.setData(Qt.ItemDataRole.UserRole + 1, self._dl_table.isRowHidden(row))
+
         self._dl_table.setSortingEnabled(True)
 
         # Setting: show/hide meta columns (Size + Date)
@@ -732,6 +735,9 @@ class GamePanel(QWidget):
             self._dl_table.verticalHeader().setDefaultSectionSize(24)
         else:
             self._dl_table.verticalHeader().setDefaultSectionSize(46)
+
+        # Text-Filter erneut anwenden nach Tabellen-Rebuild
+        self._on_dl_filter_changed(self._dl_filter_edit.text())
 
     def _get_dl_archive_path(self, row: int) -> str | None:
         """Get archive path from the name column's UserRole data."""
@@ -805,6 +811,19 @@ class GamePanel(QWidget):
             self.refresh_downloads()
 
     # ── Hide/Un-Hide (MO2 style) ─────────────────────────────────
+
+    def _on_dl_filter_changed(self, text: str) -> None:
+        """Filter downloads table rows by name (case-insensitive substring match)."""
+        needle = text.strip().lower()
+        for row in range(self._dl_table.rowCount()):
+            item = self._dl_table.item(row, 0)
+            if item is None:
+                continue
+            # Zeile durch Hidden-Logik versteckt → nicht anfassen
+            if item.data(Qt.ItemDataRole.UserRole + 1):
+                continue
+            name = item.text().lower()
+            self._dl_table.setRowHidden(row, needle != "" and needle not in name)
 
     def _on_toggle_hidden(self, state: int) -> None:
         """Toggle visibility of hidden downloads."""
