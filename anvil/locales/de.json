@@ -89,7 +89,10 @@
     "rename": "Umbenennen",
     "delete": "Löschen",
     "delete_nexus": "Nexus löschen",
-    "delete_profile": "Profil löschen"
+    "delete_profile": "Profil löschen",
+
+    "select_color": "Farbe ändern...",
+    "reset_color": "Farbe entfernen"
   },
 
   "toolbar": {

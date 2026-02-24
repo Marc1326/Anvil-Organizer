@@ -89,7 +89,10 @@
     "rename": "Renomear",
     "delete": "Eliminar",
     "delete_nexus": "Eliminar Nexus",
-    "delete_profile": "Eliminar perfil"
+    "delete_profile": "Eliminar perfil",
+
+    "select_color": "Alterar cor...",
+    "reset_color": "Remover cor"
   },
 
   "toolbar": {

@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QDialog,
     QMenu,
-    QInputDialog,
     QTextEdit,
     QDialogButtonBox,
     QLineEdit,
@@ -27,6 +26,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSettings, QTimer, QUrl, QSize
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
 
+from anvil.core.ui_helpers import _center_on_parent, get_text_input
 from anvil.styles.dark_theme import load_theme, default_theme
 from anvil.widgets.toolbar import create_toolbar
 from anvil.widgets.profile_bar import ProfileBar
@@ -55,7 +55,7 @@ from anvil.core.update_checker import UpdateChecker
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nxm_handler import parse_nxm_url, check_cli_for_nxm
 from anvil.core.conflict_scanner import ConflictScanner
-from anvil.models.mod_list_model import mod_entry_to_row
+from anvil.models.mod_list_model import mod_entry_to_row, COL_COUNT
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 from anvil.widgets.category_dialog import CategoryDialog
 from anvil.widgets.log_panel import LogPanel
@@ -79,24 +79,6 @@ def _matches_direct_install(name_lower: str, patterns: list[str]) -> bool:
         if not rest or not rest[0].isalpha():
             return True
     return False
-
-
-def _center_on_parent(dialog):
-    """Center a QDialog on its parent if Interface/center_dialogs is enabled."""
-    s = QSettings(
-        str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf"),
-        QSettings.Format.IniFormat,
-    )
-    if not s.value("Interface/center_dialogs", False, type=bool):
-        return
-    parent = dialog.parent()
-    if parent is None:
-        return
-    dialog.adjustSize()
-    pg = parent.frameGeometry()
-    x = pg.center().x() - dialog.width() // 2
-    y = pg.center().y() - dialog.height() // 2
-    dialog.move(x, y)
 
 
 def _ensure_list(val) -> list:
@@ -165,6 +147,10 @@ class MainWindow(QMainWindow):
         self._profile_bar.open_ao_logs_requested.connect(self._open_ao_logs_folder)
         self._profile_bar.backup_requested.connect(self._create_backup)
         self._profile_bar.restore_requested.connect(self._restore_backup)
+        self._profile_bar.install_mod_requested.connect(self._on_install_mod)
+        self._profile_bar.create_separator_requested.connect(self._ctx_create_separator)
+        self._profile_bar.enable_all_requested.connect(lambda: self._ctx_enable_all(True))
+        self._profile_bar.disable_all_requested.connect(lambda: self._ctx_enable_all(False))
         self._profile_bar.profile_create_confirmed.connect(self._on_profile_created)
         self._profile_bar.profile_renamed.connect(self._on_profile_renamed)
         self._profile_bar.profile_changed.connect(self._on_profile_changed)
@@ -1678,6 +1664,18 @@ class MainWindow(QMainWindow):
         act_info = menu.addAction(tr("context.information"))
         act_info.setEnabled(single)
 
+        # ── Separator-Farbe ──────────────────────────────────────
+        act_select_color = None
+        act_reset_color = None
+        _sep_entry = None
+        if single and selected_rows[0] < len(self._current_mod_entries):
+            _sep_entry = self._current_mod_entries[selected_rows[0]]
+            if _sep_entry.is_separator:
+                menu.addSeparator()
+                act_select_color = menu.addAction(tr("context.select_color"))
+                if _sep_entry.color:
+                    act_reset_color = menu.addAction(tr("context.reset_color"))
+
         # ── Execute ───────────────────────────────────────────────
         chosen = menu.exec(global_pos)
 
@@ -1728,12 +1726,16 @@ class MainWindow(QMainWindow):
             self._ctx_open_explorer(selected_rows[0])
         elif chosen == act_info:
             self._ctx_show_info(selected_rows[0])
+        elif chosen is not None and chosen == act_select_color and act_select_color:
+            self._ctx_select_separator_color(selected_rows[0])
+        elif chosen is not None and chosen == act_reset_color and act_reset_color:
+            self._ctx_reset_separator_color(selected_rows[0])
 
     # ── Context menu actions ───────────────────────────────────────
 
     def _ctx_create_separator(self) -> None:
         """Create a new separator in the mod list."""
-        name, ok = QInputDialog.getText(
+        name, ok = get_text_input(
             self, tr("dialog.create_separator_title"), tr("dialog.create_separator_prompt"),
         )
         if not ok or not name.strip():
@@ -1762,6 +1764,75 @@ class MainWindow(QMainWindow):
         add_mod_to_modlist(self._current_profile_path, folder_name, True)
         self._reload_mod_list()
         self.statusBar().showMessage(tr("status.separator_created", name=name), 5000)
+
+    def _ctx_select_separator_color(self, source_row: int) -> None:
+        """Open QColorDialog for separator and save chosen color."""
+        if source_row >= len(self._current_mod_entries):
+            return
+        entry = self._current_mod_entries[source_row]
+        if not entry.is_separator:
+            return
+
+        from PySide6.QtWidgets import QColorDialog
+        from PySide6.QtGui import QColor
+
+        initial = QColor(entry.color) if entry.color else QColor(Qt.GlobalColor.white)
+        if not initial.isValid():
+            initial = QColor(Qt.GlobalColor.white)
+
+        color = QColorDialog.getColor(initial, self, tr("context.select_color"))
+        if not color.isValid():
+            return  # User cancelled
+
+        hex_color = color.name()  # e.g. "#ff0000"
+
+        # Persist to meta.ini
+        from anvil.core.mod_metadata import write_meta_ini
+        write_meta_ini(entry.install_path, {"color": hex_color})
+
+        # Update in-memory data
+        entry.color = hex_color
+
+        # Update ModRow in model
+        model = self._mod_list_view.source_model()
+        rows = model._rows
+        if source_row < len(rows):
+            rows[source_row].color = hex_color
+            model.dataChanged.emit(
+                model.index(source_row, 0),
+                model.index(source_row, COL_COUNT - 1),
+                [Qt.ItemDataRole.BackgroundRole],
+            )
+        # Repaint scrollbar
+        self._mod_list_view._tree.verticalScrollBar().update()
+
+    def _ctx_reset_separator_color(self, source_row: int) -> None:
+        """Remove custom color from separator."""
+        if source_row >= len(self._current_mod_entries):
+            return
+        entry = self._current_mod_entries[source_row]
+        if not entry.is_separator:
+            return
+
+        # Persist empty color to meta.ini
+        from anvil.core.mod_metadata import write_meta_ini
+        write_meta_ini(entry.install_path, {"color": ""})
+
+        # Update in-memory data
+        entry.color = ""
+
+        # Update ModRow in model
+        model = self._mod_list_view.source_model()
+        rows = model._rows
+        if source_row < len(rows):
+            rows[source_row].color = ""
+            model.dataChanged.emit(
+                model.index(source_row, 0),
+                model.index(source_row, COL_COUNT - 1),
+                [Qt.ItemDataRole.BackgroundRole],
+            )
+        # Repaint scrollbar
+        self._mod_list_view._tree.verticalScrollBar().update()
 
     def _open_mods_folder(self) -> None:
         """Open the mods folder in file manager."""
@@ -2217,7 +2288,7 @@ class MainWindow(QMainWindow):
         """Create a new empty mod folder."""
         from anvil.core.mod_metadata import create_default_meta_ini
 
-        name, ok = QInputDialog.getText(
+        name, ok = get_text_input(
             self, tr("dialog.create_empty_mod_title"), tr("dialog.create_empty_mod_prompt"),
         )
         if not ok or not name.strip():
@@ -2519,7 +2590,7 @@ class MainWindow(QMainWindow):
         entry = self._current_mod_entries[row]
         old_name = entry.name
 
-        new_name, ok = QInputDialog.getText(
+        new_name, ok = get_text_input(
             self, tr("dialog.rename_mod_title"), tr("dialog.rename_mod_prompt"), text=old_name,
         )
         if not ok or not new_name.strip() or new_name.strip() == old_name:

@@ -7,12 +7,13 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter,
     QListView, QLineEdit, QPushButton, QLabel, QWidget, QFrame,
-    QAbstractItemView, QInputDialog, QMessageBox, QStyle,
+    QAbstractItemView, QMessageBox, QStyle,
 )
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon, QDesktopServices
 from PySide6.QtCore import Qt, QSortFilterProxyModel, QSettings, QModelIndex, QUrl, QSize
 
 from anvil.core.instance_manager import InstanceManager
+from anvil.core.ui_helpers import get_text_input
 from anvil.core.icon_manager import IconManager, placeholder_game_icon
 from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.translator import tr
@@ -371,12 +372,11 @@ class InstanceManagerDialog(QDialog):
         if name is None or self._im is None or self._is_active_selected():
             return
 
-        new_name, ok = QInputDialog.getText(
+        new_name, ok = get_text_input(
             self,
             tr("instance.btn_rename"),
             tr("instance.label_name"),
-            QLineEdit.EchoMode.Normal,
-            name,
+            text=name,
         )
 
         if not ok or not new_name.strip() or new_name.strip() == name:

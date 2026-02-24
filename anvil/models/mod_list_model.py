@@ -307,6 +307,12 @@ class ModListModel(QAbstractItemModel):
             # Setting 6: Highlight mods that conflict with selected separator's children
             if index.row() in self._highlighted_rows:
                 return QBrush(self._highlight_color)
+            # Separator custom background color (from meta.ini, dampened with alpha ~80)
+            if r.is_separator and r.color:
+                c = QColor(r.color)
+                if c.isValid():
+                    c.setAlpha(80)
+                    return QBrush(c)
             if r.is_error:
                 return QBrush(QColor("#3a1414"))
             if r.is_framework:

@@ -679,7 +679,7 @@ class SettingsDialog(QDialog):
         wa_content_layout.addWidget(QLabel(tr("label.workarounds_hint")))
         wa_scroll.setWidget(wa_content)
         wa_layout.addWidget(wa_scroll)
-        self._tabs.addTab(workarounds_tab, tr("settings.tab_workarounds"))
+        # self._tabs.addTab(workarounds_tab, tr("settings.tab_workarounds"))
 
         # Tab Diagnose
         diagnose_tab = QWidget()
@@ -717,7 +717,7 @@ class SettingsDialog(QDialog):
         diag_content_layout.addStretch()
         diag_scroll.setWidget(diag_content)
         diag_layout.addWidget(diag_scroll)
-        self._tabs.addTab(diagnose_tab, tr("settings.tab_diagnostics"))
+        # self._tabs.addTab(diagnose_tab, tr("settings.tab_diagnostics"))
 
         layout.addWidget(self._tabs)
 
@@ -972,8 +972,8 @@ class SettingsDialog(QDialog):
 
     def _nx_enter_api_key(self) -> None:
         """Prompt the user to enter their Nexus API key manually."""
-        from PySide6.QtWidgets import QInputDialog
-        key, ok = QInputDialog.getText(
+        from anvil.core.ui_helpers import get_text_input
+        key, ok = get_text_input(
             self, tr("settings.nexus_enter_key_title"),
             tr("settings.nexus_enter_key_prompt"),
         )

@@ -10,12 +10,12 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem,
     QHeaderView,
     QPushButton,
-    QInputDialog,
     QMessageBox,
 )
 from PySide6.QtCore import Qt, QSettings
 
 from anvil.core.categories import CategoryManager
+from anvil.core.ui_helpers import get_text_input
 from anvil.core.mod_entry import ModEntry
 from anvil.core.mod_metadata import write_meta_ini
 from anvil.core.translator import tr
@@ -163,7 +163,7 @@ class CategoryDialog(QDialog):
     # ── Actions ────────────────────────────────────────────────────
 
     def _on_new(self) -> None:
-        name, ok = QInputDialog.getText(
+        name, ok = get_text_input(
             self, tr("dialog.new_category"), tr("label.name") + ":"
         )
         if not ok or not name.strip():
@@ -187,7 +187,7 @@ class CategoryDialog(QDialog):
             )
             return
         old_name = self._cat_mgr.get_name(cat_id)
-        new_name, ok = QInputDialog.getText(
+        new_name, ok = get_text_input(
             self, tr("dialog.rename_category"), tr("dialog.rename_mod_prompt"), text=old_name
         )
         if not ok or not new_name.strip():
