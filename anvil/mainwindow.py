@@ -438,13 +438,17 @@ class MainWindow(QMainWindow):
         act.setEnabled(False)
 
         act = hm.addAction(tr("menu.documentation"))
-        act.setEnabled(False)
+        act.triggered.connect(
+            lambda: QDesktopServices.openUrl(QUrl("https://github.com/Marc1326/Anvil-Organizer/wiki"))
+        )
 
         act = hm.addAction(tr("menu.discord"))
         act.setEnabled(False)
 
         act = hm.addAction(tr("menu.report_issue"))
-        act.setEnabled(False)
+        act.triggered.connect(
+            lambda: QDesktopServices.openUrl(QUrl("https://github.com/Marc1326/Anvil-Organizer/issues"))
+        )
 
         tutorials_menu = hm.addMenu("Tutorials")
         tutorials_menu.setEnabled(False)
@@ -455,7 +459,7 @@ class MainWindow(QMainWindow):
         act.triggered.connect(self._on_about)
 
         act = hm.addAction(tr("menu.about_qt"))
-        act.setEnabled(False)
+        act.triggered.connect(lambda: QMessageBox.aboutQt(self))
 
     # ── MO2 icon size constants ─────────────────────────────────────
 

@@ -11,7 +11,6 @@ from PySide6.QtCore import Qt, QSize
 from anvil.widgets.instance_manager_dialog import InstanceManagerDialog
 from anvil.widgets.profile_dialog import ProfileDialog
 from anvil.widgets.executables_dialog import ExecutablesDialog
-from anvil.core import _todo
 from anvil.core.translator import tr
 
 _ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
@@ -95,7 +94,13 @@ def create_toolbar(parent=None):
     exec_btn.clicked.connect(lambda: ExecutablesDialog(bar.window()).exec())
 
     tools_btn = _add_btn("tools.svg", "Tools")
-    tools_btn.clicked.connect(_todo("Tools"))
+    tools_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+    tools_menu = QMenu(bar)
+    tools_menu.addAction(tr("menu.profiles"), lambda: _call_win("_on_menu_profiles"))
+    tools_menu.addAction(tr("menu.executables"), lambda: _call_win("_on_menu_executables"))
+    tools_menu.addSeparator()
+    tools_menu.addAction(tr("menu.settings"), lambda: _call_win("_on_menu_settings"))
+    tools_btn.setMenu(tools_menu)
 
     settings_btn = _add_btn("settings.svg", tr("menu.settings"))
 
@@ -133,9 +138,19 @@ def create_toolbar(parent=None):
     bar.addWidget(spacer)
 
     # Rechts: 4 Status-Icons
-    _add_btn("endorse.svg", "Endorse").clicked.connect(_todo("Endorse"))
-    _add_btn("problems.svg", "Benachrichtigungen").clicked.connect(_todo("Benachrichtigungen"))
-    _add_btn("update.svg", "Update").clicked.connect(_todo("Update"))
-    _add_btn("help.svg", "Info").clicked.connect(_todo("Info"))
+    endorse_btn = _add_btn("endorse.svg", "Endorse")
+    endorse_btn.setEnabled(False)
+
+    notifications_btn = _add_btn("problems.svg", "Benachrichtigungen")
+    notifications_btn.setEnabled(False)
+    update_btn = _add_btn("update.svg", "Update")
+    def _on_update_check():
+        win = bar.window()
+        if win and hasattr(win, "_update_checker"):
+            win._update_checker.check()
+    update_btn.clicked.connect(_on_update_check)
+
+    info_btn = _add_btn("help.svg", "Info")
+    info_btn.clicked.connect(lambda: _call_win("_on_about"))
 
     return bar
