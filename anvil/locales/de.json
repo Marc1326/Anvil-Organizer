@@ -80,6 +80,8 @@
     "deactivate": "Deaktivieren",
     "uninstall": "Deinstallieren...",
     "open_file_manager": "Im Dateimanager öffnen",
+    "reinstall_framework": "Framework neu installieren...",
+    "uninstall_framework": "Framework deinstallieren...",
 
     "copy": "Kopieren",
     "copy_all": "Alles kopieren",
@@ -174,6 +176,9 @@
 
     "reinstall_title": "Neu installieren",
     "no_matching_archive": "Kein passendes Archiv für \"{name}\" in .downloads/ gefunden.",
+
+    "uninstall_framework_title": "Framework deinstallieren",
+    "uninstall_framework_message": "Framework \"{name}\" wirklich deinstallieren?\n\nDie zugehörigen Dateien werden aus dem Spielverzeichnis gelöscht.",
 
     "select_game_hint": "Wähle das Spiel für das du eine Instanz erstellen möchtest:",
 
@@ -407,6 +412,8 @@
     "installed": "Installiert: {names}",
     "installed_inactive": "Installiert (inaktiv): {names}",
     "framework_installed": "Framework installiert: {names}",
+    "framework_uninstalled": "Framework deinstalliert: {name}",
+    "no_framework_detected": "Kein Framework im Archiv erkannt",
     "install_failed": "Installation fehlgeschlagen: {name}",
     "separator_created": "Trenner erstellt: {name}",
     "separators_collapsed": "Alle Trenner eingeklappt ({count})",

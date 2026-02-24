@@ -80,6 +80,8 @@
     "deactivate": "Deactivate",
     "uninstall": "Uninstall...",
     "open_file_manager": "Open in File Manager",
+    "reinstall_framework": "Reinstall Framework...",
+    "uninstall_framework": "Uninstall Framework...",
 
     "copy": "Copy",
     "copy_all": "Copy All",
@@ -174,6 +176,9 @@
 
     "reinstall_title": "Reinstall",
     "no_matching_archive": "No matching archive for \"{name}\" found in .downloads/.",
+
+    "uninstall_framework_title": "Uninstall Framework",
+    "uninstall_framework_message": "Really uninstall framework \"{name}\"?\n\nThe associated files will be deleted from the game directory.",
 
     "select_game_hint": "Select the game you want to create an instance for:",
 
@@ -407,6 +412,8 @@
     "installed": "Installed: {names}",
     "installed_inactive": "Installed (inactive): {names}",
     "framework_installed": "Framework installed: {names}",
+    "framework_uninstalled": "Framework uninstalled: {name}",
+    "no_framework_detected": "No framework detected in archive",
     "install_failed": "Installation failed: {name}",
     "separator_created": "Separator created: {name}",
     "separators_collapsed": "All separators collapsed ({count})",

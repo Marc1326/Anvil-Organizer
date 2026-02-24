@@ -265,6 +265,8 @@ class MainWindow(QMainWindow):
         self._mod_list_view.archives_dropped.connect(
             self._on_archives_dropped, Qt.ConnectionType.QueuedConnection,
         )
+        self._mod_list_view.fw_context_menu_requested.connect(self._on_fw_context_menu)
+        self._mod_list_view.fw_archives_dropped.connect(self._on_fw_archives_dropped)
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
 
@@ -3222,6 +3224,101 @@ class MainWindow(QMainWindow):
             mods_path = self._bg3_installer._mods_path
             if mods_path and mods_path.is_dir():
                 subprocess.Popen(["xdg-open", str(mods_path)])
+
+    # ── Framework context menu + handlers ──────────────────────────
+
+    def _on_fw_context_menu(self, global_pos, fw_data: dict) -> None:
+        """Context menu for framework mods: reinstall or uninstall."""
+        menu = QMenu(self)
+        name = fw_data.get("name", "")
+        installed = fw_data.get("installed", False)
+
+        act_reinstall = menu.addAction(tr("context.reinstall_framework"))
+        act_uninstall = menu.addAction(tr("context.uninstall_framework"))
+        act_uninstall.setEnabled(installed)
+        menu.addSeparator()
+        act_explorer = menu.addAction(tr("context.open_file_manager"))
+
+        chosen = menu.exec(global_pos)
+        if not chosen:
+            return
+
+        if chosen == act_reinstall:
+            self._fw_reinstall(name)
+        elif chosen == act_uninstall:
+            self._fw_uninstall(name)
+        elif chosen == act_explorer:
+            if self._current_game_path and self._current_game_path.is_dir():
+                import subprocess
+                subprocess.Popen(["xdg-open", str(self._current_game_path)])
+
+    def _fw_reinstall(self, fw_name: str) -> None:
+        """Reinstall a framework from its archive in .downloads/."""
+        if not self._current_instance_path or not self._current_plugin:
+            return
+        downloads_path = self._current_instance_path / ".downloads"
+        if not downloads_path.is_dir():
+            QMessageBox.warning(
+                self, tr("dialog.reinstall_title"),
+                tr("status.no_downloads_folder"),
+            )
+            return
+        archive = None
+        fw_lower = fw_name.lower()
+        for f in downloads_path.iterdir():
+            if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
+                if fw_lower in f.stem.lower():
+                    archive = f
+                    break
+        if not archive:
+            QMessageBox.information(
+                self, tr("dialog.reinstall_title"),
+                tr("dialog.no_matching_archive", name=fw_name),
+            )
+            return
+        self._install_archives([archive])
+        self._game_panel.refresh_downloads()
+
+    def _fw_uninstall(self, fw_name: str) -> None:
+        """Uninstall a framework by removing its detect_installed files from game dir."""
+        if not self._current_plugin or not self._current_game_path:
+            return
+        fw_obj = None
+        for fw in self._current_plugin.get_framework_mods():
+            if fw.name == fw_name:
+                fw_obj = fw
+                break
+        if not fw_obj:
+            return
+        reply = QMessageBox.question(
+            self, tr("dialog.uninstall_framework_title"),
+            tr("dialog.uninstall_framework_message", name=fw_name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        game_path = self._current_game_path
+        removed = 0
+        for det_path in fw_obj.detect_installed:
+            full = game_path / det_path
+            if full.is_file():
+                full.unlink()
+                removed += 1
+            elif full.is_dir():
+                shutil.rmtree(full, ignore_errors=True)
+                removed += 1
+        if removed:
+            self.statusBar().showMessage(tr("status.framework_uninstalled", name=fw_name), 5000)
+        else:
+            self.statusBar().showMessage(tr("status.uninstall_failed"), 5000)
+        self._reload_mod_list()
+
+    def _on_fw_archives_dropped(self, paths: list) -> None:
+        """Handle archives dropped onto the framework tree."""
+        if not self._current_instance_path:
+            return
+        self._install_archives([Path(p) for p in paths])
+        self._game_panel.refresh_downloads()
 
     def _on_bg3_extras_context_menu(self, global_pos, mod_data: dict) -> None:
         """Context menu for data-overrides and frameworks."""

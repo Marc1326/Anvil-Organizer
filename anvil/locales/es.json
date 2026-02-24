@@ -80,6 +80,8 @@
     "deactivate": "Desactivar",
     "uninstall": "Desinstalar...",
     "open_file_manager": "Abrir en administrador de archivos",
+    "reinstall_framework": "Reinstalar framework...",
+    "uninstall_framework": "Desinstalar framework...",
 
     "copy": "Copiar",
     "copy_all": "Copiar todo",
@@ -174,6 +176,9 @@
 
     "reinstall_title": "Reinstalar",
     "no_matching_archive": "No se encontró un archivo coincidente para \"{name}\" en .downloads/.",
+
+    "uninstall_framework_title": "Desinstalar framework",
+    "uninstall_framework_message": "¿Desinstalar realmente el framework \"{name}\"?\n\nLos archivos asociados se eliminarán del directorio del juego.",
 
     "select_game_hint": "Selecciona el juego para el que deseas crear una instancia:",
 
@@ -407,6 +412,8 @@
     "installed": "Instalado: {names}",
     "installed_inactive": "Instalado (inactivo): {names}",
     "framework_installed": "Framework instalado: {names}",
+    "framework_uninstalled": "Framework desinstalado: {name}",
+    "no_framework_detected": "No se detectó un framework en el archivo",
     "install_failed": "Instalación fallida: {name}",
     "separator_created": "Separador creado: {name}",
     "separators_collapsed": "Todos los separadores contraídos ({count})",

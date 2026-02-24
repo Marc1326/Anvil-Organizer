@@ -67,6 +67,8 @@ class _DraggableDownloadTable(QTableWidget):
                 continue
             rows_seen.add(r)
             name_item = self.item(r, 0)
+            if name_item and name_item.data(Qt.ItemDataRole.UserRole + 2):
+                continue  # Separator-Zeile überspringen
             if name_item:
                 path = name_item.data(Qt.ItemDataRole.UserRole)
                 if path:
@@ -250,6 +252,7 @@ class GamePanel(QWidget):
         self._dl_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._dl_table.setRowCount(0)
         self._dl_table.cellDoubleClicked.connect(self._on_dl_double_click)
+        self._dl_table.cellClicked.connect(self._on_dl_cell_clicked)
         self._dl_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._dl_table.customContextMenuRequested.connect(self._on_dl_context_menu)
         dl_layout.addWidget(self._dl_table)
@@ -277,6 +280,8 @@ class GamePanel(QWidget):
         self._dl_archives: list[Path] = []
         # Hidden downloads toggle (MO2: showHidden)
         self._show_hidden: bool = False
+        # Collapsed folder separators in downloads tab
+        self._dl_collapsed: set[str] = set()
 
         # Download manager for active Nexus downloads
         self._download_manager = DownloadManager(self)
@@ -615,8 +620,40 @@ class GamePanel(QWidget):
         self._mods_path = mods_path
         self.refresh_downloads()
 
+    def _is_separator_row(self, row: int) -> bool:
+        """Check if a row is a folder separator."""
+        item = self._dl_table.item(row, 0)
+        return bool(item and item.data(Qt.ItemDataRole.UserRole + 2))
+
+    def _scan_archives(self, folder: Path) -> list[tuple[str, int, float, Path, bool, bool, str]]:
+        """Scan a folder for archives and return metadata tuples."""
+        results = []
+        for entry in folder.rglob("*"):
+            if entry.is_file() and entry.suffix.lower() in SUPPORTED_EXTENSIONS:
+                try:
+                    stat = entry.stat()
+                    is_hidden = False
+                    meta_installed = False
+                    meta_install_file = ""
+                    meta = Path(str(entry) + ".meta")
+                    if meta.is_file():
+                        cp = configparser.ConfigParser()
+                        cp.optionxform = str
+                        try:
+                            cp.read(str(meta), encoding="utf-8")
+                            is_hidden = cp.getboolean("General", "removed", fallback=False)
+                            meta_installed = cp.getboolean("General", "installed", fallback=False)
+                            meta_install_file = cp.get("General", "installationFile", fallback="")
+                        except Exception:
+                            pass
+                    results.append((entry.name, stat.st_size, stat.st_mtime, entry, is_hidden, meta_installed, meta_install_file))
+                except OSError:
+                    continue
+        results.sort(key=lambda t: t[0].lower())
+        return results
+
     def refresh_downloads(self) -> None:
-        """Scan .downloads/ and populate the table."""
+        """Scan .downloads/ recursively (1 level deep) and populate the table with folder separators."""
         self._dl_table.setRowCount(0)
         self._dl_archives.clear()
 
@@ -626,19 +663,19 @@ class GamePanel(QWidget):
         import re
         from datetime import datetime
 
-        archives: list[tuple[str, int, float, Path, bool, bool, str]] = []
+        # 1. Root-Dateien sammeln (direkte Kinder, keine Rekursion)
+        root_archives = []
         for entry in self._downloads_path.iterdir():
             if entry.is_file() and entry.suffix.lower() in SUPPORTED_EXTENSIONS:
                 try:
                     stat = entry.stat()
-                    # Read status flags from .meta file (MO2 compatible)
                     is_hidden = False
                     meta_installed = False
                     meta_install_file = ""
                     meta = Path(str(entry) + ".meta")
                     if meta.is_file():
                         cp = configparser.ConfigParser()
-                        cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
+                        cp.optionxform = str
                         try:
                             cp.read(str(meta), encoding="utf-8")
                             is_hidden = cp.getboolean("General", "removed", fallback=False)
@@ -646,11 +683,23 @@ class GamePanel(QWidget):
                             meta_install_file = cp.get("General", "installationFile", fallback="")
                         except Exception:
                             pass
-                    archives.append((entry.name, stat.st_size, stat.st_mtime, entry, is_hidden, meta_installed, meta_install_file))
+                    root_archives.append((entry.name, stat.st_size, stat.st_mtime, entry, is_hidden, meta_installed, meta_install_file))
                 except OSError:
                     continue
+        root_archives.sort(key=lambda t: t[0].lower())
 
-        archives.sort(key=lambda t: t[0].lower())
+        # 2. Unterordner sammeln (1 Ebene), Archive darin rekursiv
+        subfolders: list[tuple[str, list]] = []
+        for entry in sorted(self._downloads_path.iterdir(), key=lambda e: e.name.lower()):
+            if entry.is_dir():
+                folder_archives = self._scan_archives(entry)
+                if folder_archives:  # Leere Ordner ignorieren
+                    subfolders.append((entry.name, folder_archives))
+
+        # 3. Gesamtzahl Zeilen berechnen (Root + pro Ordner: 1 Separator + Archive)
+        total_rows = len(root_archives)
+        for folder_name, folder_archives in subfolders:
+            total_rows += 1 + len(folder_archives)  # 1 Separator + Archive
 
         # Build set of installed mod folder names for status check
         installed_names: set[str] = set()
@@ -663,30 +712,35 @@ class GamePanel(QWidget):
         )
 
         self._dl_table.setSortingEnabled(False)
-        self._dl_table.setRowCount(len(archives))
-        for row, (name, size, mtime, path, is_hidden, meta_installed, meta_install_file) in enumerate(archives):
+        self._dl_table.setRowCount(total_rows)
+
+        row = 0
+
+        def _insert_archive_row(row_idx, name, size, mtime, path, is_hidden, meta_installed, meta_install_file, folder_name_for_filter=""):
+            """Insert a single archive row into the table."""
             self._dl_archives.append(path)
 
-            # Name — store archive path in UserRole for install after sort
+            # Name — store archive path in UserRole
             item_name = QTableWidgetItem(name)
             item_name.setData(Qt.ItemDataRole.UserRole, str(path))
-            self._dl_table.setItem(row, 0, item_name)
+            # Ordnername für Filter speichern (UserRole + 3)
+            if folder_name_for_filter:
+                item_name.setData(Qt.ItemDataRole.UserRole + 3, folder_name_for_filter)
+            self._dl_table.setItem(row_idx, 0, item_name)
 
-            # Size — numeric sort via _NumericSortItem
+            # Size
             item_size = _NumericSortItem()
             item_size.setText(self._format_size(size))
             item_size.setData(Qt.ItemDataRole.UserRole, size)
             item_size.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            self._dl_table.setItem(row, 1, item_size)
+            self._dl_table.setItem(row_idx, 1, item_size)
 
-            # MO2-Muster: Meta ist die Wahrheit
+            # Status (MO2-Muster)
             if meta_installed:
                 is_installed = True
             elif meta_install_file:
-                # installationFile vorhanden aber installed=false → prüfe ob Ordner existiert
                 is_installed = meta_install_file.lower() in installed_names
             else:
-                # Kein Meta-Status → Fallback: verbesserte Namens-Heuristik
                 stem = path.stem
                 clean = re.sub(r"-\d+(-\d+)*$", "", stem).strip()
                 clean = clean.replace("_", " ")
@@ -698,32 +752,71 @@ class GamePanel(QWidget):
             item_status = QTableWidgetItem(status_text)
             if is_installed:
                 item_status.setForeground(QColor("#4CAF50"))
-            self._dl_table.setItem(row, 2, item_status)
+            self._dl_table.setItem(row_idx, 2, item_status)
 
-            # Auto-hide installed downloads if setting is active
+            # Auto-hide installed
             if is_installed and not is_hidden:
                 hide_after = s.value("Interface/hide_downloads_after_install", False, type=bool)
                 if hide_after and not self._show_hidden:
-                    self._dl_table.setRowHidden(row, True)
+                    self._dl_table.setRowHidden(row_idx, True)
 
             # Date
             date_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
-            self._dl_table.setItem(row, 3, QTableWidgetItem(date_str))
+            self._dl_table.setItem(row_idx, 3, QTableWidgetItem(date_str))
 
-            # Hidden: grey text + hide row if not showing hidden (MO2 style)
+            # Hidden: grey text + hide row
             if is_hidden:
                 grey = QColor("#808080")
                 for col in range(4):
-                    ci = self._dl_table.item(row, col)
+                    ci = self._dl_table.item(row_idx, col)
                     if ci:
                         ci.setForeground(grey)
                 if not self._show_hidden:
-                    self._dl_table.setRowHidden(row, True)
+                    self._dl_table.setRowHidden(row_idx, True)
 
             # Base-Hidden-Flag für Text-Filter-Interop
-            item_name.setData(Qt.ItemDataRole.UserRole + 1, self._dl_table.isRowHidden(row))
+            item_name.setData(Qt.ItemDataRole.UserRole + 1, self._dl_table.isRowHidden(row_idx))
 
-        self._dl_table.setSortingEnabled(True)
+        # 4. Root-Archive einfügen (ohne Separator)
+        for (name, size, mtime, path, is_hidden, meta_installed, meta_install_file) in root_archives:
+            _insert_archive_row(row, name, size, mtime, path, is_hidden, meta_installed, meta_install_file)
+            row += 1
+
+        # 5. Pro Unterordner: Separator + Archive
+        for folder_name, folder_archives in subfolders:
+            # Separator-Zeile — Pfeil je nach Collapse-State
+            collapsed = folder_name in self._dl_collapsed
+            count = len(folder_archives)
+            if collapsed:
+                sep_text = f"\u25B6 \U0001F4C1 {folder_name} ({count})"
+            else:
+                sep_text = f"\u25BC \U0001F4C1 {folder_name}"
+            sep_item = QTableWidgetItem(sep_text)
+            sep_item.setData(Qt.ItemDataRole.UserRole + 2, True)  # Separator-Marker
+            sep_item.setData(Qt.ItemDataRole.UserRole + 3, folder_name)  # Ordnername für Collapse
+            sep_item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # Klickbar aber nicht selektierbar/editierbar
+            sep_item.setBackground(QColor("#1a2a3a"))
+            sep_item.setForeground(QColor("#FFFFFF"))
+            font = sep_item.font()
+            font.setBold(True)
+            sep_item.setFont(font)
+            self._dl_table.setItem(row, 0, sep_item)
+            # Leere Items für restliche Spalten mit gleichem Hintergrund
+            for col in range(1, 4):
+                empty = QTableWidgetItem()
+                empty.setFlags(Qt.ItemFlag.NoItemFlags)
+                empty.setBackground(QColor("#1a2a3a"))
+                self._dl_table.setItem(row, col, empty)
+            self._dl_table.setSpan(row, 0, 1, 4)
+            row += 1
+
+            # Archive in diesem Ordner
+            for (name, size, mtime, path, is_hidden, meta_installed, meta_install_file) in folder_archives:
+                _insert_archive_row(row, name, size, mtime, path, is_hidden, meta_installed, meta_install_file, folder_name)
+                row += 1
+
+        # Sorting bleibt deaktiviert — manuelle Ordnung durch Ordner-Gruppen
+        # self._dl_table.setSortingEnabled(True)
 
         # Setting: show/hide meta columns (Size + Date)
         show_meta = s.value("Interface/show_meta_info", False, type=bool)
@@ -738,14 +831,111 @@ class GamePanel(QWidget):
 
         # Text-Filter erneut anwenden nach Tabellen-Rebuild
         self._on_dl_filter_changed(self._dl_filter_edit.text())
+        # Collapse-State anwenden (bleibt über Refresh erhalten)
+        self._apply_dl_collapse()
 
     def _get_dl_archive_path(self, row: int) -> str | None:
         """Get archive path from the name column's UserRole data."""
         item = self._dl_table.item(row, 0)
         return item.data(Qt.ItemDataRole.UserRole) if item else None
 
+    def _on_dl_cell_clicked(self, row: int, col: int) -> None:
+        """Toggle collapse/expand when clicking a separator row."""
+        if not self._is_separator_row(row):
+            return
+        item = self._dl_table.item(row, 0)
+        if item is None:
+            return
+        folder_name = item.data(Qt.ItemDataRole.UserRole + 3)
+        if not folder_name:
+            return
+
+        if folder_name in self._dl_collapsed:
+            self._dl_collapsed.discard(folder_name)
+        else:
+            self._dl_collapsed.add(folder_name)
+
+        self._apply_dl_collapse()
+
+    def _apply_dl_collapse(self) -> None:
+        """Zentrale Visibility-Steuerung: base-hidden, collapse, filter.
+        Eine Zeile ist nur sichtbar wenn alle 3 Ebenen 'sichtbar' sagen.
+        """
+        needle = self._dl_filter_edit.text().strip().lower()
+        current_folder = ""
+        current_collapsed = False
+
+        for row in range(self._dl_table.rowCount()):
+            item = self._dl_table.item(row, 0)
+            if item is None:
+                continue
+
+            if item.data(Qt.ItemDataRole.UserRole + 2):
+                # Separator-Zeile — State + Text aktualisieren
+                folder_name = item.data(Qt.ItemDataRole.UserRole + 3) or ""
+                current_folder = folder_name
+                current_collapsed = folder_name in self._dl_collapsed
+
+                # Kinder zählen
+                child_count = 0
+                for peek in range(row + 1, self._dl_table.rowCount()):
+                    peek_item = self._dl_table.item(peek, 0)
+                    if peek_item and peek_item.data(Qt.ItemDataRole.UserRole + 2):
+                        break
+                    child_count += 1
+
+                if current_collapsed:
+                    item.setText(f"\u25B6 \U0001F4C1 {folder_name} ({child_count})")
+                else:
+                    item.setText(f"\u25BC \U0001F4C1 {folder_name}")
+
+                # Separator sichtbar wenn ≥1 Kind nicht base-hidden (+ Filter-Match)
+                has_any_child = False
+                for peek in range(row + 1, self._dl_table.rowCount()):
+                    peek_item = self._dl_table.item(peek, 0)
+                    if peek_item is None:
+                        continue
+                    if peek_item.data(Qt.ItemDataRole.UserRole + 2):
+                        break
+                    if peek_item.data(Qt.ItemDataRole.UserRole + 1):
+                        continue  # base-hidden
+                    if needle:
+                        name = peek_item.text().lower()
+                        folder = (peek_item.data(Qt.ItemDataRole.UserRole + 3) or "").lower()
+                        if needle in name or (folder and needle in folder):
+                            has_any_child = True
+                            break
+                    else:
+                        has_any_child = True
+                        break
+                self._dl_table.setRowHidden(row, not has_any_child)
+                continue
+
+            # ── Archiv-Zeile: 3 Ebenen prüfen ──
+
+            # Ebene 1: Base-hidden (meta-hidden, auto-hide installed)
+            if item.data(Qt.ItemDataRole.UserRole + 1):
+                continue  # bleibt versteckt, nicht anfassen
+
+            # Ebene 2: Collapse (nur wenn kein Filter aktiv)
+            if current_collapsed and not needle:
+                self._dl_table.setRowHidden(row, True)
+                continue
+
+            # Ebene 3: Filter
+            if needle:
+                name = item.text().lower()
+                folder = (item.data(Qt.ItemDataRole.UserRole + 3) or "").lower()
+                visible = needle in name or (folder and needle in folder)
+                self._dl_table.setRowHidden(row, not visible)
+            else:
+                # Nicht base-hidden, nicht collapsed, kein Filter → SICHTBAR
+                self._dl_table.setRowHidden(row, False)
+
     def _on_dl_double_click(self, row: int, _col: int) -> None:
         """Double-click on a download row → install it."""
+        if self._is_separator_row(row):
+            return
         path = self._get_dl_archive_path(row)
         if path:
             self.install_requested.emit([path])
@@ -776,6 +966,8 @@ class GamePanel(QWidget):
         not_installed_text = tr("game_panel.not_installed")
         paths: list[str] = []
         for row in range(self._dl_table.rowCount()):
+            if self._is_separator_row(row):
+                continue
             if filter_status is not None:
                 status_item = self._dl_table.item(row, 2)
                 if not status_item or status_item.text() != filter_status:
@@ -813,17 +1005,8 @@ class GamePanel(QWidget):
     # ── Hide/Un-Hide (MO2 style) ─────────────────────────────────
 
     def _on_dl_filter_changed(self, text: str) -> None:
-        """Filter downloads table rows by name (case-insensitive substring match)."""
-        needle = text.strip().lower()
-        for row in range(self._dl_table.rowCount()):
-            item = self._dl_table.item(row, 0)
-            if item is None:
-                continue
-            # Zeile durch Hidden-Logik versteckt → nicht anfassen
-            if item.data(Qt.ItemDataRole.UserRole + 1):
-                continue
-            name = item.text().lower()
-            self._dl_table.setRowHidden(row, needle != "" and needle not in name)
+        """Filter-Änderung → _apply_dl_collapse() steuert alle Visibility-Ebenen."""
+        self._apply_dl_collapse()
 
     def _on_toggle_hidden(self, state: int) -> None:
         """Toggle visibility of hidden downloads."""
@@ -870,6 +1053,8 @@ class GamePanel(QWidget):
     def _bulk_hide_by_status(self, filter_status: str | None, hidden: bool) -> None:
         """Batch hide/unhide downloads filtered by status column."""
         for row in range(self._dl_table.rowCount()):
+            if self._is_separator_row(row):
+                continue
             if filter_status is not None:
                 status_item = self._dl_table.item(row, 2)
                 if not status_item or status_item.text() != filter_status:
@@ -879,8 +1064,9 @@ class GamePanel(QWidget):
 
     def _on_dl_context_menu(self, pos) -> None:
         """Right-click context menu on downloads table (MO2 style)."""
-        # Collect all selected archive paths
+        # Collect all selected archive paths (Separator-Zeilen filtern)
         selected_rows = sorted({idx.row() for idx in self._dl_table.selectedIndexes()})
+        selected_rows = [r for r in selected_rows if not self._is_separator_row(r)]
         paths: list[str] = []
         for r in selected_rows:
             p = self._get_dl_archive_path(r)

@@ -580,9 +580,47 @@ class _DropTreeView(QTreeView):
         source.set_highlighted_rows(highlighted)
 
 
+class _DropFrameworkTree(QTreeWidget):
+    """QTreeWidget that accepts external archive file drops for framework installation."""
+
+    archives_dropped = Signal(list)  # list of file path strings
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                if url.isLocalFile():
+                    path = url.toLocalFile()
+                    if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                        event.acceptProposedAction()
+                        return
+        super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls():
+            paths = []
+            for url in event.mimeData().urls():
+                if url.isLocalFile():
+                    path = url.toLocalFile()
+                    if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                        paths.append(path)
+            if paths:
+                event.acceptProposedAction()
+                self.archives_dropped.emit(paths)
+                return
+        super().dropEvent(event)
+
+
 class ModListView(QWidget):
     archives_dropped = Signal(list)  # forwarded from _DropTreeView
     context_menu_requested = Signal(QPoint)  # global pos for context menu
+    fw_context_menu_requested = Signal(QPoint, dict)  # global pos + fw_data for framework context menu
+    fw_archives_dropped = Signal(list)  # archive paths dropped on framework tree
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -648,7 +686,7 @@ class ModListView(QWidget):
         fw_layout.setContentsMargins(0, 0, 0, 0)
         fw_layout.setSpacing(0)
 
-        self._fw_tree = QTreeWidget()
+        self._fw_tree = _DropFrameworkTree()
 
         self._fw_label = CollapsibleSectionBar(
             tr("label.type_framework") + "s", "frameworks", self._fw_tree,
@@ -665,6 +703,10 @@ class ModListView(QWidget):
         self._fw_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._fw_tree.setUniformRowHeights(True)
         self._fw_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._fw_tree.setAcceptDrops(True)
+        self._fw_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._fw_tree.customContextMenuRequested.connect(self._on_fw_context_menu)
+        self._fw_tree.archives_dropped.connect(self.fw_archives_dropped)
         fw_hdr = self._fw_tree.header()
         fw_hdr.setStretchLastSection(False)
         fw_hdr.setCascadingSectionResizes(True)
@@ -745,11 +787,23 @@ class ModListView(QWidget):
                 item.setForeground(2, QBrush(QColor("#4CAF50")))
             else:
                 item.setForeground(2, QBrush(QColor("#F44336")))
+            item.setData(0, Qt.ItemDataRole.UserRole, fw)
             self._fw_tree.addTopLevelItem(item)
 
     def restore_framework_widths(self) -> None:
         """Restore saved column widths for the frameworks tree."""
         self._ph_frameworks.restore()
+
+    def _on_fw_context_menu(self, pos) -> None:
+        """Forward framework context menu request with item data."""
+        item = self._fw_tree.itemAt(pos)
+        if item is None:
+            return
+        fw_data = item.data(0, Qt.ItemDataRole.UserRole)
+        if fw_data:
+            self.fw_context_menu_requested.emit(
+                self._fw_tree.viewport().mapToGlobal(pos), fw_data,
+            )
 
     def get_current_mod_name(self):
         """Liefert den Mod-Namen der aktuell gewählten Zeile oder None."""
