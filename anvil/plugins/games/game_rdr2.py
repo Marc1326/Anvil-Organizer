@@ -4,7 +4,7 @@ Features implemented:
   - Store detection (Steam)
   - Proton prefix paths for documents and saves
   - Executable list
-  - Framework mods (Script Hook RDR2, ASI Loader, ScriptHookRDR2 .NET, LML)
+  - Framework mods (Script Hook RDR2, ASI Loader, LML)
 
 TODO (future):
   - LML mod scanning (lml/ subfolders with install.xml)
@@ -50,10 +50,12 @@ class RDR2Game(BaseGame):
     GameDirectInstallMods = [
         "ScriptHookRDR2",
         "ASI Loader",
-        "ScriptHookRDRDotNet",
+
         "Lenny's Mod Loader",
         "LML",
     ]
+
+    GameLMLPath = "lml"  # LML-Mods werden nach <game>/lml/<modname>/ deployt
 
     # ── Windows-Pfade (innerhalb Proton-Prefix) ────────────────────────
 
@@ -120,16 +122,8 @@ class RDR2Game(BaseGame):
                 required_by=["ASI-Mods"],
             ),
             FrameworkMod(
-                name="ScriptHookRDR2 .NET",
-                pattern=["ScriptHookRDRDotNet.asi"],
-                target="",
-                description="Erlaubt .NET Scripts",
-                detect_installed=["ScriptHookRDRDotNet.asi"],
-                required_by=[".NET-Scripts"],
-            ),
-            FrameworkMod(
                 name="Lenny's Mod Loader (LML)",
-                pattern=["vfs.asi", "lml/"],
+                pattern=["vfs.asi"],
                 target="",
                 description="Mod Loader fuer Datei-Replacements und LML-Mods",
                 detect_installed=["vfs.asi", "lml"],
