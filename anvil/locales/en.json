@@ -222,7 +222,8 @@
     "no_instance_message": "Please select an instance first.",
     "confirm_instance_change_title": "Change Instance",
     "confirm_instance_change_text": "Do you want to switch to the instance \"{name}\"?",
-    "about_text": "Anvil Organizer v{version}"
+    "about_text": "Anvil Organizer v{version}",
+    "about_qt_text": "This program uses Qt version {version}.\n\nQt is a C++ toolkit for cross-platform application development.\n\nQt provides single-source portability across all major desktop operating systems. It is also available for embedded Linux and other embedded and mobile operating systems.\n\nQt is available under multiple licensing options designed to accommodate the needs of various users.\n\nQt is The Qt Company Ltd. product developed as an open source project.\n\nSee https://www.qt.io for more information."
   },
 
   "button": {

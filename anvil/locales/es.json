@@ -222,7 +222,8 @@
     "no_instance_message": "Por favor, seleccione primero una instancia.",
     "confirm_instance_change_title": "Cambiar Instancia",
     "confirm_instance_change_text": "¿Desea cambiar a la instancia \"{name}\"?",
-    "about_text": "Anvil Organizer v{version}"
+    "about_text": "Anvil Organizer v{version}",
+    "about_qt_text": "Este programa utiliza Qt versión {version}.\n\nQt es un toolkit de C++ para el desarrollo de aplicaciones multiplataforma.\n\nQt ofrece portabilidad desde una única fuente en todos los principales sistemas operativos de escritorio. También está disponible para Linux embebido y otros sistemas operativos embebidos y móviles.\n\nQt está disponible bajo múltiples opciones de licencia diseñadas para satisfacer las necesidades de diversos usuarios.\n\nQt es un producto de Qt Company Ltd., desarrollado como proyecto de código abierto.\n\nMás información: https://www.qt.io"
   },
 
   "button": {

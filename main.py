@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, QTranslator, QLibraryInfo
 
 from anvil.mainwindow import MainWindow
 from anvil.core.translator import Translator
@@ -26,6 +26,13 @@ def main():
 
     # Translator mit gespeicherter Sprache initialisieren
     _init_translator()
+
+    # Qt-eigene Übersetzungen laden (für About Qt, Datei-Dialoge, etc.)
+    lang = Translator.instance().current_language
+    qt_translator = QTranslator(app)
+    translations_path = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    if qt_translator.load(f"qtbase_{lang}", translations_path):
+        app.installTranslator(qt_translator)
 
     w = MainWindow()
     w.showMaximized()

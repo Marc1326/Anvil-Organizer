@@ -459,7 +459,7 @@ class MainWindow(QMainWindow):
         act.triggered.connect(self._on_about)
 
         act = hm.addAction(tr("menu.about_qt"))
-        act.triggered.connect(lambda: QMessageBox.aboutQt(self))
+        act.triggered.connect(self._on_about_qt)
 
     # ── MO2 icon size constants ─────────────────────────────────────
 
@@ -3360,6 +3360,12 @@ class MainWindow(QMainWindow):
 
     def _on_about(self):
         QMessageBox.about(self, tr("menu.about_anvil"), tr("dialog.about_text", version=APP_VERSION))
+
+    def _on_about_qt(self):
+        """Hilfe → Über Qt (vollständig übersetzt)."""
+        from PySide6.QtCore import qVersion
+        text = tr("dialog.about_qt_text", version=qVersion())
+        QMessageBox.about(self, tr("menu.about_qt"), text)
 
     def _on_update_available(self, version: str, url: str):
         """Show toast when a new version is available."""
