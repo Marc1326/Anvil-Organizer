@@ -807,5 +807,18 @@
     "not_detected": "no detectado",
     "create_error": "No se pudo crear la instancia:\n{error}",
     "browse_folder_title": "Seleccionar carpeta"
+  },
+
+  "update": {
+    "commits_available": "{count} nuevos commits disponibles",
+    "changelog_title": "Actualización disponible",
+    "changelog_message": "{count} nuevos commits en origin/main:\n\n{changelog}\n\n¿Actualizar ahora?",
+    "button_update": "Actualizar",
+    "button_later": "Más tarde",
+    "updating": "Actualizando...",
+    "restart_required": "Actualización instalada. Reiniciando la aplicación...",
+    "failed": "Actualización fallida: {error}",
+    "dirty_tree": "Cambios locales detectados. Por favor, confirma primero.",
+    "pip_updated": "Dependencias de Python actualizadas"
   }
 }

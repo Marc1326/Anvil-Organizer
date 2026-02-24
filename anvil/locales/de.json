@@ -807,5 +807,18 @@
     "not_detected": "nicht erkannt",
     "create_error": "Instanz konnte nicht erstellt werden:\n{error}",
     "browse_folder_title": "Ordner wählen"
+  },
+
+  "update": {
+    "commits_available": "{count} neue Commits verfügbar",
+    "changelog_title": "Update verfügbar",
+    "changelog_message": "{count} neue Commits auf origin/main:\n\n{changelog}\n\nJetzt aktualisieren?",
+    "button_update": "Aktualisieren",
+    "button_later": "Später",
+    "updating": "Aktualisiere...",
+    "restart_required": "Update installiert. App wird neu gestartet...",
+    "failed": "Update fehlgeschlagen: {error}",
+    "dirty_tree": "Lokale Änderungen erkannt. Bitte zuerst committen.",
+    "pip_updated": "Python-Abhängigkeiten aktualisiert"
   }
 }

@@ -807,5 +807,18 @@
     "not_detected": "non detecte",
     "create_error": "Impossible de creer l'instance:\n{error}",
     "browse_folder_title": "Sélectionner le dossier"
+  },
+
+  "update": {
+    "commits_available": "{count} nouveaux commits disponibles",
+    "changelog_title": "Mise à jour disponible",
+    "changelog_message": "{count} nouveaux commits sur origin/main :\n\n{changelog}\n\nMettre à jour maintenant ?",
+    "button_update": "Mettre à jour",
+    "button_later": "Plus tard",
+    "updating": "Mise à jour en cours...",
+    "restart_required": "Mise à jour installée. Redémarrage de l'application...",
+    "failed": "Échec de la mise à jour : {error}",
+    "dirty_tree": "Modifications locales détectées. Veuillez d'abord valider vos changements.",
+    "pip_updated": "Dépendances Python mises à jour"
   }
 }

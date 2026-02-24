@@ -6,7 +6,9 @@ from pathlib import Path
 
 import configparser
 import json
+import os
 import shutil
+import sys
 
 from PySide6.QtWidgets import (
     QMainWindow,
@@ -284,6 +286,8 @@ class MainWindow(QMainWindow):
         # ── Update-Check (im Hintergrund, 3s nach Start) ────────────
         self._update_checker = UpdateChecker(self)
         self._update_checker.update_available.connect(self._on_update_available)
+        self._update_checker.update_applied.connect(self._on_update_applied)
+        self._update_checker.update_progress.connect(self._on_update_progress)
         QTimer.singleShot(3000, self._update_checker.check)
 
     # ── Menu bar (MO2-Struktur) ─────────────────────────────────────
@@ -3367,12 +3371,67 @@ class MainWindow(QMainWindow):
         text = tr("dialog.about_qt_text", version=qVersion())
         QMessageBox.about(self, tr("menu.about_qt"), text)
 
-    def _on_update_available(self, version: str, url: str):
-        """Show toast when a new version is available."""
+    # ── Self-Update (Git-basiert) ──────────────────────────────────
+
+    def _on_update_available(self, count: int, changelog: str):
+        """Show clickable toast when new commits are available."""
+        self._pending_count = count
+        self._pending_changelog = changelog
         toast = Toast(
             self,
-            tr("status.update_available", version=version),
+            tr("update.commits_available", count=count),
             duration=8000,
             clickable=True,
         )
-        toast.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url)))
+        toast.clicked.connect(
+            lambda checked=False: self._show_update_dialog(count, changelog)
+        )
+
+    def _show_update_dialog(self, count: int, changelog: str):
+        """Show QMessageBox with changelog, buttons Aktualisieren / Spaeter."""
+        msg = QMessageBox(self)
+        msg.setWindowTitle(tr("update.changelog_title"))
+        msg.setText(
+            tr("update.changelog_message", count=count, changelog=changelog)
+        )
+        msg.setIcon(QMessageBox.Icon.Information)
+
+        btn_update = msg.addButton(
+            tr("update.button_update"), QMessageBox.ButtonRole.AcceptRole
+        )
+        msg.addButton(
+            tr("update.button_later"), QMessageBox.ButtonRole.RejectRole
+        )
+
+        msg.exec()
+
+        if msg.clickedButton() == btn_update:
+            self._on_perform_update()
+
+    def _on_perform_update(self):
+        """Trigger the git-based update via update_checker.apply_update()."""
+        self.statusBar().showMessage(tr("update.updating"), 0)
+        self._update_checker.apply_update()
+
+    def _on_update_progress(self, message: str):
+        """Show update progress in status bar; handle dirty-tree warning."""
+        if message == "dirty_tree":
+            self.statusBar().clearMessage()
+            Toast(self, tr("update.dirty_tree"), duration=8000)
+            return
+        self.statusBar().showMessage(message, 0)
+
+    def _on_update_applied(self, success: bool, pip_ran: bool):
+        """Handle update result -- restart on success, toast on failure."""
+        if success:
+            if pip_ran:
+                Toast(self, tr("update.pip_updated"), duration=3000)
+            Toast(self, tr("update.restart_required"), duration=3000)
+            QTimer.singleShot(1500, self._restart_app)
+        else:
+            self.statusBar().clearMessage()
+            Toast(self, tr("update.failed", error="git pull"), duration=8000)
+
+    def _restart_app(self):
+        """Restart the application via os.execv."""
+        os.execv(sys.executable, [sys.executable] + sys.argv)

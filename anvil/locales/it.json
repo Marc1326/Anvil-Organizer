@@ -807,5 +807,18 @@
     "not_detected": "non rilevato",
     "create_error": "Impossibile creare l'istanza:\n{error}",
     "browse_folder_title": "Seleziona cartella"
+  },
+
+  "update": {
+    "commits_available": "{count} nuovi commit disponibili",
+    "changelog_title": "Aggiornamento disponibile",
+    "changelog_message": "{count} nuovi commit su origin/main:\n\n{changelog}\n\nAggiornare adesso?",
+    "button_update": "Aggiorna",
+    "button_later": "Più tardi",
+    "updating": "Aggiornamento in corso...",
+    "restart_required": "Aggiornamento installato. Riavvio dell'applicazione...",
+    "failed": "Aggiornamento fallito: {error}",
+    "dirty_tree": "Modifiche locali rilevate. Esegui prima il commit.",
+    "pip_updated": "Dipendenze Python aggiornate"
   }
 }

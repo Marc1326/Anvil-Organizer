@@ -809,5 +809,18 @@
     "not_detected": "not detected",
     "create_error": "Failed to create instance:\n{error}",
     "browse_folder_title": "Select Folder"
+  },
+
+  "update": {
+    "commits_available": "{count} new commits available",
+    "changelog_title": "Update Available",
+    "changelog_message": "{count} new commits on origin/main:\n\n{changelog}\n\nUpdate now?",
+    "button_update": "Update",
+    "button_later": "Later",
+    "updating": "Updating...",
+    "restart_required": "Update installed. Restarting app...",
+    "failed": "Update failed: {error}",
+    "dirty_tree": "Local changes detected. Please commit first.",
+    "pip_updated": "Python dependencies updated"
   }
 }
