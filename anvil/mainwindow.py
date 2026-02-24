@@ -2573,14 +2573,12 @@ class MainWindow(QMainWindow):
         if entry.nexus_id <= 0:
             return
 
-        # Get Nexus game slug from plugin
+        # Get Nexus game slug from plugin (self._current_plugin, NOT _game_panel)
         nexus_slug = ""
-        if hasattr(self, '_game_panel') and hasattr(self._game_panel, '_current_plugin'):
-            plugin = self._game_panel._current_plugin
-            if plugin:
-                nexus_slug = getattr(plugin, "GameNexusName", "") or getattr(plugin, "GameShortName", "")
+        if self._current_plugin:
+            nexus_slug = getattr(self._current_plugin, "GameNexusName", "") or getattr(self._current_plugin, "GameShortName", "")
         if not nexus_slug:
-            nexus_slug = "site"  # fallback: generic Nexus URL
+            nexus_slug = "site"
 
         url = f"https://www.nexusmods.com/{nexus_slug}/mods/{entry.nexus_id}"
         QDesktopServices.openUrl(QUrl(url))

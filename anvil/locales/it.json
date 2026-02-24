@@ -11,7 +11,7 @@
 
     "manage_instances": "Gestisci istanze...",
     "install_mod": "Installa Mod...",
-    "visit_nexus": "Visita Nexus",
+    "visit_nexus": "Apri pagina Nexus",
     "quit": "Esci",
 
     "reload": "Ricarica",
@@ -69,7 +69,7 @@
     "remove_endorsement": "Rimuovi endorsement",
     "reassign_category": "Riassegna categoria (da Nexus)",
     "start_tracking": "Inizia monitoraggio",
-    "visit_nexus": "Visita su NexusMods",
+    "visit_nexus": "Apri pagina Nexus",
     "open_explorer": "Apri in esplora risorse",
     "information": "Informazioni...",
 
@@ -462,7 +462,7 @@
 
   "game_panel": {
     "install": "Installa",
-    "visit_nexus": "Visita su Nexus",
+    "visit_nexus": "Apri pagina Nexus",
     "open_file": "Apri file",
     "open_meta": "Apri file Meta",
     "show_in_downloads": "Mostra nella cartella download",

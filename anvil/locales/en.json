@@ -11,7 +11,7 @@
 
     "manage_instances": "Manage Instances...",
     "install_mod": "Install Mod...",
-    "visit_nexus": "Visit Nexus",
+    "visit_nexus": "Open Nexus Page",
     "quit": "Quit",
 
     "reload": "Reload",
@@ -69,7 +69,7 @@
     "remove_endorsement": "Remove Endorsement",
     "reassign_category": "Reassign Category (from Nexus)",
     "start_tracking": "Start Tracking",
-    "visit_nexus": "Visit on NexusMods",
+    "visit_nexus": "Open Nexus Page",
     "open_explorer": "Open in Explorer",
     "information": "Information...",
 
@@ -464,7 +464,7 @@
 
   "game_panel": {
     "install": "Install",
-    "visit_nexus": "Visit on Nexus",
+    "visit_nexus": "Open Nexus Page",
     "open_file": "Open File",
     "open_meta": "Open Meta File",
     "show_in_downloads": "Show in Downloads Folder",
