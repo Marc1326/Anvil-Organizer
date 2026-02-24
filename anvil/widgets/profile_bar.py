@@ -126,6 +126,15 @@ class FadeEdge(QWidget):
         painter.fillRect(self.rect(), gradient)
 
 
+class _FocusOutLineEdit(QLineEdit):
+    """QLineEdit that emits focus_lost when focus leaves (click anywhere else)."""
+    focus_lost = Signal()
+
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self.focus_lost.emit()
+
+
 class ProfileBar(QWidget):
     # Existing signals
     collapse_all_requested = Signal()
@@ -332,6 +341,10 @@ class ProfileBar(QWidget):
         # Connect scroll for fade updates
         self._scroll_area.horizontalScrollBar().valueChanged.connect(self._update_fade_visibility)
 
+        # Application-wide click detection: close inline input on click anywhere
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance().installEventFilter(self)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._position_fade_edges()
@@ -471,7 +484,7 @@ class ProfileBar(QWidget):
 
         self._inline_confirmed = False
 
-        edit = QLineEdit()
+        edit = _FocusOutLineEdit()
         edit.setObjectName("profileInlineInput")
         edit.setPlaceholderText(tr("placeholder.profile_name"))
         edit.setFixedWidth(140)
@@ -492,7 +505,7 @@ class ProfileBar(QWidget):
 
         edit.setFocus()
         edit.returnPressed.connect(lambda: self._finish_inline_create(edit))
-        edit.editingFinished.connect(lambda: self._cancel_inline_create(edit))
+        edit.focus_lost.connect(lambda: self._cancel_inline_create(edit))
 
         self._inline_input = edit
 
@@ -548,7 +561,7 @@ class ProfileBar(QWidget):
         tab.hide()
 
         # Create input
-        edit = QLineEdit()
+        edit = _FocusOutLineEdit()
         edit.setObjectName("profileInlineInput")
         edit.setText(old_name)
         edit.setFixedWidth(max(140, tab.width()))
@@ -569,7 +582,7 @@ class ProfileBar(QWidget):
         edit.setFocus()
         edit.selectAll()
         edit.returnPressed.connect(lambda: self._finish_inline_rename(edit, tab, old_name))
-        edit.editingFinished.connect(lambda: self._cancel_inline_rename(edit, tab))
+        edit.focus_lost.connect(lambda: self._cancel_inline_rename(edit, tab))
 
         self._rename_input = edit
         self._rename_tab = tab
@@ -651,12 +664,14 @@ class ProfileBar(QWidget):
 
     def eventFilter(self, obj, event: QEvent) -> bool:
         """Handle drag & drop events on tabs and focus management."""
-        # Klick auf freie Fläche → Eingabefelder schließen
+        # Application-level: Klick irgendwo → Inline-Input schließen
         if event.type() == QEvent.Type.MouseButtonPress:
-            if self._inline_input is not None and obj != self._inline_input:
+            if self._inline_input is not None and obj is not self._inline_input:
                 self._inline_input.clearFocus()
-            if self._rename_input is not None and obj != self._rename_input:
+                return False
+            if self._rename_input is not None and obj is not self._rename_input:
                 self._rename_input.clearFocus()
+                return False
 
         # Nur Events von Tabs verarbeiten (für Drag & Drop)
         if obj not in self._tabs:
