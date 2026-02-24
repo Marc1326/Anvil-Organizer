@@ -102,6 +102,10 @@ class BaseGame:
     These mods are NOT removed during purge.
     """
 
+    GameLMLPath: str = ""
+    """If set, mods containing install.xml are deployed as directory
+    symlinks into this path (e.g. 'lml' for RDR2).  Empty = disabled."""
+
     # ── Interner State ────────────────────────────────────────────────
 
     def __init__(self) -> None:

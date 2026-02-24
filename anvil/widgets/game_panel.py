@@ -344,8 +344,10 @@ class GamePanel(QWidget):
         direct_patterns = getattr(game_plugin, "GameDirectInstallMods", []) if game_plugin else []
         data_path = getattr(game_plugin, "GameDataPath", "") if game_plugin else ""
         nest = getattr(game_plugin, "GameNestModsUnderName", False) if game_plugin else False
+        lml_path = getattr(game_plugin, "GameLMLPath", "") if game_plugin else ""
+        multi_routes = getattr(game_plugin, "GameMultiFolderRoutes", {}) if game_plugin else {}
         if self._instance_path and game_path:
-            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, data_path=data_path, nest_under_mod_name=nest)
+            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes)
 
         # Update label
         self._game_label.setText(game_name or tr("game_panel.no_game_selected"))
@@ -609,8 +611,10 @@ class GamePanel(QWidget):
         direct_patterns = getattr(self._current_plugin, "GameDirectInstallMods", []) if self._current_plugin else []
         data_path = getattr(self._current_plugin, "GameDataPath", "") if self._current_plugin else ""
         nest = getattr(self._current_plugin, "GameNestModsUnderName", False) if self._current_plugin else False
+        lml_path = getattr(self._current_plugin, "GameLMLPath", "") if self._current_plugin else ""
+        multi_routes = getattr(self._current_plugin, "GameMultiFolderRoutes", {}) if self._current_plugin else {}
         if self._current_game_path and instance_path:
-            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, data_path=data_path, nest_under_mod_name=nest)
+            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes)
         else:
             self._deployer = None
 

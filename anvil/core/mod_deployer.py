@@ -67,11 +67,15 @@ class ModDeployer:
         profile_name: str = "Default",
         data_path: str = "",
         nest_under_mod_name: bool = False,
+        lml_path: str = "",
+        multi_folder_routes: dict[str, str] | None = None,
     ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
         self._data_path = data_path
         self._nest_under_mod_name = nest_under_mod_name
+        self._lml_path = lml_path
+        self._multi_folder_routes = multi_folder_routes or {}
         self._mods_path = instance_path / ".mods"
         self._profiles_dir = instance_path / ".profiles"
         self._profile_path = self._profiles_dir / profile_name
@@ -145,6 +149,32 @@ class ModDeployer:
             if mod_name.endswith("_separator"):
                 continue
 
+            # LML-Mod? (hat install.xml im Mod-Root) → Ordner-Symlink
+            if self._lml_path and (mod_dir / "install.xml").is_file():
+                lml_target = self._game_path / self._lml_path / mod_name
+                lml_target.parent.mkdir(parents=True, exist_ok=True)
+
+                if lml_target.is_symlink():
+                    lml_target.unlink()
+                elif lml_target.exists():
+                    result.skipped_real_files.append(
+                        str(lml_target.relative_to(self._game_path))
+                    )
+                    continue
+
+                try:
+                    lml_target.symlink_to(mod_dir)
+                    result.links_created += 1
+                    symlinks.append({
+                        "link": str(Path(self._lml_path) / mod_name),
+                        "target": str(mod_dir),
+                        "mod": mod_name,
+                        "type": "dir_symlink",
+                    })
+                except OSError as exc:
+                    result.errors.append(f"lml symlink {mod_name}: {exc}")
+                continue  # Keine Einzel-Dateien symlinken
+
             # Walk all files in this mod
             for src_file in mod_dir.rglob("*"):
                 if not src_file.is_file():
@@ -167,14 +197,25 @@ class ModDeployer:
                 # Skip for direct-install mods — they deploy into game root
                 if self._data_path and not is_direct:
                     data_prefix = Path(self._data_path)
-                    try:
-                        rel.relative_to(data_prefix)
-                        # rel beginnt bereits mit Data/ → nicht nochmal
-                    except ValueError:
-                        if self._nest_under_mod_name:
-                            rel = data_prefix / mod_name / rel
-                        else:
-                            rel = data_prefix / rel
+
+                    # Multi-folder routing (e.g. Witcher 3: mods/ → Mods/, dlc/ → DLC/)
+                    routed = False
+                    if self._multi_folder_routes and len(rel.parts) > 1:
+                        first_part = rel.parts[0]
+                        if first_part in self._multi_folder_routes:
+                            target_prefix = self._multi_folder_routes[first_part]
+                            rel = Path(target_prefix) / Path(*rel.parts[1:])
+                            routed = True
+
+                    if not routed:
+                        try:
+                            rel.relative_to(data_prefix)
+                            # rel beginnt bereits mit Data/ → nicht nochmal
+                        except ValueError:
+                            if self._nest_under_mod_name:
+                                rel = data_prefix / mod_name / rel
+                            else:
+                                rel = data_prefix / rel
 
                 target = self._game_path / rel
 
@@ -302,6 +343,16 @@ class ModDeployer:
 
             # Direct-install copies are intentionally left in place
             if deploy_type == "copy":
+                continue
+
+            # Directory symlinks (LML mods)
+            if deploy_type == "dir_symlink":
+                if link_path.is_symlink():
+                    try:
+                        link_path.unlink()
+                        result.links_removed += 1
+                    except OSError as exc:
+                        result.errors.append(f"unlink dir_symlink {link_rel}: {exc}")
                 continue
 
             if not link_path.is_symlink():

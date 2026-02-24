@@ -52,7 +52,11 @@ class Witcher3Game(BaseGame):
     GameLauncher = ""  # No separate launcher
 
     GameFlattenArchive = False        # Keep modXXX/content/ structure intact
-    GameNestModsUnderName = True      # Deploy: Mods/modXXX/content/ not Mods/content/
+    GameNestModsUnderName = False     # Witcher 3 scannt nur EINE Ebene in Mods/
+
+    # Multi-Ordner Routing: Mods wie "Brothers In Arms" haben
+    # mods/, dlc/, bin/ Unterordner die an verschiedene Ziele gehen
+    GameMultiFolderRoutes = {"mods": "Mods", "dlc": "DLC", "bin": "bin"}
 
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()
     GameSavesDirectory = ""     # resolved dynamically via gameSavesDirectory()
