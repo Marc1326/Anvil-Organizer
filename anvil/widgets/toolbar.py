@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, QSize
 from anvil.widgets.instance_manager_dialog import InstanceManagerDialog
 from anvil.widgets.profile_dialog import ProfileDialog
 from anvil.widgets.executables_dialog import ExecutablesDialog
+from anvil.widgets.donate_dialog import DonateDialog
 from anvil.core.translator import tr
 
 _ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
@@ -138,8 +139,8 @@ def create_toolbar(parent=None):
     bar.addWidget(spacer)
 
     # Rechts: 4 Status-Icons
-    endorse_btn = _add_btn("endorse.svg", "Endorse")
-    endorse_btn.setEnabled(False)
+    donate_btn = _add_btn("endorse.svg", "Support / Donate")
+    donate_btn.clicked.connect(lambda: DonateDialog(bar.window()).exec())
 
     notifications_btn = _add_btn("problems.svg", "Benachrichtigungen")
     notifications_btn.setEnabled(False)

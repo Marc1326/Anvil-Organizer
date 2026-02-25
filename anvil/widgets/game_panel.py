@@ -218,6 +218,7 @@ class GamePanel(QWidget):
         self._ph_saves = PersistentHeader(saves_header, "saves")
         saves_layout.addWidget(self._saves_tree)
         tabs.addTab(saves, tr("game_panel.saves_tab"))
+        tabs.setTabEnabled(1, False)  # Saves tab — coming soon
 
         # ── Downloads-Tab ─────────────────────────────────────────────
         downloads = QWidget()
@@ -371,6 +372,8 @@ class GamePanel(QWidget):
         banner = None
         if self._icon_manager and self._current_short_name:
             banner = self._icon_manager.get_game_banner(self._current_short_name)
+            if banner is None:
+                banner = self._icon_manager.get_game_icon(self._current_short_name)
 
         if banner is not None:
             scaled = banner.scaled(
@@ -452,6 +455,8 @@ class GamePanel(QWidget):
         """Return small (24x24) game banner icon (cover art), or placeholder."""
         if self._icon_manager and self._current_short_name:
             pix = self._icon_manager.get_game_banner(self._current_short_name)
+            if pix is None:
+                pix = self._icon_manager.get_game_icon(self._current_short_name)
             if pix is not None:
                 return QIcon(pix.scaled(
                     QSize(24, 24),

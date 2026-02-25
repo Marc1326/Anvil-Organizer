@@ -782,17 +782,6 @@ class MainWindow(QMainWindow):
         Args:
             instance_name: Name of the instance to switch to.
         """
-        s = self._settings()
-        if s.value("Interface/confirm_instance_change", True, type=bool):
-            reply = QMessageBox.question(
-                self,
-                tr("dialog.confirm_instance_change_title"),
-                tr("dialog.confirm_instance_change_text", name=instance_name),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
         self.instance_manager.set_current_instance(instance_name)
         self._apply_instance(instance_name)
 

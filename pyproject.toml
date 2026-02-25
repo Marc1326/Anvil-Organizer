@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "anvil-organizer"
+version = "0.1.0"
+description = "A native Linux mod manager inspired by Mod Organizer 2"
+readme = "README.md"
+license = {text = "GPL-3.0-or-later"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Marc"}
+]
+keywords = ["modding", "mod-manager", "linux", "gaming", "proton", "steam"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Games/Entertainment",
+]
+dependencies = [
+    "PySide6>=6.6.0",
+    "lz4>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Marc1326/Anvil-Organizer"
+Repository = "https://github.com/Marc1326/Anvil-Organizer"
+Issues = "https://github.com/Marc1326/Anvil-Organizer/issues"
+Wiki = "https://github.com/Marc1326/Anvil-Organizer/wiki"
+
+[project.scripts]
+anvil-organizer = "anvil.__main__:main"
+
+[project.gui-scripts]
+anvil-organizer = "anvil.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["anvil*"]
