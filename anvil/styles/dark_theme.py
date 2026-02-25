@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 
-_STYLES_DIR = Path(__file__).parent
+from anvil.core.resource_path import get_anvil_base
+
+_STYLES_DIR = get_anvil_base() / "styles"
 _DEFAULT_THEME = "Paper Dark"
 
 

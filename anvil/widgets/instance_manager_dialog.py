@@ -17,8 +17,9 @@ from anvil.core.ui_helpers import get_text_input
 from anvil.core.icon_manager import IconManager, placeholder_game_icon
 from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.translator import tr
+from anvil.core.resource_path import get_anvil_base
 
-_ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
+_ICONS_DIR = get_anvil_base() / "styles" / "icons"
 
 _DIALOG_STYLE = """
 QDialog { background: #1C1C1C; }

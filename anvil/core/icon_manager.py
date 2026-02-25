@@ -13,7 +13,9 @@ from pathlib import Path
 
 from PySide6.QtGui import QPixmap, QPainter, QColor, QFont, QIcon
 
-_ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets" / "icons"
+from anvil.core.resource_path import get_anvil_base
+
+_ASSETS_DIR = get_anvil_base() / "assets" / "icons"
 
 
 # ── Placeholder generators ────────────────────────────────────────────

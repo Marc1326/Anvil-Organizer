@@ -6,6 +6,11 @@ __pycache__/
 dist/
 build/
 debug.log
+release/
+AnvilOrganizer.AppDir/
+*.AppImage
+*.spec
+!anvil-organizer.spec
 
 # IDE
 .idea/

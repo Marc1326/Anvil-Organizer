@@ -28,7 +28,9 @@ from anvil.stores.store_manager import StoreManager
 
 # ── Plugin directories ─────────────────────────────────────────────────
 
-_BUILTIN_GAMES_DIR = Path(__file__).parent / "games"
+from anvil.core.resource_path import get_anvil_base
+
+_BUILTIN_GAMES_DIR = get_anvil_base() / "plugins" / "games"
 _USER_GAMES_DIR = Path.home() / ".anvil-organizer" / "plugins" / "games"
 
 _USER_README = """\

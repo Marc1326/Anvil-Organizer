@@ -7,9 +7,10 @@ from PySide6.QtGui import QColor, QBrush, QFont, QIcon
 
 from anvil.core.mod_entry import ModEntry
 from anvil.core.translator import tr
+from anvil.core.resource_path import get_anvil_base
 
 # Conflict icon paths (resolved once)
-_ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "conflicts")
+_ICON_DIR = str(get_anvil_base() / "styles" / "icons" / "conflicts")
 _CONFLICT_ICONS: dict[str, QIcon] = {}
 
 

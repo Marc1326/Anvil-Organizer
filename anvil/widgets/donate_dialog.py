@@ -9,7 +9,9 @@ from PySide6.QtWidgets import (
     QStackedWidget, QWidget, QApplication,
 )
 
-_ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
+from anvil.core.resource_path import get_anvil_base
+
+_ICONS_DIR = get_anvil_base() / "styles" / "icons"
 _DONATE_DIR = _ICONS_DIR / "donate"
 
 BTC_ADDR = "bc1q6ghal7tewh38gdggt8z8qeqr99u3y5ehmruwk9"

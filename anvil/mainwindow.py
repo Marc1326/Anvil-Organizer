@@ -98,7 +98,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"Anvil Organizer v{APP_VERSION}")
-        logo_path = Path(__file__).parent / "resources" / "logo.svg"
+        from anvil.core.resource_path import get_anvil_base
+        logo_path = get_anvil_base() / "resources" / "logo.svg"
         self.setWindowIcon(QIcon(str(logo_path)))
         self.setMinimumSize(1000, 650)
         self.resize(1200, 750)
@@ -1900,21 +1901,24 @@ class MainWindow(QMainWindow):
     def _open_ao_install_folder(self) -> None:
         """Open the Anvil Organizer installation folder in file manager."""
         import subprocess
-        path = Path(__file__).parent.parent
+        from anvil.core.resource_path import get_anvil_base
+        path = get_anvil_base().parent
         if path.is_dir():
             subprocess.Popen(["xdg-open", str(path)])
 
     def _open_ao_plugins_folder(self) -> None:
         """Open the Anvil Organizer plugins folder in file manager."""
         import subprocess
-        path = Path(__file__).parent / "plugins"
+        from anvil.core.resource_path import get_anvil_base
+        path = get_anvil_base() / "plugins"
         if path.is_dir():
             subprocess.Popen(["xdg-open", str(path)])
 
     def _open_ao_styles_folder(self) -> None:
         """Open the Anvil Organizer styles folder in file manager."""
         import subprocess
-        path = Path(__file__).parent / "styles"
+        from anvil.core.resource_path import get_anvil_base
+        path = get_anvil_base() / "styles"
         if path.is_dir():
             subprocess.Popen(["xdg-open", str(path)])
 

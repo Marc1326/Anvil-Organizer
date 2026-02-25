@@ -25,7 +25,8 @@ class Translator:
         self._current_lang = "de"
         self._strings: dict[str, Any] = {}
         self._fallback: dict[str, Any] = {}
-        self._locales_dir = Path(__file__).parent.parent / "locales"
+        from anvil.core.resource_path import get_anvil_base
+        self._locales_dir = get_anvil_base() / "locales"
 
         # Lade Standard-Sprache
         self._load_language(self._current_lang)

@@ -13,8 +13,9 @@ from anvil.widgets.profile_dialog import ProfileDialog
 from anvil.widgets.executables_dialog import ExecutablesDialog
 from anvil.widgets.donate_dialog import DonateDialog
 from anvil.core.translator import tr
+from anvil.core.resource_path import get_anvil_base
 
-_ICONS_DIR = Path(__file__).resolve().parent.parent / "styles" / "icons"
+_ICONS_DIR = get_anvil_base() / "styles" / "icons"
 
 
 def _icon(name: str) -> QIcon:

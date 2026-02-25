@@ -7,6 +7,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from anvil.core.resource_path import get_anvil_base
+
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -97,7 +99,7 @@ class GamePanel(QWidget):
         # Verknüpfung-Button oben rechts
         link_btn = QPushButton()
         link_btn.setObjectName("linkButton")
-        _exec_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "executables.svg")
+        _exec_icon = str(get_anvil_base() / "styles" / "icons" / "executables.svg")
         if os.path.exists(_exec_icon):
             link_btn.setIcon(QIcon(_exec_icon))
         link_btn.setIconSize(QSize(20, 20))
@@ -143,7 +145,7 @@ class GamePanel(QWidget):
         # Start-Button
         self._start_btn = QPushButton()
         self._start_btn.setObjectName("startButton")
-        _play_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "files", "play.png")
+        _play_icon = str(get_anvil_base() / "styles" / "icons" / "files" / "play.png")
         if os.path.exists(_play_icon):
             self._start_btn.setIcon(QIcon(_play_icon))
             self._start_btn.setIconSize(QSize(24, 24))
@@ -172,7 +174,7 @@ class GamePanel(QWidget):
         data = QWidget()
         data_layout = QVBoxLayout(data)
         data_reload_btn = QPushButton(tr("game_panel.reload"))
-        _refresh_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "refresh.svg")
+        _refresh_icon = str(get_anvil_base() / "styles" / "icons" / "refresh.svg")
         if os.path.exists(_refresh_icon):
             data_reload_btn.setIcon(QIcon(_refresh_icon))
         data_reload_btn.setIconSize(QSize(20, 20))
@@ -224,7 +226,7 @@ class GamePanel(QWidget):
         downloads = QWidget()
         dl_layout = QVBoxLayout(downloads)
         reload_btn = QPushButton(tr("game_panel.reload"))
-        _refresh_icon2 = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "refresh.svg")
+        _refresh_icon2 = str(get_anvil_base() / "styles" / "icons" / "refresh.svg")
         if os.path.exists(_refresh_icon2):
             reload_btn.setIcon(QIcon(_refresh_icon2))
         reload_btn.setIconSize(QSize(20, 20))

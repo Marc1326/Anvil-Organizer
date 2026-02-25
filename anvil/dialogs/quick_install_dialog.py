@@ -16,8 +16,9 @@ from PySide6.QtCore import Qt
 from pathlib import Path
 
 from anvil.core.translator import tr
+from anvil.core.resource_path import get_anvil_base
 
-_ARROW_SVG = str(Path(__file__).resolve().parent.parent / "resources" / "arrow_down.svg").replace("\\", "/")
+_ARROW_SVG = str(get_anvil_base() / "resources" / "arrow_down.svg").replace("\\", "/")
 
 _STYLE = f"""
 QDialog {{ background: #1C1C1C; color: #D3D3D3; }}

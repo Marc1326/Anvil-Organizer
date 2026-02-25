@@ -21,8 +21,9 @@ from PySide6.QtCore import QSize, Signal, Qt, QTimer, QPoint, QEvent
 
 from anvil.core import _todo
 from anvil.core.translator import tr
+from anvil.core.resource_path import get_anvil_base
 
-ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "styles", "icons", "files")
+ICON_DIR = str(get_anvil_base() / "styles" / "icons" / "files")
 
 
 BUTTON_STYLE = """

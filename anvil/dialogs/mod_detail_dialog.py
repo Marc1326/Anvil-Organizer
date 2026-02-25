@@ -139,8 +139,8 @@ QLabel { color: #D3D3D3; }
 
 def _icon_path(name):
     """Pfad zu Icon in anvil/styles/icons/files/."""
-    base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, "..", "styles", "icons", "files", name)
+    from anvil.core.resource_path import get_anvil_base
+    return str(get_anvil_base() / "styles" / "icons" / "files" / name)
 
 
 def _code_font():
