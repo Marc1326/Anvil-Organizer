@@ -14,6 +14,11 @@ debug.log
 
 # Development files (not for release)
 _dev/
+..bfg-report/
 
 # WIP game plugins (not ready for release)
 anvil/plugins/games/_wip/
+
+# Claude Code (nicht veröffentlichen)
+CLAUDE.md
+.claude/
