@@ -67,7 +67,7 @@ cat > "$DESKTOP_FILE" << EOF
 [Desktop Entry]
 Name=Anvil Organizer
 Comment=Linux Mod Manager inspired by Mod Organizer 2
-Exec=$VENV_DIR/bin/python $SCRIPT_DIR/main.py
+Exec="$VENV_DIR/bin/python" "$SCRIPT_DIR/main.py"
 Icon=anvil-organizer
 Terminal=false
 Type=Application
