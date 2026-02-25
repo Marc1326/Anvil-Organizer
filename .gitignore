@@ -2,8 +2,18 @@
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
+dist/
+build/
+debug.log
 
-# Claude Agent System
-CLAUDE.md
-HOW_TO_USE_AGENTS.md
-.claude/
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Development files (not for release)
+_dev/
+
+# WIP game plugins (not ready for release)
+anvil/plugins/games/_wip/
