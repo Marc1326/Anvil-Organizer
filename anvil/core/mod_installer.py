@@ -9,6 +9,7 @@ Supported formats:
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -345,8 +346,20 @@ class ModInstaller:
     @staticmethod
     def _extract_zip(archive: Path, dest: Path) -> bool:
         try:
+            real_dest = os.path.realpath(dest)
             with zipfile.ZipFile(archive, "r") as zf:
-                zf.extractall(dest)
+                for member in zf.infolist():
+                    resolved = os.path.realpath(
+                        os.path.join(real_dest, member.filename)
+                    )
+                    if not resolved.startswith(real_dest + os.sep) and resolved != real_dest:
+                        print(
+                            f"mod_installer: SECURITY — skipping zip entry "
+                            f"with path traversal: {member.filename!r}",
+                            file=sys.stderr,
+                        )
+                        continue
+                    zf.extract(member, dest)
             return True
         except (zipfile.BadZipFile, OSError) as exc:
             print(
@@ -369,6 +382,7 @@ class ModInstaller:
                 check=True,
                 capture_output=True,
             )
+            ModInstaller._validate_extracted_paths(dest, "RAR")
             return True
         except subprocess.CalledProcessError as exc:
             print(
@@ -391,6 +405,7 @@ class ModInstaller:
                 check=True,
                 capture_output=True,
             )
+            ModInstaller._validate_extracted_paths(dest, "7z")
             return True
         except subprocess.CalledProcessError as exc:
             print(
@@ -400,6 +415,25 @@ class ModInstaller:
             return False
 
     # ── Helpers ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _validate_extracted_paths(dest: Path, fmt: str) -> None:
+        """Post-extraction validation: remove files outside target dir."""
+        real_dest = os.path.realpath(dest)
+        for root, dirs, files in os.walk(real_dest):
+            for fname in files:
+                fpath = os.path.join(root, fname)
+                resolved = os.path.realpath(fpath)
+                if not resolved.startswith(real_dest + os.sep) and resolved != real_dest:
+                    print(
+                        f"mod_installer: SECURITY — removing {fmt} entry "
+                        f"with path traversal: {resolved!r}",
+                        file=sys.stderr,
+                    )
+                    try:
+                        os.remove(resolved)
+                    except OSError:
+                        pass
 
     @staticmethod
     def _sanitize_name(name: str) -> str:

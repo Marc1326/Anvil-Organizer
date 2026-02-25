@@ -12,6 +12,7 @@ supports inactive mods (in Mods node but not in ModOrder).
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -885,6 +886,25 @@ class BG3ModInstaller:
         )
 
     @staticmethod
+    def _validate_extracted_paths(target_dir: str, fmt: str) -> None:
+        """Post-extraction validation: remove files outside target dir."""
+        real_dest = os.path.realpath(target_dir)
+        for root, dirs, files in os.walk(real_dest):
+            for fname in files:
+                fpath = os.path.join(root, fname)
+                resolved = os.path.realpath(fpath)
+                if not resolved.startswith(real_dest + os.sep) and resolved != real_dest:
+                    print(
+                        f"bg3_installer: SECURITY — removing {fmt} entry "
+                        f"with path traversal: {resolved!r}",
+                        file=sys.stderr,
+                    )
+                    try:
+                        os.remove(resolved)
+                    except OSError:
+                        pass
+
+    @staticmethod
     def _extract_archive(archive_path: Path) -> str | None:
         """Extract an archive to a temp directory. Returns temp dir path."""
         tmp = tempfile.mkdtemp(prefix="bg3_mod_")
@@ -892,8 +912,20 @@ class BG3ModInstaller:
 
         try:
             if suffix == ".zip":
+                real_tmp = os.path.realpath(tmp)
                 with zipfile.ZipFile(archive_path, "r") as zf:
-                    zf.extractall(tmp)
+                    for member in zf.infolist():
+                        resolved = os.path.realpath(
+                            os.path.join(real_tmp, member.filename)
+                        )
+                        if not resolved.startswith(real_tmp + os.sep) and resolved != real_tmp:
+                            print(
+                                f"bg3_installer: SECURITY — skipping zip entry "
+                                f"with path traversal: {member.filename!r}",
+                                file=sys.stderr,
+                            )
+                            continue
+                        zf.extract(member, tmp)
                 return tmp
 
             if suffix == ".rar":
@@ -906,6 +938,7 @@ class BG3ModInstaller:
                     [unrar, "x", "-o+", str(archive_path), tmp + "/"],
                     check=True, capture_output=True,
                 )
+                BG3ModInstaller._validate_extracted_paths(tmp, "RAR")
                 return tmp
 
             if suffix == ".7z":
@@ -918,6 +951,7 @@ class BG3ModInstaller:
                     [p7z, "x", f"-o{tmp}", str(archive_path), "-y"],
                     check=True, capture_output=True,
                 )
+                BG3ModInstaller._validate_extracted_paths(tmp, "7z")
                 return tmp
 
             print(f"bg3_installer: unsupported archive format: {suffix}", file=sys.stderr)
