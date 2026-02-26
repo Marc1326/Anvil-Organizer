@@ -950,7 +950,7 @@ class MainWindow(QMainWindow):
             self._mod_list_view.load_frameworks([])
 
         # 5. Mod deployer + auto-deploy
-        self._game_panel.set_instance_path(instance_path)
+        self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
         self._game_panel.silent_deploy()
 
         # 6. Status bar
@@ -2208,6 +2208,11 @@ class MainWindow(QMainWindow):
                 tree._collapsed_separators.clear()
             tree._apply_separator_filter()
 
+        # 6. Redeploy with new profile
+        self._game_panel.silent_purge()
+        self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
+        self._game_panel.silent_deploy()
+
     def _apply_active_state(self, active_mods: set[str]) -> None:
         """Update checkbox state for all mods without reloading.
 
@@ -3117,7 +3122,7 @@ class MainWindow(QMainWindow):
         self._current_profile_path = instance_path / ".profiles" / profile_name
 
         # No auto-deploy for BG3 (user deploys manually)
-        self._game_panel.set_instance_path(instance_path)
+        self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
 
     def _bg3_mark_dirty(self) -> None:
         """Show and highlight the Deploy button (unsaved changes)."""

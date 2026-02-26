@@ -122,12 +122,15 @@ class ModDeployer:
                 return result
 
         # Read global modlist for order + profile's active mods
+        print(f"[DEPLOY] Profile: {self._profile_path}", flush=True)
         global_order = read_global_modlist(self._profiles_dir)
         active_mods = read_active_mods(self._profile_path)
         enabled_mods = [
             (name, idx) for idx, name in enumerate(global_order)
             if name in active_mods
         ]
+        print(f"[DEPLOY] Enabled mods: {len(enabled_mods)}", flush=True)
+        print(f"[DEPLOY] Data path: {self._data_path or '(root)'}", flush=True)
 
         if not enabled_mods:
             result.errors.append("No enabled mods found.")
@@ -304,6 +307,12 @@ class ModDeployer:
             result.errors.append(f"write manifest: {exc}")
 
         result.dirs_created = len(created_dirs)
+
+        print(
+            f"[DEPLOY] Result: {result.links_created} symlinks, "
+            f"{result.files_copied} copies, {len(result.errors)} errors",
+            flush=True,
+        )
 
         if result.errors:
             result.success = False
