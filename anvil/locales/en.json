@@ -109,7 +109,8 @@
     "open_ao_install_folder": "Open AO Install Folder",
     "open_ao_plugins_folder": "Open AO Plugins Folder",
     "open_ao_styles_folder": "Open AO Stylesheets Folder",
-    "open_ao_logs_folder": "Open AO Logs Folder"
+    "open_ao_logs_folder": "Open AO Logs Folder",
+    "open_saves_folder": "Open Save Folder"
   },
 
   "dialog": {
@@ -223,7 +224,9 @@
     "confirm_instance_change_title": "Change Instance",
     "confirm_instance_change_text": "Do you want to switch to the instance \"{name}\"?",
     "about_text": "Anvil Organizer v{version}",
-    "about_qt_text": "This program uses Qt version {version}.\n\nQt is a C++ toolkit for cross-platform application development.\n\nQt provides single-source portability across all major desktop operating systems. It is also available for embedded Linux and other embedded and mobile operating systems.\n\nQt is available under multiple licensing options designed to accommodate the needs of various users.\n\nQt is The Qt Company Ltd. product developed as an open source project.\n\nSee https://www.qt.io for more information."
+    "about_qt_text": "This program uses Qt version {version}.\n\nQt is a C++ toolkit for cross-platform application development.\n\nQt provides single-source portability across all major desktop operating systems. It is also available for embedded Linux and other embedded and mobile operating systems.\n\nQt is available under multiple licensing options designed to accommodate the needs of various users.\n\nQt is The Qt Company Ltd. product developed as an open source project.\n\nSee https://www.qt.io for more information.",
+    "saves_not_found_title": "Save Folder Not Found",
+    "saves_not_found_message": "The save folder could not be found. Have you started the game at least once?"
   },
 
   "button": {
@@ -517,7 +520,9 @@
     "delete_confirm_title": "Confirm Delete",
     "steam_not_found": "Steam was not found in PATH.\nPlease install Steam or adjust your PATH.",
     "game_dir_not_found": "Game directory not found.",
-    "exe_not_found": "Executable not found:\n{path}"
+    "exe_not_found": "Executable not found:\n{path}",
+    "proton_not_found": "Proton not found for this game.\nMake sure the game has been run at least once via Steam.",
+    "proton_launch_failed": "Failed to launch via Proton:\n{error}"
   },
 
   "filter": {

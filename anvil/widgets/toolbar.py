@@ -65,6 +65,7 @@ def create_toolbar(parent=None):
     folder_menu = QMenu(bar)
     folder_menu.addAction(tr("toolbar.open_game_folder"), lambda: _call_win("_open_game_folder"))
     folder_menu.addAction(tr("toolbar.open_mygames_folder"), lambda: _call_win("_open_mygames_folder"))
+    folder_menu.addAction(tr("toolbar.open_saves_folder"), lambda: _call_win("_open_saves_folder"))
     folder_menu.addAction(tr("toolbar.open_ini_folder"), lambda: _call_win("_open_ini_folder"))
     folder_menu.addAction(tr("toolbar.open_instance_folder"), lambda: _call_win("_open_instance_folder"))
     folder_menu.addAction(tr("toolbar.open_mods_folder"), lambda: _call_win("_open_mods_folder"))

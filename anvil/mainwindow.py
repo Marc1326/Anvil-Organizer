@@ -1861,6 +1861,22 @@ class MainWindow(QMainWindow):
             if path and path.is_dir():
                 subprocess.Popen(["xdg-open", str(path)])
 
+    def _open_saves_folder(self) -> None:
+        """Open the save game directory in file manager."""
+        import subprocess
+        if not self._current_plugin:
+            return
+        if hasattr(self._current_plugin, "gameSavesDirectory"):
+            path = self._current_plugin.gameSavesDirectory()
+            if path and path.is_dir():
+                subprocess.Popen(["xdg-open", str(path)])
+            else:
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self, tr("dialog.saves_not_found_title"),
+                    tr("dialog.saves_not_found_message"),
+                )
+
     def _open_ini_folder(self) -> None:
         """Open the INI folder in file manager (same as My Games for most games)."""
         import subprocess

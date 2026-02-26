@@ -109,7 +109,8 @@
     "open_ao_install_folder": "Apri cartella installazione AO",
     "open_ao_plugins_folder": "Apri cartella Plugin AO",
     "open_ao_styles_folder": "Apri cartella stili AO",
-    "open_ao_logs_folder": "Apri cartella log AO"
+    "open_ao_logs_folder": "Apri cartella log AO",
+    "open_saves_folder": "Apri cartella salvataggi"
   },
 
   "dialog": {
@@ -223,7 +224,9 @@
     "confirm_instance_change_title": "Cambia Istanza",
     "confirm_instance_change_text": "Vuoi passare all'istanza \"{name}\"?",
     "about_text": "Anvil Organizer v{version}",
-    "about_qt_text": "Questo programma utilizza Qt versione {version}.\n\nQt è un toolkit C++ per lo sviluppo di applicazioni multipiattaforma.\n\nQt offre portabilità da un'unica sorgente su tutti i principali sistemi operativi desktop. È disponibile anche per Linux embedded e altri sistemi operativi embedded e mobili.\n\nQt è disponibile con molteplici opzioni di licenza progettate per soddisfare le esigenze di vari utenti.\n\nQt è un prodotto di Qt Company Ltd., sviluppato come progetto open source.\n\nMaggiori informazioni: https://www.qt.io"
+    "about_qt_text": "Questo programma utilizza Qt versione {version}.\n\nQt è un toolkit C++ per lo sviluppo di applicazioni multipiattaforma.\n\nQt offre portabilità da un'unica sorgente su tutti i principali sistemi operativi desktop. È disponibile anche per Linux embedded e altri sistemi operativi embedded e mobili.\n\nQt è disponibile con molteplici opzioni di licenza progettate per soddisfare le esigenze di vari utenti.\n\nQt è un prodotto di Qt Company Ltd., sviluppato come progetto open source.\n\nMaggiori informazioni: https://www.qt.io",
+    "saves_not_found_title": "Cartella salvataggi non trovata",
+    "saves_not_found_message": "La cartella dei salvataggi non è stata trovata. Hai avviato il gioco almeno una volta?"
   },
 
   "button": {
@@ -515,7 +518,9 @@
     "delete_confirm_title": "Conferma eliminazione",
     "steam_not_found": "Steam non trovato nel PATH.\nPer favore installa Steam o modifica il PATH.",
     "game_dir_not_found": "Directory del gioco non trovata.",
-    "exe_not_found": "Eseguibile non trovato:\n{path}"
+    "exe_not_found": "Eseguibile non trovato:\n{path}",
+    "proton_not_found": "Proton non trovato per questo gioco.\nAssicurati di aver avviato il gioco almeno una volta tramite Steam.",
+    "proton_launch_failed": "Avvio tramite Proton non riuscito:\n{error}"
   },
 
   "filter": {

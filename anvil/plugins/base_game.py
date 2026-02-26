@@ -233,6 +233,98 @@ class BaseGame:
 
         return None
 
+    def findProtonRun(self) -> tuple[Path, Path, Path] | None:
+        """Find the Proton runner for this Steam game.
+
+        Locates the ``proton`` script and compat-data directory needed
+        to launch arbitrary .exe files via ``proton run <exe>``.
+
+        Returns:
+            Tuple of (proton_script, compat_data_dir, steam_root) or
+            None if any component is missing.  *proton_script* is the
+            absolute path to the ``proton`` Python script,
+            *compat_data_dir* is the game's compatdata directory
+            (containing ``pfx/``), and *steam_root* is the Steam
+            installation root.
+        """
+        if self._detected_store != "steam":
+            return None
+
+        from anvil.stores.steam_utils import find_steam_path
+        steam_root = find_steam_path()
+        if steam_root is None:
+            return None
+
+        # Collect all Steam library folders (including external drives)
+        libraries = [steam_root]
+        vdf = steam_root / "steamapps" / "libraryfolders.vdf"
+        if vdf.is_file():
+            try:
+                import re as _re
+                text = vdf.read_text(encoding="utf-8")
+                for match in _re.finditer(r'"path"\s+"([^"]+)"', text):
+                    lib = Path(match.group(1))
+                    if lib.is_dir() and lib not in libraries:
+                        libraries.append(lib)
+            except OSError:
+                pass
+
+        # Find the compat-data directory for this game
+        compat_data: Path | None = None
+        for lib in libraries:
+            for steam_id in _as_list(self.GameSteamId):
+                candidate = lib / "steamapps" / "compatdata" / str(steam_id)
+                if candidate.is_dir():
+                    compat_data = candidate
+                    break
+            if compat_data is not None:
+                break
+
+        if compat_data is None:
+            return None
+
+        # Read config_info to find the Proton installation path.
+        # Line 1 = version string, line 2 = path to fonts dir inside Proton.
+        # From the fonts path we can derive the Proton root.
+        config_info = compat_data / "config_info"
+        proton_script: Path | None = None
+        if config_info.is_file():
+            try:
+                lines = config_info.read_text(encoding="utf-8").splitlines()
+                if len(lines) >= 2:
+                    # Line 2 is e.g. /path/to/Proton - Experimental/files/share/fonts/
+                    fonts_path = Path(lines[1])
+                    # Walk up to the Proton root (contains the "proton" script)
+                    candidate = fonts_path
+                    for _ in range(6):  # max depth to search upward
+                        candidate = candidate.parent
+                        if (candidate / "proton").is_file():
+                            proton_script = candidate / "proton"
+                            break
+            except OSError:
+                pass
+
+        # Fallback: search for Proton in all libraries by newest version
+        if proton_script is None:
+            for lib in libraries:
+                common = lib / "steamapps" / "common"
+                if not common.is_dir():
+                    continue
+                proton_dirs = sorted(
+                    [d for d in common.iterdir()
+                     if d.name.startswith("Proton") and (d / "proton").is_file()],
+                    key=lambda d: d.name,
+                    reverse=True,
+                )
+                if proton_dirs:
+                    proton_script = proton_dirs[0] / "proton"
+                    break
+
+        if proton_script is None:
+            return None
+
+        return proton_script, compat_data, steam_root
+
     def icon(self) -> str | None:
         """Return path to a game icon, or None.
 

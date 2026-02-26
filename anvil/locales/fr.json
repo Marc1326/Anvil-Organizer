@@ -109,7 +109,8 @@
     "open_ao_install_folder": "Ouvrir le dossier d'installation AO",
     "open_ao_plugins_folder": "Ouvrir le dossier Plugins AO",
     "open_ao_styles_folder": "Ouvrir le dossier des feuilles de style AO",
-    "open_ao_logs_folder": "Ouvrir le dossier des journaux AO"
+    "open_ao_logs_folder": "Ouvrir le dossier des journaux AO",
+    "open_saves_folder": "Ouvrir le dossier des sauvegardes"
   },
 
   "dialog": {
@@ -223,7 +224,9 @@
     "confirm_instance_change_title": "Changer d'instance",
     "confirm_instance_change_text": "Voulez-vous basculer vers l'instance \"{name}\" ?",
     "about_text": "Anvil Organizer v{version}",
-    "about_qt_text": "Ce programme utilise Qt version {version}.\n\nQt est une boîte à outils C++ pour le développement d'applications multiplateformes.\n\nQt offre une portabilité depuis une source unique sur tous les principaux systèmes d'exploitation de bureau. Il est également disponible pour Linux embarqué et d'autres systèmes d'exploitation embarqués et mobiles.\n\nQt est disponible sous plusieurs options de licence conçues pour répondre aux besoins de divers utilisateurs.\n\nQt est un produit de Qt Company Ltd., développé en tant que projet open source.\n\nPlus d'informations : https://www.qt.io"
+    "about_qt_text": "Ce programme utilise Qt version {version}.\n\nQt est une boîte à outils C++ pour le développement d'applications multiplateformes.\n\nQt offre une portabilité depuis une source unique sur tous les principaux systèmes d'exploitation de bureau. Il est également disponible pour Linux embarqué et d'autres systèmes d'exploitation embarqués et mobiles.\n\nQt est disponible sous plusieurs options de licence conçues pour répondre aux besoins de divers utilisateurs.\n\nQt est un produit de Qt Company Ltd., développé en tant que projet open source.\n\nPlus d'informations : https://www.qt.io",
+    "saves_not_found_title": "Dossier de sauvegardes introuvable",
+    "saves_not_found_message": "Le dossier des sauvegardes est introuvable. Avez-vous lancé le jeu au moins une fois ?"
   },
 
   "button": {
@@ -515,7 +518,9 @@
     "delete_confirm_title": "Confirmer la suppression",
     "steam_not_found": "Steam n'a pas été trouvé dans le PATH.\nVeuillez installer Steam ou ajuster le PATH.",
     "game_dir_not_found": "Répertoire du jeu introuvable.",
-    "exe_not_found": "Exécutable introuvable :\n{path}"
+    "exe_not_found": "Exécutable introuvable :\n{path}",
+    "proton_not_found": "Proton introuvable pour ce jeu.\nAssurez-vous d'avoir lance le jeu au moins une fois via Steam.",
+    "proton_launch_failed": "Echec du lancement via Proton :\n{error}"
   },
 
   "filter": {

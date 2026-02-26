@@ -434,7 +434,11 @@ class GamePanel(QWidget):
                 self._executables.append({"name": name, "binary": binary})
 
             # Disabled-Platzhalter: "skip REDmod deploy", "Manually deploy REDmod"
-            if game_name:
+            has_redmod = any(
+                "redmod" in e.get("binary", "").lower() or "prelauncher" in e.get("binary", "").lower()
+                for e in game_plugin.executables()
+            )
+            if game_name and has_redmod:
                 skip_action = self._exe_menu.addAction(cover_icon, tr("game_panel.skip_redmod", name=game_name))
                 skip_action.setEnabled(False)
                 deploy_action = self._exe_menu.addAction(tr("game_panel.deploy_redmod"))
@@ -523,34 +527,28 @@ class GamePanel(QWidget):
         if not binary:
             return
 
-        # Steam-Spiel → NUR Hauptspiel über Steam starten (Linux/Proton)
         plugin = self._current_plugin
-        if plugin and hasattr(plugin, "GameSteamId") and plugin.GameSteamId:
-            if hasattr(plugin, "GameBinary") and binary == plugin.GameBinary:
-                import shutil
-                steam_bin = shutil.which("steam")
-                if steam_bin:
-                    from PySide6.QtCore import QProcess
-                    steam_id = plugin.GameSteamId
-                    if isinstance(steam_id, list):
-                        steam_id = steam_id[0]
-                    args = ["-applaunch", str(steam_id)]
-                    if hasattr(plugin, "GameLaunchArgs"):
-                        args.extend(plugin.GameLaunchArgs)
-                    success, pid = QProcess.startDetached(steam_bin, args)
-                    if not success:
-                        QMessageBox.warning(
-                            self, tr("game_panel.start"),
-                            tr("game_panel.steam_not_found"),
-                        )
-                else:
-                    QMessageBox.warning(
-                        self, tr("game_panel.start"),
-                        tr("game_panel.steam_not_found"),
-                    )
-                return
+        is_steam = (
+            plugin
+            and hasattr(plugin, "GameSteamId")
+            and plugin.GameSteamId
+            and hasattr(plugin, "detectedStore")
+            and plugin.detectedStore() == "steam"
+        )
 
-        # Direkter Start für alle anderen Executables
+        if is_steam:
+            is_main_binary = (
+                hasattr(plugin, "GameBinary") and binary == plugin.GameBinary
+            )
+            if is_main_binary:
+                # Main game binary -> launch via steam -applaunch
+                self._launch_via_steam(plugin)
+            else:
+                # Non-primary executable (F4SE, REDmod, etc.) -> launch via proton run
+                self._launch_via_proton(plugin, binary)
+            return
+
+        # Non-Steam game: direct start (GOG, Epic, etc.)
         game_path = self._current_game_path
         if game_path is None:
             QMessageBox.warning(
@@ -569,6 +567,92 @@ class GamePanel(QWidget):
 
         working_dir = str(binary_path.parent)
         self.start_requested.emit(str(binary_path), working_dir)
+
+    def _launch_via_steam(self, plugin) -> None:
+        """Launch the main game binary via steam -applaunch."""
+        import shutil
+        steam_bin = shutil.which("steam")
+        if not steam_bin:
+            QMessageBox.warning(
+                self, tr("game_panel.start"),
+                tr("game_panel.steam_not_found"),
+            )
+            return
+
+        from PySide6.QtCore import QProcess
+        steam_id = plugin.GameSteamId
+        if isinstance(steam_id, list):
+            steam_id = steam_id[0]
+        args = ["-applaunch", str(steam_id)]
+        if hasattr(plugin, "GameLaunchArgs"):
+            args.extend(plugin.GameLaunchArgs)
+        success, pid = QProcess.startDetached(steam_bin, args)
+        if not success:
+            QMessageBox.warning(
+                self, tr("game_panel.start"),
+                tr("game_panel.steam_not_found"),
+            )
+
+    def _launch_via_proton(self, plugin, binary: str) -> None:
+        """Launch a non-primary executable via Proton for Steam games.
+
+        Uses ``proton run <exe>`` with the correct environment variables
+        (STEAM_COMPAT_DATA_PATH, STEAM_COMPAT_CLIENT_INSTALL_PATH) so
+        that tools like F4SE, REDmod, DX12 variants, etc. run inside
+        the game's Proton prefix.
+        """
+        game_path = self._current_game_path
+        if game_path is None:
+            QMessageBox.warning(
+                self, tr("game_panel.start"),
+                tr("game_panel.game_dir_not_found"),
+            )
+            return
+
+        binary_path = game_path / binary
+        if not binary_path.exists():
+            QMessageBox.warning(
+                self, tr("game_panel.start"),
+                tr("game_panel.exe_not_found", path=str(binary_path)),
+            )
+            return
+
+        # Find the Proton runner for this game
+        proton_info = plugin.findProtonRun()
+        if proton_info is None:
+            QMessageBox.warning(
+                self, tr("game_panel.start"),
+                tr("game_panel.proton_not_found"),
+            )
+            return
+
+        proton_script, compat_data, steam_root = proton_info
+
+        # Build environment for proton run
+        env = os.environ.copy()
+        env["STEAM_COMPAT_DATA_PATH"] = str(compat_data)
+        env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_root)
+
+        # Set SteamAppId so Proton knows which game context to use
+        steam_id = plugin.GameSteamId
+        if isinstance(steam_id, list):
+            steam_id = steam_id[0]
+        env["SteamAppId"] = str(steam_id)
+        env["SteamGameId"] = str(steam_id)
+
+        working_dir = str(binary_path.parent)
+
+        try:
+            subprocess.Popen(
+                [str(proton_script), "run", str(binary_path)],
+                cwd=working_dir,
+                env=env,
+            )
+        except OSError as exc:
+            QMessageBox.warning(
+                self, tr("game_panel.start"),
+                tr("game_panel.proton_launch_failed", error=str(exc)),
+            )
 
     def _populate_data_tree(self, game_path: Path | None) -> None:
         """Scan game_path and show top-level entries in the data tree."""

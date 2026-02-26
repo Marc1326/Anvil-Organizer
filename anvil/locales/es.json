@@ -109,7 +109,8 @@
     "open_ao_install_folder": "Abrir carpeta de instalación de AO",
     "open_ao_plugins_folder": "Abrir carpeta de Plugins de AO",
     "open_ao_styles_folder": "Abrir carpeta de estilos de AO",
-    "open_ao_logs_folder": "Abrir carpeta de registros de AO"
+    "open_ao_logs_folder": "Abrir carpeta de registros de AO",
+    "open_saves_folder": "Abrir carpeta de guardados"
   },
 
   "dialog": {
@@ -223,7 +224,9 @@
     "confirm_instance_change_title": "Cambiar Instancia",
     "confirm_instance_change_text": "¿Desea cambiar a la instancia \"{name}\"?",
     "about_text": "Anvil Organizer v{version}",
-    "about_qt_text": "Este programa utiliza Qt versión {version}.\n\nQt es un toolkit de C++ para el desarrollo de aplicaciones multiplataforma.\n\nQt ofrece portabilidad desde una única fuente en todos los principales sistemas operativos de escritorio. También está disponible para Linux embebido y otros sistemas operativos embebidos y móviles.\n\nQt está disponible bajo múltiples opciones de licencia diseñadas para satisfacer las necesidades de diversos usuarios.\n\nQt es un producto de Qt Company Ltd., desarrollado como proyecto de código abierto.\n\nMás información: https://www.qt.io"
+    "about_qt_text": "Este programa utiliza Qt versión {version}.\n\nQt es un toolkit de C++ para el desarrollo de aplicaciones multiplataforma.\n\nQt ofrece portabilidad desde una única fuente en todos los principales sistemas operativos de escritorio. También está disponible para Linux embebido y otros sistemas operativos embebidos y móviles.\n\nQt está disponible bajo múltiples opciones de licencia diseñadas para satisfacer las necesidades de diversos usuarios.\n\nQt es un producto de Qt Company Ltd., desarrollado como proyecto de código abierto.\n\nMás información: https://www.qt.io",
+    "saves_not_found_title": "Carpeta de guardados no encontrada",
+    "saves_not_found_message": "No se encontró la carpeta de guardados. ¿Has iniciado el juego al menos una vez?"
   },
 
   "button": {
@@ -515,7 +518,9 @@
     "delete_confirm_title": "Confirmar eliminación",
     "steam_not_found": "Steam no se encontró en el PATH.\nPor favor, instale Steam o ajuste el PATH.",
     "game_dir_not_found": "Directorio del juego no encontrado.",
-    "exe_not_found": "Ejecutable no encontrado:\n{path}"
+    "exe_not_found": "Ejecutable no encontrado:\n{path}",
+    "proton_not_found": "Proton no encontrado para este juego.\nAsegurese de haber ejecutado el juego al menos una vez a traves de Steam.",
+    "proton_launch_failed": "Error al iniciar con Proton:\n{error}"
   },
 
   "filter": {
