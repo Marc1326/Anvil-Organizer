@@ -427,3 +427,18 @@ QMessageBox QPushButton {
   padding: 4px 12px; }
   #filterResetBtn:hover, #filterManageBtn:hover {
     background: #3D3D3D; }
+
+/* ── FOMOD Installer Dialog ──────────────────────────────── */
+
+#fomodStepLabel {
+  font-size: 13px;
+  font-weight: bold; }
+
+#fomodPreviewImage {
+  background: #242424;
+  border: 1px solid #3D3D3D;
+  border-radius: 3px; }
+
+#fomodPreviewDesc {
+  padding: 8px;
+  color: #AAAAAA; }

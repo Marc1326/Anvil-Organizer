@@ -46,6 +46,11 @@ from anvil.core.instance_manager import InstanceManager
 from anvil.core.icon_manager import IconManager
 from anvil.core.mod_entry import scan_mods_directory
 from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
+from anvil.core.fomod_parser import (
+    detect_fomod, parse_fomod, parse_fomod_info,
+    collect_fomod_files, assemble_fomod_files,
+)
+from anvil.dialogs.fomod_dialog import FomodDialog
 from anvil.core.mod_list_io import (
     add_mod_to_modlist, write_modlist, remove_mod_from_modlist,
     rename_mod_in_modlist, read_active_mods, write_active_mods,
@@ -1231,8 +1236,51 @@ class MainWindow(QMainWindow):
                         shutil.rmtree(temp_dir, ignore_errors=True)
                         continue
 
-            # 3. Normal mod installation
+            # 3. FOMOD installer check
+            fomod_name_override = None
+            fomod_xml = detect_fomod(temp_dir)
+            if fomod_xml is not None:
+                print(f"DEBUG _install_archives: FOMOD detected: {fomod_xml}", flush=True)
+                config = parse_fomod(fomod_xml)
+                if config is not None and config.install_steps:
+                    dlg = FomodDialog(config, temp_dir, parent=self)
+                    _center_on_parent(dlg)
+                    if dlg.exec() != QDialog.DialogCode.Accepted:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        continue
+                    all_files = collect_fomod_files(
+                        config, dlg.selected_plugins(), dlg.flags()
+                    )
+                    # Read FOMOD info BEFORE deleting temp_dir (K3 fix)
+                    info = parse_fomod_info(fomod_xml.parent)
+                    new_temp = assemble_fomod_files(temp_dir, all_files)
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    if new_temp is None:
+                        continue
+                    temp_dir = new_temp
+                    # Use FOMOD name for suggestion
+                    if "name" in info:
+                        fomod_name_override = info["name"]
+                    elif config.module_name and config.module_name != "FOMOD Package":
+                        fomod_name_override = config.module_name
+                elif config is not None and config.required_files:
+                    # No steps but required files — install them directly
+                    # Read FOMOD info BEFORE deleting temp_dir (K3 fix)
+                    info = parse_fomod_info(fomod_xml.parent)
+                    new_temp = assemble_fomod_files(temp_dir, config.required_files)
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    if new_temp is None:
+                        continue
+                    temp_dir = new_temp
+                    if "name" in info:
+                        fomod_name_override = info["name"]
+
+            # 4. Normal mod installation
             best, variants = installer.suggest_names(archive)
+            if fomod_name_override:
+                best = fomod_name_override
+                if best not in variants:
+                    variants.insert(0, best)
             mod_name = best
             dest = installer.mods_path / mod_name
 

@@ -460,10 +460,6 @@
     "export_failed_title": "Esportazione fallita"
   },
 
-  "mod_detail": {
-    "open_in_explorer": "Apri Mod in esplora risorse"
-  },
-
   "game_panel": {
     "install": "Installa",
     "visit_nexus": "Apri pagina Nexus",
@@ -693,6 +689,7 @@
   },
 
   "mod_detail": {
+    "open_in_explorer": "Apri Mod in esplora risorse",
     "tab_textfiles": "File di Testo",
     "tab_ini": "File INI",
     "tab_images": "Immagini",
@@ -825,5 +822,21 @@
     "failed": "Aggiornamento fallito: {error}",
     "dirty_tree": "Modifiche locali rilevate. Esegui prima il commit.",
     "pip_updated": "Dipendenze Python aggiornate"
+  },
+
+  "fomod": {
+    "title": "Installatore FOMOD",
+    "step_of": "Passo {current} di {total}: {name}",
+    "back": "< Indietro",
+    "next": "Avanti >",
+    "install": "Installa",
+    "cancel": "Annulla",
+    "none_option": "Nessuno",
+    "required": "(Richiesto)",
+    "recommended": "(Consigliato)",
+    "not_usable": "(Non disponibile)",
+    "no_description": "Nessuna descrizione disponibile.",
+    "no_image": "Nessuna anteprima disponibile",
+    "validation_required": "Effettua una selezione nel gruppo \"{group}\"."
   }
 }

@@ -460,10 +460,6 @@
     "export_failed_title": "Exportation échouée"
   },
 
-  "mod_detail": {
-    "open_in_explorer": "Ouvrir le Mod dans l'explorateur"
-  },
-
   "game_panel": {
     "install": "Installer",
     "visit_nexus": "Ouvrir la page Nexus",
@@ -693,6 +689,7 @@
   },
 
   "mod_detail": {
+    "open_in_explorer": "Ouvrir le Mod dans l'explorateur",
     "tab_textfiles": "Fichiers Texte",
     "tab_ini": "Fichiers INI",
     "tab_images": "Images",
@@ -825,5 +822,21 @@
     "failed": "Échec de la mise à jour : {error}",
     "dirty_tree": "Modifications locales détectées. Veuillez d'abord valider vos changements.",
     "pip_updated": "Dépendances Python mises à jour"
+  },
+
+  "fomod": {
+    "title": "Installateur FOMOD",
+    "step_of": "Étape {current} sur {total} : {name}",
+    "back": "< Retour",
+    "next": "Suivant >",
+    "install": "Installer",
+    "cancel": "Annuler",
+    "none_option": "Aucun",
+    "required": "(Requis)",
+    "recommended": "(Recommandé)",
+    "not_usable": "(Non disponible)",
+    "no_description": "Aucune description disponible.",
+    "no_image": "Aucun aperçu disponible",
+    "validation_required": "Veuillez faire une sélection dans le groupe \"{group}\"."
   }
 }

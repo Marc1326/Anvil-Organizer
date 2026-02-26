@@ -431,10 +431,8 @@
     "load_order_failed": "Could not change load order",
     "no_bg3_installer": "No BG3 installer active",
     "deploy_failed": "Deploy failed — see console",
-    "notifications": "▲ Notifications",
     "unknown": "unknown",
-    "instance_info": "Instance: {game} | Plugin: {plugin} | Store: {store}",
-    "no_instance": "No instance selected"
+    "instance_info": "Instance: {game} | Plugin: {plugin} | Store: {store}"
   },
 
   "toast": {
@@ -460,10 +458,6 @@
     "start_failed_message": "Could not start:\n{path}",
     "rename_failed_title": "Rename Failed",
     "export_failed_title": "Export Failed"
-  },
-
-  "mod_detail": {
-    "open_in_explorer": "Open Mod in Explorer"
   },
 
   "game_panel": {
@@ -695,6 +689,7 @@
   },
 
   "mod_detail": {
+    "open_in_explorer": "Open Mod in Explorer",
     "tab_textfiles": "Text Files",
     "tab_ini": "INI Files",
     "tab_images": "Images",
@@ -827,5 +822,21 @@
     "failed": "Update failed: {error}",
     "dirty_tree": "Local changes detected. Please commit first.",
     "pip_updated": "Python dependencies updated"
+  },
+
+  "fomod": {
+    "title": "FOMOD Installer",
+    "step_of": "Step {current} of {total}: {name}",
+    "back": "< Back",
+    "next": "Next >",
+    "install": "Install",
+    "cancel": "Cancel",
+    "none_option": "None",
+    "required": "(Required)",
+    "recommended": "(Recommended)",
+    "not_usable": "(Not usable)",
+    "no_description": "No description available.",
+    "no_image": "No preview available",
+    "validation_required": "Please make a selection in the group \"{group}\"."
   }
 }
