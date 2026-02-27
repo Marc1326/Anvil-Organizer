@@ -110,6 +110,26 @@ class BaseGame:
     """Primary/DLC plugin files (.esm) that are always active.
     Only relevant for Bethesda Creation Engine games."""
 
+    # ── BA2-Packing (Bethesda-Spiele unter Proton) ─────────────────────
+
+    NeedsBa2Packing: bool = False
+    """If True, loose mod files are packed into BA2 archives during deploy."""
+
+    Ba2Format: str = ""
+    """BSArch format flag for general assets ('fo4', 'sse')."""
+
+    Ba2TextureFormat: str = ""
+    """BSArch format flag for textures ('fo4dds', 'sse')."""
+
+    Ba2IniSection: str = ""
+    """INI section for archive registration ('Archive')."""
+
+    Ba2IniKey: str = ""
+    """INI key for archive list ('sResourceArchive2List')."""
+
+    Ba2IniFile: str = ""
+    """Custom INI filename ('Fallout4Custom.ini')."""
+
     # ── Interner State ────────────────────────────────────────────────
 
     def __init__(self) -> None:
@@ -346,6 +366,17 @@ class BaseGame:
         """Return path to plugins.txt in the Proton prefix, or None."""
         return None
 
+    def ba2_ini_path(self) -> Path | None:
+        """Return absolute path to the BA2 registration INI file."""
+        if not self.NeedsBa2Packing or not self.Ba2IniFile:
+            return None
+        get_docs = getattr(self, "gameDocumentsDirectory", None)
+        if get_docs is not None:
+            docs = get_docs()
+            if docs is not None:
+                return docs / self.Ba2IniFile
+        return None
+
     # ── Framework-Mod-Erkennung ──────────────────────────────────────
 
     def get_framework_mods(self) -> list[FrameworkMod]:
@@ -368,14 +399,10 @@ class BaseGame:
                               (e.g. from zipfile.namelist()).
         """
         lower_contents = [f.lower().replace("\\", "/") for f in archive_contents]
-        print(f"DEBUG is_framework_mod: checking {len(archive_contents)} files", flush=True)
-        print(f"DEBUG is_framework_mod: lower_contents={lower_contents[:10]}", flush=True)
         for fw in self.get_framework_mods():
             for pattern in fw.pattern:
                 pat = pattern.lower().replace("\\", "/")
-                matched = any(pat in entry for entry in lower_contents)
-                print(f"DEBUG is_framework_mod: fw={fw.name}, pattern={pat}, matched={matched}", flush=True)
-                if matched:
+                if any(pat in entry for entry in lower_contents):
                     return fw
         return None
 

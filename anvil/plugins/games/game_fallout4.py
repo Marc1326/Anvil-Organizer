@@ -76,6 +76,15 @@ class Fallout4Game(BaseGame):
         "DLCUltraHighResolution.esm",
     ]
 
+    # -- BA2-Packing (loose files → BA2 archives via BSArch/Proton) ---------
+
+    NeedsBa2Packing = True
+    Ba2Format = "fo4"             # BSArch: -fo4 -mt
+    Ba2TextureFormat = "fo4dds"   # BSArch: -fo4dds -mt (DX10 textures)
+    Ba2IniSection = "Archive"
+    Ba2IniKey = "sResourceArchive2List"
+    Ba2IniFile = "Fallout4Custom.ini"
+
     DLC_PLUGINS = [
         "DLCRobot.esm",          # Automatron
         "DLCworkshop01.esm",     # Wasteland Workshop

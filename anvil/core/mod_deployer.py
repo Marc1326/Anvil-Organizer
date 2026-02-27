@@ -32,6 +32,14 @@ from anvil.core.mod_list_io import read_global_modlist, read_active_mods
 # Files inside mod folders that are metadata, not game content.
 _SKIP_FILES = {"meta.ini", "codes.txt"}
 
+# Extensions always deployed as symlinks even when BA2-packing is active.
+_BA2_SYMLINK_EXTENSIONS = {
+    ".esp", ".esm", ".esl",   # plugins
+    ".dll", ".exe",            # script extenders / binaries
+    ".ini", ".cfg", ".toml",   # config files
+    ".ba2", ".bsa",            # existing archives
+}
+
 
 @dataclass
 class DeployResult:
@@ -69,6 +77,7 @@ class ModDeployer:
         nest_under_mod_name: bool = False,
         lml_path: str = "",
         multi_folder_routes: dict[str, str] | None = None,
+        needs_ba2_packing: bool = False,
     ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
@@ -81,6 +90,7 @@ class ModDeployer:
         self._profile_path = self._profiles_dir / profile_name
         self._manifest_path = instance_path / self.MANIFEST_NAME
         self._direct_patterns = [p.lower() for p in (direct_install_patterns or [])]
+        self._needs_ba2_packing = needs_ba2_packing
 
     def is_direct_install(self, mod_name: str) -> bool:
         """Return True if *mod_name* matches a direct-install pattern.
@@ -186,6 +196,12 @@ class ModDeployer:
                 # Skip metadata files
                 if src_file.name in _SKIP_FILES:
                     continue
+
+                # BA2-Packing: skip files that will be packed into BA2
+                if self._needs_ba2_packing:
+                    ext = src_file.suffix.lower()
+                    if ext not in _BA2_SYMLINK_EXTENSIONS:
+                        continue
 
                 # Compute relative path from mod root
                 try:
@@ -297,6 +313,8 @@ class ModDeployer:
             "instance_path": str(self._instance_path),
             "symlinks": symlinks,
             "created_dirs": sorted(created_dirs, reverse=True),
+            "ba2_archives": [],
+            "ini_backup": None,
         }
         try:
             self._manifest_path.write_text(
@@ -386,6 +404,11 @@ class ModDeployer:
                 result.links_removed += 1
             except OSError as exc:
                 result.errors.append(f"unlink {link_rel}: {exc}")
+
+        # NOTE: BA2 archive cleanup and INI restore are handled by
+        # game_panel.py (the orchestrator) via BA2Packer.cleanup_ba2s()
+        # and BA2Packer.restore_ini().  We skip them here to avoid
+        # double-cleanup and race conditions with manifest updates.
 
         # Clean up created directories (deepest first)
         for dir_rel in manifest.get("created_dirs", []):

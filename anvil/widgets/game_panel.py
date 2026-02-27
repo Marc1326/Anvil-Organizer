@@ -381,8 +381,9 @@ class GamePanel(QWidget):
         nest = getattr(game_plugin, "GameNestModsUnderName", False) if game_plugin else False
         lml_path = getattr(game_plugin, "GameLMLPath", "") if game_plugin else ""
         multi_routes = getattr(game_plugin, "GameMultiFolderRoutes", {}) if game_plugin else {}
+        ba2_packing = getattr(game_plugin, "NeedsBa2Packing", False) if game_plugin else False
         if self._instance_path and game_path:
-            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes)
+            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing)
 
         # Update label
         self._game_label.setText(game_name or tr("game_panel.no_game_selected"))
@@ -544,8 +545,47 @@ class GamePanel(QWidget):
 
     def silent_deploy(self) -> None:
         """Deploy mods silently.  Called automatically by MainWindow."""
+        result = None
         if self._deployer:
-            self._deployer.deploy()
+            result = self._deployer.deploy()
+
+        # BA2-Packing for Bethesda games (only if deploy succeeded)
+        needs_ba2 = getattr(self._current_plugin, "NeedsBa2Packing", False)
+        if (
+            needs_ba2
+            and result is not None
+            and result.success
+            and self._current_plugin is not None
+            and self._current_game_path is not None
+            and self._instance_path is not None
+        ):
+            from anvil.core.ba2_packer import BA2Packer
+            packer = BA2Packer(self._current_plugin, self._instance_path)
+            if packer.is_available():
+                # Read enabled mods from profile
+                profiles_dir = self._instance_path / ".profiles"
+                from anvil.core.mod_list_io import read_global_modlist, read_active_mods
+                global_order = read_global_modlist(profiles_dir)
+                profile_path = profiles_dir / self._current_profile_name
+                active_mods = read_active_mods(profile_path)
+                enabled = [n for n in global_order if n in active_mods]
+
+                pack_result = packer.pack_all_mods(enabled)
+                if pack_result.ba2_paths:
+                    # Extract just filenames for INI
+                    ba2_names = [Path(p).name for p in pack_result.ba2_paths]
+                    packer.update_ini(ba2_names)
+
+                    # Store BA2 info in manifest
+                    if self._deployer and self._deployer.is_deployed():
+                        self._update_manifest_ba2(pack_result.ba2_paths, packer)
+            else:
+                print(
+                    "[BA2] BSArch or Proton not available — "
+                    "loose files will not be packed into BA2 archives",
+                    flush=True,
+                )
+
         # Write plugins.txt for Bethesda games
         if (
             self._current_plugin is not None
@@ -564,6 +604,60 @@ class GamePanel(QWidget):
         """Purge deployed mods silently.  Called automatically by MainWindow."""
         if self._deployer:
             self._deployer.purge()
+
+        # BA2-Cleanup for Bethesda games
+        needs_ba2 = getattr(self._current_plugin, "NeedsBa2Packing", False)
+        if (
+            needs_ba2
+            and self._current_plugin is not None
+            and self._current_game_path is not None
+            and self._instance_path is not None
+        ):
+            from anvil.core.ba2_packer import BA2Packer
+            packer = BA2Packer(self._current_plugin, self._instance_path)
+            packer.cleanup_ba2s()
+            packer.restore_ini()
+
+        # Remove plugins.txt for Bethesda games
+        if (
+            self._current_plugin is not None
+            and hasattr(self._current_plugin, "has_plugins_txt")
+            and self._current_plugin.has_plugins_txt()
+            and self._current_game_path is not None
+            and self._instance_path is not None
+        ):
+            writer = PluginsTxtWriter(
+                self._current_plugin, self._current_game_path, self._instance_path
+            )
+            writer.remove()
+
+    def _update_manifest_ba2(self, ba2_paths: list[str], packer) -> None:
+        """Update the deploy manifest with BA2 archive info."""
+        import json
+        manifest_path = self._instance_path / ModDeployer.MANIFEST_NAME
+        if not manifest_path.is_file():
+            return
+        try:
+            text = manifest_path.read_text(encoding="utf-8")
+            manifest = json.loads(text)
+            manifest["ba2_archives"] = ba2_paths
+
+            # Record INI backup info
+            ini_path = self._current_plugin.ba2_ini_path()
+            if ini_path is not None:
+                backup_path = ini_path.parent / f"{ini_path.name}.anvil_backup"
+                if backup_path.is_file():
+                    manifest["ini_backup"] = {
+                        "file": str(ini_path),
+                        "backup_path": str(backup_path),
+                    }
+
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"[BA2] Failed to update manifest: {exc}", flush=True)
 
     def _refresh_plugins_tab(self) -> None:
         """Populate the plugins tree with scanned plugin files."""
@@ -807,8 +901,9 @@ class GamePanel(QWidget):
         nest = getattr(self._current_plugin, "GameNestModsUnderName", False) if self._current_plugin else False
         lml_path = getattr(self._current_plugin, "GameLMLPath", "") if self._current_plugin else ""
         multi_routes = getattr(self._current_plugin, "GameMultiFolderRoutes", {}) if self._current_plugin else {}
+        ba2_packing = getattr(self._current_plugin, "NeedsBa2Packing", False) if self._current_plugin else False
         if self._current_game_path and instance_path:
-            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes)
+            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing)
         else:
             self._deployer = None
 
