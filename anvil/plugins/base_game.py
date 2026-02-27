@@ -106,6 +106,10 @@ class BaseGame:
     """If set, mods containing install.xml are deployed as directory
     symlinks into this path (e.g. 'lml' for RDR2).  Empty = disabled."""
 
+    PRIMARY_PLUGINS: list[str] = []
+    """Primary/DLC plugin files (.esm) that are always active.
+    Only relevant for Bethesda Creation Engine games."""
+
     # ── Interner State ────────────────────────────────────────────────
 
     def __init__(self) -> None:
@@ -330,6 +334,16 @@ class BaseGame:
 
         Subclasses can override this to provide a custom icon.
         """
+        return None
+
+    # ── Plugin-Liste (Bethesda) ──────────────────────────────────────
+
+    def has_plugins_txt(self) -> bool:
+        """Return True if this game uses a plugins.txt load order file."""
+        return bool(self.PRIMARY_PLUGINS)
+
+    def plugins_txt_path(self) -> Path | None:
+        """Return path to plugins.txt in the Proton prefix, or None."""
         return None
 
     # ── Framework-Mod-Erkennung ──────────────────────────────────────

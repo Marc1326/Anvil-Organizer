@@ -37,6 +37,7 @@ from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.mod_deployer import ModDeployer
 from anvil.core.download_manager import DownloadManager
 from anvil.core.persistent_header import PersistentHeader
+from anvil.core.plugins_txt_writer import PluginsTxtWriter
 from anvil.core import _todo
 from anvil.core.translator import tr
 
@@ -170,6 +171,32 @@ class GamePanel(QWidget):
         tabs.setStyleSheet("QTabBar { qproperty-alignment: AlignCenter; }"
                            "QTabWidget::tab-bar { alignment: center; }")
 
+        # ── Plugins-Tab (Index 0) ──────────────────────────────────────
+        plugins_w = QWidget()
+        plugins_layout = QVBoxLayout(plugins_w)
+        self._plugins_tree = QTreeWidget()
+        self._plugins_tree.setColumnCount(3)
+        self._plugins_tree.setHeaderLabels([
+            tr("game_panel.plugins_col_name"),
+            tr("game_panel.plugins_col_type"),
+            tr("game_panel.plugins_col_index"),
+        ])
+        self._plugins_tree.setAlternatingRowColors(True)
+        self._plugins_tree.setRootIsDecorated(False)
+        plugins_header = self._plugins_tree.header()
+        plugins_header.setStretchLastSection(False)
+        plugins_header.setCascadingSectionResizes(True)
+        plugins_header.setMinimumSectionSize(40)
+        plugins_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        plugins_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        plugins_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self._plugins_tree.setColumnWidth(1, 80)
+        self._plugins_tree.setColumnWidth(2, 60)
+        self._ph_plugins = PersistentHeader(plugins_header, "plugins")
+        plugins_layout.addWidget(self._plugins_tree)
+        tabs.addTab(plugins_w, tr("game_panel.plugins_tab"))
+        tabs.setTabVisible(0, False)  # hidden until Bethesda game detected
+
         # ── Daten-Tab ─────────────────────────────────────────────────
         data = QWidget()
         data_layout = QVBoxLayout(data)
@@ -220,7 +247,7 @@ class GamePanel(QWidget):
         self._ph_saves = PersistentHeader(saves_header, "saves")
         saves_layout.addWidget(self._saves_tree)
         tabs.addTab(saves, tr("game_panel.saves_tab"))
-        tabs.setTabEnabled(1, False)  # Saves tab — coming soon
+        tabs.setTabEnabled(2, False)  # Saves tab — coming soon
 
         # ── Downloads-Tab ─────────────────────────────────────────────
         downloads = QWidget()
@@ -299,22 +326,26 @@ class GamePanel(QWidget):
     # ── Column persistence ─────────────────────────────────────────────
 
     def restore_tab_column_widths(self, tab_index: int) -> None:
-        """Restore column widths for a specific tab (0=data, 1=saves, 2=downloads)."""
+        """Restore column widths for a specific tab (0=plugins, 1=data, 2=saves, 3=downloads)."""
         if tab_index == 0:
-            self._ph_data.restore()
+            self._ph_plugins.restore()
         elif tab_index == 1:
-            self._ph_saves.restore()
+            self._ph_data.restore()
         elif tab_index == 2:
+            self._ph_saves.restore()
+        elif tab_index == 3:
             self._ph_downloads.restore()
 
     def restore_all_column_widths(self) -> None:
-        """Restore column widths for all three tabs."""
+        """Restore column widths for all tabs."""
+        self._ph_plugins.restore()
         self._ph_data.restore()
         self._ph_saves.restore()
         self._ph_downloads.restore()
 
     def flush_column_widths(self) -> None:
         """Flush any pending debounced column-width writes."""
+        self._ph_plugins.flush()
         self._ph_data.flush()
         self._ph_saves.flush()
         self._ph_downloads.flush()
@@ -364,6 +395,16 @@ class GamePanel(QWidget):
 
         # Update data tree with real directory contents
         self._populate_data_tree(game_path)
+
+        # Plugins-Tab visibility
+        has_plugins = (
+            game_plugin is not None
+            and hasattr(game_plugin, "has_plugins_txt")
+            and game_plugin.has_plugins_txt()
+        )
+        self._tabs.setTabVisible(0, has_plugins)
+        if has_plugins:
+            self._refresh_plugins_tab()
 
         # Downloads are populated via set_downloads_path() from MainWindow
 
@@ -505,11 +546,84 @@ class GamePanel(QWidget):
         """Deploy mods silently.  Called automatically by MainWindow."""
         if self._deployer:
             self._deployer.deploy()
+        # Write plugins.txt for Bethesda games
+        if (
+            self._current_plugin is not None
+            and hasattr(self._current_plugin, "has_plugins_txt")
+            and self._current_plugin.has_plugins_txt()
+            and self._current_game_path is not None
+            and self._instance_path is not None
+        ):
+            writer = PluginsTxtWriter(
+                self._current_plugin, self._current_game_path, self._instance_path
+            )
+            writer.write()
+            self._refresh_plugins_tab()
 
     def silent_purge(self) -> None:
         """Purge deployed mods silently.  Called automatically by MainWindow."""
         if self._deployer:
             self._deployer.purge()
+        # Remove plugins.txt for Bethesda games
+        if (
+            self._current_plugin is not None
+            and hasattr(self._current_plugin, "has_plugins_txt")
+            and self._current_plugin.has_plugins_txt()
+            and self._current_game_path is not None
+            and self._instance_path is not None
+        ):
+            writer = PluginsTxtWriter(
+                self._current_plugin, self._current_game_path, self._instance_path
+            )
+            writer.remove()
+            self._refresh_plugins_tab()
+
+    def _refresh_plugins_tab(self) -> None:
+        """Populate the plugins tree with scanned plugin files."""
+        self._plugins_tree.clear()
+
+        if (
+            self._current_plugin is None
+            or self._current_game_path is None
+            or self._instance_path is None
+            or not hasattr(self._current_plugin, "has_plugins_txt")
+            or not self._current_plugin.has_plugins_txt()
+        ):
+            return
+
+        writer = PluginsTxtWriter(
+            self._current_plugin, self._current_game_path, self._instance_path
+        )
+        plugins = writer.scan_plugins()
+
+        primary_lower = {
+            p.lower()
+            for p in getattr(self._current_plugin, "PRIMARY_PLUGINS", [])
+        }
+
+        for idx, name in enumerate(plugins):
+            ext = Path(name).suffix.lower()
+            is_primary = name.lower() in primary_lower
+
+            item = QTreeWidgetItem()
+            # Column 0: Plugin name
+            item.setText(0, name)
+            item.setCheckState(0, Qt.CheckState.Checked)
+            if is_primary:
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
+                font = item.font(0)
+                font.setItalic(True)
+                item.setFont(0, font)
+                item.setForeground(0, QColor("#808080"))
+
+            # Column 1: Type
+            type_label = ext.lstrip(".").upper()
+            item.setText(1, type_label)
+
+            # Column 2: Mod index (hex, 2-digit)
+            item.setText(2, f"{idx:02X}")
+
+            self._plugins_tree.addTopLevelItem(item)
 
     def _on_exe_selected(self, index: int) -> None:
         """Handle executable selection from the menu."""
