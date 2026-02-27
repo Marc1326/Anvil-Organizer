@@ -764,8 +764,6 @@ class MainWindow(QMainWindow):
         and purge them.
         """
         from anvil.core.mod_deployer import ModDeployer
-        from anvil.core.plugins_txt_writer import PluginsTxtWriter
-
         for entry in self.instance_manager.list_instances():
             name = entry.get("name", "") if isinstance(entry, dict) else str(entry)
             if not name:
@@ -780,15 +778,6 @@ class MainWindow(QMainWindow):
                     if game_path.is_dir():
                         deployer = ModDeployer(instance_path, game_path)
                         deployer.purge()
-                        # Remove plugins.txt for Bethesda games
-                        short_name = data.get("game_short_name", "") if data else ""
-                        plugin = self.plugin_loader.get_game(short_name) if short_name else None
-                        if (
-                            plugin is not None
-                            and hasattr(plugin, "has_plugins_txt")
-                            and plugin.has_plugins_txt()
-                        ):
-                            PluginsTxtWriter(plugin, game_path, instance_path).remove()
 
     def switch_instance(self, instance_name: str) -> None:
         """Switch to a different instance and update all UI components.

@@ -564,19 +564,6 @@ class GamePanel(QWidget):
         """Purge deployed mods silently.  Called automatically by MainWindow."""
         if self._deployer:
             self._deployer.purge()
-        # Remove plugins.txt for Bethesda games
-        if (
-            self._current_plugin is not None
-            and hasattr(self._current_plugin, "has_plugins_txt")
-            and self._current_plugin.has_plugins_txt()
-            and self._current_game_path is not None
-            and self._instance_path is not None
-        ):
-            writer = PluginsTxtWriter(
-                self._current_plugin, self._current_game_path, self._instance_path
-            )
-            writer.remove()
-            self._refresh_plugins_tab()
 
     def _refresh_plugins_tab(self) -> None:
         """Populate the plugins tree with scanned plugin files."""
