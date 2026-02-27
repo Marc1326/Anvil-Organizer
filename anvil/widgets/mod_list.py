@@ -357,6 +357,12 @@ class _DropTreeView(QTreeView):
         self._collapse_timer.timeout.connect(self._on_collapse_timer)
         self._collapse_hover_index: QModelIndex = QModelIndex()
 
+        # Auto-scroll during drag & drop
+        self._auto_scroll_timer = QTimer(self)
+        self._auto_scroll_timer.setInterval(50)
+        self._auto_scroll_timer.timeout.connect(self._do_auto_scroll)
+        self._auto_scroll_speed: int = 0
+
         # ── Setting 6: Konflikte VON Trenner ──
         self._conflicts_from_separator: bool = False
 
@@ -427,6 +433,21 @@ class _DropTreeView(QTreeView):
         self._collapse_timer.stop()
         self._collapse_hover_index = QModelIndex()
 
+    # ── Auto-scroll during drag ─────────────────────────────────
+
+    def _do_auto_scroll(self) -> None:
+        """Scroll the view during drag based on cursor proximity to edges."""
+        if self._auto_scroll_speed == 0:
+            self._auto_scroll_timer.stop()
+            return
+        sb = self.verticalScrollBar()
+        sb.setValue(sb.value() + self._auto_scroll_speed)
+
+    def _stop_auto_scroll(self) -> None:
+        """Stop the auto-scroll timer."""
+        self._auto_scroll_speed = 0
+        self._auto_scroll_timer.stop()
+
     # ── Drag & Drop events ────────────────────────────────────────
 
     def dragEnterEvent(self, event):
@@ -443,6 +464,25 @@ class _DropTreeView(QTreeView):
         super().dragMoveEvent(event)
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
+
+        # Auto-scroll when dragging near edges
+        EDGE_SIZE = 40
+        pos = event.position().toPoint()
+        viewport_height = self.viewport().height()
+        y = pos.y()
+
+        if y < EDGE_SIZE:
+            ratio = 1.0 - (y / EDGE_SIZE)
+            self._auto_scroll_speed = -max(1, int(ratio * 5))
+            if not self._auto_scroll_timer.isActive():
+                self._auto_scroll_timer.start()
+        elif y > viewport_height - EDGE_SIZE:
+            ratio = 1.0 - ((viewport_height - y) / EDGE_SIZE)
+            self._auto_scroll_speed = max(1, int(ratio * 5))
+            if not self._auto_scroll_timer.isActive():
+                self._auto_scroll_timer.start()
+        else:
+            self._stop_auto_scroll()
 
         # Setting 4: Auto-Collapse logic
         if not self._auto_collapse_on_drag:
@@ -486,10 +526,12 @@ class _DropTreeView(QTreeView):
         self._collapse_timer.start()
 
     def dragLeaveEvent(self, event):
+        self._stop_auto_scroll()
         self._stop_collapse_timer()
         super().dragLeaveEvent(event)
 
     def dropEvent(self, event):
+        self._stop_auto_scroll()
         self._stop_collapse_timer()
         if event.mimeData().hasUrls():
             paths = []
