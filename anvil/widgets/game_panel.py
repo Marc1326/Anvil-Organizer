@@ -581,7 +581,7 @@ class GamePanel(QWidget):
                         self._update_manifest_ba2(pack_result.ba2_paths, packer)
             else:
                 print(
-                    "[BA2] BSArch or Proton not available — "
+                    "[BA2] BSArch or Wine not available — "
                     "loose files will not be packed into BA2 archives",
                     flush=True,
                 )

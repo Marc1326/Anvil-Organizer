@@ -1,7 +1,7 @@
-"""BA2 archive packer for Bethesda games under Proton.
+"""BA2 archive packer for Bethesda games via Wine.
 
 Packs loose mod files into BA2 archives using BSArch (Windows CLI)
-executed via the game's Proton installation.  Textures (.dds) are
+executed via Wine with the game's Proton prefix.  Textures (.dds) are
 packed into separate archives with DX10 compression.
 
 Usage::
@@ -97,7 +97,7 @@ def _classify_file(rel_path: Path) -> str:
 # ── BA2Packer ────────────────────────────────────────────────────────
 
 class BA2Packer:
-    """Pack mod files into BA2 archives using BSArch via Proton."""
+    """Pack mod files into BA2 archives using BSArch via Wine."""
 
     def __init__(
         self,
@@ -148,28 +148,46 @@ class BA2Packer:
 
         return None
 
-    # ── Proton environment ───────────────────────────────────────────
+    # ── Wine environment ────────────────────────────────────────────
 
-    def _get_proton_env(self) -> tuple[Path, dict] | None:
-        """Build environment variables for running BSArch via Proton.
+    def _get_wine_env(self) -> tuple[str, dict] | None:
+        """Build environment variables for running BSArch via Wine.
 
-        Returns (proton_script, env_dict) or None if Proton is unavailable.
+        Returns (wine_binary, env_dict) or None if Wine is unavailable.
         """
-        proton_info = self._plugin.findProtonRun()
-        if proton_info is None:
+        wine_bin = shutil.which("wine")
+        if wine_bin is None:
             return None
 
-        proton_script, compat_data, steam_root = proton_info
-        steam_id = self._plugin.GameSteamId
-        if isinstance(steam_id, list):
-            steam_id = steam_id[0]
+        prefix = self._plugin.protonPrefix()
+        if prefix is None:
+            return None
 
         env = os.environ.copy()
-        env["STEAM_COMPAT_DATA_PATH"] = str(compat_data)
-        env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_root)
-        env["SteamAppId"] = str(steam_id)
+        env["WINEPREFIX"] = str(prefix)
+        env["WINEDEBUG"] = "-all"
 
-        return proton_script, env
+        return wine_bin, env
+
+    def _to_wine_path(self, linux_path: Path, env: dict) -> str:
+        """Convert a Linux path to a Windows path for Wine.
+
+        Uses ``winepath -w`` for robust conversion that respects
+        drive mappings and Wine prefix configuration.
+        Falls back to manual ``Z:`` mapping if winepath fails.
+        """
+        try:
+            result = subprocess.run(
+                ["winepath", "-w", str(linux_path)],
+                capture_output=True, text=True, timeout=5, env=env,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
+        # Fallback: Z: maps the entire Linux root /
+        return "Z:" + str(linux_path).replace("/", "\\")
 
     # ── Staging ──────────────────────────────────────────────────────
 
@@ -224,11 +242,11 @@ class BA2Packer:
         self,
         source_dir: Path,
         output_ba2: Path,
-        proton_script: Path,
+        wine_bin: str,
         env: dict,
         is_textures: bool = False,
     ) -> tuple[bool, str]:
-        """Execute BSArch via Proton to create a BA2 archive.
+        """Execute BSArch via Wine to create a BA2 archive.
 
         Returns (success, error_message).
         """
@@ -240,12 +258,17 @@ class BA2Packer:
         if not fmt:
             return False, "No BA2 format configured for this game"
 
+        # Convert Linux paths to Wine-compatible Windows paths
+        bsarch_win = self._to_wine_path(bsarch, env)
+        source_win = self._to_wine_path(source_dir, env)
+        output_win = self._to_wine_path(output_ba2, env)
+
         cmd = [
-            str(proton_script), "run",
-            str(bsarch),
+            wine_bin,
+            bsarch_win,
             "pack",
-            str(source_dir),
-            str(output_ba2),
+            source_win,
+            output_win,
             f"-{fmt}",
             "-mt",
         ]
@@ -273,13 +296,13 @@ class BA2Packer:
     # ── Public API ───────────────────────────────────────────────────
 
     def is_available(self) -> bool:
-        """Return True if BSArch and Proton are both available."""
-        return self.find_bsarch() is not None and self._get_proton_env() is not None
+        """Return True if BSArch and Wine are both available."""
+        return self.find_bsarch() is not None and self._get_wine_env() is not None
 
     def pack_mod(
         self,
         mod_name: str,
-        proton_script: Path,
+        wine_bin: str,
         env: dict,
     ) -> PackResult:
         """Pack a single mod into 0-2 BA2 archives.
@@ -323,7 +346,7 @@ class BA2Packer:
                 general_dir = staging_dir / "general"
                 out_ba2 = self._data_path / f"{BA2_PREFIX}{safe_name}.ba2"
                 ok, err = self._run_bsarch(
-                    general_dir, out_ba2, proton_script, env, is_textures=False
+                    general_dir, out_ba2, wine_bin, env, is_textures=False
                 )
                 if ok:
                     result.ba2_paths.append(str(out_ba2.relative_to(self._game_path)))
@@ -336,7 +359,7 @@ class BA2Packer:
                 textures_dir = staging_dir / "textures"
                 out_tex = self._data_path / f"{BA2_PREFIX}{safe_name} - Textures.ba2"
                 ok, err = self._run_bsarch(
-                    textures_dir, out_tex, proton_script, env, is_textures=True
+                    textures_dir, out_tex, wine_bin, env, is_textures=True
                 )
                 if ok:
                     result.ba2_paths.append(str(out_tex.relative_to(self._game_path)))
@@ -359,7 +382,7 @@ class BA2Packer:
     ) -> PackAllResult:
         """Pack all enabled mods into BA2 archives.
 
-        Pre-flight checks BSArch + Proton availability, cleans up
+        Pre-flight checks BSArch + Wine availability, cleans up
         old ``anvil_*.ba2`` files, then packs each mod.
 
         Args:
@@ -372,13 +395,13 @@ class BA2Packer:
         result = PackAllResult()
 
         # Pre-flight
-        proton_env = self._get_proton_env()
-        if proton_env is None:
+        wine_env = self._get_wine_env()
+        if wine_env is None:
             result.success = False
-            result.errors.append("Proton not available for this game")
+            result.errors.append("Wine not available (install wine or check WINEPREFIX)")
             return result
 
-        proton_script, env = proton_env
+        wine_bin, env = wine_env
 
         if self.find_bsarch() is None:
             result.success = False
@@ -420,7 +443,7 @@ class BA2Packer:
 
             print(f"[BA2] Packing: {mod_name}", flush=True)
             try:
-                pack_result = self.pack_mod(mod_name, proton_script, env)
+                pack_result = self.pack_mod(mod_name, wine_bin, env)
             except Exception as exc:
                 result.errors.append(f"{mod_name}: unexpected error: {exc}")
                 result.mods_skipped += 1
@@ -428,7 +451,7 @@ class BA2Packer:
                 if consecutive_errors >= _MAX_CONSECUTIVE_ERRORS:
                     result.errors.append(
                         f"Aborted: {_MAX_CONSECUTIVE_ERRORS} consecutive "
-                        "packing failures — BSArch or Proton may be broken"
+                        "packing failures — BSArch or Wine may be broken"
                     )
                     break
                 continue
@@ -448,7 +471,7 @@ class BA2Packer:
                 if consecutive_errors >= _MAX_CONSECUTIVE_ERRORS:
                     result.errors.append(
                         f"Aborted: {_MAX_CONSECUTIVE_ERRORS} consecutive "
-                        "packing failures — BSArch or Proton may be broken"
+                        "packing failures — BSArch or Wine may be broken"
                     )
                     break
 
