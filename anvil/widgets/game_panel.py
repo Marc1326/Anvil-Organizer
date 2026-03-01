@@ -597,7 +597,9 @@ class GamePanel(QWidget):
             writer = PluginsTxtWriter(
                 self._current_plugin, self._current_game_path, self._instance_path
             )
-            writer.write()
+            result_path = writer.write()
+            if result_path is None:
+                print("[GamePanel] plugins.txt write failed or skipped", flush=True)
             self._refresh_plugins_tab()
 
     def silent_purge(self) -> None:

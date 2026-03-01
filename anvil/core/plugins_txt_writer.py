@@ -35,6 +35,34 @@ class PluginsTxtWriter:
         self._instance_path = instance_path
         self._primary: list[str] = getattr(game_plugin, "PRIMARY_PLUGINS", [])
 
+    # ── Private helpers ──────────────────────────────────────────────
+
+    def _remove_case_variants(self, txt_path: Path) -> None:
+        """Remove case-variant files (e.g. Plugins.txt vs plugins.txt).
+
+        On Linux, the filesystem is case-sensitive, so both can coexist.
+        Proton/Wine gets confused when both exist. Remove any variant
+        that doesn't match our exact target filename.
+        """
+        target_name_lower = txt_path.name.lower()
+        parent = txt_path.parent
+        if not parent.is_dir():
+            return
+        try:
+            for entry in os.scandir(parent):
+                if (
+                    entry.is_file()
+                    and entry.name.lower() == target_name_lower
+                    and entry.name != txt_path.name
+                ):
+                    try:
+                        (parent / entry.name).unlink()
+                        print(f"{_TAG} Removed case-variant: {entry.name}")
+                    except OSError:
+                        pass
+        except OSError:
+            pass
+
     # ── Public API ────────────────────────────────────────────────────
 
     def scan_plugins(self) -> list[str]:
@@ -47,6 +75,7 @@ class PluginsTxtWriter:
             self._game_plugin, "GameDataPath", "Data"
         )
         if not data_dir.is_dir():
+            print(f"{_TAG} Data directory not found: {data_dir}")
             return []
 
         # Collect all plugin files directly in Data/ (not subdirs)
@@ -60,6 +89,10 @@ class PluginsTxtWriter:
                     found.add(entry.name)
         except OSError as exc:
             print(f"{_TAG} Error scanning {data_dir}: {exc}")
+            return []
+
+        if not found:
+            print(f"{_TAG} No plugin files found in {data_dir}")
             return []
 
         # Build primary list (only plugins that actually exist on disk)
@@ -107,6 +140,9 @@ class PluginsTxtWriter:
         # Ensure parent directory exists
         os.makedirs(txt_path.parent, exist_ok=True)
 
+        # Remove case-variants (e.g. Plugins.txt) before writing
+        self._remove_case_variants(txt_path)
+
         # Build content
         lines = [_HEADER]
         for plugin in plugins:
@@ -127,6 +163,8 @@ class PluginsTxtWriter:
         if txt_path is None:
             return True
         try:
+            # Also remove case-variants (e.g. Plugins.txt, PLUGINS.TXT)
+            self._remove_case_variants(txt_path)
             if txt_path.exists():
                 txt_path.unlink()
                 print(f"{_TAG} Removed {txt_path}")

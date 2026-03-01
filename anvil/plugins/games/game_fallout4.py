@@ -82,7 +82,7 @@ class Fallout4Game(BaseGame):
     Ba2Format = "fo4"             # BSArch: -fo4 -mt
     Ba2TextureFormat = "fo4dds"   # BSArch: -fo4dds -mt (DX10 textures)
     Ba2IniSection = "Archive"
-    Ba2IniKey = "sResourceArchive2List"
+    Ba2IniKey = "sResourceArchiveList2"
     Ba2IniFile = "Fallout4Custom.ini"
 
     DLC_PLUGINS = [

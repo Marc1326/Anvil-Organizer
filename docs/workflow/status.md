@@ -1,7 +1,8 @@
 # Workflow Status
-Feature: Deploy-Bug Fix -- Mods werden nicht in den Game-Ordner verlinkt
+
+Feature: plugins.txt Fix (Case-Varianten + Diagnostik-Logging)
 Iteration: 1
-Checkliste: docs/workflow/checkliste.md
-Letzter QA-Report: (inline -- alle 11/11 Punkte erfuellt)
+Checkliste: docs/workflow/checkliste-plugins-txt-fix.md
+Letzter QA-Report: docs/workflow/qa-report-plugins-txt-1.md
 Offene Punkte: keine
 Status: DONE

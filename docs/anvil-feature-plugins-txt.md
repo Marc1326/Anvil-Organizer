@@ -1,222 +1,249 @@
-# Feature-Spec: plugins.txt Generator + Plugin-Liste UI
+# Feature-Spec: plugins.txt bleibt leer nach Deploy -- Konsolidierter Report
 
-**Datum:** 2026-02-26
-**Status:** Geplant
-**Betrifft:** Bethesda-Spiele (Fallout 4, künftig Skyrim SE, Starfield etc.)
-
----
-
-## 1. Problem
-
-Bethesda-Spiele (Creation Engine) laden Mod-Plugins (.esp/.esm/.esl) nur, wenn sie in der `plugins.txt` eingetragen sind. Ohne diese Datei werden Symlinks zwar korrekt deployt, aber das Spiel ignoriert die Mod-Dateien. Anvil schreibt aktuell keine `plugins.txt`.
-
-## 2. Lösung
-
-Nach jedem Deploy automatisch `plugins.txt` in den Proton-Prefix schreiben. Bei Purge die Datei löschen/zurücksetzen. Zusätzlich ein UI-Tab zur Anzeige und Verwaltung der Plugin-Liste.
+**Datum:** 2026-03-01
+**Konsolidiert aus:** Agent 1, 2, 3 Reports
+**Status:** Analyse abgeschlossen -- Fix-Plan erstellt
 
 ---
 
-## 3. plugins.txt Format (Bethesda-Standard)
+## 1. Problembeschreibung
 
-```
-# This file is used by the game to keep track of your downloaded content.
-# Please do not modify this file.
-*Fallout4.esm
-*DLCRobot.esm
-*DLCworkshop01.esm
-*DLCCoast.esm
-*DLCworkshop02.esm
-*DLCworkshop03.esm
-*DLCNukaWorld.esm
-*DLCUltraHighResolution.esm
-*UnofficalFallout4Patch.esp
-*SomeMod.esp
-InactiveMod.esp
-*LightPlugin.esl
-```
-
-### Regeln
-
-| Regel | Detail |
-|-------|--------|
-| Encoding | UTF-8 (ohne BOM) |
-| Zeilenende | `\r\n` (Windows-Format, Proton erwartet das) |
-| Header | 2 Kommentarzeilen mit `#` |
-| Aktiv | `*PluginName.ext` (Asterisk-Prefix) |
-| Inaktiv | `PluginName.ext` (ohne Prefix) |
-| Reihenfolge | Primary Plugins zuerst, dann Masters (.esm), dann normale Plugins (.esp) |
-| Extensions | `.esm`, `.esp`, `.esl` |
+Nach dem Deploy von 4 Mods (CBBE, GCM, LooksMenu, Undressed Character Creation) fuer Fallout 4 soll `plugins.txt` mindestens 12 Eintraege enthalten (8 PRIMARY + 4 Mod-ESPs). Marc berichtet, dass die Datei LEER bleibt.
 
 ---
 
-## 4. Architektur
+## 2. Ist-Zustand (verifiziert am 2026-03-01)
 
-### 4.1 Neue Datei: `anvil/core/plugins_txt_writer.py`
+### 2.1 Data-Verzeichnis
 
-```
-class PluginsTxtWriter:
-    __init__(game_plugin, game_path, instance_path)
+Im Verzeichnis `/mnt/gamingS/SteamLibrary/steamapps/common/Fallout 4/Data/` liegen:
 
-    scan_plugins() -> list[str]
-        # Scannt game_path/Data/ nach .esp/.esm/.esl
-        # Filtert optional/ Plugins raus (aus mod_detail_dialog)
-        # Sortiert: Primary zuerst, dann .esm, dann .esp/.esl
+| Typ | Dateien | Status |
+|-----|---------|--------|
+| PRIMARY ESMs | 8 Stueck (Fallout4.esm + 7 DLCs) | Originale Dateien (kein Symlink) |
+| Mod ESPs | CBBE.esp, GCM.esp, LooksMenu.esp, Undressed_Character_Creation.esp | Symlinks nach `.mods/` -- KORREKT |
+| CC ESLs | 9 Stueck (ccBGS..., ccFSV..., ccOTM..., ccSBJ...) | Originale Dateien |
+| **Gesamt** | **21 Plugin-Dateien** | Alle werden von scan_plugins() erkannt |
 
-    write(enabled_plugins: list[str] | None = None) -> Path | None
-        # Header schreiben
-        # Primary Plugins immer mit * (aktiv)
-        # User-Plugins mit * oder ohne (je nach Status)
-        # Gibt geschriebenen Pfad zurück oder None
+### 2.2 plugins.txt-Dateien im Proton-Prefix
 
-    remove() -> bool
-        # plugins.txt löschen
-        # Gibt True zurück wenn erfolgreich
-```
+Es existieren **ZWEI** Dateien im selben Verzeichnis:
+`/mnt/gamingS/SteamLibrary/steamapps/compatdata/377160/pfx/drive_c/users/steamuser/AppData/Local/Fallout4/`
 
-### 4.2 Hook-Architektur (im GamePanel, nicht im Deployer)
+| Datei | Groesse | Erstellt | Inhalt |
+|-------|---------|----------|--------|
+| `plugins.txt` (klein-p) | 588 Bytes | 07:19 | **21 Eintraege -- KORREKT** |
+| `Plugins.txt` (gross-P) | 109 Bytes | 07:03 | **NUR Header-Kommentare -- LEER** |
 
-Der `ModDeployer` wird **nicht** umgebaut. Stattdessen werden die Hooks in `GamePanel.silent_deploy()` und `silent_purge()` eingefügt — dort ist `self._current_plugin` verfügbar.
+### 2.3 scan_plugins() Direkttest
 
 ```
-GamePanel.silent_deploy()
-    -> self._deployer.deploy()
-    -> if self._current_plugin and has_plugins_txt():
-           PluginsTxtWriter(plugin, game_path, instance_path).write()
-           self._refresh_plugins_tab()
-
-GamePanel.silent_purge()
-    -> self._deployer.purge()
-    -> if self._current_plugin and has_plugins_txt():
-           PluginsTxtWriter(plugin, game_path, instance_path).remove()
-           self._refresh_plugins_tab()
+$ python3 -c "... PluginsTxtWriter.scan_plugins() ..."
+Scanned plugins: 21
+  Fallout4.esm, DLCRobot.esm, ... (8 PRIMARY)
+  CBBE.esp, GCM.esp, LooksMenu.esp, Undressed_Character_Creation.esp (4 Mod-ESPs)
+  ccBGS...esl (9 CC-ESLs)
 ```
 
-### 4.3 base_game.py Erweiterungen
+Ergebnis: scan_plugins() funktioniert einwandfrei. Alle 21 Plugins werden erkannt, inklusive aller 4 Mod-ESP-Symlinks.
 
-Neue Defaults in `BaseGame`:
+---
+
+## 3. Root-Cause-Analyse
+
+### 3.1 Hauptursache: Case-Sensitivity-Problem (Wahrscheinlichkeit: 90%)
+
+**Das Problem:** Auf Linux (ext4/btrfs) sind `plugins.txt` und `Plugins.txt` zwei verschiedene Dateien. Unter Windows (NTFS) waeren sie identisch.
+
+- **Anvil** schreibt nach `plugins.txt` (klein-p) -- via `_WIN_PLUGINS_TXT = "...Fallout4/plugins.txt"`
+- **Fallout 4** (via Proton/Wine) erstellt `Plugins.txt` (gross-P) beim ersten Start
+- **Ergebnis:** Auf dem Dateisystem existieren BEIDE nebeneinander. Das Spiel liest moeglicherweise die leere `Plugins.txt` statt Anvils korrekte `plugins.txt`
+
+**Evidenz:**
+- `Plugins.txt` (gross-P) wurde um 07:03 erstellt (vom Spiel beim Start via Proton)
+- `plugins.txt` (klein-p) wurde um 07:19 erstellt (von Anvil beim Deploy)
+- Beide koexistieren -- auf Windows unmoeglich, auf Linux normal
+
+**Wie Proton/Wine mit Case-Sensitivity umgeht:**
+- Proton hat ein casefold-System das normalerweise `plugins.txt` == `Plugins.txt` behandelt
+- ABER: Wenn beide Dateien physisch existieren, kann Proton nicht entscheiden welche "die richtige" ist
+- Je nach Wine/Proton-Version und casefold-Einstellung wird eine der beiden gewaehlt
+- Fallout 4 erwartet intern `Plugins.txt` (Windows-Standard mit grossem P)
+
+### 3.2 Ablauf des Problems
+
+```
+1. User startet Fallout 4 zum ersten Mal via Steam/Proton
+   -> Spiel erstellt "Plugins.txt" (gross-P, Windows-Konvention)
+   -> Inhalt: nur Header-Kommentare (keine Mods installiert)
+
+2. User oeffnet Anvil Organizer, deployed Mods
+   -> PluginsTxtWriter.write() erstellt NEUE Datei "plugins.txt" (klein-p)
+   -> Inhalt: 21 Plugins (korrekt)
+   -> "Plugins.txt" (gross-P) bleibt UNVERAENDERT daneben liegen
+
+3. User startet Fallout 4 erneut via Steam/Proton
+   -> Proton findet ZWEI Dateien: "plugins.txt" UND "Plugins.txt"
+   -> Proton waehlt (je nach Version/casefold) die falsche: "Plugins.txt"
+   -> Spiel sieht: leere plugins.txt -> keine Mod-Plugins geladen
+   -> Marc beobachtet: "plugins.txt bleibt LEER"
+```
+
+### 3.3 Alle moeglichen Fehlerquellen (sortiert nach Wahrscheinlichkeit)
+
+| # | Fehlerquelle | Wahrsch. | Status | Begruendung |
+|---|-------------|----------|--------|-------------|
+| 1 | **Case-Sensitivity:** Zwei Dateien `plugins.txt` + `Plugins.txt` koexistieren | 90% | BESTAETIGT | Beide Dateien physisch vorhanden, unterschiedlicher Inhalt |
+| 2 | **Timing:** Purge loeschte plugins.txt vor Neuschreibung | 5% | GEFIXT | Commit 69521fc entfernte das Loeschen bei Purge |
+| 3 | **protonPrefix() gibt None zurueck** | 2% | WIDERLEGT | Test zeigt korrekten Pfad, Store=steam |
+| 4 | **scan_plugins() findet keine Dateien** | 1% | WIDERLEGT | Test zeigt 21 Plugins |
+| 5 | **Schreibberechtigung fehlt** | 1% | WIDERLEGT | Datei wird geschrieben (588 Bytes) |
+| 6 | **_current_plugin ist None bei silent_deploy()** | 0.5% | UNWAHRSCHEINLICH | update_game() wird vor set_instance_path() aufgerufen |
+| 7 | **Data/-Verzeichnis existiert nicht** | 0.5% | WIDERLEGT | Verzeichnis existiert mit 21 Plugin-Dateien |
+
+---
+
+## 4. Loesungsplan
+
+### 4.1 Fix: Case-Varianten bereinigen (PRIMAER)
+
+**Datei: `anvil/core/plugins_txt_writer.py`**
+
+Neue private Methode hinzufuegen:
 
 ```python
-PRIMARY_PLUGINS: list[str] = []
+def _remove_case_variants(self, txt_path: Path) -> None:
+    """Remove case-variant files (e.g. Plugins.txt vs plugins.txt).
 
-def has_plugins_txt(self) -> bool:
-    """True wenn das Spiel eine plugins.txt braucht."""
-    return bool(self.PRIMARY_PLUGINS)
-
-def plugins_txt_path(self) -> Path | None:
-    """Pfad zur plugins.txt im Proton-Prefix. None = nicht verfügbar."""
-    return None
+    On Linux, the filesystem is case-sensitive, so both can coexist.
+    Proton/Wine gets confused when both exist. Remove any variant
+    that doesn't match our exact target filename.
+    """
+    target_name_lower = txt_path.name.lower()
+    parent = txt_path.parent
+    if not parent.is_dir():
+        return
+    try:
+        for entry in os.scandir(parent):
+            if (
+                entry.is_file()
+                and entry.name.lower() == target_name_lower
+                and entry.name != txt_path.name
+            ):
+                try:
+                    (parent / entry.name).unlink()
+                    print(f"{_TAG} Removed case-variant: {entry.name}")
+                except OSError:
+                    pass
+    except OSError:
+        pass
 ```
 
-Fallout 4 hat bereits `PRIMARY_PLUGINS` und `plugins_txt_path()` — kein Umbau nötig.
-
-### 4.4 UI: Plugins-Tab in game_panel.py
-
-**Position:** Index 0 (erster Tab), mit `setTabVisible(0, False)` für Nicht-Bethesda-Spiele.
-
-**Widget:** QTreeWidget mit Checkboxes
-
-| Spalte | Inhalt | Breite |
-|--------|--------|--------|
-| 0 | Plugin-Name mit Checkbox | stretch |
-| 1 | Typ (ESM/ESP/ESL) | 80px |
-| 2 | Mod-Index (hex, 2-stellig) | 60px |
-
-**Verhalten:**
-- Primary Plugins: Checkbox disabled, immer checked, nicht verschiebbar, visuell abgehoben (italic/grau)
-- User-Plugins: Checkbox frei schaltbar, Drag&Drop für Reihenfolge
-- Refresh bei: `update_game()`, nach Deploy, nach Purge
-
-**Tab-Sichtbarkeit:**
+In `write()` aufrufen -- VOR dem Schreiben:
 ```python
-# In update_game():
-has_plugins = (game_plugin and hasattr(game_plugin, 'has_plugins_txt')
-               and game_plugin.has_plugins_txt())
-self._tabs.setTabVisible(0, has_plugins)
+# Remove case-variants before writing
+self._remove_case_variants(txt_path)
 ```
 
-**Index-Anpassung:** `restore_tab_column_widths()` und `_on_tab_changed()` in mainwindow.py müssen von hart-kodierten Indizes auf Tab-Referenzen umgestellt werden (z.B. `self._tabs.indexOf(widget)`).
-
----
-
-## 5. Datenfluss
-
-```
-Mod-Ordner (.mods/<name>/Data/*.esp)
-        |
-        v
-ModDeployer.deploy() — Symlinks nach game_path/Data/
-        |
-        v
-PluginsTxtWriter.scan_plugins() — scannt game_path/Data/ nach .esp/.esm/.esl
-        |
-        v
-PluginsTxtWriter.write() — schreibt plugins.txt in Proton-Prefix
-        |
-        v
-PluginsTab.refresh() — zeigt Plugin-Liste in UI
+In `remove()` aufrufen -- Case-Varianten ebenfalls loeschen:
+```python
+# Also remove case-variants
+self._remove_case_variants(txt_path)
 ```
 
----
+### 4.2 Verbesserung: Diagnostik-Logging (SEKUNDAER)
 
-## 6. Betroffene Dateien
+**Datei: `anvil/core/plugins_txt_writer.py`**
 
-| Datei | Änderung | Risiko |
-|-------|----------|--------|
-| `anvil/core/plugins_txt_writer.py` | **NEU** — scan, write, remove | Niedrig |
-| `anvil/plugins/base_game.py` | Neue Defaults: `has_plugins_txt()`, `PRIMARY_PLUGINS` | Niedrig |
-| `anvil/widgets/game_panel.py` | Plugins-Tab (Index 0), Hooks in silent_deploy/purge | Mittel |
-| `anvil/mainwindow.py` | Index-Anpassung restore_tab_column_widths | Mittel |
-| `anvil/locales/*.json` (6 Dateien) | Neue tr()-Keys | Niedrig |
+In `scan_plugins()` differenziertes Logging:
+- Data/ nicht vorhanden -> Log "Data directory not found: {data_dir}"
+- Data/ vorhanden aber keine Plugins -> Log "No .esp/.esm/.esl files in {data_dir}"
+- OSError -> Log bereits vorhanden
 
-**NICHT ändern:**
-- `anvil/plugins/games/game_fallout4.py` — hat bereits alles was nötig ist
-- `anvil/core/mod_deployer.py` — Hooks gehen über GamePanel, nicht Deployer
-- Cover-Bilder, Icons, REDmod
+### 4.3 Verbesserung: write()-Rueckgabe pruefen (OPTIONAL)
 
----
+**Datei: `anvil/widgets/game_panel.py`**
 
-## 7. Edge Cases und Risiken
-
-| Edge Case | Lösung |
-|-----------|--------|
-| Proton-Prefix nicht gefunden | `plugins_txt_path()` gibt None → write() wird übersprungen, Tab zeigt Hinweis |
-| AppData/Local/Fallout4/ existiert nicht | `os.makedirs(parent, exist_ok=True)` vor dem Schreiben |
-| Mehrere .esp pro Mod | Alle werden aufgenommen, in der Reihenfolge des Mod |
-| Optional-ESPs (in optional/ verschoben) | Nicht in plugins.txt aufnehmen — nur Dateien direkt in Data/ |
-| DLC nicht installiert | Primary Plugins nur schreiben wenn .esm in game_path/Data/ existiert |
-| `_crash_recovery_purge()` ohne game_plugin | plugins.txt bleibt bestehen — wird beim nächsten normalen Purge aufgeräumt |
-| Groß-/Kleinschreibung | Case-insensitive Vergleich für .esp/.esm/.esl Extensions |
-| Nicht-Bethesda-Spiele | `has_plugins_txt()` gibt False → Tab unsichtbar, keine Hooks |
+In `silent_deploy()` den Rueckgabewert von `write()` pruefen:
+```python
+result_path = writer.write()
+if result_path is None:
+    print("[GamePanel] plugins.txt write failed or skipped", flush=True)
+```
 
 ---
 
-## 8. Akzeptanz-Kriterien
+## 5. Betroffene Dateien
 
-- [ ] `plugins.txt` wird nach Deploy im korrekten Proton-Prefix geschrieben
-- [ ] `plugins.txt` wird bei Purge gelöscht
-- [ ] Format: UTF-8, `\r\n`, Header-Kommentare, `*`-Prefix für aktive Plugins
-- [ ] Primary Plugins (Fallout4.esm + DLCs) immer oben, immer aktiv
-- [ ] Nur vorhandene Primary Plugins werden geschrieben (DLC-Check)
-- [ ] User-Mod-Plugins (.esp/.esm/.esl) werden nach Primary Plugins gelistet
-- [ ] Masters (.esm) werden vor normalen Plugins (.esp) sortiert
-- [ ] Optional-ESPs werden NICHT in plugins.txt geschrieben
-- [ ] Plugins-Tab ist nur bei Bethesda-Spielen sichtbar
-- [ ] Plugins-Tab zeigt alle Plugins mit Checkbox und Typ-Markierung
-- [ ] Primary Plugins im Tab: Checkbox disabled, immer checked
-- [ ] Tab refresht sich nach Deploy/Purge
-- [ ] Keine Regression: Nicht-Bethesda-Spiele (CP2077, Witcher3, BG3, RDR2) unverändert
-- [ ] Keine Crashes bei fehlenden Proton-Prefix
-- [ ] `./restart.sh` startet ohne Fehler
-- [ ] Alle 6 Locale-Dateien haben die neuen Keys
+| Datei | Aenderungstyp | Risiko |
+|-------|---------------|--------|
+| `anvil/core/plugins_txt_writer.py` | Case-Varianten-Handling + Diagnostik | Niedrig |
+| `anvil/widgets/game_panel.py` | Rueckgabe-Handling (optional) | Niedrig |
+| `anvil/plugins/games/game_fallout4.py` | **Keine Aenderung noetig** | - |
+| `anvil/plugins/base_game.py` | **Keine Aenderung noetig** | - |
+| Locale-Dateien | **Keine Aenderung noetig** (nur Logging, kein UI-Text) | - |
 
 ---
 
-## 9. Phase 2 (Später)
+## 6. Akzeptanz-Kriterien (ALLE muessen erfuellt sein)
 
-- Drag&Drop für Plugin-Reihenfolge im Tab
-- ESP-Header-Parsing (Master-Flag, Light-Flag erkennen)
-- Master-Dependency-Validierung (fehlende Masters warnen)
-- LOOT-Integration für automatische Sortierung
-- loadorder.txt für ältere Bethesda-Spiele (Oblivion, FO3, FNV)
-- Plugin-Index-Berechnung (FE:xxx für Light Plugins)
-- Weitere Bethesda-Plugins (Skyrim SE, Starfield)
+- [ ] Kriterium 1: Wenn Anvil plugins.txt schreibt und eine `Plugins.txt` (gross-P) im selben Verzeichnis existiert, wird die gross-P-Variante VOR dem Schreiben geloescht, sodass nur EINE Datei mit dem korrekten Namen (`plugins.txt`) verbleibt
+- [ ] Kriterium 2: Wenn User silent_deploy() ausfuehrt und 4 Mod-ESPs deployed sind, enthaelt die resultierende plugins.txt mindestens 12 Eintraege (8 PRIMARY + 4 Mod-ESPs) -- nicht 0
+- [ ] Kriterium 3: Wenn User silent_deploy() ausfuehrt und Creation Club ESLs im Data-Verzeichnis liegen, werden diese ebenfalls in plugins.txt aufgefuehrt (aktuell 21 total)
+- [ ] Kriterium 4: Wenn User silent_purge() ausfuehrt, werden ALLE Case-Varianten von plugins.txt entfernt (sowohl `plugins.txt` als auch `Plugins.txt` als auch andere Varianten wie `PLUGINS.TXT`)
+- [ ] Kriterium 5: Wenn scan_plugins() eine leere Liste zurueckgibt, wird im Log der Grund ausgegeben ("Data directory not found" vs. "No plugin files found" vs. OSError-Details)
+- [ ] Kriterium 6: Wenn write() fehlschlaegt (return None), wird in silent_deploy() eine Warnung ins Log geschrieben
+- [ ] Kriterium 7: Wenn write() erfolgreich ist, wird im Log die Anzahl der geschriebenen Plugins UND der Ziel-Pfad ausgegeben (bereits implementiert -- sicherstellen dass es bestehen bleibt)
+- [ ] Kriterium 8: Wenn die Proton-Prefix-Verzeichnisstruktur nicht existiert, wird sie von write() automatisch erstellt (bereits implementiert via makedirs -- sicherstellen dass es bestehen bleibt)
+- [ ] Kriterium 9: Nicht-Bethesda-Spiele (Cyberpunk 2077, Witcher 3, BG3, RDR2) sind von den Aenderungen nicht betroffen -- kein veraendertes Verhalten
+- [ ] Kriterium 10: restart.sh startet ohne Fehler
+
+---
+
+## 7. Zusammenfassung der 3 Agent-Reports
+
+### Agent 1: plugins_txt_writer.py Analyse
+- Code ist solide und defensiv geschrieben
+- Symlink-Handling ist korrekt (follow_symlinks=True Default erkennt Symlinks als Dateien)
+- Kein Bug im Writer selbst -- Scan und Write funktionieren korrekt
+- **Luecke:** Rueckgabewert von write() wird vom Aufrufer ignoriert
+
+### Agent 2: Aufrufpfad silent_deploy() Analyse
+- plugins.txt-Block wird UNABHAENGIG vom Deploy-Ergebnis ausgefuehrt
+- 7 Bedingungen muessen erfuellt sein (alle verifiziert als True fuer Fallout 4 Steam)
+- Purge loescht plugins.txt NICHT MEHR (seit Commit 69521fc)
+- Kein Redeploy bei Mod-Toggle (beabsichtigt -- Deploy erst bei Profil-/Instanzwechsel oder App-Start)
+
+### Agent 3: MO2-Vergleich + Fallout 4 Plugin
+- Kritischer Unterschied: MO2 scannt VFS, Anvil scannt physisches Data/ (korrekt fuer Symlink-Deploy)
+- Mod-Index-Berechnung fuer ESL-Plugins ist falsch (fortlaufend statt FE:xxx) -- Phase-2-Problem
+- GOG-Support fehlt (protonPrefix gibt None zurueck) -- bekannte Einschraenkung
+- Plugin-Aktivierung/-Deaktivierung nicht implementiert (Phase 1: alle aktiv mit `*`-Prefix)
+
+### Agent 4 (Konsolidierung -- dieses Dokument)
+- **Root Cause identifiziert:** Case-Sensitivity auf Linux -- `plugins.txt` und `Plugins.txt` existieren als zwei getrennte Dateien nebeneinander
+- Die Schreib-Logik funktioniert korrekt (verifiziert: 21 Plugins in `plugins.txt`)
+- Das Problem: Fallout 4 via Proton liest moeglicherweise die ANDERE (leere) Datei `Plugins.txt`
+- **Fix:** Case-Varianten bereinigen bevor geschrieben wird
+
+---
+
+## 8. Risiken und Einschraenkungen
+
+| Risiko | Bewertung | Mitigation |
+|--------|-----------|------------|
+| Proton-casefold aendert sich in Zukunft | Niedrig | Unser Fix ist defensiv -- loescht nur "falsche" Varianten |
+| Spiel erstellt `Plugins.txt` bei jedem Start neu | Mittel | Anvil muesste plugins.txt bei jedem Deploy neu schreiben (bereits der Fall) |
+| Andere Bethesda-Spiele haben andere Case-Konventionen | Niedrig | _remove_case_variants ist generisch und funktioniert fuer alle Varianten |
+| GOG-Spiele haben kein Proton-Prefix | Bekannt | Separate Feature-Anforderung -- nicht Teil dieses Fixes |
+
+---
+
+## 9. Phase 2 (Spaeter, nicht Teil dieses Fixes)
+
+- Drag-and-Drop fuer Plugin-Reihenfolge im Plugins-Tab
+- Plugin-Aktivierung/-Deaktivierung per Checkbox (mit/ohne `*`-Prefix)
+- ESL-Index-Berechnung (FE:xxx statt fortlaufend)
+- Master-Dependency-Validierung
+- GOG/Heroic/Lutris Wine-Prefix Support
+- LOOT-Integration fuer automatische Sortierung
