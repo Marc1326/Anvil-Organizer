@@ -442,6 +442,7 @@
     "nexus_query_loading": "Caricamento info Nexus...",
     "nexus_query_success": "Info Nexus aggiornate: {name}",
     "nexus_query_invalid_id": "ID Mod non valido.",
+    "nexus_no_id_found": "Nessun ID Nexus trovato. Scarica la mod tramite Nexus.",
     "nexus_no_game_slug": "Nessuno slug di gioco Nexus configurato."
   },
 

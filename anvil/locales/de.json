@@ -442,6 +442,7 @@
     "nexus_query_loading": "Lade Nexus-Info...",
     "nexus_query_success": "Nexus-Info aktualisiert: {name}",
     "nexus_query_invalid_id": "Ungültige Mod-ID eingegeben.",
+    "nexus_no_id_found": "Keine Nexus-ID gefunden. Lade die Mod über Nexus herunter.",
     "nexus_no_game_slug": "Kein Nexus-Spielname konfiguriert."
   },
 

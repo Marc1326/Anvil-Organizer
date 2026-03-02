@@ -2731,20 +2731,10 @@ class MainWindow(QMainWindow):
                                     nexus_id = parsed_id
                                     break
 
-        # Step 3: Manual fallback dialog
+        # Step 3: No ID found → status message only
         if nexus_id <= 0:
-            text, ok = get_text_input(
-                self, tr("game_panel.query_nexus_info"), tr("game_panel.query_nexus_enter_id"),
-            )
-            if not ok or not text.strip():
-                return
-            try:
-                nexus_id = int(text.strip())
-                if nexus_id <= 0:
-                    raise ValueError
-            except ValueError:
-                self.statusBar().showMessage(tr("status.nexus_query_invalid_id"), 5000)
-                return
+            self.statusBar().showMessage(tr("status.nexus_no_id_found"), 5000)
+            return
 
         self._pending_query_path = entry.install_path
         self._pending_dl_query_path = None
