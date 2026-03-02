@@ -415,7 +415,7 @@
     "not_connected": "Not connected.",
     "not_installed": "Not installed",
     "api_not_logged_in": "API: not logged in",
-    "started": "Started: {name}",
+    "game_started": "Game started: {name}",
     "installed": "Installed: {names}",
     "installed_inactive": "Installed (inactive): {names}",
     "framework_installed": "Framework installed: {names}",

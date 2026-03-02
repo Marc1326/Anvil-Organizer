@@ -282,7 +282,8 @@ class MainWindow(QMainWindow):
         self._mod_list_view.fw_archives_dropped.connect(self._on_fw_archives_dropped)
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
-        self._game_panel.nexus_query_requested.connect(self._on_nexus_query_from_panel)
+        self._game_panel.game_started.connect(self._on_game_started)
+
         self._game_panel.dl_query_info_requested.connect(self._on_dl_query_info)
 
         # ── Deferred tab column restore ───────────────────────────────
@@ -1231,21 +1232,21 @@ class MainWindow(QMainWindow):
             self._game_panel.silent_deploy()
         from PySide6.QtCore import QProcess
         success, pid = QProcess.startDetached(binary_path, [], working_dir)
-        if success:
-            self.statusBar().showMessage(
-                tr("status.started", name=Path(binary_path).name), 5000,
-            )
-        else:
+        if not success:
             QMessageBox.warning(
                 self, tr("error.start_failed_title"),
                 tr("error.start_failed_message", path=binary_path),
             )
 
+    def _on_game_started(self, game_name: str) -> None:
+        """Show statusbar message when a game has been started."""
+        msg = tr("status.game_started", name=game_name)
+        print("SLOT TEST", flush=True)
+        self.statusBar().showMessage(msg, 5000)
+
     def _on_downloads_install(self, paths: list) -> None:
         """Handle install request from the Downloads tab."""
-        print(f"DEBUG _on_downloads_install: paths={paths}", flush=True)
         if not self._current_instance_path:
-            print("DEBUG _on_downloads_install: NO instance_path, RETURNING", flush=True)
             return
         self._install_archives([Path(p) for p in paths])
         self._game_panel.refresh_downloads()
@@ -2753,13 +2754,6 @@ class MainWindow(QMainWindow):
         self._nexus_api.query_mod_info(nexus_slug, nexus_id)
         self.statusBar().showMessage(tr("status.nexus_query_loading"), 5000)
 
-    def _on_nexus_query_from_panel(self) -> None:
-        """GamePanel button: Query Nexus Info for selected mod."""
-        selected_rows = self._mod_list_view.get_selected_source_rows()
-        if len(selected_rows) != 1:
-            self.statusBar().showMessage(tr("dialog.no_selection"), 3000)
-            return
-        self._ctx_query_nexus_info(selected_rows[0])
 
     def _on_dl_query_info(self, archive_path: str) -> None:
         """Handle 'Query Nexus Info' from Downloads tab context menu."""

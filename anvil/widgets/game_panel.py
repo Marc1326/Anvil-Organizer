@@ -84,7 +84,8 @@ class _DraggableDownloadTable(QTableWidget):
 class GamePanel(QWidget):
     install_requested = Signal(list)  # list of archive path strings
     start_requested = Signal(str, str)  # (binary_path, working_dir)
-    nexus_query_requested = Signal()
+    game_started = Signal(str)  # game_name
+
     dl_query_info_requested = Signal(str)  # archive_path
 
     def __init__(self, parent=None):
@@ -158,14 +159,6 @@ class GamePanel(QWidget):
         self._start_btn.clicked.connect(self._on_start_clicked)
         top_layout.addWidget(self._start_btn, 0, Qt.AlignmentFlag.AlignHCenter)
 
-        # Nexus-Info-Button
-        self._nexus_query_btn = QPushButton(tr("context.nexus_query"))
-        self._nexus_query_btn.setMinimumWidth(140)
-        self._nexus_query_btn.setFixedHeight(28)
-        self._nexus_query_btn.clicked.connect(
-            lambda checked=False: self.nexus_query_requested.emit()
-        )
-        top_layout.addWidget(self._nexus_query_btn, 0, Qt.AlignmentFlag.AlignHCenter)
 
         # (Deploy-UI entfernt — Deploy/Purge läuft jetzt automatisch)
 
@@ -798,6 +791,8 @@ class GamePanel(QWidget):
 
         working_dir = str(binary_path.parent)
         self.start_requested.emit(str(binary_path), working_dir)
+        print("EMIT TEST direct", flush=True)
+        self.game_started.emit(self._game_label.text())
 
     def _launch_via_steam(self, plugin) -> None:
         """Launch the main game binary via steam -applaunch."""
@@ -818,7 +813,10 @@ class GamePanel(QWidget):
         if hasattr(plugin, "GameLaunchArgs"):
             args.extend(plugin.GameLaunchArgs)
         success, pid = QProcess.startDetached(steam_bin, args)
-        if not success:
+        if success:
+            print("EMIT TEST steam", flush=True)
+            self.game_started.emit(self._game_label.text())
+        else:
             QMessageBox.warning(
                 self, tr("game_panel.start"),
                 tr("game_panel.steam_not_found"),
@@ -879,6 +877,8 @@ class GamePanel(QWidget):
                 cwd=working_dir,
                 env=env,
             )
+            print("EMIT TEST proton", flush=True)
+            self.game_started.emit(self._game_label.text())
         except OSError as exc:
             QMessageBox.warning(
                 self, tr("game_panel.start"),
