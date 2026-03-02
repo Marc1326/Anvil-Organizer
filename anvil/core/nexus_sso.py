@@ -30,8 +30,8 @@ from PySide6.QtCore import QObject, Signal, QThread, QTimer
 
 
 WSS_URL = "wss://sso.nexusmods.com"
-# Must be registered with Nexus Mods — placeholder until approved
-APPLICATION_SLUG = "anvilorganizer"
+# Registered with Nexus Mods
+APPLICATION_SLUG = "nathuk-anvilorganizer"
 
 
 class _SSOState:

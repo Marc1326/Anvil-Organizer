@@ -439,15 +439,12 @@ class SettingsDialog(QDialog):
         btn_col = QVBoxLayout()
         self._btn_connect = QPushButton(tr("button.connect_nexus"))
         self._btn_connect.clicked.connect(self._nx_connect_sso)
-        _disabled(self._btn_connect)
         btn_col.addWidget(self._btn_connect)
         self._btn_api_key = QPushButton(tr("settings.nexus_enter_api_key"))
         self._btn_api_key.clicked.connect(self._nx_enter_api_key)
-        _disabled(self._btn_api_key)
         btn_col.addWidget(self._btn_api_key)
         self._btn_disconnect = QPushButton(tr("settings.nexus_disconnect"))
         self._btn_disconnect.clicked.connect(self._nx_disconnect)
-        _disabled(self._btn_disconnect)
         btn_col.addWidget(self._btn_disconnect)
         btn_col.addStretch()
         verb_layout.addLayout(btn_col)
@@ -529,6 +526,7 @@ class SettingsDialog(QDialog):
             self._nexus_api.validate_key()
         else:
             self._nx_log_add(tr("status.not_connected"))
+        self._nx_update_button_states()
 
         # Tab Plugins
         plugins_tab = QWidget()
@@ -934,12 +932,44 @@ class SettingsDialog(QDialog):
                 self._nx_log.addItem(line.strip())
         self._nx_log.scrollToBottom()
 
+    def _nx_update_button_states(self) -> None:
+        """Update Nexus button enabled states based on connection status."""
+        has_key = bool(self._nexus_api.has_api_key())
+        sso_active = bool(self._sso_login and self._sso_login.is_active())
+
+        if sso_active:
+            # SSO läuft: Connect=Abbrechen, Rest disabled
+            self._btn_connect.setEnabled(True)
+            self._btn_api_key.setEnabled(False)
+            self._btn_disconnect.setEnabled(False)
+        elif has_key and self._nx_uid.text():
+            # Verbunden (Key + validiert): nur Disconnect
+            self._btn_connect.setEnabled(False)
+            self._btn_api_key.setEnabled(False)
+            self._btn_disconnect.setEnabled(True)
+        elif has_key:
+            # Key gesetzt aber noch nicht validiert oder Fehler
+            self._btn_connect.setEnabled(True)
+            self._btn_api_key.setEnabled(True)
+            self._btn_disconnect.setEnabled(True)
+        else:
+            # Nicht verbunden: Connect + API-Key, kein Disconnect
+            self._btn_connect.setEnabled(True)
+            self._btn_api_key.setEnabled(True)
+            self._btn_disconnect.setEnabled(False)
+
+        # Tooltips zurücksetzen (weg von "Noch nicht verfügbar")
+        self._btn_connect.setToolTip("")
+        self._btn_api_key.setToolTip("")
+        self._btn_disconnect.setToolTip("")
+
     def _nx_connect_sso(self) -> None:
         """Start the SSO login flow via browser (MO2 style)."""
         # Cancel existing SSO if active
         if self._sso_login and self._sso_login.is_active():
             self._sso_login.cancel()
             self._btn_connect.setText(tr("button.connect_nexus"))
+            self._nx_update_button_states()
             return
 
         self._nx_log.clear()
@@ -948,6 +978,7 @@ class SettingsDialog(QDialog):
         self._sso_login.key_changed.connect(self._nx_on_sso_key)
         self._btn_connect.setText(tr("button.cancel"))
         self._sso_login.start()
+        self._nx_update_button_states()
 
     def _nx_on_sso_state(self, state: int, detail: str) -> None:
         """Handle SSO state changes — show progress in log."""
@@ -960,6 +991,7 @@ class SettingsDialog(QDialog):
                      NexusSSOLogin.State.CANCELLED,
                      NexusSSOLogin.State.ERROR):
             self._btn_connect.setText(tr("button.connect_nexus"))
+            self._nx_update_button_states()
 
     def _nx_on_sso_key(self, api_key: str) -> None:
         """Handle API key received from SSO."""
@@ -969,6 +1001,7 @@ class SettingsDialog(QDialog):
         settings.setValue("nexus/api_key", api_key)
         self._nx_log_add(tr("settings.nexus_key_validating"))
         self._nexus_api.validate_key()
+        self._nx_update_button_states()
 
     def _nx_enter_api_key(self) -> None:
         """Prompt the user to enter their Nexus API key manually."""
@@ -986,6 +1019,7 @@ class SettingsDialog(QDialog):
             self._nx_log_add(tr("settings.nexus_key_validating"))
             self._nx_status_label.setStyleSheet("")
             self._nexus_api.validate_key()
+            self._nx_update_button_states()
 
     def _nx_disconnect(self) -> None:
         """Clear the API key and reset all Nexus fields."""
@@ -1006,6 +1040,7 @@ class SettingsDialog(QDialog):
         self._nx_log_add(tr("status.disconnected"))
         self._nx_status_label.setText(tr("status.disconnected"))
         self._nx_status_label.setStyleSheet("")
+        self._nx_update_button_states()
 
     def _nx_on_validated(self, user_info: dict) -> None:
         """Handle successful API key validation."""
@@ -1024,6 +1059,7 @@ class SettingsDialog(QDialog):
         self._nx_log_add(tr("settings.nexus_connected_success"))
         self._nx_status_label.setText(tr("status.connected"))
         self._nx_status_label.setStyleSheet("color: #4CAF50;")
+        self._nx_update_button_states()
 
     def _nx_on_error(self, tag: str, message: str) -> None:
         """Handle API request error."""
@@ -1031,6 +1067,7 @@ class SettingsDialog(QDialog):
             self._nx_log_add(tr("settings.nexus_error", message=message))
             self._nx_status_label.setText(tr("settings.nexus_error", message=message))
             self._nx_status_label.setStyleSheet("color: #F44336;")
+            self._nx_update_button_states()
 
     def _nx_on_rate_limit(self, daily: int, hourly: int) -> None:
         """Update rate limit display."""
