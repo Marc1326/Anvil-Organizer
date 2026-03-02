@@ -123,6 +123,7 @@ class MainWindow(QMainWindow):
         self._toolbar = create_toolbar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._toolbar)
         self._toolbar.installEventFilter(self)
+        self.installEventFilter(self)  # Alt-key recovery for menubar
         self._build_menu_bar()
 
         central = QWidget()
@@ -571,14 +572,7 @@ class MainWindow(QMainWindow):
         self._act_icons_text.setChecked(cur_style == Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
 
     def keyPressEvent(self, event):
-        """Toggle menubar visibility on Alt key press."""
-        if event.key() == Qt.Key.Key_Alt and not event.isAutoRepeat():
-            s = self._settings()
-            if s.value("Interface/show_menubar_on_alt", True, type=bool):
-                mb = self.menuBar()
-                mb.setVisible(not mb.isVisible())
-                if hasattr(self, "_act_menubar"):
-                    self._act_menubar.setChecked(mb.isVisible())
+        """Forward to super (Alt handling moved to eventFilter)."""
         super().keyPressEvent(event)
 
     def _on_menu_profiles(self) -> None:
@@ -639,6 +633,12 @@ class MainWindow(QMainWindow):
             self._toolbar.setVisible(s.value("view/toolbar_visible", True, type=bool))
         if s.value("view/statusbar_visible") is not None:
             self._status_bar.setVisible(s.value("view/statusbar_visible", True, type=bool))
+
+        # Safety net: if both menubar AND toolbar are hidden, force menubar visible
+        if not self.menuBar().isVisible() and not self._toolbar.isVisible():
+            self.menuBar().setVisible(True)
+            if hasattr(self, "_act_menubar"):
+                self._act_menubar.setChecked(True)
 
         # Filter panel
         fp_open = s.value("view/filter_panel_open", False, type=bool)
@@ -723,6 +723,20 @@ class MainWindow(QMainWindow):
                 return True
             # FilterPanel und Chips handlen ihre Kontextmenüs selbst
             # via CustomContextMenu + customContextMenuRequested Signal
+
+        # Alt-key toggles menubar (robust recovery, works even when hidden)
+        if (obj is self
+                and event.type() == QEvent.Type.KeyRelease
+                and event.key() == Qt.Key.Key_Alt
+                and not event.isAutoRepeat()
+                and not event.modifiers() & ~Qt.KeyboardModifier.AltModifier):
+            s = self._settings()
+            if s.value("Interface/show_menubar_on_alt", True, type=bool):
+                mb = self.menuBar()
+                mb.setVisible(not mb.isVisible())
+                if hasattr(self, "_act_menubar"):
+                    self._act_menubar.setChecked(mb.isVisible())
+                return True
 
         return super().eventFilter(obj, event)
 
@@ -3024,8 +3038,13 @@ class MainWindow(QMainWindow):
         s = self._settings()
         s.setValue("splitter/state", self._splitter.saveState())
         # View settings
-        s.setValue("view/menubar_visible", self.menuBar().isVisible())
-        s.setValue("view/toolbar_visible", self._toolbar.isVisible())
+        menubar_vis = self.menuBar().isVisible()
+        toolbar_vis = self._toolbar.isVisible()
+        # Safety net: never persist both-hidden state (dead end)
+        if not menubar_vis and not toolbar_vis:
+            menubar_vis = True
+        s.setValue("view/menubar_visible", menubar_vis)
+        s.setValue("view/toolbar_visible", toolbar_vis)
         s.setValue("view/statusbar_visible", self._status_bar.isVisible())
         # Log state is persisted by CollapsibleSectionBar (log/collapsed)
         s.setValue("view/filter_panel_open", self._filter_panel.is_open())
