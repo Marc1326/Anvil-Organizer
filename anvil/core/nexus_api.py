@@ -117,6 +117,13 @@ class NexusAPI(QObject):
         """Fetch mod metadata.  GET /games/{game}/mods/{mod_id}.json"""
         self._get(f"/games/{game}/mods/{mod_id}.json", tag=f"mod_info:{game}:{mod_id}")
 
+    def query_mod_info(self, game: str, mod_id: int) -> None:
+        """Fetch mod metadata for Query Info feature.
+        Uses separate tag prefix to avoid collision with NXM download flow.
+        """
+        self._get(f"/games/{game}/mods/{mod_id}.json",
+                  tag=f"query_mod_info:{game}:{mod_id}")
+
     def get_mod_files(self, game: str, mod_id: int) -> None:
         """Fetch file list for a mod.  GET /games/{game}/mods/{mod_id}/files.json"""
         self._get(

@@ -94,7 +94,8 @@
     "delete_profile": "Eliminar perfil",
 
     "select_color": "Alterar cor...",
-    "reset_color": "Remover cor"
+    "reset_color": "Remover cor",
+    "nexus_query": "Consultar info do Nexus"
   },
 
   "toolbar": {
@@ -186,6 +187,8 @@
     "new_category": "Nova categoria",
     "category_exists": "A categoria já existe",
     "category_exists_message": "Já existe uma categoria com o nome \"{name}\".",
+    "nexus_query_title": "Inserir ID do Mod no Nexus",
+    "nexus_query_prompt": "ID do Mod no Nexus (do URL, ex. 107658):",
     "no_selection": "Sem seleção",
     "select_category_first": "Por favor, selecione primeiro uma categoria.",
     "rename_category": "Renomear categoria",
@@ -435,7 +438,11 @@
     "instance_info": "Instância: {game} | Plugin: {plugin} | Loja: {store}",
     "deploying": "Implantando...",
     "deployed": "Mods implantados",
-    "deploy_skipped": "Deploy ignorado (sem instância)"
+    "deploy_skipped": "Deploy ignorado (sem instância)",
+    "nexus_query_loading": "A carregar info do Nexus...",
+    "nexus_query_success": "Info do Nexus atualizada: {name}",
+    "nexus_query_invalid_id": "ID do Mod inválido.",
+    "nexus_no_game_slug": "Nenhum slug de jogo Nexus configurado."
   },
 
   "toast": {
@@ -525,7 +532,10 @@
     "game_dir_not_found": "Diretório do jogo não encontrado.",
     "exe_not_found": "Executável não encontrado:\n{path}",
     "proton_not_found": "Proton nao encontrado para este jogo.\nCertifique-se de ter executado o jogo pelo menos uma vez pelo Steam.",
-    "proton_launch_failed": "Falha ao iniciar via Proton:\n{error}"
+    "proton_launch_failed": "Falha ao iniciar via Proton:\n{error}",
+    "query_nexus_info": "Consultar info do Nexus",
+    "query_nexus_enter_id": "Inserir ID do Mod do Nexus (do URL):",
+    "query_nexus_parsed_id": "Detetado do nome do ficheiro: Mod ID {id}. Usar?"
   },
 
   "filter": {

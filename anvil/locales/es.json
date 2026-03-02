@@ -94,7 +94,8 @@
     "delete_profile": "Eliminar perfil",
 
     "select_color": "Cambiar color...",
-    "reset_color": "Eliminar color"
+    "reset_color": "Eliminar color",
+    "nexus_query": "Consultar info de Nexus"
   },
 
   "toolbar": {
@@ -226,7 +227,9 @@
     "about_text": "Anvil Organizer v{version}",
     "about_qt_text": "Este programa utiliza Qt versión {version}.\n\nQt es un toolkit de C++ para el desarrollo de aplicaciones multiplataforma.\n\nQt ofrece portabilidad desde una única fuente en todos los principales sistemas operativos de escritorio. También está disponible para Linux embebido y otros sistemas operativos embebidos y móviles.\n\nQt está disponible bajo múltiples opciones de licencia diseñadas para satisfacer las necesidades de diversos usuarios.\n\nQt es un producto de Qt Company Ltd., desarrollado como proyecto de código abierto.\n\nMás información: https://www.qt.io",
     "saves_not_found_title": "Carpeta de guardados no encontrada",
-    "saves_not_found_message": "No se encontró la carpeta de guardados. ¿Has iniciado el juego al menos una vez?"
+    "saves_not_found_message": "No se encontró la carpeta de guardados. ¿Has iniciado el juego al menos una vez?",
+    "nexus_query_title": "Introducir ID de Mod en Nexus",
+    "nexus_query_prompt": "ID de Mod en Nexus (de la URL, ej. 107658):"
   },
 
   "button": {
@@ -435,7 +438,11 @@
     "instance_info": "Instancia: {game} | Plugin: {plugin} | Tienda: {store}",
     "deploying": "Desplegando...",
     "deployed": "Mods desplegados",
-    "deploy_skipped": "Despliegue omitido (sin instancia)"
+    "deploy_skipped": "Despliegue omitido (sin instancia)",
+    "nexus_query_loading": "Cargando info de Nexus...",
+    "nexus_query_success": "Info de Nexus actualizada: {name}",
+    "nexus_query_invalid_id": "ID de Mod no válida.",
+    "nexus_no_game_slug": "No hay slug de juego Nexus configurado."
   },
 
   "toast": {
@@ -525,7 +532,10 @@
     "game_dir_not_found": "Directorio del juego no encontrado.",
     "exe_not_found": "Ejecutable no encontrado:\n{path}",
     "proton_not_found": "Proton no encontrado para este juego.\nAsegurese de haber ejecutado el juego al menos una vez a traves de Steam.",
-    "proton_launch_failed": "Error al iniciar con Proton:\n{error}"
+    "proton_launch_failed": "Error al iniciar con Proton:\n{error}",
+    "query_nexus_info": "Consultar info de Nexus",
+    "query_nexus_enter_id": "Introducir ID de Mod de Nexus (de la URL):",
+    "query_nexus_parsed_id": "Detectado del nombre de archivo: Mod ID {id}. ¿Usar?"
   },
 
   "filter": {

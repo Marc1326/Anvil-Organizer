@@ -259,11 +259,15 @@ class MainWindow(QMainWindow):
         self._nexus_api.request_finished.connect(self._on_nexus_response)
         self._nexus_api.request_error.connect(self._on_nexus_error)
         self._nexus_api.rate_limit_updated.connect(self._update_api_status)
+        self._game_panel.set_nexus_api_available(self._nexus_api.has_api_key())
 
         # ── Mod state ─────────────────────────────────────────────────
         self._current_mod_entries = []
+        self._pending_query_path: Path | None = None
+        self._pending_dl_query_path: str | None = None
         self._current_profile_path: Path | None = None
         self._current_instance_path: Path | None = None
+        self._current_downloads_path: Path | None = None
         self._current_plugin = None  # Active game plugin
         self._current_game_path: Path | None = None
 
@@ -278,6 +282,8 @@ class MainWindow(QMainWindow):
         self._mod_list_view.fw_archives_dropped.connect(self._on_fw_archives_dropped)
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
+        self._game_panel.nexus_query_requested.connect(self._on_nexus_query_from_panel)
+        self._game_panel.dl_query_info_requested.connect(self._on_dl_query_info)
 
         # ── Deferred tab column restore ───────────────────────────────
         self._restored_tabs: set[int] = set()
@@ -832,6 +838,7 @@ class MainWindow(QMainWindow):
             self._current_mod_entries = []
             self._current_profile_path = None
             self._current_instance_path = None
+            self._current_downloads_path = None
             self._bg3_installer = None
             self._toolbar.deploy_sep.setVisible(False)
             self._toolbar.deploy_action.setVisible(False)
@@ -875,6 +882,7 @@ class MainWindow(QMainWindow):
         downloads_dir = resolve_path(data.get("path_downloads_directory", "%INSTANCE_DIR%/.downloads"))
         mods_dir = resolve_path(data.get("path_mods_directory", "%INSTANCE_DIR%/.mods"))
 
+        self._current_downloads_path = downloads_dir
         self._game_panel.set_downloads_path(downloads_dir, mods_dir)
         self._game_panel.download_manager().set_downloads_dir(downloads_dir)
 
@@ -1754,6 +1762,8 @@ class MainWindow(QMainWindow):
         act.setEnabled(False)
         act = menu.addAction(tr("context.start_tracking"))
         act.setEnabled(False)
+        act_nexus_query = menu.addAction(tr("context.nexus_query"))
+        act_nexus_query.setEnabled(single and self._nexus_api.has_api_key())
         # Nexus: nur aktiviert wenn Mod eine Nexus-ID hat
         act_nexus = menu.addAction(tr("context.visit_nexus"))
         has_nexus = single and selected_rows[0] < len(self._current_mod_entries) and self._current_mod_entries[selected_rows[0]].nexus_id > 0
@@ -1821,6 +1831,8 @@ class MainWindow(QMainWindow):
             self._ctx_create_backup(selected_rows[0])
         elif chosen == act_nexus:
             self._ctx_visit_nexus(selected_rows[0])
+        elif chosen == act_nexus_query:
+            self._ctx_query_nexus_info(selected_rows[0])
         elif chosen == act_explorer:
             self._ctx_open_explorer(selected_rows[0])
         elif chosen == act_info:
@@ -2689,6 +2701,155 @@ class MainWindow(QMainWindow):
                 self, tr("error.backup_failed_title"), str(exc),
             )
 
+    def _ctx_query_nexus_info(self, row: int) -> None:
+        """Context menu / panel button: Query Nexus Info for a mod."""
+        if row >= len(self._current_mod_entries):
+            return
+        entry = self._current_mod_entries[row]
+
+        nexus_id = entry.nexus_id
+
+        # Step 2: Search .downloads/ for matching archive → parse filename
+        if nexus_id <= 0:
+            from anvil.core.nexus_filename_parser import extract_nexus_mod_id
+            downloads_path = self._current_downloads_path
+            if downloads_path and downloads_path.is_dir():
+                mod_normalized = entry.name.lower().replace('_', ' ').replace('-', ' ')
+                for f in downloads_path.iterdir():
+                    if f.is_file() and f.suffix.lower() in ('.zip', '.rar', '.7z'):
+                        stem_normalized = f.stem.lower().replace('_', ' ').replace('-', ' ')
+                        if mod_normalized in stem_normalized:
+                            parsed_id = extract_nexus_mod_id(f.name)
+                            if parsed_id and parsed_id > 0:
+                                answer = QMessageBox.question(
+                                    self,
+                                    tr("game_panel.query_nexus_info"),
+                                    tr("game_panel.query_nexus_parsed_id", id=parsed_id),
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                )
+                                if answer == QMessageBox.StandardButton.Yes:
+                                    nexus_id = parsed_id
+                                    break
+
+        # Step 3: Manual fallback dialog
+        if nexus_id <= 0:
+            text, ok = get_text_input(
+                self, tr("game_panel.query_nexus_info"), tr("game_panel.query_nexus_enter_id"),
+            )
+            if not ok or not text.strip():
+                return
+            try:
+                nexus_id = int(text.strip())
+                if nexus_id <= 0:
+                    raise ValueError
+            except ValueError:
+                self.statusBar().showMessage(tr("status.nexus_query_invalid_id"), 5000)
+                return
+
+        self._pending_query_path = entry.install_path
+        self._pending_dl_query_path = None
+
+        nexus_slug = ""
+        if self._current_plugin:
+            nexus_slug = (
+                getattr(self._current_plugin, "GameNexusName", "")
+                or getattr(self._current_plugin, "GameShortName", "")
+            )
+        if not nexus_slug:
+            self._pending_query_path = None
+            self.statusBar().showMessage(tr("status.nexus_no_game_slug"), 5000)
+            return
+
+        self._nexus_api.query_mod_info(nexus_slug, nexus_id)
+        self.statusBar().showMessage(tr("status.nexus_query_loading"), 5000)
+
+    def _on_nexus_query_from_panel(self) -> None:
+        """GamePanel button: Query Nexus Info for selected mod."""
+        selected_rows = self._mod_list_view.get_selected_source_rows()
+        if len(selected_rows) != 1:
+            self.statusBar().showMessage(tr("dialog.no_selection"), 3000)
+            return
+        self._ctx_query_nexus_info(selected_rows[0])
+
+    def _on_dl_query_info(self, archive_path: str) -> None:
+        """Handle 'Query Nexus Info' from Downloads tab context menu."""
+        from anvil.core.nexus_filename_parser import extract_nexus_mod_id
+
+        # 1. Try .meta modID
+        mod_id_str = self._game_panel._read_meta_mod_id(archive_path)
+        mod_id = 0
+        if mod_id_str:
+            try:
+                mod_id = int(mod_id_str)
+            except ValueError:
+                pass
+
+        # 2. Filename parsing
+        if mod_id <= 0:
+            filename = Path(archive_path).name
+            parsed_id = extract_nexus_mod_id(filename)
+            if parsed_id and parsed_id > 0:
+                answer = QMessageBox.question(
+                    self,
+                    tr("game_panel.query_nexus_info"),
+                    tr("game_panel.query_nexus_parsed_id", id=parsed_id),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if answer == QMessageBox.StandardButton.Yes:
+                    mod_id = parsed_id
+
+        # 3. Manual input
+        if mod_id <= 0:
+            text, ok = get_text_input(
+                self, tr("game_panel.query_nexus_info"),
+                tr("game_panel.query_nexus_enter_id"),
+            )
+            if not ok or not text.strip():
+                return
+            try:
+                mod_id = int(text.strip())
+                if mod_id <= 0:
+                    raise ValueError
+            except ValueError:
+                self.statusBar().showMessage(tr("status.nexus_query_invalid_id"), 5000)
+                return
+
+        # 4. Fire API request
+        self._pending_dl_query_path = archive_path
+        self._pending_query_path = None
+
+        nexus_slug = ""
+        if self._current_plugin:
+            nexus_slug = (
+                getattr(self._current_plugin, "GameNexusName", "")
+                or getattr(self._current_plugin, "GameShortName", "")
+            )
+        if not nexus_slug:
+            return
+
+        self._nexus_api.query_mod_info(nexus_slug, mod_id)
+        self.statusBar().showMessage(tr("status.nexus_query_loading"), 5000)
+
+    def _update_download_meta(self, archive_path: str, nexus_data: dict) -> None:
+        """Update .meta neben Archiv mit Nexus-Daten. Bestehende Felder bleiben erhalten."""
+        meta_path = Path(archive_path + ".meta")
+        cp = configparser.ConfigParser()
+        cp.optionxform = str
+        if meta_path.is_file():
+            try:
+                cp.read(str(meta_path), encoding="utf-8")
+            except Exception:
+                pass
+        if not cp.has_section("General"):
+            cp.add_section("General")
+        cp.set("General", "modID", str(nexus_data.get("mod_id", 0)))
+        cp.set("General", "modName", nexus_data.get("name", ""))
+        cp.set("General", "name", nexus_data.get("name", ""))
+        cp.set("General", "version", nexus_data.get("version", ""))
+        cp.set("General", "description", nexus_data.get("summary", ""))
+        with open(meta_path, "w", encoding="utf-8") as f:
+            cp.write(f)
+
     def _ctx_visit_nexus(self, row: int) -> None:
         """Open the mod's Nexus Mods page in the browser."""
         if row >= len(self._current_mod_entries):
@@ -2992,8 +3153,58 @@ class MainWindow(QMainWindow):
             self._pending_nxm_mod_name = data.get("name", "")
             self._pending_nxm_mod_version = data.get("version", "")
 
+        elif tag.startswith("query_mod_info:") and isinstance(data, dict):
+            dl_path = self._pending_dl_query_path
+            mod_path = self._pending_query_path
+
+            if dl_path:
+                # Downloads-Tab query
+                self._pending_dl_query_path = None
+                self._update_download_meta(dl_path, data)
+                self._game_panel.refresh_downloads()
+                # Set tooltip
+                name = data.get("name", "")
+                mod_id_val = data.get("mod_id", 0)
+                version = data.get("version", "")
+                summary = data.get("summary", "")
+                tooltip = f"{name} (ID: {mod_id_val}) v{version}"
+                if summary:
+                    tooltip += f"\n{summary}"
+                self._game_panel.update_download_tooltip(dl_path, tooltip)
+                self.statusBar().showMessage(
+                    tr("status.nexus_query_success", name=name), 5000,
+                )
+            elif mod_path:
+                # Mod-Liste query (existing logic)
+                self._pending_query_path = None
+                if not mod_path.exists():
+                    return
+                from anvil.core.mod_metadata import write_meta_ini
+                nexus_slug = ""
+                if self._current_plugin:
+                    nexus_slug = (
+                        getattr(self._current_plugin, "GameNexusName", "")
+                        or getattr(self._current_plugin, "GameShortName", "")
+                    )
+                write_meta_ini(mod_path, {
+                    "modid": str(data.get("mod_id", 0)),
+                    "version": data.get("version", ""),
+                    "newestVersion": data.get("version", ""),
+                    "name": data.get("name", ""),
+                    "author": data.get("author", ""),
+                    "description": data.get("summary", ""),
+                    "url": f"https://www.nexusmods.com/{nexus_slug}/mods/{data.get('mod_id', 0)}",
+                })
+                self._reload_mod_list()
+                self.statusBar().showMessage(
+                    tr("status.nexus_query_success", name=data.get("name", "")), 5000,
+                )
+
     def _on_nexus_error(self, tag: str, message: str) -> None:
         """Handle Nexus API errors."""
+        if tag.startswith("query_mod_info:"):
+            self._pending_dl_query_path = None
+            self._pending_query_path = None
         self.statusBar().showMessage(tr("status.nexus_error", message=message), 5000)
 
     def _update_api_status(self, daily: int, hourly: int) -> None:

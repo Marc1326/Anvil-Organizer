@@ -84,6 +84,8 @@ class _DraggableDownloadTable(QTableWidget):
 class GamePanel(QWidget):
     install_requested = Signal(list)  # list of archive path strings
     start_requested = Signal(str, str)  # (binary_path, working_dir)
+    nexus_query_requested = Signal()
+    dl_query_info_requested = Signal(str)  # archive_path
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -155,6 +157,15 @@ class GamePanel(QWidget):
         self._start_btn.setToolTip(tr("game_panel.start"))
         self._start_btn.clicked.connect(self._on_start_clicked)
         top_layout.addWidget(self._start_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+
+        # Nexus-Info-Button
+        self._nexus_query_btn = QPushButton(tr("context.nexus_query"))
+        self._nexus_query_btn.setMinimumWidth(140)
+        self._nexus_query_btn.setFixedHeight(28)
+        self._nexus_query_btn.clicked.connect(
+            lambda checked=False: self.nexus_query_requested.emit()
+        )
+        top_layout.addWidget(self._nexus_query_btn, 0, Qt.AlignmentFlag.AlignHCenter)
 
         # (Deploy-UI entfernt — Deploy/Purge läuft jetzt automatisch)
 
@@ -302,6 +313,7 @@ class GamePanel(QWidget):
         self._current_short_name: str = ""
         self._current_plugin = None
         self._icon_manager = None
+        self._has_nexus_api_key: bool = False
         self._downloads_path: Path | None = None
         self._mods_path: Path | None = None
         self._instance_path: Path | None = None
@@ -1276,6 +1288,18 @@ class GamePanel(QWidget):
         meta = Path(archive_path + ".meta")
         return meta if meta.is_file() else None
 
+    def set_nexus_api_available(self, available: bool) -> None:
+        """Set whether Nexus API key is configured (for context menu state)."""
+        self._has_nexus_api_key = available
+
+    def update_download_tooltip(self, archive_path: str, tooltip: str) -> None:
+        """Set tooltip on the download row matching archive_path."""
+        for row in range(self._dl_table.rowCount()):
+            item = self._dl_table.item(row, 0)
+            if item and item.data(Qt.ItemDataRole.UserRole) == archive_path:
+                item.setToolTip(tooltip)
+                break
+
     def _bulk_delete_by_status(self, filter_status: str | None) -> None:
         """Delete archives filtered by status column. None = all."""
         installed_text = tr("game_panel.installed")
@@ -1405,6 +1429,10 @@ class GamePanel(QWidget):
         # ── Group 2: Open / Nexus ──
         act_nexus = menu.addAction(tr("game_panel.visit_nexus"))
         act_nexus.setEnabled(mod_id is not None)
+        act_query = None
+        if len(paths) == 1:
+            act_query = menu.addAction(tr("game_panel.query_nexus_info"))
+            act_query.setEnabled(self._has_nexus_api_key)
         act_open = menu.addAction(tr("game_panel.open_file"))
         act_meta = menu.addAction(tr("game_panel.open_meta"))
         act_meta.setEnabled(meta_path is not None)
@@ -1453,6 +1481,8 @@ class GamePanel(QWidget):
             game = self._current_short_name or "site"
             QDesktopServices.openUrl(
                 QUrl(f"https://www.nexusmods.com/{game}/mods/{mod_id}"))
+        elif act_query and chosen == act_query:
+            self.dl_query_info_requested.emit(first)
         elif chosen == act_open:
             subprocess.Popen(["xdg-open", first])
         elif chosen == act_meta:

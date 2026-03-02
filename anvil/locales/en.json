@@ -94,7 +94,8 @@
     "delete_profile": "Delete Profile",
 
     "select_color": "Select Color...",
-    "reset_color": "Reset Color"
+    "reset_color": "Reset Color",
+    "nexus_query": "Query Nexus Info"
   },
 
   "toolbar": {
@@ -226,7 +227,9 @@
     "about_text": "Anvil Organizer v{version}",
     "about_qt_text": "This program uses Qt version {version}.\n\nQt is a C++ toolkit for cross-platform application development.\n\nQt provides single-source portability across all major desktop operating systems. It is also available for embedded Linux and other embedded and mobile operating systems.\n\nQt is available under multiple licensing options designed to accommodate the needs of various users.\n\nQt is The Qt Company Ltd. product developed as an open source project.\n\nSee https://www.qt.io for more information.",
     "saves_not_found_title": "Save Folder Not Found",
-    "saves_not_found_message": "The save folder could not be found. Have you started the game at least once?"
+    "saves_not_found_message": "The save folder could not be found. Have you started the game at least once?",
+    "nexus_query_title": "Enter Nexus Mod ID",
+    "nexus_query_prompt": "Nexus Mod ID (from URL, e.g. 107658):"
   },
 
   "button": {
@@ -435,7 +438,11 @@
     "instance_info": "Instance: {game} | Plugin: {plugin} | Store: {store}",
     "deploying": "Deploying...",
     "deployed": "Mods deployed",
-    "deploy_skipped": "Deploy skipped (no instance)"
+    "deploy_skipped": "Deploy skipped (no instance)",
+    "nexus_query_loading": "Loading Nexus info...",
+    "nexus_query_success": "Nexus info updated: {name}",
+    "nexus_query_invalid_id": "Invalid Mod ID entered.",
+    "nexus_no_game_slug": "No Nexus game slug configured."
   },
 
   "toast": {
@@ -525,7 +532,10 @@
     "game_dir_not_found": "Game directory not found.",
     "exe_not_found": "Executable not found:\n{path}",
     "proton_not_found": "Proton not found for this game.\nMake sure the game has been run at least once via Steam.",
-    "proton_launch_failed": "Failed to launch via Proton:\n{error}"
+    "proton_launch_failed": "Failed to launch via Proton:\n{error}",
+    "query_nexus_info": "Query Nexus Info",
+    "query_nexus_enter_id": "Enter Nexus Mod ID (from URL):",
+    "query_nexus_parsed_id": "Detected from filename: Mod ID {id}. Use it?"
   },
 
   "filter": {

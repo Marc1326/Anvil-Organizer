@@ -94,7 +94,8 @@
     "delete_profile": "Supprimer le profil",
 
     "select_color": "Changer la couleur...",
-    "reset_color": "Supprimer la couleur"
+    "reset_color": "Supprimer la couleur",
+    "nexus_query": "Interroger les infos Nexus"
   },
 
   "toolbar": {
@@ -226,7 +227,9 @@
     "about_text": "Anvil Organizer v{version}",
     "about_qt_text": "Ce programme utilise Qt version {version}.\n\nQt est une boîte à outils C++ pour le développement d'applications multiplateformes.\n\nQt offre une portabilité depuis une source unique sur tous les principaux systèmes d'exploitation de bureau. Il est également disponible pour Linux embarqué et d'autres systèmes d'exploitation embarqués et mobiles.\n\nQt est disponible sous plusieurs options de licence conçues pour répondre aux besoins de divers utilisateurs.\n\nQt est un produit de Qt Company Ltd., développé en tant que projet open source.\n\nPlus d'informations : https://www.qt.io",
     "saves_not_found_title": "Dossier de sauvegardes introuvable",
-    "saves_not_found_message": "Le dossier des sauvegardes est introuvable. Avez-vous lancé le jeu au moins une fois ?"
+    "saves_not_found_message": "Le dossier des sauvegardes est introuvable. Avez-vous lancé le jeu au moins une fois ?",
+    "nexus_query_title": "Entrer l'ID du Mod Nexus",
+    "nexus_query_prompt": "ID du Mod Nexus (depuis l'URL, ex. 107658) :"
   },
 
   "button": {
@@ -435,7 +438,11 @@
     "instance_info": "Instance : {game} | Plugin : {plugin} | Magasin : {store}",
     "deploying": "D\u00e9ploiement...",
     "deployed": "Mods d\u00e9ploy\u00e9s",
-    "deploy_skipped": "D\u00e9ploiement ignor\u00e9 (pas d'instance)"
+    "deploy_skipped": "D\u00e9ploiement ignor\u00e9 (pas d'instance)",
+    "nexus_query_loading": "Chargement des infos Nexus...",
+    "nexus_query_success": "Infos Nexus mises \u00e0 jour : {name}",
+    "nexus_query_invalid_id": "ID de Mod invalide.",
+    "nexus_no_game_slug": "Aucun slug de jeu Nexus configuré."
   },
 
   "toast": {
@@ -525,7 +532,10 @@
     "game_dir_not_found": "Répertoire du jeu introuvable.",
     "exe_not_found": "Exécutable introuvable :\n{path}",
     "proton_not_found": "Proton introuvable pour ce jeu.\nAssurez-vous d'avoir lance le jeu au moins une fois via Steam.",
-    "proton_launch_failed": "Echec du lancement via Proton :\n{error}"
+    "proton_launch_failed": "Echec du lancement via Proton :\n{error}",
+    "query_nexus_info": "Interroger les infos Nexus",
+    "query_nexus_enter_id": "Entrer l'ID du Mod Nexus (depuis l'URL) :",
+    "query_nexus_parsed_id": "Détecté dans le nom de fichier : Mod ID {id}. Utiliser ?"
   },
 
   "filter": {

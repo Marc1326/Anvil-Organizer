@@ -94,7 +94,8 @@
     "delete_profile": "Profil löschen",
 
     "select_color": "Farbe ändern...",
-    "reset_color": "Farbe entfernen"
+    "reset_color": "Farbe entfernen",
+    "nexus_query": "Nexus-Info abrufen"
   },
 
   "toolbar": {
@@ -226,7 +227,9 @@
     "about_text": "Anvil Organizer v{version}",
     "about_qt_text": "Dieses Programm verwendet Qt Version {version}.\n\nQt ist ein C++ Toolkit für plattformübergreifende Anwendungsentwicklung.\n\nQt bietet Portabilität über alle wichtigen Desktop-Betriebssysteme hinweg. Es ist auch für eingebettete Linux- sowie andere eingebettete und mobile Betriebssysteme verfügbar.\n\nQt ist unter verschiedenen Lizenzoptionen verfügbar, die auf die Bedürfnisse verschiedener Nutzer zugeschnitten sind.\n\nQt ist ein Produkt der Qt Company Ltd., entwickelt als Open-Source-Projekt.\n\nWeitere Informationen: https://www.qt.io",
     "saves_not_found_title": "Spielstände nicht gefunden",
-    "saves_not_found_message": "Der Spielstände-Ordner wurde nicht gefunden. Wurde das Spiel bereits einmal gestartet?"
+    "saves_not_found_message": "Der Spielstände-Ordner wurde nicht gefunden. Wurde das Spiel bereits einmal gestartet?",
+    "nexus_query_title": "Nexus Mod-ID eingeben",
+    "nexus_query_prompt": "Nexus Mod-ID (aus der URL, z.B. 107658):"
   },
 
   "button": {
@@ -435,7 +438,11 @@
     "instance_info": "Instanz: {game} | Plugin: {plugin} | Store: {store}",
     "deploying": "Wird bereitgestellt...",
     "deployed": "Mods bereitgestellt",
-    "deploy_skipped": "Deploy übersprungen (keine Instanz)"
+    "deploy_skipped": "Deploy übersprungen (keine Instanz)",
+    "nexus_query_loading": "Lade Nexus-Info...",
+    "nexus_query_success": "Nexus-Info aktualisiert: {name}",
+    "nexus_query_invalid_id": "Ungültige Mod-ID eingegeben.",
+    "nexus_no_game_slug": "Kein Nexus-Spielname konfiguriert."
   },
 
   "toast": {
@@ -525,7 +532,10 @@
     "game_dir_not_found": "Spielverzeichnis nicht gefunden.",
     "exe_not_found": "Executable nicht gefunden:\n{path}",
     "proton_not_found": "Proton wurde fuer dieses Spiel nicht gefunden.\nStelle sicher, dass das Spiel mindestens einmal ueber Steam gestartet wurde.",
-    "proton_launch_failed": "Start ueber Proton fehlgeschlagen:\n{error}"
+    "proton_launch_failed": "Start ueber Proton fehlgeschlagen:\n{error}",
+    "query_nexus_info": "Nexus-Info abrufen",
+    "query_nexus_enter_id": "Nexus Mod-ID eingeben (aus der URL):",
+    "query_nexus_parsed_id": "Aus Dateiname erkannt: Mod-ID {id}. Verwenden?"
   },
 
   "filter": {
