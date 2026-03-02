@@ -60,16 +60,4 @@ class StatusBarWidget(QStatusBar):
         text = f"API  Queued: {queued} | Daily: {daily_remaining} | Hourly: {hourly_remaining}"
         self._api_label.setText(text)
 
-        remaining = min(
-            daily_remaining if daily_remaining >= 0 else 999999,
-            hourly_remaining if hourly_remaining >= 0 else 999999,
-        )
-
-        if remaining >= 500:
-            style = "QLabel { padding: 2px 6px; background-color: darkgreen; color: white; }"
-        elif remaining > 200:
-            style = "QLabel { padding: 2px 6px; background-color: rgb(226, 192, 0); color: black; }"
-        else:
-            style = "QLabel { padding: 2px 6px; background-color: darkred; color: white; }"
-
-        self._api_label.setStyleSheet(style)
+        self._api_label.setStyleSheet("QLabel { padding: 2px 6px; }")
