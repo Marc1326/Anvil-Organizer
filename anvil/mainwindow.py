@@ -282,6 +282,12 @@ class MainWindow(QMainWindow):
         self._restored_tabs: set[int] = set()
         self._game_panel._tabs.currentChanged.connect(self._on_tab_changed)
 
+        # Debounce timer for auto-redeploy after mod changes
+        self._redeploy_timer = QTimer()
+        self._redeploy_timer.setSingleShot(True)
+        self._redeploy_timer.setInterval(500)
+        self._redeploy_timer.timeout.connect(self._do_redeploy)
+
         # ── Erster Start / Instanz laden ──────────────────────────────
         self._check_first_start()
 
@@ -799,6 +805,8 @@ class MainWindow(QMainWindow):
         Args:
             instance_name: Name of the instance to apply.
         """
+        # Cancel any pending debounced redeploy
+        self._redeploy_timer.stop()
         # Purge old deployment before switching
         self._game_panel.silent_purge()
 
@@ -1032,6 +1040,7 @@ class MainWindow(QMainWindow):
                     break
         self._write_current_modlist()
         self._update_active_count()
+        self._schedule_redeploy()
 
     def _on_mods_reordered(self) -> None:
         """Mods were reordered via drag & drop — sync entries and persist."""
@@ -1061,12 +1070,33 @@ class MainWindow(QMainWindow):
             model.index(0, 0),
             model.index(model.rowCount() - 1, model.columnCount() - 1),
         )
+        self._schedule_redeploy()
 
     def _update_active_count(self) -> None:
         """Update the active mod counter in the profile bar."""
         active = sum(1 for e in self._current_mod_entries if e.enabled)
         total = len(self._current_mod_entries)
         self._profile_bar.update_active_count(active, total)
+
+    # ── Auto-redeploy helpers ────────────────────────────────────────
+
+    def _schedule_redeploy(self) -> None:
+        """Schedule a debounced redeploy (500ms)."""
+        if not self._current_instance_path:
+            return
+        self.statusBar().showMessage(tr("status.deploying"), 0)
+        self._redeploy_timer.start()
+
+    def _do_redeploy(self) -> None:
+        """Execute purge + fast deploy immediately."""
+        self._redeploy_timer.stop()
+        if not self._current_instance_path:
+            return
+        print("[PURGE] Auto-redeploy: purging current deployment", flush=True)
+        self._game_panel.silent_purge()
+        print("[DEPLOY] Auto-redeploy: deploying mods (fast, no BA2)", flush=True)
+        self._game_panel.silent_deploy_fast()
+        self.statusBar().showMessage(tr("status.deployed"), 3000)
 
     def _on_filter_changed(self) -> None:
         """Mod search or FilterPanel chip changed — update proxy filter."""
@@ -1170,6 +1200,13 @@ class MainWindow(QMainWindow):
 
     def _on_start_game(self, binary_path: str, working_dir: str) -> None:
         """Launch the selected game executable."""
+        self._redeploy_timer.stop()
+        # Full deploy (with BA2) before game start
+        if self._current_instance_path:
+            print("[PURGE] Pre-launch purge", flush=True)
+            self._game_panel.silent_purge()
+            print("[DEPLOY] Pre-launch full deploy (with BA2)", flush=True)
+            self._game_panel.silent_deploy()
         from PySide6.QtCore import QProcess
         success, pid = QProcess.startDetached(binary_path, [], working_dir)
         if success:
@@ -1378,6 +1415,7 @@ class MainWindow(QMainWindow):
         if installed:
             names = ", ".join(installed)
             self.statusBar().showMessage(tr("status.installed", names=names), 5000)
+            self._schedule_redeploy()
 
     def _write_install_meta(self, archive: Path, mod_name: str) -> None:
         """Write installed=true and installationFile=mod_name to the archive's .meta file."""
@@ -2103,6 +2141,7 @@ class MainWindow(QMainWindow):
 
         # Reload and show toast
         self._reload_mod_list()
+        self._do_redeploy()
         Toast(self, tr("toast.backup_restored", name=zip_path.name))
 
     def _on_profile_created(self, name: str) -> None:
@@ -2208,6 +2247,7 @@ class MainWindow(QMainWindow):
             tree._apply_separator_filter()
 
         # 6. Redeploy with new profile
+        self._redeploy_timer.stop()
         self._game_panel.silent_purge()
         self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
         self._game_panel.silent_deploy()
@@ -2441,6 +2481,7 @@ class MainWindow(QMainWindow):
         )
         self._write_current_modlist()
         self._update_active_count()
+        self._schedule_redeploy()
 
     def _ctx_enable_all(self, enabled: bool) -> None:
         """Enable or disable ALL mods."""
@@ -2687,6 +2728,7 @@ class MainWindow(QMainWindow):
         rename_mod_in_modlist(self._current_profile_path, old_name, new_name)
         self._update_install_meta_name(old_name, new_name)
         self._reload_mod_list()
+        self._do_redeploy()
         self._game_panel.refresh_downloads()
         self.statusBar().showMessage(tr("status.renamed", old=old_name, new=new_name), 5000)
 
@@ -2722,6 +2764,7 @@ class MainWindow(QMainWindow):
 
         self._install_archives([archive])
         self._game_panel.refresh_downloads()
+        self._do_redeploy()
 
     def _ctx_remove_mods(self, rows: list[int]) -> None:
         """Remove selected mods (folder + modlist.txt entry)."""
@@ -2753,6 +2796,7 @@ class MainWindow(QMainWindow):
             self._clear_install_meta(name)
 
         self._reload_mod_list()
+        self._do_redeploy()
         self._game_panel.refresh_downloads()
         self.statusBar().showMessage(tr("status.removed", names=", ".join(names)), 5000)
 
@@ -3053,6 +3097,7 @@ class MainWindow(QMainWindow):
             self._restored_tabs.add(index)
 
     def closeEvent(self, event) -> None:
+        self._redeploy_timer.stop()
         # Purge deployed mods before closing
         self._game_panel.silent_purge()
         self._save_ui_state()

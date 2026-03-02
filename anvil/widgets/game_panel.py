@@ -602,6 +602,27 @@ class GamePanel(QWidget):
                 print("[GamePanel] plugins.txt write failed or skipped", flush=True)
             self._refresh_plugins_tab()
 
+    def silent_deploy_fast(self) -> None:
+        """Deploy mods without BA2 packing.  Used for quick redeploy after toggle."""
+        if self._deployer:
+            self._deployer.deploy()
+
+        # Write plugins.txt for Bethesda games
+        if (
+            self._current_plugin is not None
+            and hasattr(self._current_plugin, "has_plugins_txt")
+            and self._current_plugin.has_plugins_txt()
+            and self._current_game_path is not None
+            and self._instance_path is not None
+        ):
+            writer = PluginsTxtWriter(
+                self._current_plugin, self._current_game_path, self._instance_path
+            )
+            result_path = writer.write()
+            if result_path is None:
+                print("[GamePanel] plugins.txt write failed or skipped", flush=True)
+            self._refresh_plugins_tab()
+
     def silent_purge(self) -> None:
         """Purge deployed mods silently.  Called automatically by MainWindow."""
         if self._deployer:

@@ -432,7 +432,10 @@
     "no_bg3_installer": "Nessun installer BG3 attivo",
     "deploy_failed": "Deploy fallito — vedi console",
     "unknown": "sconosciuto",
-    "instance_info": "Istanza: {game} | Plugin: {plugin} | Negozio: {store}"
+    "instance_info": "Istanza: {game} | Plugin: {plugin} | Negozio: {store}",
+    "deploying": "Distribuzione...",
+    "deployed": "Mod distribuiti",
+    "deploy_skipped": "Deploy saltato (nessuna istanza)"
   },
 
   "toast": {
