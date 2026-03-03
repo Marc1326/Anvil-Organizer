@@ -106,6 +106,11 @@ class BaseGame:
     """If set, mods containing install.xml are deployed as directory
     symlinks into this path (e.g. 'lml' for RDR2).  Empty = disabled."""
 
+    ProtonShimFiles: list[str] = []
+    """DLL filenames shipped in anvil/data/shims/<GameShortName>/ that are
+    copied into the game root during deploy and removed during purge.
+    Only deployed when the corresponding framework is installed."""
+
     PRIMARY_PLUGINS: list[str] = []
     """Primary/DLC plugin files (.esm) that are always active.
     Only relevant for Bethesda Creation Engine games."""
@@ -455,6 +460,14 @@ class BaseGame:
         Subclasses override this for game-specific category sets.
         """
         return None
+
+    def get_proton_env_overrides(self) -> dict[str, str]:
+        """Return extra environment variables for Proton launch when shim DLLs are deployed.
+
+        Subclasses override this to provide game-specific overrides
+        (e.g. WINEDLLOVERRIDES for F4SE shim).  Default: empty dict.
+        """
+        return {}
 
     def get_conflict_ignores(self) -> list[str]:
         """Return glob patterns for files to ignore during conflict detection.

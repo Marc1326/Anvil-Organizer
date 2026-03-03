@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import configparser
+import json
 import os
+import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -646,6 +648,20 @@ class GamePanel(QWidget):
                 print("[GamePanel] plugins.txt write failed or skipped", flush=True)
             self._refresh_plugins_tab()
 
+        # Deploy Proton shim DLLs (e.g. F4SE version.dll)
+        shim_files = getattr(self._current_plugin, "ProtonShimFiles", [])
+        if (
+            shim_files
+            and self._current_plugin is not None
+            and self._current_game_path is not None
+            and self._instance_path is not None
+        ):
+            # Only deploy if the corresponding framework is installed
+            fw_list = self._current_plugin.get_installed_frameworks()
+            any_fw_installed = any(installed for _fw, installed in fw_list)
+            if any_fw_installed:
+                self._deploy_proton_shims(shim_files)
+
     def silent_deploy_fast(self) -> None:
         """Deploy mods without BA2 packing.  Used for quick redeploy after toggle."""
         if self._deployer:
@@ -697,6 +713,48 @@ class GamePanel(QWidget):
                 self._current_plugin, self._current_game_path, self._instance_path
             )
             writer.remove()
+
+    def _deploy_proton_shims(self, shim_files: list[str]) -> None:
+        """Copy Proton shim DLLs into the game root and record in manifest."""
+        plugin = self._current_plugin
+        short = getattr(plugin, "GameShortName", "").lower() or "unknown"
+        shim_dir = get_anvil_base() / "data" / "shims" / short
+        game_path = self._current_game_path
+
+        copied = []
+        for fname in shim_files:
+            src = shim_dir / fname
+            if not src.is_file():
+                print(f"[SHIM] Source not found: {src}", flush=True)
+                continue
+            dst = game_path / fname
+            try:
+                shutil.copy2(src, dst)
+                copied.append(fname)
+                print(f"[SHIM] Deployed {fname}", flush=True)
+            except OSError as exc:
+                print(f"[SHIM] Error copying {fname}: {exc}", flush=True)
+
+        # Append to manifest
+        if copied and self._instance_path is not None:
+            manifest_path = self._instance_path / ModDeployer.MANIFEST_NAME
+            if manifest_path.is_file():
+                try:
+                    text = manifest_path.read_text(encoding="utf-8")
+                    manifest = json.loads(text)
+                    for fname in copied:
+                        manifest["symlinks"].append({
+                            "link": fname,
+                            "target": str(shim_dir / fname),
+                            "mod": "__proton_shim__",
+                            "type": "shim_copy",
+                        })
+                    manifest_path.write_text(
+                        json.dumps(manifest, indent=2, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+                except (OSError, json.JSONDecodeError) as exc:
+                    print(f"[SHIM] Manifest update error: {exc}", flush=True)
 
     def _update_manifest_ba2(self, ba2_paths: list[str], packer) -> None:
         """Update the deploy manifest with BA2 archive info."""
@@ -853,6 +911,15 @@ class GamePanel(QWidget):
             args.extend(plugin.GameLaunchArgs)
         success, pid = QProcess.startDetached(steam_bin, args)
         if success:
+            # Warn if Proton shim DLLs need WINEDLLOVERRIDES (Steam can't set env)
+            if hasattr(plugin, "get_proton_env_overrides"):
+                overrides = plugin.get_proton_env_overrides()
+                if "WINEDLLOVERRIDES" in overrides:
+                    QMessageBox.information(
+                        self, tr("game_panel.start"),
+                        tr("game_panel.shim_steam_hint",
+                           overrides=overrides["WINEDLLOVERRIDES"]),
+                    )
             print("EMIT TEST steam", flush=True)
             self.game_started.emit(self._game_label.text())
         else:
@@ -907,6 +974,15 @@ class GamePanel(QWidget):
             steam_id = steam_id[0]
         env["SteamAppId"] = str(steam_id)
         env["SteamGameId"] = str(steam_id)
+
+        # Proton shim env overrides (e.g. WINEDLLOVERRIDES for F4SE)
+        if hasattr(plugin, "get_proton_env_overrides"):
+            for key, val in plugin.get_proton_env_overrides().items():
+                if key == "WINEDLLOVERRIDES":
+                    existing = env.get(key, "")
+                    env[key] = f"{existing};{val}" if existing else val
+                else:
+                    env[key] = val
 
         working_dir = str(binary_path.parent)
 

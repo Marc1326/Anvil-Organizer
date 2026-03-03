@@ -11,6 +11,7 @@ a = Analysis(
         ('anvil/assets', 'anvil/assets'),
         ('anvil/resources', 'anvil/resources'),
         ('anvil/plugins/games', 'anvil/plugins/games'),
+        ('anvil/data/shims', 'anvil/data/shims'),
     ],
     hiddenimports=[
         'PySide6.QtSvg',

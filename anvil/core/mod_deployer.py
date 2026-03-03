@@ -372,6 +372,15 @@ class ModDeployer:
             if deploy_type == "copy":
                 continue
 
+            # Shim copies are removed during purge (unlike framework copies)
+            if deploy_type == "shim_copy":
+                try:
+                    link_path.unlink(missing_ok=True)
+                    result.links_removed += 1
+                except OSError as exc:
+                    result.errors.append(f"unlink shim {link_rel}: {exc}")
+                continue
+
             # Directory symlinks (LML mods)
             if deploy_type == "dir_symlink":
                 if link_path.is_symlink():

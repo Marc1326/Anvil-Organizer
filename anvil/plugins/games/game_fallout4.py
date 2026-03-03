@@ -63,6 +63,8 @@ class Fallout4Game(BaseGame):
         "Game:-Fallout-4"
     )
 
+    ProtonShimFiles = ["X3DAudio1_7.dll"]
+
     # -- Primary & DLC Plugins (aus MO2) ------------------------------------
 
     PRIMARY_PLUGINS = [
@@ -187,7 +189,23 @@ class Fallout4Game(BaseGame):
                 detect_installed=["f4se_loader.exe"],
                 required_by=["F4SE-Plugins", "MCM", "Looksmenu"],
             ),
+            FrameworkMod(
+                name="F4SE Proton Shim",
+                pattern=["X3DAudio1_7.dll"],
+                target="",
+                description="Proxy-DLL — ermöglicht F4SE unter Linux/Proton",
+                detect_installed=["X3DAudio1_7.dll"],
+                required_by=["F4SE"],
+            ),
         ]
+
+    def get_proton_env_overrides(self) -> dict[str, str]:
+        """Return WINEDLLOVERRIDES for F4SE Proton shim."""
+        if self._game_path is None:
+            return {}
+        if (self._game_path / "X3DAudio1_7.dll").exists():
+            return {"WINEDLLOVERRIDES": "X3DAudio1_7=n,b"}
+        return {}
 
     # TODO: plugins.txt Parser/Writer -- Load-Order verwalten
     # TODO: .esp/.esm Scanner -- Mod-Dateien erkennen
