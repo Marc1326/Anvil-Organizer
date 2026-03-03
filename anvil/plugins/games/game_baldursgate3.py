@@ -109,14 +109,31 @@ class BaldursGate3Game(BaseGame):
         """Return the save game directory of the active profile.
 
         Uses the same profile as modsettings_path() (newest mtime).
+        Falls back to the Public profile if the active profile has no saves.
         Returns None if no prefix is found.
         """
         ms = self.modsettings_path()
         if ms is not None:
             path = ms.parent / self._WIN_SAVES_SUBDIR
-            if path.is_dir():
+            if path.is_dir() and any(path.glob("*/*.lsv")):
                 return path
+        # Fallback: Public-Profil pruefen
+        profiles = self._profiles_dir()
+        if profiles is not None:
+            public = profiles / "Public" / self._WIN_SAVES_SUBDIR
+            if public.is_dir() and any(public.glob("*/*.lsv")):
+                return public
         return None
+
+    def listSaves(self, folder: Path) -> list[Path]:
+        """Find BG3 save files (.lsv inside per-save subdirectories)."""
+        if not folder.is_dir():
+            return []
+        return sorted(
+            folder.glob("*/*.lsv"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
 
     # ── BG3-spezifische Pfade (Grundlage für Teil 2) ──────────────────
 
