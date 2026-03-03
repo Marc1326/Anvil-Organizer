@@ -366,6 +366,9 @@ class _DropTreeView(QTreeView):
         # ── Setting 6: Konflikte VON Trenner ──
         self._conflicts_from_separator: bool = False
 
+        # ── Conflict highlighting for selected mod ──
+        self._conflict_highlight_on_select: bool = False
+
     def _apply_separator_filter(self):
         """Recalculate which rows to hide based on collapsed separators."""
         proxy = self.model()
@@ -550,10 +553,10 @@ class _DropTreeView(QTreeView):
     # ── Setting 6: Selection-based conflict highlighting ──────────
 
     def selectionChanged(self, selected: QItemSelection, deselected: QItemSelection) -> None:
-        """Override to handle Setting 6: highlight conflicting mods when a collapsed separator is selected."""
+        """Handle Setting 6 (separator conflict highlighting) and mod conflict highlighting."""
         super().selectionChanged(selected, deselected)
 
-        if not self._conflicts_from_separator:
+        if not self._conflicts_from_separator and not self._conflict_highlight_on_select:
             return
 
         proxy = self.model()
@@ -563,63 +566,95 @@ class _DropTreeView(QTreeView):
         if not source:
             return
 
-        # Check if exactly one separator is selected
         sel_model = self.selectionModel()
         if sel_model is None:
             return
         selected_indexes = sel_model.selectedRows()
+
+        # Multi-select or no selection → clear all highlights
         if len(selected_indexes) != 1:
             source.set_highlighted_rows(set())
+            source.set_conflict_highlight(set(), set())
             return
 
         proxy_idx = selected_indexes[0]
         source_idx = proxy.mapToSource(proxy_idx)
         if not source_idx.isValid():
             source.set_highlighted_rows(set())
+            source.set_conflict_highlight(set(), set())
             return
 
         row = source_idx.row()
         if row >= len(source._rows):
             source.set_highlighted_rows(set())
+            source.set_conflict_highlight(set(), set())
             return
 
         r = source._rows[row]
-        if not r.is_separator:
+
+        if r.is_separator:
+            # Separator selected → clear mod conflict highlights, apply Setting 6
+            source.set_conflict_highlight(set(), set())
+
+            if not self._conflicts_from_separator:
+                source.set_highlighted_rows(set())
+                return
+
+            # Only for collapsed separators
+            if r.folder_name not in self._collapsed_separators:
+                source.set_highlighted_rows(set())
+                return
+
+            # Collect folder_names of mods that conflict with children
+            child_conflict_mods: set[str] = set()
+            children = source._get_separator_children(row)
+            for child_row in children:
+                child = source._rows[child_row]
+                if isinstance(child.conflicts, dict) and child.conflicts.get("type", ""):
+                    for mod_name in child.conflicts.get("win_mods_list", []):
+                        child_conflict_mods.add(mod_name)
+                    for mod_name in child.conflicts.get("lose_mods_list", []):
+                        child_conflict_mods.add(mod_name)
+
+            if not child_conflict_mods:
+                source.set_highlighted_rows(set())
+                return
+
+            # Find source rows outside this separator that match conflicting mod names
+            children_set = set(children)
+            children_set.add(row)  # Exclude the separator itself
+            highlighted: set[int] = set()
+            for i, mod_row in enumerate(source._rows):
+                if i in children_set:
+                    continue
+                if mod_row.folder_name in child_conflict_mods:
+                    highlighted.add(i)
+            source.set_highlighted_rows(highlighted)
+        else:
+            # Normal mod selected → clear Setting 6, apply conflict highlighting
             source.set_highlighted_rows(set())
-            return
 
-        # Only for collapsed separators
-        if r.folder_name not in self._collapsed_separators:
-            source.set_highlighted_rows(set())
-            return
+            if not self._conflict_highlight_on_select:
+                source.set_conflict_highlight(set(), set())
+                return
 
-        # Collect folder_names of mods that conflict with children
-        child_conflict_mods: set[str] = set()
-        children = source._get_separator_children(row)
-        for child_row in children:
-            child = source._rows[child_row]
-            if isinstance(child.conflicts, dict) and child.conflicts.get("type", ""):
-                # Collect mods this child conflicts with (from win_mods_list / lose_mods_list)
-                for mod_name in child.conflicts.get("win_mods_list", []):
-                    child_conflict_mods.add(mod_name)
-                for mod_name in child.conflicts.get("lose_mods_list", []):
-                    child_conflict_mods.add(mod_name)
+            if not isinstance(r.conflicts, dict) or not r.conflicts.get("type", ""):
+                source.set_conflict_highlight(set(), set())
+                return
 
-        if not child_conflict_mods:
-            source.set_highlighted_rows(set())
-            return
+            # Build win/lose row sets from conflict data
+            win_names = set(r.conflicts.get("win_mods_list", []))
+            lose_names = set(r.conflicts.get("lose_mods_list", []))
 
-        # Find source rows outside this separator that match conflicting mod names
-        children_set = set(children)
-        children_set.add(row)  # Exclude the separator itself
-        highlighted: set[int] = set()
-        for i, mod_row in enumerate(source._rows):
-            if i in children_set:
-                continue
-            if mod_row.folder_name in child_conflict_mods:
-                highlighted.add(i)
+            win_rows: set[int] = set()
+            lose_rows: set[int] = set()
+            for i, mod_row in enumerate(source._rows):
+                if mod_row.folder_name in lose_names:
+                    lose_rows.add(i)   # Lose takes priority (criterion 10)
+                elif mod_row.folder_name in win_names:
+                    win_rows.add(i)
 
-        source.set_highlighted_rows(highlighted)
+            source.set_conflict_highlight(win_rows, lose_rows)
 
 
 class _DropFrameworkTree(QTreeWidget):

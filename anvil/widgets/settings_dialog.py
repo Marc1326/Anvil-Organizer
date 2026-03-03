@@ -280,6 +280,10 @@ class SettingsDialog(QDialog):
             settings.value("ModList/conflicts_from_separator", True, type=bool))
         conflict_row.addWidget(self._cb_conflicts_on_sep)
         conflict_row.addWidget(self._cb_conflicts_from_sep)
+        self._cb_conflict_highlight = QCheckBox(tr("settings.conflict_highlight_on_select"))
+        self._cb_conflict_highlight.setChecked(
+            settings.value("ModList/conflict_highlight_on_select", True, type=bool))
+        conflict_row.addWidget(self._cb_conflict_highlight)
         conflict_row.addStretch()
         sep_layout.addLayout(conflict_row)
         symbol_row = QHBoxLayout()
@@ -858,6 +862,7 @@ class SettingsDialog(QDialog):
         settings.setValue("ModList/auto_collapse_on_drag", self._cb_auto_collapse_drag.isChecked())
         settings.setValue("ModList/conflicts_on_separator", self._cb_conflicts_on_sep.isChecked())
         settings.setValue("ModList/conflicts_from_separator", self._cb_conflicts_from_sep.isChecked())
+        settings.setValue("ModList/conflict_highlight_on_select", self._cb_conflict_highlight.isChecked())
         settings.setValue("ModList/symbol_conflicts", self._cb_sym_conflicts.isChecked())
         settings.setValue("ModList/symbol_flags", self._cb_sym_flags.isChecked())
         settings.setValue("ModList/symbol_content", self._cb_sym_content.isChecked())

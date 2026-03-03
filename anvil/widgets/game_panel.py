@@ -5,6 +5,7 @@ from __future__ import annotations
 import configparser
 import os
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 from anvil.core.resource_path import get_anvil_base
@@ -240,18 +241,43 @@ class GamePanel(QWidget):
         # ── Spielstände-Tab ───────────────────────────────────────────
         saves = QWidget()
         saves_layout = QVBoxLayout(saves)
+
+        # Button-Leiste
+        saves_btn_bar = QHBoxLayout()
+        saves_reload_btn = QPushButton(tr("game_panel.saves_refresh"))
+        _refresh_icon3 = str(get_anvil_base() / "styles" / "icons" / "refresh.svg")
+        if os.path.exists(_refresh_icon3):
+            saves_reload_btn.setIcon(QIcon(_refresh_icon3))
+        saves_reload_btn.setIconSize(QSize(20, 20))
+        saves_reload_btn.clicked.connect(self._on_reload_saves)
+        saves_btn_bar.addWidget(saves_reload_btn)
+        saves_open_btn = QPushButton(tr("game_panel.saves_open_folder"))
+        saves_open_btn.setIcon(self.style().standardIcon(self.style().StandardPixmap.SP_DirOpenIcon))
+        saves_open_btn.setIconSize(QSize(20, 20))
+        saves_open_btn.clicked.connect(self._on_open_saves_folder)
+        saves_btn_bar.addWidget(saves_open_btn)
+        saves_btn_bar.addStretch()
+        self._saves_count_label = QLabel()
+        saves_btn_bar.addWidget(self._saves_count_label)
+        saves_layout.addLayout(saves_btn_bar)
+
         self._saves_tree = QTreeWidget()
-        self._saves_tree.setColumnCount(2)
-        self._saves_tree.setHeaderLabels([tr("game_panel.header_name"), tr("game_panel.header_file")])
+        self._saves_tree.setColumnCount(3)
+        self._saves_tree.setHeaderLabels([tr("game_panel.header_name"), tr("game_panel.header_date"), tr("game_panel.header_size")])
+        self._saves_tree.setAlternatingRowColors(True)
+        self._saves_tree.setEditTriggers(QTreeWidget.EditTrigger.NoEditTriggers)
+        self._saves_tree.setSelectionBehavior(QTreeWidget.SelectionBehavior.SelectRows)
         saves_header = self._saves_tree.header()
         saves_header.setStretchLastSection(False)
         saves_header.setCascadingSectionResizes(True)
         saves_header.setMinimumSectionSize(40)
         saves_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self._saves_tree.setColumnWidth(0, 250)
+        self._saves_tree.setColumnWidth(1, 150)
+        self._saves_tree.setColumnWidth(2, 90)
         self._ph_saves = PersistentHeader(saves_header, "saves")
         saves_layout.addWidget(self._saves_tree)
         tabs.addTab(saves, tr("game_panel.saves_tab"))
-        tabs.setTabEnabled(2, False)  # Saves tab — coming soon
 
         # ── Downloads-Tab ─────────────────────────────────────────────
         downloads = QWidget()
@@ -411,6 +437,19 @@ class GamePanel(QWidget):
         self._tabs.setTabVisible(0, has_plugins)
         if has_plugins:
             self._refresh_plugins_tab()
+
+        # Saves-Tab: dynamisch aktivieren
+        saves_dir = None
+        if game_plugin is not None and hasattr(game_plugin, "gameSavesDirectory"):
+            saves_dir = game_plugin.gameSavesDirectory()
+        self._current_saves_dir = saves_dir
+        if saves_dir is not None and saves_dir.is_dir():
+            self._tabs.setTabEnabled(2, True)
+            self._populate_saves_tree(saves_dir, game_plugin)
+        else:
+            self._tabs.setTabEnabled(2, False)
+            self._saves_tree.clear()
+            self._saves_count_label.setText("")
 
         # Downloads are populated via set_downloads_path() from MainWindow
 
@@ -913,6 +952,43 @@ class GamePanel(QWidget):
     def _on_reload_data(self) -> None:
         """Reload the data tree from the current game path."""
         self._populate_data_tree(self._current_game_path)
+
+    # ── Saves-Tab helpers ────────────────────────────────────────
+
+    def _populate_saves_tree(self, saves_dir: Path, game_plugin) -> None:
+        """Fill the saves tree with save-game files from *saves_dir*."""
+        self._saves_tree.clear()
+        saves = game_plugin.listSaves(saves_dir) if game_plugin else []
+        if not saves:
+            item = QTreeWidgetItem(self._saves_tree, [tr("game_panel.saves_empty"), "", ""])
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            self._saves_count_label.setText(tr("game_panel.saves_count", count=0))
+            return
+        for p in saves:
+            try:
+                if p.is_dir():
+                    sav_file = p / "sav.dat"
+                    st = sav_file.stat() if sav_file.exists() else p.stat()
+                else:
+                    st = p.stat()
+                dt = datetime.fromtimestamp(st.st_mtime).strftime("%d.%m.%Y %H:%M")
+                sz = self._format_size(st.st_size)
+            except OSError:
+                dt, sz = "—", "—"
+            QTreeWidgetItem(self._saves_tree, [p.name, dt, sz])
+        self._saves_count_label.setText(tr("game_panel.saves_count", count=len(saves)))
+
+    def _on_reload_saves(self) -> None:
+        """Reload the saves tree from the current saves directory."""
+        saves_dir = getattr(self, "_current_saves_dir", None)
+        if saves_dir and saves_dir.is_dir():
+            self._populate_saves_tree(saves_dir, self._current_plugin)
+
+    def _on_open_saves_folder(self) -> None:
+        """Open the saves directory in the system file manager."""
+        saves_dir = getattr(self, "_current_saves_dir", None)
+        if saves_dir and saves_dir.is_dir():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(saves_dir)))
 
     @staticmethod
     def _format_size(size_bytes: int) -> str:

@@ -695,6 +695,10 @@ class MainWindow(QMainWindow):
         tree._conflicts_from_separator = s.value(
             "ModList/conflicts_from_separator", True, type=bool)
 
+        # Conflict highlighting on mod selection
+        tree._conflict_highlight_on_select = s.value(
+            "ModList/conflict_highlight_on_select", True, type=bool)
+
         # Settings 7-10: Symbol icons on collapsed separators
         model._symbol_conflicts = s.value(
             "ModList/symbol_conflicts", True, type=bool)
@@ -1068,6 +1072,8 @@ class MainWindow(QMainWindow):
     def _on_mods_reordered(self) -> None:
         """Mods were reordered via drag & drop — sync entries and persist."""
         model = self._mod_list_view.source_model()
+        # Clear stale conflict highlights (row indices changed)
+        model.set_conflict_highlight(set(), set())
         # Rebuild visible entries from the model's new order
         new_entries = []
         for i in range(model.rowCount()):

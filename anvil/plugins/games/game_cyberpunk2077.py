@@ -127,6 +127,15 @@ class Cyberpunk2077Game(BaseGame):
                 return path
         return None
 
+    def listSaves(self, folder: Path) -> list[Path]:
+        """Return save-game folders (Cyberpunk stores saves as directories)."""
+        if not folder.is_dir():
+            return []
+        return sorted(
+            [d for d in folder.iterdir() if d.is_dir() and (d / "sav.dat").exists()],
+            key=lambda p: p.stat().st_mtime, reverse=True,
+        )
+
     def executables(self) -> list[dict[str, str]]:
         """Return executable definitions for Cyberpunk 2077.
 
