@@ -107,6 +107,12 @@ class ModListModel(QAbstractItemModel):
         self._highlighted_rows: set[int] = set()       # Source row indices to highlight
         self._highlight_color: QColor = QColor("#3a2a14")  # Warm orange-brown tint
 
+        # ── Conflict highlighting for selected mod ──
+        self._conflict_win_rows: set[int] = set()       # Green (selected wins)
+        self._conflict_lose_rows: set[int] = set()      # Red (selected loses)
+        self._conflict_win_color = QColor("#1a3a1a")
+        self._conflict_lose_color = QColor("#3a1a1a")
+
         # ── Collapsed separators reference (set by view) ──
         self._collapsed_separators: set[str] = set()
 
@@ -123,6 +129,19 @@ class ModListModel(QAbstractItemModel):
         self._highlighted_rows = rows
         # Notify view about changed rows (union of old and new)
         changed = old | rows
+        if changed and self._rows:
+            self.dataChanged.emit(
+                self.index(0, 0),
+                self.index(len(self._rows) - 1, COL_COUNT - 1),
+                [Qt.ItemDataRole.BackgroundRole],
+            )
+
+    def set_conflict_highlight(self, win_rows: set[int], lose_rows: set[int]) -> None:
+        """Highlight conflict partners of the selected mod."""
+        old = self._conflict_win_rows | self._conflict_lose_rows
+        self._conflict_win_rows = win_rows
+        self._conflict_lose_rows = lose_rows
+        changed = old | win_rows | lose_rows
         if changed and self._rows:
             self.dataChanged.emit(
                 self.index(0, 0),
@@ -305,8 +324,15 @@ class ModListModel(QAbstractItemModel):
             if r.is_framework and c == COL_NAME:
                 return tr("tooltip.direct_install")
         if role == Qt.ItemDataRole.BackgroundRole:
+            row_idx = index.row()
+            # Conflict highlighting (highest priority for temp highlights)
+            # Lose (rot) hat Vorrang vor Win (grün) — Warnung > Erfolg
+            if row_idx in self._conflict_lose_rows:
+                return QBrush(self._conflict_lose_color)
+            if row_idx in self._conflict_win_rows:
+                return QBrush(self._conflict_win_color)
             # Setting 6: Highlight mods that conflict with selected separator's children
-            if index.row() in self._highlighted_rows:
+            if row_idx in self._highlighted_rows:
                 return QBrush(self._highlight_color)
             # Separator custom background color (from meta.ini, dampened with alpha ~80)
             if r.is_separator and r.color:
