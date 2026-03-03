@@ -22,7 +22,7 @@ def _init_translator():
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Anvil Organizer")
-    app.setApplicationVersion("0.1.0")
+    app.setApplicationVersion("0.2.0")
 
     # Translator mit gespeicherter Sprache initialisieren
     _init_translator()
