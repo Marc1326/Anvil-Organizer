@@ -42,7 +42,7 @@ class RDR2Game(BaseGame):
 
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()
     GameSavesDirectory = ""     # resolved dynamically via gameSavesDirectory()
-    GameSaveExtension = "dat"
+    GameSaveExtension = ""
 
     GameNexusId = 0  # TODO: set when known
     GameNexusName = "reddeadredemption2"
@@ -95,6 +95,23 @@ class RDR2Game(BaseGame):
             if path.is_dir():
                 return path
         return None
+
+    def listSaves(self, folder: Path) -> list[Path]:
+        """Find RDR2 save files (SRDR3* pattern, no extension).
+
+        Saves live inside profile sub-folders under the Profiles directory,
+        e.g. Profiles/A9B1B2C2/SRDR30000.
+        """
+        if not folder.is_dir():
+            return []
+        results: list[Path] = []
+        for profile_dir in folder.iterdir():
+            if not profile_dir.is_dir():
+                continue
+            for f in profile_dir.iterdir():
+                if f.is_file() and f.name.startswith("SRDR3"):
+                    results.append(f)
+        return sorted(results, key=lambda p: p.stat().st_mtime, reverse=True)
 
     def executables(self) -> list[dict[str, str]]:
         """Return executable definitions for Red Dead Redemption 2."""
