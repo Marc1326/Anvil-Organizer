@@ -21,10 +21,13 @@ MO2 dominates on Windows — Anvil fills the gap on Linux.
 - **Drag & drop mod ordering** — with collapsible separators and color coding
 - **Category system** — primary + secondary categories, filter panel
 - **Framework detection** — auto-detects and installs game frameworks
-- **Nexus Mods integration** — NXM link handler, one-click downloads
-- **Conflict detection** — shows file conflicts between mods
+- **Nexus Mods integration** — SSO-Login, API Key, direct downloads, NXM link handler
+- **Conflict detection** — shows file conflicts between mods with visual highlighting
+- **Savegame browser** — view saves per game, open in file manager
+- **F4SE Proton Shim** — enables F4SE under Linux/Proton (world first!)
+- **Auto-redeploy** — mods redeployed automatically on toggle/reorder
 - **Self-update** — checks GitHub for updates, one-click git pull + restart
-- **6 languages** — DE, EN, FR, ES, IT, PT
+- **7 languages** — DE, EN, FR, ES, IT, PT, RU
 - **Dark theme** — multiple styles included
 
 ## Supported Games
@@ -36,7 +39,7 @@ MO2 dominates on Windows — Anvil fills the gap on Linux.
 | The Witcher 3: Wild Hunt | ✅ Working | Multi-folder routing (mods/dlc/bin) |
 | Baldur's Gate 3 | ✅ Working | PAK mods, modsettings.lsx |
 | Skyrim Special Edition | 🔧 Partial | Needs load-order system for .esp/.esm |
-| Fallout 4 | 🔧 Partial | Needs load-order system for .esp/.esm |
+| Fallout 4 | ✅ Working | F4SE Proton Shim, plugins.txt, BA2 packing |
 | Starfield | 🔧 Partial | Needs load-order system for .esp/.esm |
 
 Works with **Steam** and **Heroic Games Launcher** (GOG/Epic via Proton/Wine).
@@ -69,7 +72,18 @@ Works with **Steam** and **Heroic Games Launcher** (GOG/Epic via Proton/Wine).
 | **Git** | `git --version` | `sudo pacman -S git` | `sudo apt install git` |
 | **Qt6 libraries** | `python3 -c "from PySide6 import QtWidgets"` | `sudo pacman -S qt6-base` | `sudo apt install libgl1 libegl1 libxcb-cursor0 libxkbcommon0` |
 
-### Quick Install
+### AppImage (recommended)
+
+No installation needed — download, make executable, run:
+
+```bash
+chmod +x Anvil_Organizer-0.2.0-x86_64.AppImage
+./Anvil_Organizer-0.2.0-x86_64.AppImage
+```
+
+Download from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest).
+
+### From Source
 
 ```bash
 git clone https://github.com/Marc1326/Anvil-Organizer.git
@@ -130,7 +144,7 @@ Anvil-Organizer/
 │   │   └── ...
 │   ├── widgets/            # UI components
 │   ├── styles/             # Dark themes (QSS)
-│   ├── i18n/               # Translations (6 languages)
+│   ├── locales/            # Translations (7 languages)
 │   └── assets/icons/       # Game icons and covers
 ```
 
