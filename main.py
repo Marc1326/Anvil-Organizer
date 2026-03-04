@@ -10,6 +10,7 @@ from anvil.mainwindow import MainWindow
 from anvil.core.translator import Translator
 from anvil.core.single_instance import SingleInstance
 from anvil.core.nxm_handler import check_cli_for_nxm
+from anvil.version import APP_VERSION
 
 
 def _init_translator():
@@ -24,7 +25,7 @@ def _init_translator():
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Anvil Organizer")
-    app.setApplicationVersion("0.2.0")
+    app.setApplicationVersion(APP_VERSION)
 
     # ── Single-instance check ────────────────────────────────
     single = SingleInstance(app)

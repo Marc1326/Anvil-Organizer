@@ -77,8 +77,8 @@ Works with **Steam** and **Heroic Games Launcher** (GOG/Epic via Proton/Wine).
 No installation needed — download, make executable, run:
 
 ```bash
-chmod +x Anvil_Organizer-0.2.0-x86_64.AppImage
-./Anvil_Organizer-0.2.0-x86_64.AppImage
+chmod +x Anvil_Organizer-0.3.0-x86_64.AppImage
+./Anvil_Organizer-0.3.0-x86_64.AppImage
 ```
 
 Download from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest).
