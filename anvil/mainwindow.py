@@ -682,8 +682,8 @@ class MainWindow(QMainWindow):
         # Setting 3: Check updates after install (flag read in _install_archives)
         # No runtime attribute needed — read directly from QSettings at install time.
 
-        # Setting 4: Auto-collapse on drag (attribute for drag handler)
-        tree._auto_collapse_on_drag = s.value(
+        # Setting 4: Auto-expand on drag (attribute for drag handler)
+        tree._auto_expand_on_drag = s.value(
             "ModList/auto_collapse_on_drag", False, type=bool)
 
         # Setting 5: Conflicts ON separator (aggregated in collapsed separator row)
@@ -1068,6 +1068,15 @@ class MainWindow(QMainWindow):
         self._write_current_modlist()
         self._update_active_count()
         self._schedule_redeploy()
+        # ── Konflikte neu berechnen ──
+        conflict_data = self._compute_conflict_data()
+        for mod_row in model._rows:
+            folder = mod_row.folder_name
+            mod_row.conflicts = conflict_data.get(folder, "")
+        model.dataChanged.emit(
+            model.index(0, 0),
+            model.index(model.rowCount() - 1, model.columnCount() - 1),
+        )
 
     def _on_mods_reordered(self) -> None:
         """Mods were reordered via drag & drop — sync entries and persist."""
@@ -1384,7 +1393,7 @@ class MainWindow(QMainWindow):
             # Install from extracted temp dir
             mod_path = installer.install_from_extracted(temp_dir, mod_name)
             if mod_path:
-                add_mod_to_modlist(self._current_profile_path, mod_path.name)
+                add_mod_to_modlist(self._current_profile_path, mod_path.name, enabled=False)
                 installed.append(mod_path.name)
                 # Mark as installed in .meta (MO2: markInstalled)
                 downloads_dir = self._current_instance_path / ".downloads"
@@ -2418,7 +2427,7 @@ class MainWindow(QMainWindow):
         result = installer.install_from_archive(archive_path)
 
         if result:
-            add_mod_to_modlist(self._current_profile_path, result.name, True)
+            add_mod_to_modlist(self._current_profile_path, result.name, False)
             self._reload_mod_list()
             self.statusBar().showMessage(tr("status.mod_installed", name=result.name), 5000)
         else:
@@ -2458,7 +2467,7 @@ class MainWindow(QMainWindow):
             )
             return
 
-        add_mod_to_modlist(self._current_profile_path, name, True)
+        add_mod_to_modlist(self._current_profile_path, name, False)
         self._reload_mod_list()
         self.statusBar().showMessage(tr("status.empty_mod_created", name=name), 5000)
 

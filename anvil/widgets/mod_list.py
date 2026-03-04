@@ -349,13 +349,13 @@ class _DropTreeView(QTreeView):
         self._sep_scrollbar.set_tree_view(self)
         self.setVerticalScrollBar(self._sep_scrollbar)
 
-        # ── Setting 4: Auto-Collapse bei Drag & Drop ──
-        self._auto_collapse_on_drag: bool = False
-        self._collapse_timer = QTimer(self)
-        self._collapse_timer.setSingleShot(True)
-        self._collapse_timer.setInterval(500)
-        self._collapse_timer.timeout.connect(self._on_collapse_timer)
-        self._collapse_hover_index: QModelIndex = QModelIndex()
+        # ── Setting 4: Auto-Expand bei Drag & Drop ──
+        self._auto_expand_on_drag: bool = False
+        self._expand_timer = QTimer(self)
+        self._expand_timer.setSingleShot(True)
+        self._expand_timer.setInterval(500)
+        self._expand_timer.timeout.connect(self._on_expand_timer)
+        self._expand_hover_index: QModelIndex = QModelIndex()
 
         # Auto-scroll during drag & drop
         self._auto_scroll_timer = QTimer(self)
@@ -410,11 +410,35 @@ class _DropTreeView(QTreeView):
 
         proxy.set_hidden_rows(hidden)
 
-    # ── Setting 4: Auto-Collapse timer logic ──────────────────────
+    # ── Separator click on any column ────────────────────────────
 
-    def _on_collapse_timer(self) -> None:
-        """Timer fired: collapse the separator we've been hovering over."""
-        if not self._collapse_hover_index.isValid():
+    def mousePressEvent(self, event):
+        """Klick auf gesamte Separator-Zeile togglet Collapse/Expand."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            idx = self.indexAt(event.pos())
+            if idx.isValid():
+                proxy = self.model()
+                if isinstance(proxy, ModListProxyModel):
+                    source = proxy.sourceModel()
+                    source_idx = proxy.mapToSource(idx)
+                    if source and source_idx.isValid():
+                        is_sep = source.data(source.index(source_idx.row(), 0), ROLE_IS_SEPARATOR)
+                        if is_sep:
+                            if idx.column() != COL_CHECK:
+                                folder = source.data(source.index(source_idx.row(), 0), ROLE_FOLDER_NAME) or ""
+                                if folder in self._collapsed_separators:
+                                    self._collapsed_separators.discard(folder)
+                                else:
+                                    self._collapsed_separators.add(folder)
+                                self._apply_separator_filter()
+                                return
+        super().mousePressEvent(event)
+
+    # ── Setting 4: Auto-Expand timer logic ──────────────────────
+
+    def _on_expand_timer(self) -> None:
+        """Timer fired: expand the separator we've been hovering over."""
+        if not self._expand_hover_index.isValid():
             return
         proxy = self.model()
         if not isinstance(proxy, ModListProxyModel):
@@ -422,19 +446,19 @@ class _DropTreeView(QTreeView):
         source = proxy.sourceModel()
         if not source:
             return
-        source_idx = proxy.mapToSource(self._collapse_hover_index)
+        source_idx = proxy.mapToSource(self._expand_hover_index)
         if not source_idx.isValid():
             return
         folder = source.data(source.index(source_idx.row(), 0), ROLE_FOLDER_NAME) or ""
-        if folder and folder not in self._collapsed_separators:
-            self._collapsed_separators.add(folder)
+        if folder and folder in self._collapsed_separators:
+            self._collapsed_separators.discard(folder)
             self._apply_separator_filter()
-        self._collapse_hover_index = QModelIndex()
+        self._expand_hover_index = QModelIndex()
 
-    def _stop_collapse_timer(self) -> None:
-        """Stop the auto-collapse timer and clear the hover index."""
-        self._collapse_timer.stop()
-        self._collapse_hover_index = QModelIndex()
+    def _stop_expand_timer(self) -> None:
+        """Stop the auto-expand timer and clear the hover index."""
+        self._expand_timer.stop()
+        self._expand_hover_index = QModelIndex()
 
     # ── Auto-scroll during drag ─────────────────────────────────
 
@@ -487,13 +511,13 @@ class _DropTreeView(QTreeView):
         else:
             self._stop_auto_scroll()
 
-        # Setting 4: Auto-Collapse logic
-        if not self._auto_collapse_on_drag:
+        # Setting 4: Auto-Expand logic
+        if not self._auto_expand_on_drag:
             return
 
         proxy_idx = self.indexAt(event.position().toPoint())
         if not proxy_idx.isValid():
-            self._stop_collapse_timer()
+            self._stop_expand_timer()
             return
 
         proxy = self.model()
@@ -504,38 +528,38 @@ class _DropTreeView(QTreeView):
             return
         source_idx = proxy.mapToSource(proxy_idx)
         if not source_idx.isValid():
-            self._stop_collapse_timer()
+            self._stop_expand_timer()
             return
 
         is_sep = source.data(source.index(source_idx.row(), 0), ROLE_IS_SEPARATOR)
         if not is_sep:
-            self._stop_collapse_timer()
+            self._stop_expand_timer()
             return
 
         folder = source.data(source.index(source_idx.row(), 0), ROLE_FOLDER_NAME) or ""
-        # Only trigger for expanded (not yet collapsed) separators
-        if folder in self._collapsed_separators:
-            self._stop_collapse_timer()
+        # Only trigger for collapsed separators (expand them on hover)
+        if folder not in self._collapsed_separators:
+            self._stop_expand_timer()
             return
 
         # Check if we're still hovering over the same separator
-        if self._collapse_hover_index.isValid() and self._collapse_hover_index == proxy_idx:
+        if self._expand_hover_index.isValid() and self._expand_hover_index == proxy_idx:
             # Timer already running for this separator, keep going
             return
 
         # New separator: start timer
-        self._stop_collapse_timer()
-        self._collapse_hover_index = proxy_idx
-        self._collapse_timer.start()
+        self._stop_expand_timer()
+        self._expand_hover_index = proxy_idx
+        self._expand_timer.start()
 
     def dragLeaveEvent(self, event):
         self._stop_auto_scroll()
-        self._stop_collapse_timer()
+        self._stop_expand_timer()
         super().dragLeaveEvent(event)
 
     def dropEvent(self, event):
         self._stop_auto_scroll()
-        self._stop_collapse_timer()
+        self._stop_expand_timer()
         if event.mimeData().hasUrls():
             paths = []
             for url in event.mimeData().urls():
