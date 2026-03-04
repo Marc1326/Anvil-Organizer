@@ -32,7 +32,11 @@ def main():
         # Another instance is running — forward nxm:// URL if present
         nxm_link = check_cli_for_nxm()
         if nxm_link:
-            SingleInstance.send_message(nxm_link.raw_url)
+            if not SingleInstance.send_message(nxm_link.raw_url):
+                print(
+                    "[Anvil] IPC failed: could not forward NXM link to running instance",
+                    file=sys.stderr,
+                )
         sys.exit(0)
 
     # Translator mit gespeicherter Sprache initialisieren

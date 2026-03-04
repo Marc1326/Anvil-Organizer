@@ -31,13 +31,20 @@ class SingleInstance(QObject):
             self._server.newConnection.connect(self._on_new_connection)
             return True
 
-        # Listen failed — maybe stale socket from a crash
+        # Listen failed — probe if existing server is alive
+        probe = QLocalSocket()
+        probe.connectToServer(SERVER_NAME)
+        if probe.waitForConnected(1000):
+            # Server responds — real running instance
+            probe.disconnectFromServer()
+            return False
+
+        # Server dead — stale socket from crash, safe to remove
         QLocalServer.removeServer(SERVER_NAME)
         if self._server.listen(SERVER_NAME):
             self._server.newConnection.connect(self._on_new_connection)
             return True
 
-        # Another instance is truly running
         return False
 
     @staticmethod
@@ -53,6 +60,7 @@ class SingleInstance(QObject):
         socket.write(message.encode("utf-8"))
         socket.waitForBytesWritten(timeout_ms)
         socket.disconnectFromServer()
+        socket.waitForDisconnected(1000)
         return True
 
     def _on_new_connection(self):
@@ -68,3 +76,4 @@ class SingleInstance(QObject):
         if message:
             self.message_received.emit(message)
         socket.disconnectFromServer()
+        socket.deleteLater()
