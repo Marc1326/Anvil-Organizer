@@ -11,6 +11,7 @@ import configparser
 import time
 import urllib.request
 import urllib.error
+from urllib.parse import urlparse, quote, urlunparse
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -40,8 +41,11 @@ class _DownloadWorker(QThread):
 
     def run(self) -> None:
         try:
+            parsed = urlparse(self._url)
+            safe_path = quote(parsed.path, safe="/:@!$&'()*+,;=-._~")
+            clean_url = urlunparse(parsed._replace(path=safe_path))
             req = urllib.request.Request(
-                self._url,
+                clean_url,
                 headers={"User-Agent": f"Anvil Organizer/{APP_VERSION}"},
             )
             with urllib.request.urlopen(req, timeout=60) as resp:
