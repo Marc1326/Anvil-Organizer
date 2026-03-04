@@ -8,6 +8,8 @@ from PySide6.QtCore import QSettings, QTranslator, QLibraryInfo
 
 from anvil.mainwindow import MainWindow
 from anvil.core.translator import Translator
+from anvil.core.single_instance import SingleInstance
+from anvil.core.nxm_handler import check_cli_for_nxm
 
 
 def _init_translator():
@@ -24,6 +26,15 @@ def main():
     app.setApplicationName("Anvil Organizer")
     app.setApplicationVersion("0.2.0")
 
+    # ── Single-instance check ────────────────────────────────
+    single = SingleInstance(app)
+    if not single.try_lock():
+        # Another instance is running — forward nxm:// URL if present
+        nxm_link = check_cli_for_nxm()
+        if nxm_link:
+            SingleInstance.send_message(nxm_link.raw_url)
+        sys.exit(0)
+
     # Translator mit gespeicherter Sprache initialisieren
     _init_translator()
 
@@ -35,6 +46,10 @@ def main():
         app.installTranslator(qt_translator)
 
     w = MainWindow()
+
+    # Connect IPC → MainWindow for nxm:// forwarding
+    single.message_received.connect(w.handle_nxm_url)
+
     w.showMaximized()
     sys.exit(app.exec())
 
