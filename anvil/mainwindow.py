@@ -55,6 +55,7 @@ from anvil.core.mod_list_io import (
     add_mod_to_modlist, write_modlist, remove_mod_from_modlist,
     rename_mod_in_modlist, read_active_mods, write_active_mods,
     write_global_modlist, migrate_to_global_modlist,
+    insert_mod_in_modlist,
 )
 from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
 from anvil.version import APP_VERSION
@@ -277,6 +278,9 @@ class MainWindow(QMainWindow):
         model.mods_reordered.connect(self._on_mods_reordered)
         self._mod_list_view.archives_dropped.connect(
             self._on_archives_dropped, Qt.ConnectionType.QueuedConnection,
+        )
+        self._mod_list_view.archives_dropped_at.connect(
+            self._on_archives_dropped_at, Qt.ConnectionType.QueuedConnection,
         )
         self._mod_list_view.fw_context_menu_requested.connect(self._on_fw_context_menu)
         self._mod_list_view.fw_archives_dropped.connect(self._on_fw_archives_dropped)
@@ -1236,6 +1240,13 @@ class MainWindow(QMainWindow):
         self._install_archives([Path(p) for p in paths])
         self._game_panel.refresh_downloads()
 
+    def _on_archives_dropped_at(self, paths: list, target_row: int) -> None:
+        """Handle archives dropped onto the mod list at a specific position."""
+        if not self._current_instance_path:
+            return
+        self._install_archives([Path(p) for p in paths], insert_at=target_row)
+        self._game_panel.refresh_downloads()
+
     def _on_start_game(self, binary_path: str, working_dir: str) -> None:
         """Launch the selected game executable."""
         self._redeploy_timer.stop()
@@ -1266,7 +1277,7 @@ class MainWindow(QMainWindow):
         self._install_archives([Path(p) for p in paths])
         self._game_panel.refresh_downloads()
 
-    def _install_archives(self, archives: list[Path]) -> None:
+    def _install_archives(self, archives: list[Path], insert_at: int | None = None) -> None:
         """Install one or more archives as mods.
 
         MO2-Pattern (testOverwrite):
@@ -1393,7 +1404,11 @@ class MainWindow(QMainWindow):
             # Install from extracted temp dir
             mod_path = installer.install_from_extracted(temp_dir, mod_name)
             if mod_path:
-                add_mod_to_modlist(self._current_profile_path, mod_path.name, enabled=False)
+                if insert_at is not None:
+                    insert_mod_in_modlist(self._current_profile_path, mod_path.name, insert_at, enabled=False)
+                    insert_at += 1  # next mod goes after this one
+                else:
+                    add_mod_to_modlist(self._current_profile_path, mod_path.name, enabled=False)
                 installed.append(mod_path.name)
                 # Mark as installed in .meta (MO2: markInstalled)
                 downloads_dir = self._current_instance_path / ".downloads"

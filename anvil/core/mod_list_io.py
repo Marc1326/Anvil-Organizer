@@ -115,6 +115,30 @@ def add_mod_to_modlist(
     write_modlist(profile_path, existing)
 
 
+def insert_mod_in_modlist(
+    profile_path: Path, mod_name: str, position: int, enabled: bool = True,
+) -> None:
+    """Insert a mod at a specific position in ``modlist.txt``.
+
+    If the mod is already in the list it is **not** added again.
+
+    Args:
+        profile_path: Path to a profile folder.
+        mod_name: Name of the mod to insert.
+        position: 0-based index in the list.
+        enabled: Whether the mod should be enabled.
+    """
+    existing = read_modlist(profile_path)
+
+    for name, _ in existing:
+        if name == mod_name:
+            return
+
+    position = max(0, min(position, len(existing)))
+    existing.insert(position, (mod_name, enabled))
+    write_modlist(profile_path, existing)
+
+
 def remove_mod_from_modlist(profile_path: Path, mod_name: str) -> None:
     """Remove a mod from ``modlist.txt``.
 

@@ -337,6 +337,7 @@ class _DropTreeView(QTreeView):
     """QTreeView that accepts external archive file drops in addition to internal DnD."""
 
     archives_dropped = Signal(list)  # list of file path strings
+    archives_dropped_at = Signal(list, int)  # list of file paths + target source row
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -569,6 +570,29 @@ class _DropTreeView(QTreeView):
                         paths.append(path)
             if paths:
                 event.acceptProposedAction()
+                # Compute drop target source row
+                proxy_idx = self.indexAt(event.position().toPoint())
+                if proxy_idx.isValid():
+                    proxy = self.model()
+                    if isinstance(proxy, ModListProxyModel):
+                        source_idx = proxy.mapToSource(proxy_idx)
+                        source = proxy.sourceModel()
+                        if source_idx.isValid() and source:
+                            target_row = source_idx.row()
+                            is_sep = source.data(source.index(target_row, 0), ROLE_IS_SEPARATOR)
+                            if is_sep:
+                                folder = source.data(source.index(target_row, 0), ROLE_FOLDER_NAME) or ""
+                                if folder in self._collapsed_separators:
+                                    # K3: Collapsed separator → last child + 1
+                                    children = source._get_separator_children(target_row)
+                                    target_row = children[-1] + 1 if children else target_row + 1
+                                else:
+                                    # K1: Expanded separator → after separator row
+                                    target_row = target_row + 1
+                            # K2: Normal mod → insert at that position
+                            self.archives_dropped_at.emit(paths, target_row)
+                            return
+                # No valid target → append at end (K4 / file manager drop)
                 self.archives_dropped.emit(paths)
                 return
         # Internal DnD (mod reorder)
@@ -719,6 +743,7 @@ class _DropFrameworkTree(QTreeWidget):
 
 class ModListView(QWidget):
     archives_dropped = Signal(list)  # forwarded from _DropTreeView
+    archives_dropped_at = Signal(list, int)  # forwarded from _DropTreeView (with position)
     context_menu_requested = Signal(QPoint)  # global pos for context menu
     fw_context_menu_requested = Signal(QPoint, dict)  # global pos + fw_data for framework context menu
     fw_archives_dropped = Signal(list)  # archive paths dropped on framework tree
@@ -729,6 +754,7 @@ class ModListView(QWidget):
 
         self._tree = _DropTreeView()
         self._tree.archives_dropped.connect(self.archives_dropped)
+        self._tree.archives_dropped_at.connect(self.archives_dropped_at)
         self._tree.setRootIsDecorated(False)
         self._tree.setAlternatingRowColors(True)
         self._tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)

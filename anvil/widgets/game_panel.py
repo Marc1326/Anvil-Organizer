@@ -36,7 +36,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont, QDesktopServices
 from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl, QMimeData, QSettings
 
-from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
+from anvil.core.mod_installer import SUPPORTED_EXTENSIONS, ModInstaller
 from anvil.core.mod_deployer import ModDeployer
 from anvil.core.download_manager import DownloadManager
 from anvil.core.persistent_header import PersistentHeader
@@ -1184,7 +1184,20 @@ class GamePanel(QWidget):
         # Build set of installed mod folder names for status check
         installed_names: set[str] = set()
         if self._mods_path and self._mods_path.is_dir():
-            installed_names = {d.name.lower() for d in self._mods_path.iterdir() if d.is_dir()}
+            for d in self._mods_path.iterdir():
+                if d.is_dir():
+                    installed_names.add(d.name.lower())
+                    meta_ini = d / "meta.ini"
+                    if meta_ini.is_file():
+                        cp = configparser.ConfigParser(interpolation=None)
+                        cp.optionxform = str
+                        try:
+                            cp.read(str(meta_ini), encoding="utf-8")
+                            dn = cp.get("installed", "name", fallback="")
+                            if dn.strip():
+                                installed_names.add(dn.strip().lower())
+                        except Exception:
+                            pass
 
         s = QSettings(
             str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf"),
@@ -1221,13 +1234,8 @@ class GamePanel(QWidget):
             elif meta_install_file:
                 is_installed = meta_install_file.lower() in installed_names
             else:
-                stem = path.stem
-                clean = re.sub(r"-\d+(-\d+)*$", "", stem).strip()
-                clean = clean.replace("_", " ")
-                clean = clean.strip(". ")
-                clean = re.sub(r"\s*\(\d+\)$", "", clean)
-                clean = re.sub(r"\.zip$", "", clean, flags=re.I)
-                is_installed = clean.lower() in installed_names or stem.lower() in installed_names
+                suggested = ModInstaller.suggest_name(path)
+                is_installed = suggested.lower() in installed_names or path.stem.lower() in installed_names
             status_text = tr("game_panel.installed") if is_installed else tr("game_panel.not_installed")
             item_status = QTableWidgetItem(status_text)
             if is_installed:
