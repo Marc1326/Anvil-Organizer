@@ -1776,6 +1776,14 @@ class MainWindow(QMainWindow):
         # ── Senden / Mod-Aktionen ────────────────────────────────
         send_to_menu = menu.addMenu(tr("context.send_to"))
         send_to_menu.setEnabled(False)
+        move_to_sep_menu = menu.addMenu(tr("context.move_to_separator"))
+        separators = self._mod_list_view.source_model().get_all_separators()
+        if separators and has_selection:
+            for sep_row, sep_folder, sep_name in separators:
+                act_sep = move_to_sep_menu.addAction(sep_name)
+                act_sep.setData(sep_folder)
+        else:
+            move_to_sep_menu.setEnabled(False)
         act_rename = menu.addAction(tr("context.rename_mod"))
         act_rename.setEnabled(single)
         act_reinstall = menu.addAction(tr("context.reinstall_mod"))
@@ -1826,6 +1834,11 @@ class MainWindow(QMainWindow):
             if chosen.data() is not None and chosen.parent() == primaere_kat_menu:
                 cat_id = chosen.data()
                 self._set_primary_category(row, cat_id)
+
+        # Handle "In Trenner verschieben" actions
+        if chosen and chosen.data() is not None and chosen.parent() == move_to_sep_menu:
+            self._ctx_move_to_separator(selected_rows, chosen.data())
+            return
 
         if not chosen:
             return
@@ -2546,6 +2559,35 @@ class MainWindow(QMainWindow):
         self._ctx_enable_selected(all_rows, enabled)
         msg = tr("status.all_mods_enabled") if enabled else tr("status.all_mods_disabled")
         self.statusBar().showMessage(msg, 3000)
+
+    def _ctx_move_to_separator(self, source_rows: list[int], separator_folder: str) -> None:
+        """Move selected mods to the end of the given separator's children."""
+        model = self._mod_list_view.source_model()
+
+        # Separator-Position im Model finden
+        sep_row = None
+        for i, row in enumerate(model._rows):
+            if row.is_separator and row.folder_name == separator_folder:
+                sep_row = i
+                break
+        if sep_row is None:
+            return
+
+        # Kinder des Ziel-Separators ermitteln
+        children = model._get_separator_children(sep_row)
+        if children:
+            target = children[-1] + 1  # Nach dem letzten Kind
+        else:
+            target = sep_row + 1  # Direkt nach dem Separator
+
+        # Separatoren und bereits im Ziel-Trenner befindliche Mods herausfiltern
+        child_set = set(children)
+        filtered = [r for r in source_rows
+                    if not model._rows[r].is_separator and r not in child_set]
+        if not filtered:
+            return
+
+        model._move_multiple_rows(filtered, target)
 
     def _apply_category_changes(
         self,

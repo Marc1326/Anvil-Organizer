@@ -62,6 +62,7 @@
     "disable_selected": "Désactiver la sélection",
 
     "send_to": "Envoyer vers...",
+    "move_to_separator": "Déplacer vers le séparateur",
     "rename_mod": "Renommer le Mod...",
     "reinstall_mod": "Réinstaller le Mod",
     "remove_mod": "Supprimer le Mod...",

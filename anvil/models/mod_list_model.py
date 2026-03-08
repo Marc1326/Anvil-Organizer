@@ -432,14 +432,17 @@ class ModListModel(QAbstractItemModel):
         else:
             target = self.rowCount()
 
-        source_row = source_rows[0]
-
-        # Prüfen ob Separator verschoben wird → Block mitnehmen
-        if self._rows[source_row].is_separator:
-            return self._move_separator_block(source_row, target)
-
-        # Einzelne Mod verschieben (wie bisher)
-        return self._move_single_row(source_row, target)
+        if len(source_rows) == 1:
+            source_row = source_rows[0]
+            if self._rows[source_row].is_separator:
+                return self._move_separator_block(source_row, target)
+            return self._move_single_row(source_row, target)
+        else:
+            # Mehrfachauswahl: Separatoren herausfiltern, nur Mods verschieben
+            mod_rows = [r for r in source_rows if not self._rows[r].is_separator]
+            if not mod_rows:
+                return False
+            return self._move_multiple_rows(mod_rows, target)
 
     def _move_single_row(self, source_row: int, target: int) -> bool:
         """Verschiebt eine einzelne Zeile."""
@@ -455,6 +458,40 @@ class ModListModel(QAbstractItemModel):
             row_data = self._rows.pop(source_row)
             self._rows.insert(target, row_data)
         self.endMoveRows()
+        self._update_priorities()
+        return True
+
+    def _move_multiple_rows(self, source_rows: list[int], target: int) -> bool:
+        """Verschiebt mehrere nicht-zusammenhängende Zeilen an die Zielposition.
+
+        Die relative Reihenfolge der selektierten Mods bleibt erhalten.
+        Separatoren müssen vorher herausgefiltert worden sein.
+        """
+        if not source_rows:
+            return False
+
+        sorted_rows = sorted(source_rows)
+
+        # Extrahiere die ModRows in Originalreihenfolge
+        extracted = [self._rows[r] for r in sorted_rows]
+
+        self.layoutAboutToBeChanged.emit()
+
+        # Von hinten nach vorne entfernen damit Indizes stabil bleiben
+        for r in reversed(sorted_rows):
+            del self._rows[r]
+
+        # Target-Position anpassen: für jeden entfernten Row < target, eins abziehen
+        adjusted_target = target
+        for r in sorted_rows:
+            if r < target:
+                adjusted_target -= 1
+
+        # An angepasster Position einfügen (Originalreihenfolge)
+        for i, row_data in enumerate(extracted):
+            self._rows.insert(adjusted_target + i, row_data)
+
+        self.layoutChanged.emit()
         self._update_priorities()
         return True
 
@@ -557,6 +594,14 @@ class ModListModel(QAbstractItemModel):
             return name if name else ""
         except ValueError:
             return ""
+
+    def get_all_separators(self) -> list[tuple[int, str, str]]:
+        """Return list of (source_row, folder_name, display_name) for all separators."""
+        result = []
+        for i, row in enumerate(self._rows):
+            if row.is_separator:
+                result.append((i, row.folder_name, row.name))
+        return result
 
     def sort(self, column, order=Qt.SortOrder.AscendingOrder):
         self.layoutAboutToBeChanged.emit()
