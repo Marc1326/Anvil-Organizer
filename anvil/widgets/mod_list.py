@@ -202,18 +202,22 @@ class CheckboxDelegate(QStyledItemDelegate):
     def editorEvent(self, event, model, option, index):
         is_sep = index.data(ROLE_IS_SEPARATOR)
         if is_sep:
-            # Separator: toggle on Press, consume Release/DblClick
+            # Separator in COL_CHECK: let Press through for DnD, toggle on Release
             if event.type() == event.Type.MouseButtonPress:
-                folder = index.data(ROLE_FOLDER_NAME) or ""
+                return False  # Don't consume — Qt needs this for DnD start
+            if event.type() == event.Type.MouseButtonRelease:
                 view = option.widget
                 if view and hasattr(view, '_collapsed_separators'):
-                    if folder in view._collapsed_separators:
-                        view._collapsed_separators.discard(folder)
-                    else:
-                        view._collapsed_separators.add(folder)
-                    view._apply_separator_filter()
+                    # Only toggle if no drag occurred
+                    if view.state() != QAbstractItemView.State.DraggingState:
+                        folder = index.data(ROLE_FOLDER_NAME) or ""
+                        if folder in view._collapsed_separators:
+                            view._collapsed_separators.discard(folder)
+                        else:
+                            view._collapsed_separators.add(folder)
+                        view._apply_separator_filter()
                 return True
-            if event.type() in (event.Type.MouseButtonRelease, event.Type.MouseButtonDblClick):
+            if event.type() == event.Type.MouseButtonDblClick:
                 return True
             return False
         # Normal mod: toggle checkbox on Release, consume DblClick
@@ -364,6 +368,9 @@ class _DropTreeView(QTreeView):
         self._auto_scroll_timer.timeout.connect(self._do_auto_scroll)
         self._auto_scroll_speed: int = 0
 
+        # ── Deferred separator toggle (allows DnD to start) ──
+        self._pending_separator_toggle: str | None = None
+
         # ── Setting 6: Konflikte VON Trenner ──
         self._conflicts_from_separator: bool = False
 
@@ -414,7 +421,8 @@ class _DropTreeView(QTreeView):
     # ── Separator click on any column ────────────────────────────
 
     def mousePressEvent(self, event):
-        """Klick auf gesamte Separator-Zeile togglet Collapse/Expand."""
+        """Klick auf Separator merken — Toggle erst in mouseReleaseEvent (damit DnD starten kann)."""
+        self._pending_separator_toggle = None
         if event.button() == Qt.MouseButton.LeftButton:
             idx = self.indexAt(event.pos())
             if idx.isValid():
@@ -424,16 +432,23 @@ class _DropTreeView(QTreeView):
                     source_idx = proxy.mapToSource(idx)
                     if source and source_idx.isValid():
                         is_sep = source.data(source.index(source_idx.row(), 0), ROLE_IS_SEPARATOR)
-                        if is_sep:
-                            if idx.column() != COL_CHECK:
-                                folder = source.data(source.index(source_idx.row(), 0), ROLE_FOLDER_NAME) or ""
-                                if folder in self._collapsed_separators:
-                                    self._collapsed_separators.discard(folder)
-                                else:
-                                    self._collapsed_separators.add(folder)
-                                self._apply_separator_filter()
-                                return
+                        if is_sep and idx.column() != COL_CHECK:
+                            folder = source.data(source.index(source_idx.row(), 0), ROLE_FOLDER_NAME) or ""
+                            self._pending_separator_toggle = folder
         super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """Toggle Separator nur wenn KEIN Drag stattfand."""
+        if self._pending_separator_toggle is not None:
+            folder = self._pending_separator_toggle
+            self._pending_separator_toggle = None
+            if self.state() != QAbstractItemView.State.DraggingState:
+                if folder in self._collapsed_separators:
+                    self._collapsed_separators.discard(folder)
+                else:
+                    self._collapsed_separators.add(folder)
+                self._apply_separator_filter()
+        super().mouseReleaseEvent(event)
 
     # ── Setting 4: Auto-Expand timer logic ──────────────────────
 
