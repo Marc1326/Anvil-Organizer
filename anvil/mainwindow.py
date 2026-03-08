@@ -54,7 +54,7 @@ from anvil.dialogs.fomod_dialog import FomodDialog
 from anvil.core.mod_list_io import (
     add_mod_to_modlist, write_modlist, remove_mod_from_modlist,
     rename_mod_in_modlist, read_active_mods, write_active_mods,
-    write_global_modlist, migrate_to_global_modlist,
+    read_global_modlist, write_global_modlist, migrate_to_global_modlist,
     insert_mod_in_modlist,
 )
 from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
@@ -1404,11 +1404,27 @@ class MainWindow(QMainWindow):
             # Install from extracted temp dir
             mod_path = installer.install_from_extracted(temp_dir, mod_name)
             if mod_path:
-                if insert_at is not None:
-                    insert_mod_in_modlist(self._current_profile_path, mod_path.name, insert_at, enabled=False)
-                    insert_at += 1  # next mod goes after this one
+                profiles_dir = self._current_instance_path / ".profiles"
+                global_modlist = profiles_dir / "modlist.txt"
+                if global_modlist.is_file():
+                    # Global system: write to .profiles/modlist.txt
+                    mod_names = read_global_modlist(profiles_dir)
+                    if mod_path.name not in mod_names:
+                        if insert_at is not None:
+                            pos = max(0, min(insert_at, len(mod_names)))
+                            mod_names.insert(pos, mod_path.name)
+                            insert_at += 1  # next mod goes after this one
+                        else:
+                            mod_names.append(mod_path.name)
+                        write_global_modlist(profiles_dir, mod_names)
+                    # enabled=False → do NOT add to active_mods.json (default = disabled)
                 else:
-                    add_mod_to_modlist(self._current_profile_path, mod_path.name, enabled=False)
+                    # Legacy system: per-profile modlist.txt
+                    if insert_at is not None:
+                        insert_mod_in_modlist(self._current_profile_path, mod_path.name, insert_at, enabled=False)
+                        insert_at += 1
+                    else:
+                        add_mod_to_modlist(self._current_profile_path, mod_path.name, enabled=False)
                 installed.append(mod_path.name)
                 # Mark as installed in .meta (MO2: markInstalled)
                 downloads_dir = self._current_instance_path / ".downloads"
