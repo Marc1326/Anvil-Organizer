@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.0.6] — 2026-03-09
+
+### Fixes
+- Separator verschwindet bei Multi-Select DnD: Wenn mehrere Mods gleichzeitig in einen Separator gezogen wurden, verschwand der Separator. Gefixt.
+- Mods verschwinden nach Neustart: Neu installierte Mods waren nach einem Neustart nicht mehr sichtbar (falsches Name-Matching). Gefixt.
+- Mod-Toggle und Reorder: Checkbox-Toggle und Drag & Drop nutzen jetzt den eindeutigen Ordnernamen statt Display-Namen (verhindert Datenverlust bei doppelten Namen).
+
+### Visuelles
+- Ordner-Icon bei Separatoren in der Kategorie-Spalte entfernt
+- Ja/Nein-Icons in Bestätigungsdialogen entfernt (Paper Dark & 1809 Dark Mode Theme)
+
+### modlist.txt Format-Korrektur
+- Die globale modlist.txt wurde bisher invertiert geschrieben (Separator stand nach seinen Mods statt davor). Format korrigiert und automatische Migration beim ersten Start.
+- Bestehende Dateien werden gesichert (modlist.txt.bak) bevor die Migration durchgeführt wird.
+
 ## [1.0.5] — 2026-03-08
 
 ### Fixes
