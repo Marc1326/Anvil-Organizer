@@ -55,7 +55,7 @@ from anvil.core.mod_list_io import (
     add_mod_to_modlist, write_modlist, remove_mod_from_modlist,
     rename_mod_in_modlist, read_active_mods, write_active_mods,
     read_global_modlist, write_global_modlist, migrate_to_global_modlist,
-    insert_mod_in_modlist,
+    migrate_modlist_order, insert_mod_in_modlist,
 )
 from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
 from anvil.version import APP_VERSION
@@ -924,6 +924,9 @@ class MainWindow(QMainWindow):
 
         # Migrate legacy per-profile modlist.txt to global modlist + active_mods.json
         migrate_to_global_modlist(profiles_dir)
+
+        # Migrate modlist order: separators before their mods (v1 → v2)
+        migrate_modlist_order(profiles_dir)
 
         profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir()])
         if not profile_folders:

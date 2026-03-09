@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 
 _HEADER = "# Managed by Anvil Organizer\n"
+_HEADER_V2 = "# Managed by Anvil Organizer v2\n"
 
 
 def read_modlist(profile_path: Path) -> list[tuple[str, bool]]:
@@ -269,10 +270,16 @@ def read_global_modlist(profiles_dir: Path) -> list[str]:
     return result
 
 
+def _is_separator_name(name: str) -> bool:
+    """Check if a mod name represents a separator (ends with ``_separator``)."""
+    return name.endswith("_separator")
+
+
 def write_global_modlist(profiles_dir: Path, mod_names: list[str]) -> None:
     """Write global ``modlist.txt`` to the .profiles directory.
 
     All mods are written with '+' prefix (order-only, no enabled state).
+    Uses the v2 header to indicate the new separator-before-mods format.
 
     Args:
         profiles_dir: Path to the .profiles directory.
@@ -280,7 +287,7 @@ def write_global_modlist(profiles_dir: Path, mod_names: list[str]) -> None:
     """
     modlist = profiles_dir / "modlist.txt"
 
-    lines = [_HEADER]
+    lines = [_HEADER_V2]
     for name in mod_names:
         lines.append(f"+{name}\n")
 
@@ -292,6 +299,111 @@ def write_global_modlist(profiles_dir: Path, mod_names: list[str]) -> None:
             f"mod_list_io: failed to write {modlist}: {exc}",
             file=sys.stderr,
         )
+
+
+def migrate_modlist_order(profiles_dir: Path) -> bool:
+    """Migrate modlist.txt from old format (mods before separator) to new format
+    (separator before its mods).
+
+    Old format:  ModA, ModB, Separator1, ModC, ModD, Separator2
+    New format:  Separator1, ModA, ModB, Separator2, ModC, ModD
+
+    The migration is detected by checking the header line:
+    - Old: ``# Managed by Anvil Organizer`` (no "v2")
+    - New: ``# Managed by Anvil Organizer v2``
+
+    Creates a backup (modlist.txt.bak) before migrating.
+
+    Args:
+        profiles_dir: Path to the .profiles directory.
+
+    Returns:
+        True if migration was performed, False if not needed.
+    """
+    modlist = profiles_dir / "modlist.txt"
+    if not modlist.is_file():
+        return False
+
+    try:
+        text = modlist.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(
+            f"mod_list_io: migrate_modlist_order: failed to read {modlist}: {exc}",
+            file=sys.stderr,
+        )
+        return False
+
+    # Already migrated? Check for v2 header
+    first_line = text.split("\n", 1)[0].strip()
+    if "v2" in first_line:
+        return False
+
+    # Parse entries (strip +/- prefix)
+    entries: list[str] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("+") or line.startswith("-"):
+            entries.append(line[1:])
+        else:
+            entries.append(line)
+
+    if not entries:
+        return False
+
+    # Check if any separator exists — if not, no migration needed
+    has_separator = any(_is_separator_name(e) for e in entries)
+    if not has_separator:
+        # No separators → just update header
+        write_global_modlist(profiles_dir, entries)
+        return True
+
+    # In the old format (v1), each separator stands AFTER its mods:
+    #   [ModA, ModB, Sep1, ModC, ModD, Sep2, ModE]
+    # In the new format (v2), each separator stands BEFORE its mods:
+    #   [Sep1, ModA, ModB, Sep2, ModC, ModD, ModE]
+    #
+    # Algorithm: split into groups at each separator boundary.
+    # Each group = (mods before separator, separator).
+    # Trailing mods after the last separator stay at the end.
+    new_order: list[str] = []
+    current_mods: list[str] = []
+    orphan_count = 0
+
+    for entry in entries:
+        if _is_separator_name(entry):
+            # Separator found — emit: separator first, then its mods
+            new_order.append(entry)
+            new_order.extend(current_mods)
+            orphan_count += len(current_mods)
+            current_mods = []
+        else:
+            current_mods.append(entry)
+
+    # Trailing mods after the last separator (no separator owns them)
+    new_order.extend(current_mods)
+
+    # Create backup
+    backup = profiles_dir / "modlist.txt.bak"
+    try:
+        backup.write_text(text, encoding="utf-8")
+        print(f"mod_list_io: backup created: {backup}", flush=True)
+    except OSError as exc:
+        print(
+            f"mod_list_io: failed to create backup {backup}: {exc}",
+            file=sys.stderr,
+        )
+
+    # Write migrated modlist with v2 header
+    write_global_modlist(profiles_dir, new_order)
+    sep_count = sum(1 for e in entries if _is_separator_name(e))
+    print(
+        f"mod_list_io: migrated modlist order ({len(entries)} entries, "
+        f"{sep_count} separators, {orphan_count} orphan mods moved)",
+        flush=True,
+    )
+    return True
 
 
 def migrate_to_global_modlist(profiles_dir: Path) -> bool:
