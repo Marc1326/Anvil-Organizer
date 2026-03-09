@@ -557,10 +557,14 @@ class ModListModel(QAbstractItemModel):
         self.mods_reordered.emit()
 
     def removeRows(self, row, count, parent=QModelIndex()):
-        """No-Op nach DnD — beginMoveRows hat die Zeile bereits verschoben."""
+        """No-Op nach DnD — beginMoveRows hat die Zeile bereits verschoben.
+
+        MUST return False so QSortFilterProxyModel does NOT call
+        beginRemoveRows/endRemoveRows (which would hide rows from the view
+        even though the source model still contains them).
+        """
         if self._drop_in_progress:
             self._drop_in_progress = False
-            return True
         return False
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):

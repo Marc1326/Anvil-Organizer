@@ -1063,10 +1063,9 @@ class MainWindow(QMainWindow):
         model = self._mod_list_view.source_model()
         if 0 <= row < len(model._rows):
             row_data = model._rows[row]
-            # Find matching entry by display name (model shows visible_entries only)
+            # Find matching entry by unique folder name
             for entry in self._current_mod_entries:
-                display = entry.display_name or entry.name
-                if display == row_data.name:
+                if entry.name == row_data.folder_name:
                     entry.enabled = enabled
                     break
         self._write_current_modlist()
@@ -1091,10 +1090,9 @@ class MainWindow(QMainWindow):
         new_entries = []
         for i in range(model.rowCount()):
             row_data = model._rows[i]
-            # Find matching entry by display_name or folder name
+            # Find matching entry by unique folder name
             for entry in self._current_mod_entries:
-                display = entry.display_name or entry.name
-                if display == row_data.name and entry not in new_entries:
+                if entry.name == row_data.folder_name and entry not in new_entries:
                     entry.priority = i
                     new_entries.append(entry)
                     break
