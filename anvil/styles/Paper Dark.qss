@@ -380,7 +380,8 @@ QMessageBox QPushButton {
   border-radius: 6px;
   padding: 6px 20px;
   font-size: 13px;
-  min-width: 80px; }
+  min-width: 80px;
+  qproperty-icon: none; }
   QMessageBox QPushButton:hover {
     background: #3D3D3D; }
   QMessageBox QPushButton:default {

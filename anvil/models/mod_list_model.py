@@ -276,10 +276,8 @@ class ModListModel(QAbstractItemModel):
                 if c == COL_MARKERS and self._symbol_flags:
                     if self._any_child_has_markers(row_idx):
                         return QIcon.fromTheme("flag")  # System theme fallback
-                # Setting 9: Content symbol on separator (category column as proxy)
-                if c == COL_CATEGORY and self._symbol_content:
-                    if self._any_child_has_content(row_idx):
-                        return QIcon.fromTheme("document-open")
+                # Setting 9: Content symbol on separator — kein Icon (visuell entfernt)
+                # if c == COL_CATEGORY and self._symbol_content:
                 # Setting 10: Version symbol on separator
                 if c == COL_VERSION and self._symbol_version:
                     if self._any_child_has_version(row_idx):
