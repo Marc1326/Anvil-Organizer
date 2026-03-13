@@ -1113,6 +1113,7 @@ class MainWindow(QMainWindow):
             model.index(0, 0),
             model.index(model.rowCount() - 1, model.columnCount() - 1),
         )
+        self._mod_list_view._apply_separator_filter()
         self._schedule_redeploy()
 
     def _update_active_count(self) -> None:
@@ -1412,7 +1413,23 @@ class MainWindow(QMainWindow):
                     mod_names = read_global_modlist(profiles_dir)
                     if mod_path.name not in mod_names:
                         if insert_at is not None:
-                            pos = max(0, min(insert_at, len(mod_names)))
+                            # insert_at is a source-model row index (without
+                            # direct-install mods).  mod_names comes from
+                            # modlist.txt and includes ALL entries (also
+                            # direct-install).  We must map the source-model
+                            # index to the correct modlist.txt position by
+                            # looking up the folder name at that row.
+                            model = self._mod_list_view.source_model()
+                            rows = model._rows
+                            if insert_at < len(rows):
+                                ref_name = rows[insert_at].folder_name
+                            else:
+                                ref_name = None
+                            if ref_name and ref_name in mod_names:
+                                pos = mod_names.index(ref_name)
+                            else:
+                                # Fallback: append at end
+                                pos = len(mod_names)
                             mod_names.insert(pos, mod_path.name)
                             insert_at += 1  # next mod goes after this one
                         else:
@@ -3137,6 +3154,7 @@ class MainWindow(QMainWindow):
         mod_rows = [mod_entry_to_row(e, conflict_data) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
+        self._mod_list_view._apply_separator_filter()
         self._update_active_count()
 
         # Refresh framework status (nach Framework-Installation)
