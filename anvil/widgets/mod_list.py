@@ -268,7 +268,9 @@ class ModListProxyModel(QSortFilterProxyModel):
 
     def filterAcceptsRow(self, source_row, source_parent):
         if source_row in self._hidden_rows:
-            return False
+            # When search/filter is active, show mods even in collapsed separators
+            if not self._filter_text and not self._filter_prop_ids and not self._filter_cat_ids:
+                return False
 
         # If no filters active, accept all
         if not self._filter_text and not self._filter_prop_ids and not self._filter_cat_ids:

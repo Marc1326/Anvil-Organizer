@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.8] — 2026-03-13
+
+### Fixes
+- **DnD aus Download-Tab:** Mods aus dem Download-Tab landeten im falschen Separator, weil Direct-Install Mods den Index verschoben haben. Position wird jetzt korrekt über den Ordnernamen aufgelöst.
+- **Suche findet Mods in eingeklappten Separatoren:** Wenn ein Separator eingeklappt war, wurden seine Mods auch von der Suche ignoriert. Jetzt werden bei aktiver Suche/Filter alle Mods durchsucht — unabhängig vom Separator-Status.
+
 ## [1.0.7] — 2026-03-13
 
 ### Fixes
