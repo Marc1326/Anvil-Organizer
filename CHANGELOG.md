@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.7] — 2026-03-13
+
+### Fixes
+- **Kritisch: modlist.txt Migration verschiebt Mods bei jedem Start** — `migrate_modlist_order()` hat bei jedem Anvil-Start die Mod-Reihenfolge verschoben, wenn der Header noch v1 war aber die Daten bereits im v2-Format vorlagen. Jede Mod-Gruppe rutschte um einen Separator nach unten. Die Reordering-Logik wurde komplett entfernt — die Migration aktualisiert jetzt nur noch den Header.
+- Legacy `write_modlist()` schreibt jetzt ebenfalls den v2-Header, damit keine Funktion mehr den alten v1-Header erzeugt.
+
 ## [1.0.6] — 2026-03-09
 
 ### Fixes
