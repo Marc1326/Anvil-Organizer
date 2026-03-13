@@ -78,7 +78,7 @@ def write_modlist(
     """
     modlist = profile_path / "modlist.txt"
 
-    lines = [_HEADER]
+    lines = [_HEADER_V2]
     for name, enabled in mods:
         prefix = "+" if enabled else "-"
         lines.append(f"{prefix}{name}\n")
@@ -302,23 +302,25 @@ def write_global_modlist(profiles_dir: Path, mod_names: list[str]) -> None:
 
 
 def migrate_modlist_order(profiles_dir: Path) -> bool:
-    """Migrate modlist.txt from old format (mods before separator) to new format
-    (separator before its mods).
+    """Update modlist.txt header from v1 to v2.
 
-    Old format:  ModA, ModB, Separator1, ModC, ModD, Separator2
-    New format:  Separator1, ModA, ModB, Separator2, ModC, ModD
+    Previously this function also reordered entries (moving separators
+    before their mods). That reordering logic has been removed because
+    ``write_global_modlist()`` already writes the correct v2 format.
+    Running the reorder on data that is already in v2 order (but with a
+    v1 header) caused mods to shift down by one separator group on every
+    start.
 
-    The migration is detected by checking the header line:
-    - Old: ``# Managed by Anvil Organizer`` (no "v2")
-    - New: ``# Managed by Anvil Organizer v2``
-
-    Creates a backup (modlist.txt.bak) before migrating.
+    Now the function only:
+    1. Checks if the header is already v2 — if yes, returns False.
+    2. Creates a backup (modlist.txt.bak).
+    3. Replaces the v1 header with v2, keeping all entries unchanged.
 
     Args:
         profiles_dir: Path to the .profiles directory.
 
     Returns:
-        True if migration was performed, False if not needed.
+        True if the header was updated, False if not needed.
     """
     modlist = profiles_dir / "modlist.txt"
     if not modlist.is_file():
@@ -338,53 +340,7 @@ def migrate_modlist_order(profiles_dir: Path) -> bool:
     if "v2" in first_line:
         return False
 
-    # Parse entries (strip +/- prefix)
-    entries: list[str] = []
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("+") or line.startswith("-"):
-            entries.append(line[1:])
-        else:
-            entries.append(line)
-
-    if not entries:
-        return False
-
-    # Check if any separator exists — if not, no migration needed
-    has_separator = any(_is_separator_name(e) for e in entries)
-    if not has_separator:
-        # No separators → just update header
-        write_global_modlist(profiles_dir, entries)
-        return True
-
-    # In the old format (v1), each separator stands AFTER its mods:
-    #   [ModA, ModB, Sep1, ModC, ModD, Sep2, ModE]
-    # In the new format (v2), each separator stands BEFORE its mods:
-    #   [Sep1, ModA, ModB, Sep2, ModC, ModD, ModE]
-    #
-    # Algorithm: split into groups at each separator boundary.
-    # Each group = (mods before separator, separator).
-    # Trailing mods after the last separator stay at the end.
-    new_order: list[str] = []
-    current_mods: list[str] = []
-    orphan_count = 0
-
-    for entry in entries:
-        if _is_separator_name(entry):
-            # Separator found — emit: separator first, then its mods
-            new_order.append(entry)
-            new_order.extend(current_mods)
-            orphan_count += len(current_mods)
-            current_mods = []
-        else:
-            current_mods.append(entry)
-
-    # Trailing mods after the last separator (no separator owns them)
-    new_order.extend(current_mods)
-
-    # Create backup
+    # Create backup before modifying
     backup = profiles_dir / "modlist.txt.bak"
     try:
         backup.write_text(text, encoding="utf-8")
@@ -395,12 +351,25 @@ def migrate_modlist_order(profiles_dir: Path) -> bool:
             file=sys.stderr,
         )
 
-    # Write migrated modlist with v2 header
-    write_global_modlist(profiles_dir, new_order)
-    sep_count = sum(1 for e in entries if _is_separator_name(e))
+    # Replace the v1 header with v2, keep everything else unchanged
+    new_text = text.replace(_HEADER, _HEADER_V2, 1)
+    # If the old header wasn't found exactly (e.g. extra whitespace),
+    # replace the first line manually
+    if new_text == text:
+        lines = text.split("\n", 1)
+        new_text = _HEADER_V2.rstrip("\n") + "\n" + (lines[1] if len(lines) > 1 else "")
+
+    try:
+        modlist.write_text(new_text, encoding="utf-8")
+    except OSError as exc:
+        print(
+            f"mod_list_io: failed to write {modlist}: {exc}",
+            file=sys.stderr,
+        )
+        return False
+
     print(
-        f"mod_list_io: migrated modlist order ({len(entries)} entries, "
-        f"{sep_count} separators, {orphan_count} orphan mods moved)",
+        f"mod_list_io: updated modlist header to v2: {modlist}",
         flush=True,
     )
     return True
