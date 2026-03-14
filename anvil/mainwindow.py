@@ -53,6 +53,7 @@ from anvil.core.fomod_parser import (
 from anvil.dialogs.fomod_dialog import FomodDialog
 from anvil.core.mod_list_io import (
     add_mod_to_modlist, write_modlist, remove_mod_from_modlist,
+    remove_mod_from_global_modlist,
     rename_mod_in_modlist, read_active_mods, write_active_mods,
     read_global_modlist, write_global_modlist, migrate_to_global_modlist,
     migrate_modlist_order, insert_mod_in_modlist,
@@ -3054,11 +3055,12 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
+        profiles_dir = self._current_instance_path / ".profiles"
         for name in names:
             mod_path = self._current_instance_path / ".mods" / name
             if mod_path.is_dir():
                 shutil.rmtree(mod_path)
-            remove_mod_from_modlist(self._current_profile_path, name)
+            remove_mod_from_global_modlist(profiles_dir, name)
             self._clear_install_meta(name)
 
         self._reload_mod_list()

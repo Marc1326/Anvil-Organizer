@@ -156,6 +156,22 @@ def remove_mod_from_modlist(profile_path: Path, mod_name: str) -> None:
         write_modlist(profile_path, filtered)
 
 
+def remove_mod_from_global_modlist(profiles_dir: Path, mod_name: str) -> None:
+    """Remove a mod from the global ``modlist.txt``.
+
+    Does nothing if the mod is not in the list.
+
+    Args:
+        profiles_dir: Path to the .profiles directory.
+        mod_name: Name of the mod to remove.
+    """
+    existing = read_global_modlist(profiles_dir)
+    filtered = [n for n in existing if n != mod_name]
+
+    if len(filtered) != len(existing):
+        write_global_modlist(profiles_dir, filtered)
+
+
 def rename_mod_in_modlist(
     profile_path: Path, old_name: str, new_name: str,
 ) -> None:
