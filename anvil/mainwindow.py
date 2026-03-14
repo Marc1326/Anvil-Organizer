@@ -1293,6 +1293,7 @@ class MainWindow(QMainWindow):
         installer = ModInstaller(self._current_instance_path, flatten=flatten)
         installed = []
         frameworks_installed = []
+        _prev_inserted_name: str | None = None  # Track last inserted mod for multi-DnD
 
         for archive in archives:
             print(f"DEBUG _install_archives: archive={archive.name}", flush=True)
@@ -1413,25 +1414,25 @@ class MainWindow(QMainWindow):
                     mod_names = read_global_modlist(profiles_dir)
                     if mod_path.name not in mod_names:
                         if insert_at is not None:
-                            # insert_at is a source-model row index (without
-                            # direct-install mods).  mod_names comes from
-                            # modlist.txt and includes ALL entries (also
-                            # direct-install).  We must map the source-model
-                            # index to the correct modlist.txt position by
-                            # looking up the folder name at that row.
-                            model = self._mod_list_view.source_model()
-                            rows = model._rows
-                            if insert_at < len(rows):
-                                ref_name = rows[insert_at].folder_name
+                            if _prev_inserted_name and _prev_inserted_name in mod_names:
+                                # 2nd+ mod: insert right after the previously
+                                # installed mod (stays in same separator)
+                                pos = mod_names.index(_prev_inserted_name) + 1
                             else:
-                                ref_name = None
-                            if ref_name and ref_name in mod_names:
-                                pos = mod_names.index(ref_name)
-                            else:
-                                # Fallback: append at end
-                                pos = len(mod_names)
+                                # 1st mod: map source-model row to modlist
+                                # position via folder name lookup
+                                model = self._mod_list_view.source_model()
+                                rows = model._rows
+                                if insert_at < len(rows):
+                                    ref_name = rows[insert_at].folder_name
+                                else:
+                                    ref_name = None
+                                if ref_name and ref_name in mod_names:
+                                    pos = mod_names.index(ref_name)
+                                else:
+                                    pos = len(mod_names)
                             mod_names.insert(pos, mod_path.name)
-                            insert_at += 1  # next mod goes after this one
+                            _prev_inserted_name = mod_path.name
                         else:
                             mod_names.append(mod_path.name)
                         write_global_modlist(profiles_dir, mod_names)
