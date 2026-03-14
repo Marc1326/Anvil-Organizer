@@ -1041,6 +1041,19 @@ class MainWindow(QMainWindow):
             if prop_set or cat_set:
                 self._filter_panel.restore_state(prop_set, cat_set)
 
+    def _entry_for_row(self, source_row: int):
+        """Resolve a source-model row to the matching ModEntry by folder name.
+
+        Returns None if the row is out of range or no match is found.
+        """
+        model = self._mod_list_view.source_model()
+        if 0 <= source_row < len(model._rows):
+            folder = model._rows[source_row].folder_name
+            for entry in self._current_mod_entries:
+                if entry.name == folder:
+                    return entry
+        return None
+
     # ── Mod list persistence ─────────────────────────────────────────
 
     def _write_current_modlist(self) -> None:
@@ -1638,8 +1651,9 @@ class MainWindow(QMainWindow):
 
         _cat_buttons = []  # keep refs: (cat_id, QPushButton)
 
-        if single and selected_rows[0] < len(self._current_mod_entries):
-            entry = self._current_mod_entries[selected_rows[0]]
+        _ctx_entry = self._entry_for_row(selected_rows[0]) if single else None
+        if single and _ctx_entry:
+            entry = _ctx_entry
             row = selected_rows[0]
             assigned_ids = set(entry.category_ids)
 
@@ -1683,7 +1697,7 @@ class MainWindow(QMainWindow):
                 def make_toggle_handler(cid, button, cats_menu, prim_menu):
                     def handler():
                         self._toggle_category(row, cid)
-                        entry = self._current_mod_entries[row]
+                        entry = self._entry_for_row(row)
                         # UI aktualisieren ohne Menü zu schließen
                         new_assigned = cid in entry.category_ids
                         new_prefix = "●  " if new_assigned else "    "
@@ -1841,7 +1855,7 @@ class MainWindow(QMainWindow):
         act_nexus_query.setEnabled(single and self._nexus_api.has_api_key())
         # Nexus: nur aktiviert wenn Mod eine Nexus-ID hat
         act_nexus = menu.addAction(tr("context.visit_nexus"))
-        has_nexus = single and selected_rows[0] < len(self._current_mod_entries) and self._current_mod_entries[selected_rows[0]].nexus_id > 0
+        has_nexus = single and _ctx_entry is not None and _ctx_entry.nexus_id > 0
         act_nexus.setEnabled(has_nexus)
         act_explorer = menu.addAction(tr("context.open_explorer"))
         act_explorer.setEnabled(single)
@@ -1852,8 +1866,8 @@ class MainWindow(QMainWindow):
         act_select_color = None
         act_reset_color = None
         _sep_entry = None
-        if single and selected_rows[0] < len(self._current_mod_entries):
-            _sep_entry = self._current_mod_entries[selected_rows[0]]
+        if single and _ctx_entry:
+            _sep_entry = _ctx_entry
             if _sep_entry.is_separator:
                 menu.addSeparator()
                 act_select_color = menu.addAction(tr("context.select_color"))
@@ -2577,8 +2591,10 @@ class MainWindow(QMainWindow):
         """Enable or disable selected mods."""
         model = self._mod_list_view.source_model()
         for row in rows:
-            if 0 <= row < len(self._current_mod_entries):
-                self._current_mod_entries[row].enabled = enabled
+            entry = self._entry_for_row(row)
+            if entry:
+                entry.enabled = enabled
+            if 0 <= row < len(model._rows):
                 model._rows[row].enabled = enabled
         model.dataChanged.emit(
             model.index(0, 0),
@@ -2591,7 +2607,8 @@ class MainWindow(QMainWindow):
 
     def _ctx_enable_all(self, enabled: bool) -> None:
         """Enable or disable ALL mods."""
-        all_rows = list(range(len(self._current_mod_entries)))
+        model = self._mod_list_view.source_model()
+        all_rows = list(range(model.rowCount()))
         self._ctx_enable_selected(all_rows, enabled)
         msg = tr("status.all_mods_enabled") if enabled else tr("status.all_mods_disabled")
         self.statusBar().showMessage(msg, 3000)
@@ -2634,7 +2651,9 @@ class MainWindow(QMainWindow):
         """Read checkbox/radio state from the closed menu and persist changes."""
         from anvil.core.mod_metadata import write_meta_ini
 
-        entry = self._current_mod_entries[row]
+        entry = self._entry_for_row(row)
+        if not entry:
+            return
 
         # Collect checked category IDs
         new_ids = [cid for cid, cb in cat_checkboxes if cb.isChecked()]
@@ -2689,7 +2708,9 @@ class MainWindow(QMainWindow):
         """Toggle a category assignment for a mod."""
         from anvil.core.mod_metadata import write_meta_ini
 
-        entry = self._current_mod_entries[row]
+        entry = self._entry_for_row(row)
+        if not entry:
+            return
         current_ids = list(entry.category_ids)
 
         if cat_id in current_ids:
@@ -2738,7 +2759,9 @@ class MainWindow(QMainWindow):
         """Set a category as primary for a mod."""
         from anvil.core.mod_metadata import write_meta_ini
 
-        entry = self._current_mod_entries[row]
+        entry = self._entry_for_row(row)
+        if not entry:
+            return
 
         if cat_id not in entry.category_ids:
             return  # Can only set assigned categories as primary
@@ -2776,9 +2799,9 @@ class MainWindow(QMainWindow):
     def _ctx_create_backup(self, row: int) -> None:
         """Create a ZIP backup of the mod folder in .backups/."""
         import zipfile
-        if row >= len(self._current_mod_entries):
+        entry = self._entry_for_row(row)
+        if not entry:
             return
-        entry = self._current_mod_entries[row]
         mod_path = self._current_instance_path / ".mods" / entry.name
 
         if not mod_path.is_dir():
@@ -2812,9 +2835,9 @@ class MainWindow(QMainWindow):
 
     def _ctx_query_nexus_info(self, row: int) -> None:
         """Context menu / panel button: Query Nexus Info for a mod."""
-        if row >= len(self._current_mod_entries):
+        entry = self._entry_for_row(row)
+        if not entry:
             return
-        entry = self._current_mod_entries[row]
 
         nexus_id = entry.nexus_id
 
@@ -2944,9 +2967,9 @@ class MainWindow(QMainWindow):
 
     def _ctx_visit_nexus(self, row: int) -> None:
         """Open the mod's Nexus Mods page in the browser."""
-        if row >= len(self._current_mod_entries):
+        entry = self._entry_for_row(row)
+        if not entry:
             return
-        entry = self._current_mod_entries[row]
         if entry.nexus_id <= 0:
             return
 
@@ -2962,9 +2985,9 @@ class MainWindow(QMainWindow):
 
     def _ctx_rename_mod(self, row: int) -> None:
         """Rename a mod (folder + modlist.txt)."""
-        if row >= len(self._current_mod_entries):
+        entry = self._entry_for_row(row)
+        if not entry:
             return
-        entry = self._current_mod_entries[row]
         old_name = entry.name
 
         new_name, ok = get_text_input(
@@ -3001,9 +3024,9 @@ class MainWindow(QMainWindow):
 
     def _ctx_reinstall_mod(self, row: int) -> None:
         """Reinstall a mod from its archive in .downloads/."""
-        if row >= len(self._current_mod_entries):
+        entry = self._entry_for_row(row)
+        if not entry:
             return
-        entry = self._current_mod_entries[row]
         downloads_path = self._current_instance_path / ".downloads"
 
         if not downloads_path.is_dir():
@@ -3037,8 +3060,9 @@ class MainWindow(QMainWindow):
         """Remove selected mods (folder + modlist.txt entry)."""
         names = []
         for row in rows:
-            if row < len(self._current_mod_entries):
-                names.append(self._current_mod_entries[row].name)
+            entry = self._entry_for_row(row)
+            if entry:
+                names.append(entry.name)
         if not names:
             return
 
@@ -3071,17 +3095,18 @@ class MainWindow(QMainWindow):
     def _ctx_open_explorer(self, row: int) -> None:
         """Open the mod folder in the file manager."""
         import subprocess
-        if row >= len(self._current_mod_entries):
+        entry = self._entry_for_row(row)
+        if not entry:
             return
-        mod_path = self._current_instance_path / ".mods" / self._current_mod_entries[row].name
+        mod_path = self._current_instance_path / ".mods" / entry.name
         if mod_path.is_dir():
             subprocess.Popen(["xdg-open", str(mod_path)])
 
     def _ctx_show_info(self, row: int) -> None:
         """Show mod information dialog."""
-        if row >= len(self._current_mod_entries):
+        entry = self._entry_for_row(row)
+        if not entry:
             return
-        entry = self._current_mod_entries[row]
         mod_path = self._current_instance_path / ".mods" / entry.name
 
         # Collect info
