@@ -1,9 +1,12 @@
 # Changelog
 
-## [1.0.8] — 2026-03-13
+## [1.0.8] — 2026-03-14
 
 ### Fixes
-- **DnD aus Download-Tab:** Mods aus dem Download-Tab landeten im falschen Separator, weil Direct-Install Mods den Index verschoben haben. Position wird jetzt korrekt über den Ordnernamen aufgelöst.
+- **Multi-Mod DnD aus Download-Tab:** Beim Ziehen von mehreren Mods gleichzeitig (z.B. 5 Stück) landeten ab dem 3. Mod alle im falschen Separator. Ursache: `insert_at` verwies auf veraltete Source-Model-Zeilen. Fix: Jeder Mod wird jetzt direkt nach dem vorherigen eingefügt.
+- **DnD aus Download-Tab (Single):** Mods landeten im falschen Separator, weil Direct-Install Mods den Index verschoben haben. Position wird jetzt korrekt über den Ordnernamen aufgelöst.
+- **Mod-Löschung:** Gelöschte Mods wurden nicht aus der globalen modlist.txt entfernt — tote Einträge sammelten sich an. Jetzt wird der Eintrag korrekt aus `.profiles/modlist.txt` entfernt.
+- **Index-Mismatch bei Context-Menu:** 15+ Funktionen (Löschen, Umbenennen, Aktivieren, Backup, Nexus, Kategorien) griffen bei DirectInstall-Mods auf den falschen Mod zu. Alle verwenden jetzt sicheren Name-Lookup statt Index-Zugriff.
 - **Suche findet Mods in eingeklappten Separatoren:** Wenn ein Separator eingeklappt war, wurden seine Mods auch von der Suche ignoriert. Jetzt werden bei aktiver Suche/Filter alle Mods durchsucht — unabhängig vom Separator-Status.
 
 ## [1.0.7] — 2026-03-13
