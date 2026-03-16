@@ -269,6 +269,7 @@ class MainWindow(QMainWindow):
         self._pending_dl_query_path: str | None = None
         self._current_profile_path: Path | None = None
         self._current_instance_path: Path | None = None
+        self._installing = False
         self._current_downloads_path: Path | None = None
         self._current_plugin = None  # Active game plugin
         self._current_game_path: Path | None = None
@@ -1127,8 +1128,13 @@ class MainWindow(QMainWindow):
             model.index(0, 0),
             model.index(model.rowCount() - 1, model.columnCount() - 1),
         )
-        self._mod_list_view._apply_separator_filter()
+        self._mod_list_view._tree._apply_separator_filter()
         self._schedule_redeploy()
+
+        # DEBUG_MODLIST: DnD-Reorder State loggen
+        from anvil.core.debug_modlist import log, log_model_state
+        log("DND_REORDER", f"new_entries={len(self._current_mod_entries)}")
+        log_model_state("_on_mods_reordered", model._rows)
 
     def _update_active_count(self) -> None:
         """Update the active mod counter in the profile bar."""
@@ -1303,11 +1309,27 @@ class MainWindow(QMainWindow):
 
         Framework mods are detected and installed directly into the game directory.
         """
+        if self._installing:
+            print("[INSTALL] Re-entrancy blocked — already installing", flush=True)
+            return
+        self._installing = True
+        try:
+            self._install_archives_inner(archives, insert_at=insert_at)
+        finally:
+            self._installing = False
+
+    def _install_archives_inner(self, archives: list[Path], insert_at: int | None = None) -> None:
+        """Inner implementation of archive installation (called by _install_archives)."""
         flatten = getattr(self._current_plugin, "GameFlattenArchive", True) if self._current_plugin else True
         installer = ModInstaller(self._current_instance_path, flatten=flatten)
         installed = []
         frameworks_installed = []
         _prev_inserted_name: str | None = None  # Track last inserted mod for multi-DnD
+        _target_sep_boundary: int | None = None  # Index of next separator (boundary)
+
+        # DEBUG_MODLIST: Install-Session loggen
+        from anvil.core.debug_modlist import log_install_step, log
+        log("INSTALL_START", f"archives={[a.name for a in archives]} insert_at={insert_at}")
 
         for archive in archives:
             print(f"DEBUG _install_archives: archive={archive.name}", flush=True)
@@ -1430,8 +1452,10 @@ class MainWindow(QMainWindow):
                         if insert_at is not None:
                             if _prev_inserted_name and _prev_inserted_name in mod_names:
                                 # 2nd+ mod: insert right after the previously
-                                # installed mod (stays in same separator)
+                                # installed mod, clamped to separator boundary
                                 pos = mod_names.index(_prev_inserted_name) + 1
+                                if _target_sep_boundary is not None:
+                                    pos = min(pos, _target_sep_boundary)
                             else:
                                 # 1st mod: map source-model row to modlist
                                 # position via folder name lookup
@@ -1445,11 +1469,21 @@ class MainWindow(QMainWindow):
                                     pos = mod_names.index(ref_name)
                                 else:
                                     pos = len(mod_names)
+                                # Find boundary: next _separator at or after pos
+                                _target_sep_boundary = None
+                                for i in range(pos, len(mod_names)):
+                                    if mod_names[i].endswith("_separator"):
+                                        _target_sep_boundary = i
+                                        break
                             mod_names.insert(pos, mod_path.name)
                             _prev_inserted_name = mod_path.name
+                            # Adjust boundary (list grew by 1)
+                            if _target_sep_boundary is not None:
+                                _target_sep_boundary += 1
                         else:
                             mod_names.append(mod_path.name)
                         write_global_modlist(profiles_dir, mod_names)
+                        log_install_step(archive.name, mod_path.name, "WRITE_GLOBAL", f"pos={pos} prev={_prev_inserted_name} boundary={_target_sep_boundary}")
                     # enabled=False → do NOT add to active_mods.json (default = disabled)
                 else:
                     # Legacy system: per-profile modlist.txt
@@ -3182,8 +3216,12 @@ class MainWindow(QMainWindow):
         mod_rows = [mod_entry_to_row(e, conflict_data) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
-        self._mod_list_view._apply_separator_filter()
+        self._mod_list_view._tree._apply_separator_filter()
         self._update_active_count()
+
+        # DEBUG_MODLIST: Reload-State vergleichen — modlist.txt vs Model
+        from anvil.core.debug_modlist import log
+        log("RELOAD", f"mod_entries={len(self._current_mod_entries)} visible={len(visible_entries)} model_rows={len(mod_rows)}")
 
         # Refresh framework status (nach Framework-Installation)
         if self._current_plugin is not None:
