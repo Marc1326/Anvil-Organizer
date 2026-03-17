@@ -1467,6 +1467,11 @@ class MainWindow(QMainWindow):
                                     ref_name = None
                                 if ref_name and ref_name in mod_names:
                                     pos = mod_names.index(ref_name)
+                                    # v2-Format: Separator steht VOR seinen Mods.
+                                    # Insert VOR einem Separator würde den Mod in
+                                    # den VORHERIGEN Trenner platzieren → pos + 1
+                                    if ref_name.endswith("_separator"):
+                                        pos += 1
                                 else:
                                     pos = len(mod_names)
                                 # Find boundary: next _separator at or after pos
@@ -2875,6 +2880,20 @@ class MainWindow(QMainWindow):
 
         nexus_id = entry.nexus_id
 
+        # Step 1b: Parse installationFile from meta.ini (archive may be deleted)
+        if nexus_id <= 0 and entry.install_path:
+            from anvil.core.nexus_filename_parser import extract_nexus_mod_id
+            meta_path = entry.install_path / "meta.ini"
+            if meta_path.is_file():
+                import configparser
+                cp = configparser.ConfigParser()
+                cp.read(str(meta_path), encoding="utf-8")
+                inst_file = cp.get("General", "installationFile", fallback="")
+                if inst_file:
+                    parsed_id = extract_nexus_mod_id(inst_file)
+                    if parsed_id and parsed_id > 0:
+                        nexus_id = parsed_id
+
         # Step 2: Search .downloads/ for matching archive → parse filename
         if nexus_id <= 0:
             from anvil.core.nexus_filename_parser import extract_nexus_mod_id
@@ -3023,13 +3042,21 @@ class MainWindow(QMainWindow):
         if not entry:
             return
         old_name = entry.name
+        is_sep = entry.is_separator
+
+        # Separator: nur den lesbaren Teil anzeigen (ohne _separator Suffix)
+        display_old = old_name[:-len("_separator")] if is_sep else old_name
 
         new_name, ok = get_text_input(
-            self, tr("dialog.rename_mod_title"), tr("dialog.rename_mod_prompt"), text=old_name,
+            self, tr("dialog.rename_mod_title"), tr("dialog.rename_mod_prompt"), text=display_old,
         )
-        if not ok or not new_name.strip() or new_name.strip() == old_name:
+        if not ok or not new_name.strip() or new_name.strip() == display_old:
             return
         new_name = new_name.strip()
+
+        # Separator: Suffix wieder anhängen für Ordner + modlist
+        if is_sep:
+            new_name = new_name + "_separator"
 
         old_path = self._current_instance_path / ".mods" / old_name
         new_path = self._current_instance_path / ".mods" / new_name
@@ -3050,6 +3077,24 @@ class MainWindow(QMainWindow):
             return
 
         rename_mod_in_modlist(self._current_profile_path, old_name, new_name)
+        # Auch globale modlist.txt aktualisieren (Reihenfolge)
+        profiles_dir = self._current_profile_path.parent
+        global_names = read_global_modlist(profiles_dir)
+        global_names = [new_name if n == old_name else n for n in global_names]
+        write_global_modlist(profiles_dir, global_names)
+        # meta.ini: name-Feld aktualisieren (bestimmt den Anzeigenamen)
+        meta_ini = new_path / "meta.ini"
+        if meta_ini.is_file():
+            import configparser
+            cp = configparser.ConfigParser(interpolation=None)
+            cp.optionxform = str
+            cp.read(str(meta_ini), encoding="utf-8")
+            display_new = new_name[:-len("_separator")] if is_sep else new_name
+            for section in cp.sections():
+                if cp.has_option(section, "name"):
+                    cp.set(section, "name", display_new)
+            with open(str(meta_ini), "w", encoding="utf-8") as f:
+                cp.write(f)
         self._update_install_meta_name(old_name, new_name)
         self._reload_mod_list()
         self._do_redeploy()

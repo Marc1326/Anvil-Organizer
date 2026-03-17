@@ -219,6 +219,13 @@ class ModListModel(QAbstractItemModel):
         self._rows = list(mods)
         self.endResetModel()
 
+        # DEBUG_MODLIST: Model-State nach set_mods loggen
+        from anvil.core.debug_modlist import log_model_state
+        import traceback
+        _caller = traceback.extract_stack(limit=2)[0]
+        _caller_str = f"{_caller.filename.rsplit('/', 1)[-1]}:{_caller.lineno} {_caller.name}"
+        log_model_state(_caller_str, self._rows)
+
     def rowCount(self, parent=QModelIndex()):
         if parent.isValid():
             return 0

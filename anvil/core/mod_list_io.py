@@ -316,6 +316,13 @@ def write_global_modlist(profiles_dir: Path, mod_names: list[str]) -> None:
             file=sys.stderr,
         )
 
+    # DEBUG_MODLIST: Log nach jedem Write
+    import traceback
+    _caller = traceback.extract_stack(limit=2)[0]
+    _caller_str = f"{_caller.filename.rsplit('/', 1)[-1]}:{_caller.lineno} {_caller.name}"
+    from anvil.core.debug_modlist import log_modlist_write
+    log_modlist_write(_caller_str, profiles_dir, mod_names)
+
 
 def migrate_modlist_order(profiles_dir: Path) -> bool:
     """Update modlist.txt header from v1 to v2.

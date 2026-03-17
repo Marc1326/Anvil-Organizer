@@ -418,6 +418,13 @@ class _DropTreeView(QTreeView):
             elif current_sep_collapsed:
                 hidden.add(row)
 
+        # DEBUG_MODLIST: Filter-State loggen
+        from anvil.core.debug_modlist import log_separator_filter
+        import traceback
+        _caller = traceback.extract_stack(limit=2)[0]
+        _caller_str = f"{_caller.filename.rsplit('/', 1)[-1]}:{_caller.lineno} {_caller.name}"
+        log_separator_filter(_caller_str, self._collapsed_separators, hidden, source.rowCount())
+
         proxy.set_hidden_rows(hidden)
 
     # ── Separator click on any column ────────────────────────────
@@ -599,13 +606,10 @@ class _DropTreeView(QTreeView):
                             is_sep = source.data(source.index(target_row, 0), ROLE_IS_SEPARATOR)
                             if is_sep:
                                 folder = source.data(source.index(target_row, 0), ROLE_FOLDER_NAME) or ""
-                                if folder in self._collapsed_separators:
-                                    # K3: Collapsed separator → last child + 1
-                                    children = source._get_separator_children(target_row)
-                                    target_row = children[-1] + 1 if children else target_row + 1
-                                else:
-                                    # K1: Expanded separator → after separator row
-                                    target_row = target_row + 1
+                                # Separator als Ziel: immer den Separator selbst
+                                # übergeben — _install_archives_inner berechnet
+                                # die korrekte Position in der modlist.txt
+                                pass
                             # K2: Normal mod → insert at that position
                             self.archives_dropped_at.emit(paths, target_row)
                             return
