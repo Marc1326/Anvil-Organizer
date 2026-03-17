@@ -281,8 +281,9 @@ class MainWindow(QMainWindow):
         self._mod_list_view.archives_dropped.connect(
             self._on_archives_dropped, Qt.ConnectionType.QueuedConnection,
         )
-        self._mod_list_view.archives_dropped_at.connect(
-            self._on_archives_dropped_at, Qt.ConnectionType.QueuedConnection,
+        # URL-Drop mit Zielposition: Signal kommt vom Source-Model (MO2-Pattern)
+        model.url_dropped_at.connect(
+            self._on_url_dropped_at, Qt.ConnectionType.QueuedConnection,
         )
         self._mod_list_view.fw_context_menu_requested.connect(self._on_fw_context_menu)
         self._mod_list_view.fw_archives_dropped.connect(self._on_fw_archives_dropped)
@@ -1262,11 +1263,15 @@ class MainWindow(QMainWindow):
         self._install_archives([Path(p) for p in paths])
         self._game_panel.refresh_downloads()
 
-    def _on_archives_dropped_at(self, paths: list, target_row: int) -> None:
-        """Handle archives dropped onto the mod list at a specific position."""
+    def _on_url_dropped_at(self, paths: list, folder_name: str) -> None:
+        """Handle archives dropped onto the mod list at a specific position.
+
+        folder_name is the folder_name of the drop-target row, determined
+        by Qt through the proxy chain (MO2-Pattern — no manual mapToSource).
+        """
         if not self._current_instance_path:
             return
-        self._install_archives([Path(p) for p in paths], insert_at=target_row)
+        self._install_archives([Path(p) for p in paths], insert_at_folder=folder_name)
         self._game_panel.refresh_downloads()
 
     def _on_start_game(self, binary_path: str, working_dir: str) -> None:
@@ -1299,7 +1304,7 @@ class MainWindow(QMainWindow):
         self._install_archives([Path(p) for p in paths])
         self._game_panel.refresh_downloads()
 
-    def _install_archives(self, archives: list[Path], insert_at: int | None = None) -> None:
+    def _install_archives(self, archives: list[Path], insert_at: int | None = None, insert_at_folder: str | None = None) -> None:
         """Install one or more archives as mods.
 
         MO2-Pattern (testOverwrite):
@@ -1314,11 +1319,11 @@ class MainWindow(QMainWindow):
             return
         self._installing = True
         try:
-            self._install_archives_inner(archives, insert_at=insert_at)
+            self._install_archives_inner(archives, insert_at=insert_at, insert_at_folder=insert_at_folder)
         finally:
             self._installing = False
 
-    def _install_archives_inner(self, archives: list[Path], insert_at: int | None = None) -> None:
+    def _install_archives_inner(self, archives: list[Path], insert_at: int | None = None, insert_at_folder: str | None = None) -> None:
         """Inner implementation of archive installation (called by _install_archives)."""
         flatten = getattr(self._current_plugin, "GameFlattenArchive", True) if self._current_plugin else True
         installer = ModInstaller(self._current_instance_path, flatten=flatten)
@@ -1399,42 +1404,44 @@ class MainWindow(QMainWindow):
                     if "name" in info:
                         fomod_name_override = info["name"]
 
-            # 4. Normal mod installation
+            # 4. Normal mod installation (MO2-Pattern: IMMER QuickInstall → dann testOverwrite)
             best, variants = installer.suggest_names(archive)
             if fomod_name_override:
                 best = fomod_name_override
                 if best not in variants:
                     variants.insert(0, best)
             mod_name = best
-            dest = installer.mods_path / mod_name
 
-            # Nur bei Duplikat: Dialog zeigen (MO2 testOverwrite-Pattern)
-            if dest.exists():
-                while True:
-                    dlg = QuickInstallDialog(variants, mod_name, self)
-                    _center_on_parent(dlg)
-                    if dlg.exec() != QDialog.DialogCode.Accepted:
-                        mod_name = None
-                        break
-                    mod_name = dlg.mod_name()
-                    if not mod_name:
-                        continue  # empty name → show dialog again
-                    dest = installer.mods_path / mod_name
-                    if not dest.exists():
-                        break  # neuer Name, kein Konflikt mehr
-                    # Immer noch Duplikat → QueryOverwriteDialog
-                    ovr = QueryOverwriteDialog(mod_name, self)
-                    _center_on_parent(ovr)
-                    if ovr.exec() != QDialog.DialogCode.Accepted:
-                        mod_name = None
-                        break
-                    action = ovr.action()
-                    if action == OverwriteAction.RENAME:
-                        continue  # zurück zum QuickInstallDialog
-                    elif action == OverwriteAction.REPLACE:
-                        shutil.rmtree(dest)
-                    # MERGE: dest bleibt, Dateien werden reingeschrieben
+            # Schritt 1: IMMER QuickInstall-Dialog zeigen (wie MO2)
+            # User kann Namen anpassen bevor installiert wird
+            while True:
+                dlg = QuickInstallDialog(variants, mod_name, self)
+                _center_on_parent(dlg)
+                if dlg.exec() != QDialog.DialogCode.Accepted:
+                    mod_name = None
                     break
+                mod_name = dlg.mod_name()
+                if not mod_name:
+                    continue  # empty name → show dialog again
+
+                # Schritt 2: testOverwrite — nur bei Duplikat (wie MO2)
+                dest = installer.mods_path / mod_name
+                if not dest.exists():
+                    break  # kein Konflikt → weiter mit Installation
+
+                # Duplikat → QueryOverwriteDialog (Replace/Merge/Rename)
+                ovr = QueryOverwriteDialog(mod_name, self)
+                _center_on_parent(ovr)
+                if ovr.exec() != QDialog.DialogCode.Accepted:
+                    mod_name = None
+                    break
+                action = ovr.action()
+                if action == OverwriteAction.RENAME:
+                    continue  # zurück zum QuickInstallDialog
+                elif action == OverwriteAction.REPLACE:
+                    shutil.rmtree(dest)
+                # MERGE: dest bleibt, Dateien werden reingeschrieben
+                break
 
             if not mod_name:
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -1449,7 +1456,9 @@ class MainWindow(QMainWindow):
                     # Global system: write to .profiles/modlist.txt
                     mod_names = read_global_modlist(profiles_dir)
                     if mod_path.name not in mod_names:
-                        if insert_at is not None:
+                        # Determine insert position
+                        has_target = insert_at_folder is not None or insert_at is not None
+                        if has_target:
                             if _prev_inserted_name and _prev_inserted_name in mod_names:
                                 # 2nd+ mod: insert right after the previously
                                 # installed mod, clamped to separator boundary
@@ -1457,14 +1466,18 @@ class MainWindow(QMainWindow):
                                 if _target_sep_boundary is not None:
                                     pos = min(pos, _target_sep_boundary)
                             else:
-                                # 1st mod: map source-model row to modlist
-                                # position via folder name lookup
-                                model = self._mod_list_view.source_model()
-                                rows = model._rows
-                                if insert_at < len(rows):
-                                    ref_name = rows[insert_at].folder_name
+                                # 1st mod: determine ref_name
+                                if insert_at_folder is not None:
+                                    # MO2-Pattern: folder_name direkt vom Source-Model
+                                    ref_name = insert_at_folder if insert_at_folder else None
                                 else:
-                                    ref_name = None
+                                    # Legacy: row-basiert (für _on_downloads_install etc.)
+                                    model = self._mod_list_view.source_model()
+                                    rows = model._rows
+                                    if insert_at < len(rows):
+                                        ref_name = rows[insert_at].folder_name
+                                    else:
+                                        ref_name = None
                                 if ref_name and ref_name in mod_names:
                                     pos = mod_names.index(ref_name)
                                     # v2-Format: Separator steht VOR seinen Mods.
@@ -1498,6 +1511,30 @@ class MainWindow(QMainWindow):
                     else:
                         add_mod_to_modlist(self._current_profile_path, mod_path.name, enabled=False)
                 installed.append(mod_path.name)
+                # MO2-Pattern: .meta neben Archiv → meta.ini im Mod
+                # übertragen (modid, version, gameName etc.)
+                archive_meta = Path(str(archive) + ".meta")
+                if archive_meta.is_file():
+                    try:
+                        _cp = configparser.ConfigParser()
+                        _cp.optionxform = str
+                        _cp.read(str(archive_meta), encoding="utf-8")
+                        _transfer = {}
+                        _mid = _cp.get("General", "modID", fallback="0")
+                        if _mid and _mid != "0":
+                            _transfer["modid"] = _mid
+                        _ver = _cp.get("General", "version", fallback="")
+                        if _ver:
+                            _transfer["version"] = _ver
+                            _transfer["newestVersion"] = _ver
+                        _gn = _cp.get("General", "gameName", fallback="")
+                        if _gn:
+                            _transfer["gameName"] = _gn
+                        if _transfer:
+                            from anvil.core.mod_metadata import write_meta_ini
+                            write_meta_ini(mod_path, _transfer)
+                    except Exception:
+                        pass
                 # Mark as installed in .meta (MO2: markInstalled)
                 downloads_dir = self._current_instance_path / ".downloads"
                 if archive.parent == downloads_dir:
@@ -3388,15 +3425,24 @@ class MainWindow(QMainWindow):
                         getattr(self._current_plugin, "GameNexusName", "")
                         or getattr(self._current_plugin, "GameShortName", "")
                     )
-                write_meta_ini(mod_path, {
+                # MO2-Pattern: name NICHT überschreiben — nur modid,
+                # version, author, description, url aktualisieren.
+                # Sonst bekommen alle Optional Files den gleichen
+                # Nexus-Seitentitel als Display-Name.
+                from anvil.core.mod_metadata import read_meta_ini
+                existing = read_meta_ini(mod_path)
+                update = {
                     "modid": str(data.get("mod_id", 0)),
                     "version": data.get("version", ""),
                     "newestVersion": data.get("version", ""),
-                    "name": data.get("name", ""),
                     "author": data.get("author", ""),
                     "description": data.get("summary", ""),
                     "url": f"https://www.nexusmods.com/{nexus_slug}/mods/{data.get('mod_id', 0)}",
-                })
+                }
+                # name nur setzen wenn noch leer (neuer Mod ohne Display-Name)
+                if not existing.get("name", ""):
+                    update["name"] = data.get("name", "")
+                write_meta_ini(mod_path, update)
                 self._reload_mod_list()
                 self.statusBar().showMessage(
                     tr("status.nexus_query_success", name=data.get("name", "")), 5000,

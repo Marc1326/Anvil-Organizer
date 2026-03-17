@@ -89,6 +89,7 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None) -> ModR
 class ModListModel(QAbstractItemModel):
     mod_toggled = Signal(int, bool)   # (source_row, enabled)
     mods_reordered = Signal()         # after drag & drop
+    url_dropped_at = Signal(list, str)  # (file_paths, folder_name of drop target)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -409,16 +410,57 @@ class ModListModel(QAbstractItemModel):
         return False
 
     def dropMimeData(self, data, action, row, column, parent):
-        """Beim Drop: Zeile verschieben mit beginMoveRows/endMoveRows.
+        """Beim Drop: Zeile verschieben oder URL-Drop-Signal emittieren.
 
-        Wenn ein Separator verschoben wird, werden alle Mods zwischen
-        diesem Separator und dem nächsten Separator (oder Listenende)
+        Für URL-Drops (Archive aus Downloads/Dateimanager) wird das
+        url_dropped_at-Signal emittiert mit dem folder_name der Zielzeile.
+        Qt berechnet row/parent korrekt durch die Proxy-Kette — kein
+        manuelles indexAt()+mapToSource() nötig (MO2-Pattern).
+
+        Für interne DnD (Mod-Reorder) werden beginMoveRows/endMoveRows
+        verwendet. Wenn ein Separator verschoben wird, werden alle Mods
         als Block mitgenommen.
         """
         if action == Qt.DropAction.IgnoreAction:
             return True
+
+        # URL-Drops: Archive-Dateien → Signal emittieren
+        if data.hasUrls():
+            from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
+            paths = []
+            for url in data.urls():
+                if url.isLocalFile():
+                    path = url.toLocalFile()
+                    if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                        paths.append(path)
+            if paths:
+                # row = Insert-Position von Qt ("füge VOR dieser Zeile ein")
+                # parent.isValid() + parent.row() = Drop direkt AUF ein Item
+                if parent.isValid():
+                    # Drop AUF ein Item (OnItem) → das Item selbst
+                    target_row = parent.row()
+                elif row > 0:
+                    # Drop ZWISCHEN Items → row-1 ist das Item darüber
+                    # (der Separator oder Mod, auf den der User visuell zielt)
+                    target_row = row - 1
+                elif row == 0:
+                    target_row = 0
+                else:
+                    target_row = -1
+
+                if 0 <= target_row < len(self._rows):
+                    folder = self._rows[target_row].folder_name
+                else:
+                    folder = ""
+
+                from anvil.core.debug_modlist import log
+                log("DROP_MODEL", f"row={row} parent_row={parent.row() if parent.isValid() else -1} target_row={target_row} folder={folder}")
+
+                self.url_dropped_at.emit(paths, folder)
+                return True
+
         if not data.hasFormat(MIME_MOD_ROWS):
-            return False  # URL-Drops werden von _DropTreeView.dropEvent() behandelt
+            return False
 
         # Source-Rows dekodieren
         raw = data.data(MIME_MOD_ROWS)

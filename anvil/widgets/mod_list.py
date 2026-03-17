@@ -585,38 +585,10 @@ class _DropTreeView(QTreeView):
     def dropEvent(self, event):
         self._stop_auto_scroll()
         self._stop_expand_timer()
-        if event.mimeData().hasUrls():
-            paths = []
-            for url in event.mimeData().urls():
-                if url.isLocalFile():
-                    path = url.toLocalFile()
-                    if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
-                        paths.append(path)
-            if paths:
-                event.acceptProposedAction()
-                # Compute drop target source row
-                proxy_idx = self.indexAt(event.position().toPoint())
-                if proxy_idx.isValid():
-                    proxy = self.model()
-                    if isinstance(proxy, ModListProxyModel):
-                        source_idx = proxy.mapToSource(proxy_idx)
-                        source = proxy.sourceModel()
-                        if source_idx.isValid() and source:
-                            target_row = source_idx.row()
-                            is_sep = source.data(source.index(target_row, 0), ROLE_IS_SEPARATOR)
-                            if is_sep:
-                                folder = source.data(source.index(target_row, 0), ROLE_FOLDER_NAME) or ""
-                                # Separator als Ziel: immer den Separator selbst
-                                # übergeben — _install_archives_inner berechnet
-                                # die korrekte Position in der modlist.txt
-                                pass
-                            # K2: Normal mod → insert at that position
-                            self.archives_dropped_at.emit(paths, target_row)
-                            return
-                # No valid target → append at end (K4 / file manager drop)
-                self.archives_dropped.emit(paths)
-                return
-        # Internal DnD (mod reorder)
+        # URL-Drops (Archive aus Downloads/Dateimanager) fließen durch
+        # super().dropEvent() → Proxy-Kette → Source-Model dropMimeData().
+        # Dort wird row/parent korrekt von Qt berechnet (MO2-Pattern).
+        # Kein manuelles indexAt()+mapToSource() mehr nötig.
         super().dropEvent(event)
 
     # ── Setting 6: Selection-based conflict highlighting ──────────
