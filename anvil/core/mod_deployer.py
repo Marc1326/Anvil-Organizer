@@ -139,6 +139,7 @@ class ModDeployer:
             (name, idx) for idx, name in enumerate(global_order)
             if name in active_mods
         ]
+        enabled_mods.reverse()
         print(f"[DEPLOY] Enabled mods: {len(enabled_mods)}", flush=True)
         print(f"[DEPLOY] Data path: {self._data_path or '(root)'}", flush=True)
 
