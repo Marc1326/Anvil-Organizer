@@ -49,6 +49,13 @@ class ModInstaller:
     )
     _SIMPLE_RE = re.compile(r'^[^a-zA-Z]*([a-zA-Z_ ]+)')
 
+    # Ordner die NICHT hochgezogen werden dürfen — sie sind selbst Game-Root-Ordner
+    _GAME_FOLDERS = {
+        "archive", "bin", "r6", "red4ext", "mods",
+        "engine", "data", "pc", "dlc",
+        "tools", "lml", "content",
+    }
+
     @staticmethod
     def suggest_name(archive_path: Path) -> str:
         """Derive a clean mod name from a Nexus-style archive filename.
@@ -455,10 +462,17 @@ class ModInstaller:
 
     @staticmethod
     def _flatten_single_subfolder(extract_dir: Path) -> None:
-        """If *extract_dir* contains exactly one subfolder, move its contents up."""
+        """Wenn *extract_dir* genau einen Unterordner enthält, dessen Inhalt
+        eine Ebene hochziehen — AUSSER der Ordner ist ein bekannter
+        Game-Root-Ordner (z.B. ``bin``, ``r6``, ``archive``).
+        """
         children = list(extract_dir.iterdir())
         if len(children) == 1 and children[0].is_dir():
             single = children[0]
+            # Bekannte Game-Ordner NICHT flatten — sie gehoeren zur Mod-Struktur
+            if single.name.lower() in ModInstaller._GAME_FOLDERS:
+                print(f"mod_installer: skip flatten — '{single.name}' is a known game folder")
+                return
             # Move everything from single/ up to extract_dir/
             for item in single.iterdir():
                 shutil.move(str(item), str(extract_dir / item.name))
