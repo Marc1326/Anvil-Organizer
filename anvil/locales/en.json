@@ -421,6 +421,8 @@
     "game_started": "Game started: {name}",
     "installed": "Installed: {names}",
     "installed_inactive": "Installed (inactive): {names}",
+    "framework_update_title": "Update Framework",
+    "framework_update_message": "Framework \"{name}\" is already installed.\n\nOverwrite with new version?",
     "framework_installed": "Framework installed: {names}",
     "framework_uninstalled": "Framework uninstalled: {name}",
     "no_framework_detected": "No framework detected in archive",

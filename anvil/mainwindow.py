@@ -992,6 +992,11 @@ class MainWindow(QMainWindow):
             self._mod_list_view.load_frameworks([])
 
         # 5. Mod deployer + auto-deploy
+        from anvil.widgets.game_panel import _dlog
+        _dlog(f"[APPLY-INSTANCE] Setting instance path: {instance_path}")
+        _dlog(f"[APPLY-INSTANCE] Profile: {profile_name}")
+        _dlog(f"[APPLY-INSTANCE] Plugin: {getattr(plugin, 'GameName', None)}")
+        _dlog(f"[APPLY-INSTANCE] Game path: {game_path}")
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
         self._game_panel.silent_deploy()
 
@@ -1132,9 +1137,9 @@ class MainWindow(QMainWindow):
 
     def _update_active_count(self) -> None:
         """Update the active mod counter in the profile bar."""
-        active = sum(1 for e in self._current_mod_entries if e.enabled)
-        total = len(self._current_mod_entries)
-        self._profile_bar.update_active_count(active, total)
+        mods = [e for e in self._current_mod_entries if not e.is_separator]
+        active = sum(1 for e in mods if e.enabled)
+        self._profile_bar.update_active_count(active, len(mods))
 
     # ── Auto-redeploy helpers ────────────────────────────────────────
 
@@ -1330,6 +1335,22 @@ class MainWindow(QMainWindow):
                     game_path = self._current_game_path
                     print(f"DEBUG _install_archives: game_path={game_path}", flush=True)
                     if game_path:
+                        # Check if framework is already installed
+                        already_installed = any(
+                            (game_path / dp).exists()
+                            for dp in fw.detect_installed
+                        )
+                        if already_installed:
+                            answer = QMessageBox.question(
+                                self,
+                                tr("framework_update_title"),
+                                tr("framework_update_message", name=fw.name),
+                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                QMessageBox.StandardButton.Yes,
+                            )
+                            if answer != QMessageBox.StandardButton.Yes:
+                                shutil.rmtree(temp_dir, ignore_errors=True)
+                                continue
                         result = installer.install_framework(temp_dir, fw, game_path)
                         if result:
                             frameworks_installed.append(result["name"])

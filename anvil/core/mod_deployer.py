@@ -78,6 +78,7 @@ class ModDeployer:
         lml_path: str = "",
         multi_folder_routes: dict[str, str] | None = None,
         needs_ba2_packing: bool = False,
+        copy_deploy_paths: list[str] | None = None,
     ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
@@ -91,6 +92,7 @@ class ModDeployer:
         self._manifest_path = instance_path / self.MANIFEST_NAME
         self._direct_patterns = [p.lower() for p in (direct_install_patterns or [])]
         self._needs_ba2_packing = needs_ba2_packing
+        self._copy_deploy_paths = [p.replace("\\", "/") for p in (copy_deploy_paths or [])]
 
     def is_direct_install(self, mod_name: str) -> bool:
         """Return True if *mod_name* matches a direct-install pattern.
@@ -139,6 +141,20 @@ class ModDeployer:
             (name, idx) for idx, name in enumerate(global_order)
             if name in active_mods
         ]
+
+        # Direct-install mods (frameworks) are ALWAYS deployed,
+        # regardless of active_mods state — they live in the game root.
+        print(f"[DEPLOY] direct_patterns: {self._direct_patterns}", flush=True)
+        if self._direct_patterns:
+            seen = {name for name, _ in enabled_mods}
+            for idx, name in enumerate(global_order):
+                if name not in seen and self.is_direct_install(name):
+                    mod_dir = self._mods_path / name
+                    if mod_dir.is_dir():
+                        enabled_mods.append((name, idx))
+                        seen.add(name)
+                        print(f"[DEPLOY] +framework: {name}", flush=True)
+
         enabled_mods.reverse()
         print(f"[DEPLOY] Enabled mods: {len(enabled_mods)}", flush=True)
         print(f"[DEPLOY] Data path: {self._data_path or '(root)'}", flush=True)
@@ -210,6 +226,10 @@ class ModDeployer:
                 except ValueError:
                     continue
 
+                # Strip "root/" prefix (MO2 RootBuilder pattern)
+                if rel.parts and rel.parts[0].lower() == "root":
+                    rel = Path(*rel.parts[1:]) if len(rel.parts) > 1 else rel
+
                 # Direct-install mods skip data_path (frameworks go into game root)
                 is_direct = self.is_direct_install(mod_name)
 
@@ -240,9 +260,13 @@ class ModDeployer:
                 target = self._game_path / rel
 
                 # Safety: never overwrite a real (non-symlink) game file
+                # Exception: direct-install (framework) mods MUST overwrite
                 if target.exists() and not target.is_symlink():
-                    result.skipped_real_files.append(str(rel))
-                    continue
+                    if is_direct:
+                        pass  # frameworks are allowed to overwrite real files
+                    else:
+                        result.skipped_real_files.append(str(rel))
+                        continue
 
                 # Create parent directories if needed
                 parent = target.parent
@@ -278,7 +302,21 @@ class ModDeployer:
                         )
                         continue
 
-                if is_direct:
+                # Decide: copy or symlink?
+                # 1) Frameworks (direct-install) → always copy
+                # 2) Files under GameCopyDeployPaths → copy (shim_copy)
+                # 3) Everything else → symlink
+                needs_copy = is_direct
+                if not needs_copy and self._copy_deploy_paths:
+                    rel_posix = str(rel).replace("\\", "/")
+                    for cp in self._copy_deploy_paths:
+                        if rel_posix.startswith(cp + "/") or rel_posix == cp:
+                            needs_copy = True
+                            break
+
+                if needs_copy:
+                    deploy_type = "copy" if is_direct else "shim_copy"
+                    print(f"[DEPLOY] COPY ({deploy_type}): {rel} -> {target}", flush=True)
                     try:
                         shutil.copy2(src_file, target)
                         result.files_copied += 1
@@ -286,7 +324,7 @@ class ModDeployer:
                             "link": str(rel),
                             "target": str(src_file),
                             "mod": mod_name,
-                            "type": "copy",
+                            "type": deploy_type,
                         })
                     except OSError as exc:
                         result.errors.append(

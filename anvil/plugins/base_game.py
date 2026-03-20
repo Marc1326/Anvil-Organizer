@@ -111,6 +111,24 @@ class BaseGame:
     copied into the game root during deploy and removed during purge.
     Only deployed when the corresponding framework is installed."""
 
+    GameCopyDeployPaths: list[str] = []
+    """Relative paths (from game root) where files must be deployed as
+    copies instead of symlinks.  Used when a tool (e.g. CET's Lua VM)
+    cannot follow symlinks through Wine/Proton drive mappings.
+    Files deployed this way use manifest type ``shim_copy`` and are
+    removed during purge."""
+
+    GameProtonDllOverrides: dict[str, str] = {}
+    """Wine DLL overrides written to the Proton prefix user.reg during deploy.
+
+    Keys are DLL names (without .dll), values are override modes
+    (e.g. 'native,builtin'). Written under
+    ``[Software\\\\Wine\\\\AppDefaults\\\\<GameBinary>\\\\DllOverrides]``
+    and removed during purge.
+
+    Example: ``{"winmm": "native,builtin", "version": "native,builtin"}``
+    """
+
     PRIMARY_PLUGINS: list[str] = []
     """Primary/DLC plugin files (.esm) that are always active.
     Only relevant for Bethesda Creation Engine games."""

@@ -12,6 +12,14 @@ from pathlib import Path
 
 from anvil.core.resource_path import get_anvil_base
 
+_DEPLOY_LOG = Path("/tmp/anvil-deploy.log")
+
+def _dlog(msg: str) -> None:
+    """Append a debug line to the deploy log file."""
+    with open(_DEPLOY_LOG, "a", encoding="utf-8") as f:
+        f.write(msg + "\n")
+    print(msg, flush=True)
+
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -415,8 +423,9 @@ class GamePanel(QWidget):
         lml_path = getattr(game_plugin, "GameLMLPath", "") if game_plugin else ""
         multi_routes = getattr(game_plugin, "GameMultiFolderRoutes", {}) if game_plugin else {}
         ba2_packing = getattr(game_plugin, "NeedsBa2Packing", False) if game_plugin else False
+        copy_paths = getattr(game_plugin, "GameCopyDeployPaths", []) if game_plugin else []
         if self._instance_path and game_path:
-            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing)
+            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths)
 
         # Update label
         self._game_label.setText(game_name or tr("game_panel.no_game_selected"))
@@ -591,9 +600,18 @@ class GamePanel(QWidget):
 
     def silent_deploy(self) -> None:
         """Deploy mods silently.  Called automatically by MainWindow."""
+        _dlog("[DEPLOY-CHAIN] silent_deploy() called")
+        _dlog(f"[DEPLOY-CHAIN]   deployer={self._deployer is not None}")
+        _dlog(f"[DEPLOY-CHAIN]   plugin={getattr(self._current_plugin, 'GameName', None)}")
+        _dlog(f"[DEPLOY-CHAIN]   game_path={self._current_game_path}")
+        _dlog(f"[DEPLOY-CHAIN]   instance_path={self._instance_path}")
         result = None
         if self._deployer:
             result = self._deployer.deploy()
+            _dlog(f"[DEPLOY-CHAIN]   deploy result: success={result.success}, links={result.links_created}, errors={len(result.errors)}")
+            if result.errors:
+                for e in result.errors[:5]:
+                    _dlog(f"[DEPLOY-CHAIN]   ERROR: {e}")
 
         # BA2-Packing for Bethesda games (only if deploy succeeded)
         needs_ba2 = getattr(self._current_plugin, "NeedsBa2Packing", False)
@@ -662,6 +680,11 @@ class GamePanel(QWidget):
             if any_fw_installed:
                 self._deploy_proton_shims(shim_files)
 
+        # Write Proton DLL overrides (e.g. winmm, version for Cyberpunk)
+        _dlog("[DEPLOY-CHAIN] About to apply DLL overrides...")
+        self._apply_proton_dll_overrides()
+        _dlog("[DEPLOY-CHAIN] silent_deploy() DONE")
+
     def silent_deploy_fast(self) -> None:
         """Deploy mods without BA2 packing.  Used for quick redeploy after toggle."""
         if self._deployer:
@@ -685,6 +708,7 @@ class GamePanel(QWidget):
 
     def silent_purge(self) -> None:
         """Purge deployed mods silently.  Called automatically by MainWindow."""
+        _dlog(f"[DEPLOY-CHAIN] silent_purge() called, deployer={self._deployer is not None}")
         if self._deployer:
             self._deployer.purge()
 
@@ -713,6 +737,9 @@ class GamePanel(QWidget):
                 self._current_plugin, self._current_game_path, self._instance_path
             )
             writer.remove()
+
+        # Remove Proton DLL overrides
+        self._remove_proton_dll_overrides()
 
     def _deploy_proton_shims(self, shim_files: list[str]) -> None:
         """Copy Proton shim DLLs into the game root and record in manifest."""
@@ -755,6 +782,146 @@ class GamePanel(QWidget):
                     )
                 except (OSError, json.JSONDecodeError) as exc:
                     print(f"[SHIM] Manifest update error: {exc}", flush=True)
+
+    def _apply_proton_dll_overrides(self) -> None:
+        """Write Wine DLL overrides to the Proton prefix user.reg."""
+        plugin = self._current_plugin
+        if plugin is None:
+            _dlog("[DLL-OVR] Skipped: no plugin")
+            return
+        overrides = getattr(plugin, "GameProtonDllOverrides", {})
+        if not overrides:
+            _dlog("[DLL-OVR] Skipped: no overrides defined")
+            return
+        prefix = plugin.protonPrefix()
+        if prefix is None:
+            _dlog("[DLL-OVR] Skipped: no Proton prefix found")
+            return
+        _dlog("[DLL-OVR] Prefix: {prefix}")
+        _dlog("[DLL-OVR] Overrides to apply: {overrides}")
+
+        user_reg = prefix / "user.reg"
+        if not user_reg.is_file():
+            _dlog("[DLL-OVR] user.reg not found")
+            return
+
+        # Build the registry section key from the game binary name
+        binary = getattr(plugin, "GameBinary", "")
+        exe_name = Path(binary).name  # e.g. "Cyberpunk2077.exe"
+        if not exe_name:
+            return
+        section = f"[Software\\\\Wine\\\\AppDefaults\\\\{exe_name}\\\\DllOverrides]"
+
+        try:
+            text = user_reg.read_text(encoding="utf-8")
+        except OSError as exc:
+            _dlog("[DLL-OVR] Failed to read user.reg: {exc}")
+            return
+
+        # Build override lines
+        override_lines = []
+        for dll_name, mode in overrides.items():
+            override_lines.append(f'"{dll_name}"="{mode}"')
+
+        if section in text:
+            # Section exists — add missing entries
+            idx = text.index(section)
+            # Find the end of the section (next empty line or next section)
+            section_end = text.find("\n\n", idx)
+            if section_end == -1:
+                section_end = len(text)
+            existing_block = text[idx:section_end]
+
+            new_entries = []
+            for line in override_lines:
+                dll_key = line.split("=")[0]
+                if dll_key not in existing_block:
+                    new_entries.append(line)
+
+            if new_entries:
+                insert_pos = section_end
+                text = text[:insert_pos] + "\n" + "\n".join(new_entries) + text[insert_pos:]
+                try:
+                    user_reg.write_text(text, encoding="utf-8")
+                    _dlog("[DLL-OVR] Added {len(new_entries)} overrides to existing section")
+                except OSError as exc:
+                    _dlog("[DLL-OVR] Write failed: {exc}")
+            else:
+                _dlog("[DLL-OVR] All overrides already present")
+        else:
+            # Create new section at end of file
+            import time
+            timestamp = int(time.time())
+            new_section = (
+                f"\n{section} {timestamp}\n"
+                + "\n".join(override_lines)
+                + "\n"
+            )
+            text = text.rstrip("\n") + "\n" + new_section
+            try:
+                user_reg.write_text(text, encoding="utf-8")
+                _dlog("[DLL-OVR] Created new section with {len(override_lines)} overrides")
+            except OSError as exc:
+                _dlog("[DLL-OVR] Write failed: {exc}")
+
+    def _remove_proton_dll_overrides(self) -> None:
+        """Remove Wine DLL overrides from the Proton prefix user.reg."""
+        plugin = self._current_plugin
+        if plugin is None:
+            return
+        overrides = getattr(plugin, "GameProtonDllOverrides", {})
+        if not overrides:
+            return
+        prefix = plugin.protonPrefix()
+        if prefix is None:
+            return
+
+        user_reg = prefix / "user.reg"
+        if not user_reg.is_file():
+            return
+
+        binary = getattr(plugin, "GameBinary", "")
+        exe_name = Path(binary).name
+        if not exe_name:
+            return
+        section = f"[Software\\\\Wine\\\\AppDefaults\\\\{exe_name}\\\\DllOverrides]"
+
+        try:
+            text = user_reg.read_text(encoding="utf-8")
+        except OSError:
+            return
+
+        if section not in text:
+            return
+
+        # Remove the override entries we manage
+        changed = False
+        for dll_name in overrides:
+            key = f'"{dll_name}"='
+            lines = text.split("\n")
+            new_lines = [l for l in lines if key not in l]
+            if len(new_lines) != len(lines):
+                changed = True
+                text = "\n".join(new_lines)
+
+        # If the section is now empty (only header + timestamp), remove it entirely
+        idx = text.index(section)
+        section_end = text.find("\n\n", idx)
+        if section_end == -1:
+            section_end = len(text)
+        section_header_end = text.find("\n", idx)
+        section_body = text[section_header_end + 1:section_end].strip()
+        if not section_body:
+            # Remove empty section
+            text = text[:idx] + text[section_end:]
+            changed = True
+
+        if changed:
+            try:
+                user_reg.write_text(text, encoding="utf-8")
+                _dlog("[DLL-OVR] Removed overrides from user.reg")
+            except OSError as exc:
+                _dlog("[DLL-OVR] Write failed: {exc}")
 
     def _update_manifest_ba2(self, ba2_paths: list[str], packer) -> None:
         """Update the deploy manifest with BA2 archive info."""
@@ -1089,8 +1256,9 @@ class GamePanel(QWidget):
         lml_path = getattr(self._current_plugin, "GameLMLPath", "") if self._current_plugin else ""
         multi_routes = getattr(self._current_plugin, "GameMultiFolderRoutes", {}) if self._current_plugin else {}
         ba2_packing = getattr(self._current_plugin, "NeedsBa2Packing", False) if self._current_plugin else False
+        copy_paths = getattr(self._current_plugin, "GameCopyDeployPaths", []) if self._current_plugin else []
         if self._current_game_path and instance_path:
-            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing)
+            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths)
         else:
             self._deployer = None
 

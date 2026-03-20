@@ -51,6 +51,15 @@ class Cyberpunk2077Game(BaseGame):
     GameLauncher = "REDprelauncher.exe"
     GameLaunchArgs = ["--launcher-skip"]
 
+    GameProtonDllOverrides = {
+        "winmm": "native,builtin",      # RED4ext loader
+        "version": "native,builtin",     # CET (Ultimate ASI Loader)
+    }
+
+    GameCopyDeployPaths = [
+        "bin/x64/plugins/cyber_engine_tweaks",
+    ]
+
     GameDirectInstallMods = [
         "TweakXL",
         "ArchiveXL",

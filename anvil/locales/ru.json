@@ -421,6 +421,8 @@
     "game_started": "Игра запущена: {name}",
     "installed": "Установлено: {names}",
     "installed_inactive": "Установлено (неактивно): {names}",
+    "framework_update_title": "Обновить фреймворк",
+    "framework_update_message": "Фреймворк \"{name}\" уже установлен.\n\nПерезаписать новой версией?",
     "framework_installed": "Фреймворк установлен: {names}",
     "framework_uninstalled": "Фреймворк удалён: {name}",
     "no_framework_detected": "Фреймворк в архиве не обнаружен",
