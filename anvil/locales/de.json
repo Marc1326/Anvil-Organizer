@@ -182,6 +182,8 @@
 
     "uninstall_framework_title": "Framework deinstallieren",
     "uninstall_framework_message": "Framework \"{name}\" wirklich deinstallieren?\n\nDie zugehörigen Dateien werden aus dem Spielverzeichnis gelöscht.",
+    "not_a_framework_title": "Kein Framework",
+    "not_a_framework_message": "Folgende Archive sind keine bekannten Frameworks und wurden nicht installiert:\n\n{names}",
 
     "select_game_hint": "Wähle das Spiel für das du eine Instanz erstellen möchtest:",
 

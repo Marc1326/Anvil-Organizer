@@ -182,6 +182,8 @@
 
     "uninstall_framework_title": "Uninstall Framework",
     "uninstall_framework_message": "Really uninstall framework \"{name}\"?\n\nThe associated files will be deleted from the game directory.",
+    "not_a_framework_title": "Not a Framework",
+    "not_a_framework_message": "The following archives are not known frameworks and were not installed:\n\n{names}",
 
     "select_game_hint": "Select the game you want to create an instance for:",
 

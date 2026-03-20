@@ -182,6 +182,8 @@
 
     "uninstall_framework_title": "Disinstalla framework",
     "uninstall_framework_message": "Disinstallare davvero il framework \"{name}\"?\n\nI file associati verranno eliminati dalla directory del gioco.",
+    "not_a_framework_title": "Non è un framework",
+    "not_a_framework_message": "I seguenti archivi non sono framework conosciuti e non sono stati installati:\n\n{names}",
 
     "select_game_hint": "Seleziona il gioco per cui vuoi creare un'istanza:",
 

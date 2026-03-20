@@ -56,7 +56,7 @@ from anvil.core.mod_list_io import (
     remove_mod_from_global_modlist,
     rename_mod_in_modlist, read_active_mods, write_active_mods,
     read_global_modlist, write_global_modlist, migrate_to_global_modlist,
-    migrate_modlist_order, insert_mod_in_modlist,
+    migrate_modlist_order, insert_mod_in_modlist, rename_mod_globally, remove_mod_globally,
 )
 from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
 from anvil.version import APP_VERSION
@@ -3015,7 +3015,8 @@ class MainWindow(QMainWindow):
             )
             return
 
-        rename_mod_in_modlist(self._current_profile_path, old_name, new_name)
+        profiles_dir = self._current_instance_path / ".profiles"
+        rename_mod_globally(profiles_dir, old_name, new_name)
         self._update_install_meta_name(old_name, new_name)
         self._reload_mod_list()
         self._do_redeploy()
@@ -3084,7 +3085,7 @@ class MainWindow(QMainWindow):
             mod_path = self._current_instance_path / ".mods" / name
             if mod_path.is_dir():
                 shutil.rmtree(mod_path)
-            remove_mod_from_global_modlist(profiles_dir, name)
+            remove_mod_globally(profiles_dir, name)
             self._clear_install_meta(name)
 
         self._reload_mod_list()
@@ -3714,11 +3715,11 @@ class MainWindow(QMainWindow):
                 subprocess.Popen(["xdg-open", str(self._current_game_path)])
 
     def _fw_reinstall(self, fw_name: str) -> None:
-        """Reinstall a framework from its archive in .downloads/."""
+        """Reinstall a framework from its archive in the downloads directory."""
         if not self._current_instance_path or not self._current_plugin:
             return
-        downloads_path = self._current_instance_path / ".downloads"
-        if not downloads_path.is_dir():
+        downloads_path = self._current_downloads_path
+        if not downloads_path or not downloads_path.is_dir():
             QMessageBox.warning(
                 self, tr("dialog.reinstall_title"),
                 tr("status.no_downloads_folder"),
@@ -3726,7 +3727,7 @@ class MainWindow(QMainWindow):
             return
         archive = None
         fw_lower = fw_name.lower()
-        for f in downloads_path.iterdir():
+        for f in downloads_path.rglob("*"):
             if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
                 if fw_lower in f.stem.lower():
                     archive = f
@@ -3776,9 +3777,41 @@ class MainWindow(QMainWindow):
 
     def _on_fw_archives_dropped(self, paths: list) -> None:
         """Handle archives dropped onto the framework tree."""
-        if not self._current_instance_path:
+        if not self._current_instance_path or not self._current_plugin:
             return
-        self._install_archives([Path(p) for p in paths])
+
+        # Filter: only install archives that are actually framework mods
+        flatten = getattr(self._current_plugin, "GameFlattenArchive", True)
+        installer = ModInstaller(self._current_instance_path, flatten=flatten)
+        fw_archives: list[Path] = []
+        rejected: list[str] = []
+
+        for p in paths:
+            archive = Path(p)
+            temp_dir = installer.extract_to_temp(archive)
+            if temp_dir is None:
+                continue
+            file_list = [
+                str(f.relative_to(temp_dir))
+                for f in temp_dir.rglob("*") if f.is_file()
+            ]
+            fw = self._current_plugin.is_framework_mod(file_list)
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            if fw is not None:
+                fw_archives.append(archive)
+            else:
+                rejected.append(archive.name)
+
+        if rejected:
+            QMessageBox.warning(
+                self,
+                tr("dialog.not_a_framework_title"),
+                tr("dialog.not_a_framework_message",
+                   names="\n".join(rejected)),
+            )
+
+        if fw_archives:
+            self._install_archives(fw_archives)
         self._game_panel.refresh_downloads()
 
     def _on_bg3_extras_context_menu(self, global_pos, mod_data: dict) -> None:
