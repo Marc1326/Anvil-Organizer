@@ -1127,7 +1127,7 @@ class MainWindow(QMainWindow):
             model.index(0, 0),
             model.index(model.rowCount() - 1, model.columnCount() - 1),
         )
-        self._mod_list_view._apply_separator_filter()
+        self._mod_list_view._tree._apply_separator_filter()
         self._schedule_redeploy()
 
     def _update_active_count(self) -> None:
@@ -3183,7 +3183,7 @@ class MainWindow(QMainWindow):
         mod_rows = [mod_entry_to_row(e, conflict_data) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
-        self._mod_list_view._apply_separator_filter()
+        self._mod_list_view._tree._apply_separator_filter()
         self._update_active_count()
 
         # Refresh framework status (nach Framework-Installation)
@@ -3777,7 +3777,9 @@ class MainWindow(QMainWindow):
 
     def _on_fw_archives_dropped(self, paths: list) -> None:
         """Handle archives dropped onto the framework tree."""
+        print(f"[FW-DROP] _on_fw_archives_dropped called with: {paths}", flush=True)
         if not self._current_instance_path or not self._current_plugin:
+            print(f"[FW-DROP] early return: instance={self._current_instance_path}, plugin={self._current_plugin}", flush=True)
             return
 
         # Filter: only install archives that are actually framework mods

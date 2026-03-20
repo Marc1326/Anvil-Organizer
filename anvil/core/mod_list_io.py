@@ -14,8 +14,8 @@ Format::
 - Lines starting with ``-`` are disabled mods.
 - Lines starting with ``#`` are comments.
 - Empty lines are ignored.
-- Order = priority: first line = lowest priority (loaded first,
-  can be overwritten), last line = highest priority (wins conflicts).
+- Order = priority: first line = highest priority (wins conflicts),
+  last line = lowest priority. The deployer reverses internally.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ def read_modlist(profile_path: Path) -> list[tuple[str, bool]]:
 
     Returns:
         List of ``(mod_name, enabled)`` in file order
-        (first entry = lowest priority).
+        (first entry = highest priority).
     """
     modlist = profile_path / "modlist.txt"
     if not modlist.is_file():
@@ -256,7 +256,7 @@ def read_global_modlist(profiles_dir: Path) -> list[str]:
                       (e.g. ``instance_path/.profiles/``).
 
     Returns:
-        List of mod names in load order (first = lowest priority).
+        List of mod names in load order (first = highest priority).
     """
     modlist = profiles_dir / "modlist.txt"
     if not modlist.is_file():
@@ -389,6 +389,59 @@ def migrate_modlist_order(profiles_dir: Path) -> bool:
         flush=True,
     )
     return True
+
+
+def rename_mod_globally(
+    profiles_dir: Path, old_name: str, new_name: str,
+) -> None:
+    """Rename a mod in global modlist.txt and active_mods.json in ALL profiles.
+
+    Args:
+        profiles_dir: Path to the .profiles directory.
+        old_name: Current mod name.
+        new_name: New mod name.
+    """
+    # 1. Update global modlist.txt
+    order = read_global_modlist(profiles_dir)
+    updated = [new_name if n == old_name else n for n in order]
+    write_global_modlist(profiles_dir, updated)
+
+    # 2. Update active_mods.json in every profile
+    if not profiles_dir.is_dir():
+        return
+    for profile_dir in sorted(profiles_dir.iterdir()):
+        if not profile_dir.is_dir():
+            continue
+        active = read_active_mods(profile_dir)
+        if old_name in active:
+            active.discard(old_name)
+            active.add(new_name)
+            write_active_mods(profile_dir, active)
+
+
+def remove_mod_globally(profiles_dir: Path, mod_name: str) -> None:
+    """Remove a mod from global modlist.txt and active_mods.json in ALL profiles.
+
+    Args:
+        profiles_dir: Path to the .profiles directory.
+        mod_name: Name of the mod to remove.
+    """
+    # 1. Update global modlist.txt
+    order = read_global_modlist(profiles_dir)
+    filtered = [n for n in order if n != mod_name]
+    if len(filtered) != len(order):
+        write_global_modlist(profiles_dir, filtered)
+
+    # 2. Update active_mods.json in every profile
+    if not profiles_dir.is_dir():
+        return
+    for profile_dir in sorted(profiles_dir.iterdir()):
+        if not profile_dir.is_dir():
+            continue
+        active = read_active_mods(profile_dir)
+        if mod_name in active:
+            active.discard(mod_name)
+            write_active_mods(profile_dir, active)
 
 
 def migrate_to_global_modlist(profiles_dir: Path) -> bool:

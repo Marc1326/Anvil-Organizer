@@ -728,10 +728,12 @@ class _DropFrameworkTree(QTreeWidget):
     archives_dropped = Signal(list)  # list of file path strings
 
     def dragEnterEvent(self, event):
+        print(f"[FW-TREE] dragEnterEvent: hasUrls={event.mimeData().hasUrls()}", flush=True)
         if event.mimeData().hasUrls():
             for url in event.mimeData().urls():
                 if url.isLocalFile():
                     path = url.toLocalFile()
+                    print(f"[FW-TREE] dragEnter url: {path}", flush=True)
                     if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
                         event.acceptProposedAction()
                         return
@@ -744,14 +746,17 @@ class _DropFrameworkTree(QTreeWidget):
             super().dragMoveEvent(event)
 
     def dropEvent(self, event):
+        print(f"[FW-TREE] dropEvent: hasUrls={event.mimeData().hasUrls()}", flush=True)
         if event.mimeData().hasUrls():
             paths = []
             for url in event.mimeData().urls():
                 if url.isLocalFile():
                     path = url.toLocalFile()
+                    print(f"[FW-TREE] drop url: {path}", flush=True)
                     if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
                         paths.append(path)
             if paths:
+                print(f"[FW-TREE] emitting archives_dropped: {paths}", flush=True)
                 event.acceptProposedAction()
                 self.archives_dropped.emit(paths)
                 return
