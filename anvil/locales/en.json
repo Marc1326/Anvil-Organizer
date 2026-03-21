@@ -730,6 +730,7 @@
     "tab_nexus": "Nexus Info",
     "tab_filetree": "File Tree",
     "placeholder_images": "Placeholder – Images",
+    "no_images": "No images found",
     "placeholder_nexus": "Placeholder – Nexus Info",
     "label_textfiles": "Text Files",
     "label_ini_files": "INI Files",

@@ -730,6 +730,7 @@
     "tab_nexus": "Info Nexus",
     "tab_filetree": "Árbol de Archivos",
     "placeholder_images": "Marcador – Imágenes",
+    "no_images": "No se encontraron imágenes",
     "placeholder_nexus": "Marcador – Info Nexus",
     "label_textfiles": "Archivos de Texto",
     "label_ini_files": "Archivos INI",

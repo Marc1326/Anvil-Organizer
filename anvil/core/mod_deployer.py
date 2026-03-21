@@ -32,6 +32,17 @@ from anvil.core.mod_list_io import read_global_modlist, read_active_mods
 # Files inside mod folders that are metadata, not game content.
 _SKIP_FILES = {"meta.ini", "codes.txt"}
 
+# Directories inside mod folders that are installer metadata (like MO2).
+_SKIP_DIRS = {"fomod"}
+
+# Extensions skipped ONLY in the mod root directory (not in subdirectories).
+# Files in subdirectories (textures/, meshes/, etc.) are game content.
+_SKIP_ROOT_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp",  # Bilder
+    ".txt", ".md", ".pdf", ".log", ".readme",           # Dokumentation
+    ".db",                                               # Thumbs.db
+}
+
 # Extensions always deployed as symlinks even when BA2-packing is active.
 _BA2_SYMLINK_EXTENSIONS = {
     ".esp", ".esm", ".esl",   # plugins
@@ -212,6 +223,19 @@ class ModDeployer:
 
                 # Skip metadata files
                 if src_file.name in _SKIP_FILES:
+                    continue
+
+                # Skip installer directories (fomod/ etc.)
+                try:
+                    rel_check = src_file.relative_to(mod_dir)
+                    if rel_check.parts and rel_check.parts[0].lower() in _SKIP_DIRS:
+                        continue
+                except ValueError:
+                    pass
+
+                # Skip non-game files in mod root directory only
+                # (images, readmes, etc. — subdirectory files are game content)
+                if src_file.parent == mod_dir and src_file.suffix.lower() in _SKIP_ROOT_EXTENSIONS:
                     continue
 
                 # BA2-Packing: skip files that will be packed into BA2

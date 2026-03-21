@@ -730,6 +730,7 @@
     "tab_nexus": "Nexus Info",
     "tab_filetree": "Verzeichnisbaum",
     "placeholder_images": "Platzhalter – Bilder",
+    "no_images": "Keine Bilder gefunden",
     "placeholder_nexus": "Platzhalter – Nexus Info",
     "label_textfiles": "Textdateien",
     "label_ini_files": "INI Dateien",

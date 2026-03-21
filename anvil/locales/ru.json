@@ -730,6 +730,7 @@
     "tab_nexus": "Информация Nexus",
     "tab_filetree": "Дерево файлов",
     "placeholder_images": "Заглушка — Изображения",
+    "no_images": "Изображения не найдены",
     "placeholder_nexus": "Заглушка — Информация Nexus",
     "label_textfiles": "Текстовые файлы",
     "label_ini_files": "INI-файлы",

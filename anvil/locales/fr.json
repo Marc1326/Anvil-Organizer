@@ -730,6 +730,7 @@
     "tab_nexus": "Info Nexus",
     "tab_filetree": "Arborescence",
     "placeholder_images": "Espace réservé – Images",
+    "no_images": "Aucune image trouvée",
     "placeholder_nexus": "Espace réservé – Info Nexus",
     "label_textfiles": "Fichiers Texte",
     "label_ini_files": "Fichiers INI",

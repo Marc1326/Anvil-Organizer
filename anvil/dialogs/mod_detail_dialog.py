@@ -1,6 +1,7 @@
 """Mod-Detail-Dialog — öffnet bei Doppelklick auf Mod in der Mod-Liste."""
 
 import os
+import subprocess
 
 from PySide6.QtWidgets import (
     QDialog,
@@ -28,7 +29,7 @@ from PySide6.QtWidgets import (
     QMenu,
 )
 from PySide6.QtCore import Qt, QRect, QSize, QTimer
-from PySide6.QtGui import QPainter, QColor, QFont, QFontDatabase, QIcon
+from PySide6.QtGui import QPainter, QColor, QFont, QFontDatabase, QIcon, QPixmap
 
 from anvil.core.conflict_scanner import ConflictScanner
 from anvil.core.mod_metadata import write_meta_ini
@@ -134,6 +135,24 @@ QLabel { color: #D3D3D3; }
     border: 1px solid #3D3D3D;
     padding: 4px 8px;
 }
+
+/* Bilder-Tab */
+#imagesThumbnailList {
+    background: #1C1C1C;
+    color: #D3D3D3;
+    border: 1px solid #3D3D3D;
+    border-radius: 4px;
+    padding: 4px;
+}
+#imagesThumbnailList::item { padding: 4px; }
+#imagesThumbnailList::item:selected { background: #3D3D3D; }
+#imagesThumbnailList::item:hover:!selected { background: #2A2A2A; }
+#imagesPreview {
+    background: #1C1C1C;
+    border: 1px solid #3D3D3D;
+    border-radius: 4px;
+}
+#imagesInfoLabel { color: #808080; padding: 4px; }
 """
 
 
@@ -218,6 +237,170 @@ class CodeEditor(QPlainTextEdit):
             top = bottom
             bottom = top + round(self.blockBoundingRect(block).height())
         painter.end()
+
+
+_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
+_THUMB_SIZE = 64
+
+
+def _collect_images(mod_path: str):
+    """Sammelt rekursiv alle Bilddateien, ignoriert archive/."""
+    images = []
+    if not mod_path or not os.path.isdir(mod_path):
+        return images
+    for root, dirs, files in os.walk(mod_path):
+        # archive/ ausschließen
+        dirs[:] = [d for d in dirs if d.lower() != "archive"]
+        for f in sorted(files):
+            if f.lower().endswith(_IMAGE_EXTENSIONS):
+                images.append(os.path.join(root, f))
+    return images
+
+
+def _format_file_size(size_bytes: int) -> str:
+    """Dateigröße lesbar formatieren."""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+
+def _build_images_tab(mod_path: str):
+    """Tab wie MO2: Splitter; links Thumbnail-Liste + Filter, rechts Preview + Info."""
+    page = QWidget()
+    page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(0)
+
+    image_files = _collect_images(mod_path)
+
+    # Fallback: keine Bilder
+    if not image_files:
+        no_img = QLabel(tr("mod_detail.no_images"))
+        no_img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(no_img)
+        return page
+
+    splitter = QSplitter(Qt.Orientation.Horizontal)
+    splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+    # --- LINKS: Filter + Thumbnail-Liste ---
+    left_pane = QWidget()
+    left_layout = QVBoxLayout(left_pane)
+    left_layout.setContentsMargins(0, 0, 0, 0)
+    left_layout.setSpacing(6)
+
+    filter_edit = QLineEdit()
+    filter_edit.setPlaceholderText(tr("placeholder.filter"))
+    left_layout.addWidget(filter_edit)
+
+    thumb_list = QListWidget()
+    thumb_list.setObjectName("imagesThumbnailList")
+    thumb_list.setIconSize(QSize(_THUMB_SIZE, _THUMB_SIZE))
+    thumb_list.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+    thumb_list.setMinimumWidth(140)
+
+    for img_path in image_files:
+        pix = QPixmap(img_path)
+        if pix.isNull():
+            continue
+        thumb = pix.scaled(
+            _THUMB_SIZE, _THUMB_SIZE,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        item = QListWidgetItem(QIcon(thumb), os.path.basename(img_path))
+        item.setData(Qt.ItemDataRole.UserRole, img_path)
+        thumb_list.addItem(item)
+
+    left_layout.addWidget(thumb_list)
+    splitter.addWidget(left_pane)
+
+    # --- RECHTS: Preview + Info + Explorer-Button ---
+    right_pane = QWidget()
+    right_layout = QVBoxLayout(right_pane)
+    right_layout.setContentsMargins(0, 0, 0, 0)
+    right_layout.setSpacing(6)
+
+    preview_label = QLabel()
+    preview_label.setObjectName("imagesPreview")
+    preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    preview_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    preview_label.setMinimumSize(200, 200)
+    right_layout.addWidget(preview_label)
+
+    # Info-Zeile
+    info_label = QLabel()
+    info_label.setObjectName("imagesInfoLabel")
+    right_layout.addWidget(info_label)
+
+    # Explorer-Button
+    btn_explorer = QPushButton(tr("mod_detail.open_in_explorer"))
+    btn_explorer.setEnabled(False)
+    right_layout.addWidget(btn_explorer)
+
+    splitter.addWidget(right_pane)
+    splitter.setSizes([180, 600])
+    splitter.setStretchFactor(0, 0)
+    splitter.setStretchFactor(1, 1)
+
+    layout.addWidget(splitter)
+
+    # --- Signale ---
+    _current_path = [None]
+
+    def _show_preview(item):
+        img_path = item.data(Qt.ItemDataRole.UserRole)
+        _current_path[0] = img_path
+        pix = QPixmap(img_path)
+        if pix.isNull():
+            preview_label.clear()
+            info_label.setText("")
+            btn_explorer.setEnabled(False)
+            return
+        # Preview skalieren auf verfügbare Größe
+        avail = preview_label.size()
+        scaled = pix.scaled(
+            avail,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        preview_label.setPixmap(scaled)
+        # Info-Zeile
+        file_size = _format_file_size(os.path.getsize(img_path))
+        info_label.setText(
+            f"{os.path.basename(img_path)} — {pix.width()}\u00d7{pix.height()} — {file_size}"
+        )
+        btn_explorer.setEnabled(True)
+
+    thumb_list.currentItemChanged.connect(
+        lambda current, _prev: _show_preview(current) if current else None
+    )
+
+    def _open_explorer(checked=False):
+        path = _current_path[0]
+        if path:
+            subprocess.Popen(["xdg-open", os.path.dirname(path)])
+
+    btn_explorer.clicked.connect(_open_explorer)
+
+    # Filter
+    def _filter_thumbs(text):
+        text_lower = text.lower()
+        for i in range(thumb_list.count()):
+            item = thumb_list.item(i)
+            item.setHidden(text_lower not in item.text().lower())
+
+    filter_edit.textChanged.connect(_filter_thumbs)
+
+    # Erstes Bild automatisch anzeigen
+    if thumb_list.count() > 0:
+        thumb_list.setCurrentRow(0)
+
+    return page
 
 
 def _build_textfiles_tab(mod_path: str):
@@ -1246,12 +1429,8 @@ class ModDetailDialog(QDialog):
         # Tab 1: INI Dateien
         self.tab_widget.addTab(_build_ini_tab(mod_path), tr("mod_detail.tab_ini"))
 
-        # Tab 2: Bilder (Platzhalter, deaktiviert)
-        bilder_page = QWidget()
-        bilder_layout = QVBoxLayout(bilder_page)
-        bilder_layout.addWidget(QLabel(tr("mod_detail.placeholder_images")))
-        self.tab_widget.addTab(bilder_page, tr("mod_detail.tab_images"))
-        self.tab_widget.setTabEnabled(2, False)
+        # Tab 2: Bilder
+        self.tab_widget.addTab(_build_images_tab(mod_path), tr("mod_detail.tab_images"))
 
         # Tab 3: Optionale ESPs
         self.tab_widget.addTab(_build_optional_esps_tab(mod_path), tr("mod_detail.tab_optional_esps"))
