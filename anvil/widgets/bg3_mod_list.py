@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
     QHeaderView,
-    QLineEdit,
     QSplitter,
     QStyledItemDelegate,
     QTreeView,
@@ -344,13 +343,6 @@ class BG3ModListView(QWidget):
 
         layout.addWidget(self._splitter)
 
-        # ── Filter row ────────────────────────────────────────────
-        filter_row = QHBoxLayout()
-        self._filter = QLineEdit()
-        self._filter.setPlaceholderText(tr("placeholder.filter"))
-        self._filter.textChanged.connect(self._on_filter_changed)
-        filter_row.addWidget(self._filter)
-        layout.addLayout(filter_row)
 
         # ── Connect signals ───────────────────────────────────────
         self._active_tree.archives_dropped.connect(self.archives_dropped)

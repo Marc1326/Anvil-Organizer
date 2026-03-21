@@ -1163,9 +1163,14 @@ class MainWindow(QMainWindow):
 
     def _on_filter_changed(self) -> None:
         """Mod search or FilterPanel chip changed — update proxy filter."""
+        text = self._mod_search.text().strip()
+        # BG3 uses its own proxy filter
+        if self._bg3_mod_list is not None and self._mod_list_stack.currentWidget() == self._bg3_mod_list:
+            self._bg3_mod_list._on_filter_changed(text)
+            return
         proxy = self._mod_list_view._proxy_model
         proxy.set_filter_state(
-            self._mod_search.text().strip().lower(),
+            text.lower(),
             self._filter_panel.active_property_ids(),
             self._filter_panel.active_category_ids(),
         )
