@@ -250,9 +250,7 @@ class BG3ModListModel(QAbstractItemModel):
         return mime
 
     def canDropMimeData(self, data, action, row, column, parent):
-        # Accept MIME for both models — cross-tree drops are handled by the
-        # view (uuids_dropped signal), internal reorder by dropMimeData().
-        return data.hasFormat(MIME_BG3_MOD_ROWS)
+        return data.hasFormat(MIME_BG3_MOD_ROWS) or data.hasUrls()
 
     def dropMimeData(self, data, action, row, column, parent):
         if action == Qt.DropAction.IgnoreAction:

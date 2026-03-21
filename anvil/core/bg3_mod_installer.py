@@ -538,13 +538,14 @@ class BG3ModInstaller:
         # Write back — mod is in Mods but NOT in ModOrder (inactive)
         self._write_modsettings(mod_order, mods)
 
-        return {
+        result = {
             "name": result_name or pak_names[0],
             "type": MOD_TYPE_PAK,
             "uuid": result_uuid,
             "pak_files": pak_names,
             "status": "inactive",
         }
+        return result
 
     def _install_framework(self, temp_dir: Path, fw) -> dict | None:
         """Install a framework mod (e.g. BG3SE) into the game directory."""

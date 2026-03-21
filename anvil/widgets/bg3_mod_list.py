@@ -108,11 +108,9 @@ class _BG3DropTreeView(QTreeView):
     def dragEnterEvent(self, event):
         super().dragEnterEvent(event)
         md = event.mimeData()
-        # Accept our mod-row MIME (cross-tree AND internal reorder)
         if md.hasFormat(MIME_BG3_MOD_ROWS):
             event.acceptProposedAction()
             return
-        # External archives
         if md.hasUrls():
             for url in md.urls():
                 if url.isLocalFile():
@@ -181,7 +179,7 @@ def _setup_tree(
     tree.setDragEnabled(True)
     tree.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
     tree.setDefaultDropAction(Qt.DropAction.MoveAction)
-    tree.setDropIndicatorShown(allow_reorder)  # position indicator only for active
+    tree.setDropIndicatorShown(True)
     tree.setDragDropOverwriteMode(False)
 
     # Context menu

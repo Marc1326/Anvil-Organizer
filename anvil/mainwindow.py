@@ -1300,6 +1300,11 @@ class MainWindow(QMainWindow):
         """Handle install request from the Downloads tab."""
         if not self._current_instance_path:
             return
+        # BG3 uses its own installer
+        if self._bg3_mod_list is not None:
+            self._on_bg3_archives_dropped(paths)
+            self._game_panel.refresh_downloads()
+            return
         self._install_archives([Path(p) for p in paths])
         self._game_panel.refresh_downloads()
 
