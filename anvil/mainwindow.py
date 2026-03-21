@@ -1647,9 +1647,8 @@ class MainWindow(QMainWindow):
         if not mod_name:
             return
 
-        # Mod-Liste für Navigation (alle Mods, nicht nur enabled)
-        mod_names = [e.name for e in self._current_mod_entries
-                     if not e.name.endswith("_separator")]
+        # Sichtbare Mod-Reihenfolge aus dem Proxy-Model (ohne Separatoren)
+        mod_names = self._mod_list_view.get_visible_mod_names()
 
         while mod_name:
             mod_path = str(self._current_instance_path / ".mods" / mod_name)
@@ -1676,12 +1675,14 @@ class MainWindow(QMainWindow):
                     mod_name = mod_names[idx - 1]
                 else:
                     mod_name = mod_names[-1]  # wrap around
+                self._mod_list_view.select_mod_by_name(mod_name)
             elif result == ModDetailDialog.RESULT_NEXT:
                 idx = mod_names.index(mod_name) if mod_name in mod_names else -1
                 if idx < len(mod_names) - 1:
                     mod_name = mod_names[idx + 1]
                 else:
                     mod_name = mod_names[0]  # wrap around
+                self._mod_list_view.select_mod_by_name(mod_name)
             else:
                 break  # Schliessen
 

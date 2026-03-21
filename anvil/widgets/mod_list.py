@@ -971,6 +971,31 @@ class ModListView(QWidget):
         name = self._source_model.data(self._source_model.index(source_idx.row(), COL_NAME), Qt.ItemDataRole.DisplayRole)
         return name if name is not None else None
 
+    def select_mod_by_name(self, mod_name: str) -> None:
+        """Selektiert einen Mod in der Liste anhand seines Namens."""
+        for row in range(self._proxy_model.rowCount()):
+            proxy_idx = self._proxy_model.index(row, COL_NAME)
+            name = self._proxy_model.data(proxy_idx, Qt.ItemDataRole.DisplayRole)
+            if name == mod_name:
+                self._tree.setCurrentIndex(proxy_idx)
+                self._tree.scrollTo(proxy_idx)
+                return
+
+    def get_visible_mod_names(self) -> list[str]:
+        """Liefert die sichtbare Mod-Reihenfolge (ohne Separatoren) aus dem Proxy-Model."""
+        names = []
+        for row in range(self._proxy_model.rowCount()):
+            proxy_idx = self._proxy_model.index(row, 0)
+            source_idx = self._proxy_model.mapToSource(proxy_idx)
+            is_sep = self._source_model.data(source_idx, ROLE_IS_SEPARATOR)
+            if is_sep:
+                continue
+            name_idx = self._proxy_model.index(row, COL_NAME)
+            name = self._proxy_model.data(name_idx, Qt.ItemDataRole.DisplayRole)
+            if name:
+                names.append(name)
+        return names
+
     def get_selected_source_rows(self) -> list[int]:
         """Return sorted list of selected source-model row indices."""
         rows = set()
