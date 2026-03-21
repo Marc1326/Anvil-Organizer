@@ -91,6 +91,44 @@ class BaldursGate3Game(BaseGame):
 
     # ── Überschriebene Methoden ────────────────────────────────────────
 
+    def protonPrefix(self) -> Path | None:
+        """BG3-Override: primäre Steam-ID zuerst über alle Libraries suchen.
+
+        BG3 hat zwei Steam-IDs (Spiel + Toolkit).  Die Basis-Methode
+        iteriert Library→ID, was den Toolkit-Prefix finden kann bevor
+        das eigentliche Spiel geprüft wird.  Hier wird ID→Library
+        iteriert, damit die Haupt-ID (1086940) Vorrang hat.
+        """
+        if self._detected_store != "steam":
+            return None
+
+        from anvil.stores.steam_utils import find_steam_path
+        from anvil.plugins.base_game import _as_list
+        steam_root = find_steam_path()
+        if steam_root is None:
+            return None
+
+        libraries = [steam_root]
+        vdf = steam_root / "steamapps" / "libraryfolders.vdf"
+        if vdf.is_file():
+            try:
+                import re
+                text = vdf.read_text(encoding="utf-8")
+                for match in re.finditer(r'"path"\s+"([^"]+)"', text):
+                    lib = Path(match.group(1))
+                    if lib.is_dir() and lib not in libraries:
+                        libraries.append(lib)
+            except OSError:
+                pass
+
+        for steam_id in _as_list(self.GameSteamId):
+            for lib in libraries:
+                prefix = lib / "steamapps" / "compatdata" / str(steam_id) / "pfx"
+                if prefix.is_dir():
+                    return prefix
+
+        return None
+
     def gameDocumentsDirectory(self) -> Path | None:
         """Return the game's documents directory.
 
