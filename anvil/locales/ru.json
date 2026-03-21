@@ -748,7 +748,23 @@
     "overwritten_by_mod": "Перезаписан модом",
     "categories_unavailable": "Категории недоступны.",
     "no_primary": "— Нет —",
-    "primary_category": "Основная категория:"
+    "primary_category": "Основная категория:",
+    "no_nexus_info": "Информация Nexus недоступна.\nИспользуйте правый клик → «Запросить информацию Nexus» для загрузки данных.",
+    "nexus_mod_id": "ID мода:",
+    "nexus_name": "Название:",
+    "nexus_author": "Автор:",
+    "nexus_version": "Версия:",
+    "nexus_newest_version": "Новейшая версия:",
+    "nexus_url": "URL Nexus:",
+    "nexus_game": "Игра:",
+    "nexus_endorsement": "Одобрение:",
+    "nexus_not_endorsed": "Не одобрен",
+    "nexus_endorsed": "Одобрен",
+    "nexus_abstained": "Воздержался",
+    "nexus_unknown": "Неизвестно",
+    "nexus_category": "Категория:",
+    "nexus_last_query": "Последний запрос:",
+    "nexus_description": "Описание:"
   },
 
   "filetree": {

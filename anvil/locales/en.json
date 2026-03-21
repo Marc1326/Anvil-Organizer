@@ -748,7 +748,23 @@
     "overwritten_by_mod": "Overwritten by mod",
     "categories_unavailable": "Categories unavailable.",
     "no_primary": "— None —",
-    "primary_category": "Primary category:"
+    "primary_category": "Primary category:",
+    "no_nexus_info": "No Nexus information available.\nUse right-click → 'Query Nexus Info' to fetch data.",
+    "nexus_mod_id": "Mod ID:",
+    "nexus_name": "Name:",
+    "nexus_author": "Author:",
+    "nexus_version": "Version:",
+    "nexus_newest_version": "Newest version:",
+    "nexus_url": "Nexus URL:",
+    "nexus_game": "Game:",
+    "nexus_endorsement": "Endorsement:",
+    "nexus_not_endorsed": "Not endorsed",
+    "nexus_endorsed": "Endorsed",
+    "nexus_abstained": "Abstained",
+    "nexus_unknown": "Unknown",
+    "nexus_category": "Category:",
+    "nexus_last_query": "Last query:",
+    "nexus_description": "Description:"
   },
 
   "filetree": {

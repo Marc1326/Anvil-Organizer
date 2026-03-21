@@ -748,7 +748,23 @@
     "overwritten_by_mod": "Sobrescrito por mod",
     "categories_unavailable": "Categorías no disponibles.",
     "no_primary": "— Ninguna —",
-    "primary_category": "Categoría principal:"
+    "primary_category": "Categoría principal:",
+    "no_nexus_info": "No hay información de Nexus disponible.\nUsa clic derecho → 'Consultar info de Nexus' para obtener datos.",
+    "nexus_mod_id": "ID del mod:",
+    "nexus_name": "Nombre:",
+    "nexus_author": "Autor:",
+    "nexus_version": "Versión:",
+    "nexus_newest_version": "Versión más reciente:",
+    "nexus_url": "URL de Nexus:",
+    "nexus_game": "Juego:",
+    "nexus_endorsement": "Endorsement:",
+    "nexus_not_endorsed": "No endorsado",
+    "nexus_endorsed": "Endorsado",
+    "nexus_abstained": "Abstenido",
+    "nexus_unknown": "Desconocido",
+    "nexus_category": "Categoría:",
+    "nexus_last_query": "Última consulta:",
+    "nexus_description": "Descripción:"
   },
 
   "filetree": {

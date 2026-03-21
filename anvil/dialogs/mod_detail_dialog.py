@@ -153,6 +153,19 @@ QLabel { color: #D3D3D3; }
     border-radius: 4px;
 }
 #imagesInfoLabel { color: #808080; padding: 4px; }
+
+/* Nexus-Info-Tab */
+#nexusInfoGrid QLabel { color: #D3D3D3; padding: 2px 4px; }
+#nexusInfoGrid #nexusValueLabel { color: #A0D0D0; }
+#nexusInfoGrid #nexusLinkLabel { color: #00AAAA; }
+#nexusInfoGrid #nexusLinkLabel:hover { color: #00CCCC; }
+#nexusDescription {
+    background: #1C1C1C;
+    color: #D3D3D3;
+    border: 1px solid #3D3D3D;
+    border-radius: 4px;
+    padding: 8px;
+}
 """
 
 
@@ -237,6 +250,108 @@ class CodeEditor(QPlainTextEdit):
             top = bottom
             bottom = top + round(self.blockBoundingRect(block).height())
         painter.end()
+
+
+def _build_nexus_tab(mod_path: str):
+    """Tab für Nexus-Info — liest Daten aus meta.ini."""
+    from anvil.core.mod_metadata import read_meta_ini
+    from pathlib import Path
+
+    page = QWidget()
+    page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(12, 12, 12, 12)
+    layout.setSpacing(12)
+
+    meta = {}
+    if mod_path and os.path.isdir(mod_path):
+        meta = read_meta_ini(Path(mod_path))
+
+    mod_id = meta.get("modid", "0")
+    has_nexus = mod_id and mod_id != "0"
+
+    if not has_nexus:
+        no_info = QLabel(tr("mod_detail.no_nexus_info"))
+        no_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(no_info)
+        return page
+
+    # --- Info-Grid ---
+    grid_widget = QWidget()
+    grid_widget.setObjectName("nexusInfoGrid")
+    grid = QVBoxLayout(grid_widget)
+    grid.setContentsMargins(0, 0, 0, 0)
+    grid.setSpacing(8)
+
+    def _add_row(label_text: str, value_text: str, is_link: bool = False):
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        lbl = QLabel(label_text)
+        lbl.setMinimumWidth(140)
+        row.addWidget(lbl)
+        val = QLabel(value_text)
+        val.setObjectName("nexusLinkLabel" if is_link else "nexusValueLabel")
+        val.setWordWrap(True)
+        if is_link and value_text:
+            val.setOpenExternalLinks(True)
+            val.setTextFormat(Qt.TextFormat.RichText)
+            val.setText(f'<a href="{value_text}" style="color: #00AAAA;">{value_text}</a>')
+        row.addWidget(val, 1)
+        grid.addLayout(row)
+
+    _add_row(tr("mod_detail.nexus_mod_id"), mod_id)
+    _add_row(tr("mod_detail.nexus_name"), meta.get("nexusName", meta.get("name", "")))
+    _add_row(tr("mod_detail.nexus_author"), meta.get("nexusAuthor", meta.get("author", "")))
+    _add_row(tr("mod_detail.nexus_version"), meta.get("version", ""))
+
+    newest = meta.get("newestversion", meta.get("newestVersion", ""))
+    if newest:
+        _add_row(tr("mod_detail.nexus_newest_version"), newest)
+
+    url = meta.get("nexusURL", meta.get("url", ""))
+    if url:
+        _add_row(tr("mod_detail.nexus_url"), url, is_link=True)
+
+    game_name = meta.get("gamename", meta.get("gameName", ""))
+    if game_name:
+        _add_row(tr("mod_detail.nexus_game"), game_name)
+
+    # Endorsement
+    endorsed = meta.get("endorsed", "3")
+    endorsed_map = {"0": tr("mod_detail.nexus_not_endorsed"),
+                    "1": tr("mod_detail.nexus_endorsed"),
+                    "2": tr("mod_detail.nexus_abstained"),
+                    "3": tr("mod_detail.nexus_unknown")}
+    _add_row(tr("mod_detail.nexus_endorsement"), endorsed_map.get(endorsed, endorsed_map["3"]))
+
+    category = meta.get("nexuscategory", meta.get("nexusCategory", ""))
+    if category and category != "0":
+        _add_row(tr("mod_detail.nexus_category"), category)
+
+    last_query = meta.get("lastnexusquery", meta.get("lastNexusQuery", ""))
+    if last_query:
+        _add_row(tr("mod_detail.nexus_last_query"), last_query[:19].replace("T", " "))
+
+    layout.addWidget(grid_widget)
+
+    # --- Beschreibung ---
+    description = meta.get("nexusSummary", meta.get("description", ""))
+    nexus_desc = meta.get("nexusdescription", meta.get("nexusDescription", ""))
+
+    if description or nexus_desc:
+        desc_label = QLabel(tr("mod_detail.nexus_description"))
+        layout.addWidget(desc_label)
+
+        desc_text = QPlainTextEdit()
+        desc_text.setObjectName("nexusDescription")
+        desc_text.setReadOnly(True)
+        # Prefer summary (clean text) over full nexus description (HTML)
+        desc_text.setPlainText(description if description else nexus_desc)
+        layout.addWidget(desc_text)
+    else:
+        layout.addStretch(1)
+
+    return page
 
 
 _IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
@@ -1409,10 +1524,15 @@ def _build_categories_tab(category_manager, mod_entry, mod_path):
 
 
 class ModDetailDialog(QDialog):
+    # Custom result codes for navigation
+    RESULT_PREV = 100
+    RESULT_NEXT = 101
+
     def __init__(self, parent=None, mod_name="", mod_path="",
                  all_mods=None, game_plugin=None,
                  category_manager=None, mod_entry=None):
         super().__init__(parent)
+        self._all_mods = all_mods or []
         self.setWindowTitle(mod_name or tr("dialog.mod_details"))
         self.setMinimumSize(1280, 720)
         self.resize(1300, 750)
@@ -1447,12 +1567,8 @@ class ModDetailDialog(QDialog):
         # Layout-Update wenn Kategorien-Tab sichtbar wird
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
 
-        # Tab 6: Nexus Info (Platzhalter, deaktiviert)
-        nexus_page = QWidget()
-        nexus_layout = QVBoxLayout(nexus_page)
-        nexus_layout.addWidget(QLabel(tr("mod_detail.placeholder_nexus")))
-        self.tab_widget.addTab(nexus_page, tr("mod_detail.tab_nexus"))
-        self.tab_widget.setTabEnabled(6, False)
+        # Tab 6: Nexus Info
+        self.tab_widget.addTab(_build_nexus_tab(mod_path), tr("mod_detail.tab_nexus"))
 
         # Tab 7: Verzeichnisbaum (wie MO2: FileTreeTab)
         self.tab_widget.addTab(_build_filetree_tab(mod_path), tr("mod_detail.tab_filetree"))
@@ -1475,9 +1591,9 @@ class ModDetailDialog(QDialog):
         # Unten: Zurück/Weiter links, Schliessen rechts
         btn_row = QHBoxLayout()
         btn_back = QPushButton(tr("button.back"))
-        btn_back.clicked.connect(_todo("Mod-Navigation Zurück"))
+        btn_back.clicked.connect(lambda checked=False: self.done(self.RESULT_PREV))
         btn_next = QPushButton(tr("button.next"))
-        btn_next.clicked.connect(_todo("Mod-Navigation Weiter"))
+        btn_next.clicked.connect(lambda checked=False: self.done(self.RESULT_NEXT))
         btn_row.addWidget(btn_back)
         btn_row.addWidget(btn_next)
         btn_row.addStretch()

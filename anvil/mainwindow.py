@@ -1442,6 +1442,36 @@ class MainWindow(QMainWindow):
             # Install from extracted temp dir
             mod_path = installer.install_from_extracted(temp_dir, mod_name)
             if mod_path:
+                # Transfer Nexus info from download .meta to mod meta.ini
+                meta_file = Path(str(archive) + ".meta")
+                if meta_file.is_file():
+                    cp_meta = configparser.ConfigParser()
+                    cp_meta.optionxform = str
+                    try:
+                        cp_meta.read(str(meta_file), encoding="utf-8")
+                        if cp_meta.has_section("General"):
+                            dl_mod_id = cp_meta.get("General", "modID", fallback="0")
+                            dl_name = cp_meta.get("General", "name", fallback="")
+                            dl_version = cp_meta.get("General", "version", fallback="")
+                            dl_game = cp_meta.get("General", "gameName", fallback="")
+                            if dl_mod_id and dl_mod_id != "0":
+                                from anvil.core.mod_metadata import write_meta_ini
+                                nexus_data = {
+                                    "modid": dl_mod_id,
+                                    "installationFile": Path(archive).name,
+                                    "version": dl_version,
+                                    "newestVersion": dl_version,
+                                    "gameName": dl_game,
+                                    "repository": "Nexus",
+                                }
+                                if dl_name:
+                                    nexus_data["nexusName"] = dl_name
+                                if dl_game:
+                                    nexus_data["nexusURL"] = f"https://www.nexusmods.com/{dl_game}/mods/{dl_mod_id}"
+                                write_meta_ini(mod_path, nexus_data)
+                    except (configparser.Error, OSError):
+                        pass
+
                 profiles_dir = self._current_instance_path / ".profiles"
                 global_modlist = profiles_dir / "modlist.txt"
                 if global_modlist.is_file():
@@ -1614,13 +1644,19 @@ class MainWindow(QMainWindow):
             mod_name = self._mod_list_view.get_mod_name_from_index(index)
         else:
             mod_name = self._mod_list_view.get_current_mod_name()
-        if mod_name:
+        if not mod_name:
+            return
+
+        # Mod-Liste für Navigation (alle Mods, nicht nur enabled)
+        mod_names = [e.name for e in self._current_mod_entries
+                     if not e.name.endswith("_separator")]
+
+        while mod_name:
             mod_path = str(self._current_instance_path / ".mods" / mod_name)
             all_mods = [
                 {"name": e.name, "path": str(self._current_instance_path / ".mods" / e.name)}
                 for e in self._current_mod_entries if e.enabled
             ]
-            # ModEntry für diesen Mod finden
             mod_entry = next(
                 (e for e in self._current_mod_entries if e.name == mod_name),
                 None
@@ -1632,7 +1668,22 @@ class MainWindow(QMainWindow):
                 mod_entry=mod_entry,
             )
             _center_on_parent(dlg)
-            dlg.exec()
+            result = dlg.exec()
+
+            if result == ModDetailDialog.RESULT_PREV:
+                idx = mod_names.index(mod_name) if mod_name in mod_names else -1
+                if idx > 0:
+                    mod_name = mod_names[idx - 1]
+                else:
+                    mod_name = mod_names[-1]  # wrap around
+            elif result == ModDetailDialog.RESULT_NEXT:
+                idx = mod_names.index(mod_name) if mod_name in mod_names else -1
+                if idx < len(mod_names) - 1:
+                    mod_name = mod_names[idx + 1]
+                else:
+                    mod_name = mod_names[0]  # wrap around
+            else:
+                break  # Schliessen
 
     # ── Mod list context menu ──────────────────────────────────────
 
@@ -2862,27 +2913,78 @@ class MainWindow(QMainWindow):
 
         nexus_id = entry.nexus_id
 
-        # Step 2: Search .downloads/ for matching archive → parse filename
+        # Step 2: Try to find modID from meta.ini or .meta files
         if nexus_id <= 0:
-            from anvil.core.nexus_filename_parser import extract_nexus_mod_id
+            from anvil.core.mod_metadata import read_meta_ini
+            meta_data = read_meta_ini(Path(entry.install_path))
+            inst_file = meta_data.get("installationFile", "")
             downloads_path = self._current_downloads_path
-            if downloads_path and downloads_path.is_dir():
-                mod_normalized = entry.name.lower().replace('_', ' ').replace('-', ' ')
-                for f in downloads_path.iterdir():
-                    if f.is_file() and f.suffix.lower() in ('.zip', '.rar', '.7z'):
-                        stem_normalized = f.stem.lower().replace('_', ' ').replace('-', ' ')
-                        if mod_normalized in stem_normalized:
-                            parsed_id = extract_nexus_mod_id(f.name)
-                            if parsed_id and parsed_id > 0:
-                                answer = QMessageBox.question(
-                                    self,
-                                    tr("game_panel.query_nexus_info"),
-                                    tr("game_panel.query_nexus_parsed_id", id=parsed_id),
-                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                                )
-                                if answer == QMessageBox.StandardButton.Yes:
-                                    nexus_id = parsed_id
+
+            # 2a: Find .meta file by installationFile name (recursive)
+            if inst_file and downloads_path and downloads_path.is_dir():
+                for meta_candidate in downloads_path.rglob(inst_file + ".meta"):
+                    cp_meta = configparser.ConfigParser()
+                    cp_meta.optionxform = str
+                    try:
+                        cp_meta.read(str(meta_candidate), encoding="utf-8")
+                        mid = int(cp_meta.get("General", "modID", fallback="0"))
+                        if mid > 0:
+                            nexus_id = mid
+                            break
+                    except (configparser.Error, OSError, ValueError):
+                        pass
+
+            # 2b: Fallback — parse modID from installationFile filename
+            if nexus_id <= 0 and inst_file:
+                from anvil.core.nexus_filename_parser import extract_nexus_mod_id
+                parsed_id = extract_nexus_mod_id(inst_file)
+                if parsed_id and parsed_id > 0:
+                    nexus_id = parsed_id
+
+            # 2c: Search archive filenames matching mod name → get modID from .meta or filename
+            if nexus_id <= 0 and downloads_path and downloads_path.is_dir():
+                from anvil.core.nexus_filename_parser import extract_nexus_mod_id as _parse_id
+                mod_folder = Path(entry.install_path).name
+                mod_lower = mod_folder.lower()
+                # Search downloads path and its parent (archives may be one level up)
+                search_dirs = [downloads_path]
+                if downloads_path.parent != downloads_path:
+                    search_dirs.append(downloads_path.parent)
+                for search_dir in search_dirs:
+                    if not search_dir.is_dir():
+                        continue
+                    for f in search_dir.rglob("*"):
+                        if not f.is_file():
+                            continue
+                        if f.suffix.lower() not in ('.zip', '.rar', '.7z', '.meta'):
+                            continue
+                        # Check if mod name appears in archive filename
+                        fname_lower = f.stem.lower()
+                        if f.suffix.lower() == '.meta':
+                            fname_lower = Path(f.stem).stem.lower()  # strip .zip from .zip.meta
+                        if mod_lower not in fname_lower:
+                            continue
+                        # Try .meta file first for modID
+                        meta_path = f if f.suffix.lower() == '.meta' else Path(str(f) + ".meta")
+                        if meta_path.is_file():
+                            cp_meta = configparser.ConfigParser()
+                            cp_meta.optionxform = str
+                            try:
+                                cp_meta.read(str(meta_path), encoding="utf-8")
+                                mid = int(cp_meta.get("General", "modID", fallback="0"))
+                                if mid > 0:
+                                    nexus_id = mid
                                     break
+                            except (configparser.Error, OSError, ValueError):
+                                pass
+                        # Fallback: parse modID from archive filename
+                        archive_name = f.name if f.suffix.lower() != '.meta' else f.stem
+                        parsed = _parse_id(archive_name)
+                        if parsed and parsed > 0:
+                            nexus_id = parsed
+                            break
+                    if nexus_id > 0:
+                        break
 
         # Step 3: No ID found → status message only
         if nexus_id <= 0:
@@ -3327,14 +3429,33 @@ class MainWindow(QMainWindow):
                         getattr(self._current_plugin, "GameNexusName", "")
                         or getattr(self._current_plugin, "GameShortName", "")
                     )
+                # Endorsement status
+                endorsed_val = "3"  # UNKNOWN
+                endorsement = data.get("endorsement")
+                if isinstance(endorsement, dict):
+                    status = endorsement.get("endorse_status", "")
+                    if status == "Endorsed":
+                        endorsed_val = "1"
+                    elif status == "Abstained":
+                        endorsed_val = "2"
+                    elif status == "Undecided":
+                        endorsed_val = "0"
+
+                from datetime import datetime, timezone
                 write_meta_ini(mod_path, {
                     "modid": str(data.get("mod_id", 0)),
                     "version": data.get("version", ""),
                     "newestVersion": data.get("version", ""),
-                    "name": data.get("name", ""),
-                    "author": data.get("author", ""),
-                    "description": data.get("summary", ""),
-                    "url": f"https://www.nexusmods.com/{nexus_slug}/mods/{data.get('mod_id', 0)}",
+                    "nexusName": data.get("name", ""),
+                    "nexusAuthor": data.get("author", ""),
+                    "nexusSummary": data.get("summary", ""),
+                    "nexusDescription": data.get("description", ""),
+                    "nexusCategory": str(data.get("category_id", 0)),
+                    "endorsed": endorsed_val,
+                    "gameName": nexus_slug,
+                    "repository": "Nexus",
+                    "lastNexusQuery": datetime.now(timezone.utc).isoformat(),
+                    "nexusURL": f"https://www.nexusmods.com/{nexus_slug}/mods/{data.get('mod_id', 0)}",
                 })
                 self._reload_mod_list()
                 self.statusBar().showMessage(
