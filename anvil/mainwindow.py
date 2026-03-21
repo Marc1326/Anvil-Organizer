@@ -3743,6 +3743,20 @@ class MainWindow(QMainWindow):
                 mod_type = result.get("type", "pak")
                 name = result.get("name", Path(path_str).name)
                 installed.append((name, mod_type))
+                # Mark download as installed in .meta file
+                try:
+                    meta_path = Path(str(path_str) + ".meta")
+                    cp = configparser.ConfigParser()
+                    cp.optionxform = str
+                    if meta_path.is_file():
+                        cp.read(str(meta_path), encoding="utf-8")
+                    if not cp.has_section("General"):
+                        cp.add_section("General")
+                    cp.set("General", "installed", "true")
+                    with open(meta_path, "w", encoding="utf-8") as f:
+                        cp.write(f)
+                except Exception as exc:
+                    print(f"[BG3-META] Failed to write .meta: {exc}", flush=True)
             else:
                 self.statusBar().showMessage(
                     tr("status.install_failed", name=Path(path_str).name), 5000,
