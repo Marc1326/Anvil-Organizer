@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
     QSplitter,
     QStackedWidget,
     QMessageBox,
@@ -24,6 +25,9 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QDialogButtonBox,
     QLineEdit,
+    QLabel,
+    QPushButton,
+    QFrame,
 )
 from PySide6.QtCore import Qt, QSettings, QTimer, QUrl, QSize
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
@@ -216,6 +220,30 @@ class MainWindow(QMainWindow):
         splitter.setSizes([780, 420])
         main_layout.addWidget(splitter)
 
+        # ── Lock-Overlay (Game Running Lock) ─────────────────────────
+        # Overlay-Widget as child of central — NOT in the layout.
+        # Floats centered over the UI without shifting anything.
+        self._lock_overlay = QFrame(central)
+        self._lock_overlay.setObjectName("game_lock_overlay")
+        self._lock_overlay.setFixedSize(420, 120)
+        overlay_layout = QVBoxLayout(self._lock_overlay)
+        overlay_layout.setContentsMargins(20, 16, 20, 16)
+        overlay_layout.setSpacing(12)
+        self._lock_label = QLabel()
+        self._lock_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._lock_label.setWordWrap(True)
+        overlay_layout.addWidget(self._lock_label)
+        self._unlock_btn = QPushButton(tr("status.game_lock.unlock_button"))
+        self._unlock_btn.setFixedWidth(160)
+        self._unlock_btn.clicked.connect(lambda checked=False: self._unlock_ui())
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(self._unlock_btn)
+        btn_layout.addStretch()
+        overlay_layout.addLayout(btn_layout)
+        self._lock_overlay.setVisible(False)
+        self._lock_overlay.raise_()
+
         # ── Log-Panel (collapsible section with card-style panel) ───────
         self._log_container = QWidget()
         self._log_container.setMinimumHeight(28)
@@ -288,6 +316,7 @@ class MainWindow(QMainWindow):
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
         self._game_panel.game_started.connect(self._on_game_started)
+        self._game_panel.game_stopped.connect(self._unlock_ui)
 
         self._game_panel.dl_query_info_requested.connect(self._on_dl_query_info)
 
@@ -300,6 +329,9 @@ class MainWindow(QMainWindow):
         self._redeploy_timer.setSingleShot(True)
         self._redeploy_timer.setInterval(500)
         self._redeploy_timer.timeout.connect(self._do_redeploy)
+
+        # ── Game Running Lock ─────────────────────────────────────────
+        self._game_running: bool = False
 
         # ── Erster Start / Instanz laden ──────────────────────────────
         self._check_first_start()
@@ -1290,11 +1322,43 @@ class MainWindow(QMainWindow):
                 tr("error.start_failed_message", path=binary_path),
             )
 
-    def _on_game_started(self, game_name: str) -> None:
-        """Show statusbar message when a game has been started."""
+    def _on_game_started(self, game_name: str, pid: int) -> None:
+        """Lock the UI when a game has been started."""
         msg = tr("status.game_started", name=game_name)
-        print("SLOT TEST", flush=True)
         self.statusBar().showMessage(msg, 5000)
+        self._lock_ui(game_name)
+
+    # ── Game Running Lock ─────────────────────────────────────────────
+
+    def _lock_ui(self, game_name: str) -> None:
+        """Disable the UI while a game is running."""
+        self._game_running = True
+        self._lock_label.setText(tr("status.game_lock.running_label", name=game_name))
+        self._lock_overlay.setVisible(True)
+        self._lock_overlay.raise_()
+        self._center_lock_overlay()
+        self._splitter.setEnabled(False)
+        self._log_container.setEnabled(False)
+        self._toolbar.setEnabled(False)
+        self.menuBar().setEnabled(False)
+
+    def _unlock_ui(self) -> None:
+        """Re-enable the UI after a game has stopped or user clicks Unlock."""
+        self._game_running = False
+        self._lock_overlay.setVisible(False)
+        self._splitter.setEnabled(True)
+        self._log_container.setEnabled(True)
+        self._toolbar.setEnabled(True)
+        self.menuBar().setEnabled(True)
+
+    def _center_lock_overlay(self) -> None:
+        """Center the lock overlay on the central widget."""
+        cw = self.centralWidget()
+        if cw is None:
+            return
+        x = (cw.width() - self._lock_overlay.width()) // 2
+        y = (cw.height() - self._lock_overlay.height()) // 2
+        self._lock_overlay.move(x, y)
 
     def _on_downloads_install(self, paths: list) -> None:
         """Handle install request from the Downloads tab."""
@@ -3598,6 +3662,11 @@ class MainWindow(QMainWindow):
         if index not in self._restored_tabs:
             self._game_panel.restore_tab_column_widths(index)
             self._restored_tabs.add(index)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self._game_running:
+            self._center_lock_overlay()
 
     def closeEvent(self, event) -> None:
         self._redeploy_timer.stop()

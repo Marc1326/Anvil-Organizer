@@ -419,6 +419,10 @@
     "not_installed": "Не установлено",
     "api_not_logged_in": "API: не авторизован",
     "game_started": "Игра запущена: {name}",
+    "game_lock": {
+      "running_label": "Игра запущена: {name}",
+      "unlock_button": "Разблокировать"
+    },
     "installed": "Установлено: {names}",
     "installed_inactive": "Установлено (неактивно): {names}",
     "framework_update_title": "Обновить фреймворк",

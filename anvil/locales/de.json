@@ -419,6 +419,10 @@
     "not_installed": "Nicht installiert",
     "api_not_logged_in": "API: not logged in",
     "game_started": "Spiel gestartet: {name}",
+    "game_lock": {
+      "running_label": "Spiel läuft: {name}",
+      "unlock_button": "Entsperren"
+    },
     "installed": "Installiert: {names}",
     "installed_inactive": "Installiert (inaktiv): {names}",
     "framework_update_title": "Framework aktualisieren",

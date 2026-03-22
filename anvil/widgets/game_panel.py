@@ -95,7 +95,8 @@ class _DraggableDownloadTable(QTableWidget):
 class GamePanel(QWidget):
     install_requested = Signal(list)  # list of archive path strings
     start_requested = Signal(str, str)  # (binary_path, working_dir)
-    game_started = Signal(str)  # game_name
+    game_started = Signal(str, int)  # (game_name, pid) — pid=-1 if unknown
+    game_stopped = Signal()           # emitted when the game process ends
 
     dl_query_info_requested = Signal(str)  # archive_path
 
@@ -1055,8 +1056,7 @@ class GamePanel(QWidget):
 
         working_dir = str(binary_path.parent)
         self.start_requested.emit(str(binary_path), working_dir)
-        print("EMIT TEST direct", flush=True)
-        self.game_started.emit(self._game_label.text())
+        self.game_started.emit(self._game_label.text(), -1)
 
     def _launch_via_steam(self, plugin) -> None:
         """Launch the main game binary via steam -applaunch."""
@@ -1087,8 +1087,10 @@ class GamePanel(QWidget):
                         tr("game_panel.shim_steam_hint",
                            overrides=overrides["WINEDLLOVERRIDES"]),
                     )
-            print("EMIT TEST steam", flush=True)
-            self.game_started.emit(self._game_label.text())
+            self.game_started.emit(self._game_label.text(), -1)
+            # Watch for game process by SteamAppId / binary name
+            binary_name = Path(getattr(plugin, "GameBinary", "")).name.lower()
+            self._start_process_watcher(binary_name, app_id=str(steam_id))
         else:
             QMessageBox.warning(
                 self, tr("game_panel.start"),
@@ -1154,18 +1156,83 @@ class GamePanel(QWidget):
         working_dir = str(binary_path.parent)
 
         try:
-            subprocess.Popen(
+            proc = subprocess.Popen(
                 [str(proton_script), "run", str(binary_path)],
                 cwd=working_dir,
                 env=env,
             )
-            print("EMIT TEST proton", flush=True)
-            self.game_started.emit(self._game_label.text())
+            self.game_started.emit(self._game_label.text(), proc.pid)
+            # Watch the proton process; also watch game binary in case proton exits early
+            binary_name = Path(binary).name.lower()
+            self._start_process_watcher(binary_name, proc, app_id=str(steam_id))
         except OSError as exc:
             QMessageBox.warning(
                 self, tr("game_panel.start"),
                 tr("game_panel.proton_launch_failed", error=str(exc)),
             )
+
+    def _start_process_watcher(
+        self, binary_name: str, proc=None, app_id: str | None = None
+    ) -> None:
+        """Start a background thread that emits game_stopped when the game ends.
+
+        Detection priority:
+        1. SteamAppId in /proc/<pid>/environ (reliable for Steam/Proton games)
+        2. binary_name in /proc/<pid>/cmdline (fallback)
+        If proc is given, it is also used as a fallback when nothing is found.
+        """
+        import threading
+        import time
+
+        def _find_game_pid() -> int | None:
+            """Return first matching PID, or None."""
+            try:
+                for entry in os.scandir("/proc"):
+                    if not entry.name.isdigit():
+                        continue
+                    pid = entry.name
+                    try:
+                        # Primary: match via SteamAppId env var (works for all
+                        # Steam/Proton wrapper processes)
+                        if app_id:
+                            environ = Path(f"/proc/{pid}/environ").read_bytes()
+                            if f"SteamAppId={app_id}".encode() in environ:
+                                return int(pid)
+                        # Fallback: binary name in cmdline
+                        if binary_name:
+                            cmdline = Path(f"/proc/{pid}/cmdline").read_bytes()
+                            if binary_name.encode() in cmdline.lower():
+                                return int(pid)
+                    except OSError:
+                        pass
+            except OSError:
+                pass
+            return None
+
+        def _watcher() -> None:
+            # Wait up to 120s for the game process to appear
+            appeared = False
+            for _ in range(120):
+                if _find_game_pid():
+                    appeared = True
+                    break
+                time.sleep(1)
+
+            if not appeared:
+                # Game never appeared — wait for proc if we have one, then unlock
+                if proc is not None:
+                    proc.wait()
+                self.game_stopped.emit()
+                return
+
+            # Poll every 2s until all matching processes disappear
+            while _find_game_pid():
+                time.sleep(2)
+
+            self.game_stopped.emit()
+
+        t = threading.Thread(target=_watcher, daemon=True)
+        t.start()
 
     def _populate_data_tree(self, game_path: Path | None) -> None:
         """Scan game_path and show top-level entries in the data tree."""
