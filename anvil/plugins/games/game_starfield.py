@@ -53,6 +53,7 @@ class StarfieldGame(BaseGame):
     GameEpicId = ""
 
     GameLauncher = ""  # No separate launcher
+    GameLaunchViaProton = True  # steam -applaunch unreliable; always use proton run
 
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()
     GameSavesDirectory = ""     # resolved dynamically via gameSavesDirectory()

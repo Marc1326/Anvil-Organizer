@@ -1026,14 +1026,15 @@ class GamePanel(QWidget):
         )
 
         if is_steam:
+            force_proton = getattr(plugin, "GameLaunchViaProton", False)
             is_main_binary = (
                 hasattr(plugin, "GameBinary") and binary == plugin.GameBinary
             )
-            if is_main_binary:
+            if is_main_binary and not force_proton:
                 # Main game binary -> launch via steam -applaunch
                 self._launch_via_steam(plugin)
             else:
-                # Non-primary executable (F4SE, REDmod, etc.) -> launch via proton run
+                # Non-primary executable or GameLaunchViaProton flag -> launch via proton run
                 self._launch_via_proton(plugin, binary)
             return
 

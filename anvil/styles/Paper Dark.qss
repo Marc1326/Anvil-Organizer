@@ -429,6 +429,12 @@ QMessageBox QPushButton {
   #filterResetBtn:hover, #filterManageBtn:hover {
     background: #3D3D3D; }
 
+/* ── Game Lock Overlay ───────────────────────────────────── */
+
+#game_lock_overlay {
+  border: 2px solid #000000;
+  border-radius: 8px; }
+
 /* ── FOMOD Installer Dialog ──────────────────────────────── */
 
 #fomodStepLabel {

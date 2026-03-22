@@ -50,6 +50,7 @@ class Fallout4Game(BaseGame):
     GameGogId = 1998527297  # Fallout 4: Game of the Year Edition
 
     GameLauncher = "Fallout4Launcher.exe"
+    GameLaunchViaProton = True  # steam -applaunch unreliable; always use proton run
 
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()
     GameSavesDirectory = ""     # resolved dynamically via gameSavesDirectory()
