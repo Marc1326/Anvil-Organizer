@@ -119,9 +119,10 @@ class InstanceManager:
         # Default profile
         default_profile = instance_dir / ".profiles" / "Default"
         default_profile.mkdir()
-        (default_profile / "modlist.txt").write_text(
-            "# Anvil Organizer mod list\n"
-            "# +ModName = enabled, -ModName = disabled\n",
+
+        # Global modlist (v2 system: load order lives here, enabled state in active_mods.json)
+        (instance_dir / ".profiles" / "modlist.txt").write_text(
+            "# Managed by Anvil Organizer v2\n",
             encoding="utf-8",
         )
 
