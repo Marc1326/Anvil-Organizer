@@ -1155,16 +1155,21 @@ class GamePanel(QWidget):
 
         working_dir = str(binary_path.parent)
 
+        # UMU_ID aktiviert den korrekten SLR-Pfad (wine64 <exe> statt wine64 steam.exe)
+        env["UMU_ID"] = f"umu-{steam_id}"
+
         try:
             proc = subprocess.Popen(
-                [str(proton_script), "run", str(binary_path)],
+                [str(proton_script), "run", binary_path.name],
                 cwd=working_dir,
                 env=env,
             )
             self.game_started.emit(self._game_label.text(), proc.pid)
-            # Watch the proton process; also watch game binary in case proton exits early
-            binary_name = Path(binary).name.lower()
-            self._start_process_watcher(binary_name, proc, app_id=str(steam_id))
+            # Watch the actual game binary (GameBinary), not the launcher (e.g. f4se_loader.exe),
+            # because launchers exit early after spawning the real game process.
+            # app_id=None: SteamAppId-Suche würde wine/proton Prozesse finden die auch zu früh sterben.
+            game_binary = Path(getattr(plugin, "GameBinary", binary)).name.lower()
+            self._start_process_watcher(game_binary, proc, app_id=None)
         except OSError as exc:
             QMessageBox.warning(
                 self, tr("game_panel.start"),
