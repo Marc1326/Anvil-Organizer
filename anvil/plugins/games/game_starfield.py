@@ -191,6 +191,14 @@ class StarfieldGame(BaseGame):
                 detect_installed=["sfse_loader.exe"],
                 required_by=["SFSE-Plugins"],
             ),
+            FrameworkMod(
+                name="SFSE Proton Shim",
+                pattern=["version.dll"],
+                target="",
+                description="Proxy-DLL — ermöglicht SFSE unter Linux/Proton",
+                detect_installed=["version.dll"],
+                required_by=["SFSE"],
+            ),
         ]
 
     def get_proton_env_overrides(self) -> dict[str, str]:
