@@ -900,6 +900,8 @@ class MainWindow(QMainWindow):
             p = Path(game_path_str)
             if p.is_dir():
                 game_path = p
+            elif p.is_file() and p.suffix.lower() == ".exe":
+                game_path = p.parent
 
         plugin = self.plugin_loader.get_game(short_name) if short_name else None
         self._current_plugin = plugin
@@ -908,7 +910,7 @@ class MainWindow(QMainWindow):
         # Sync plugin game path with instance config (instance may store a
         # different path than what detectGame() found via store detection)
         if plugin is not None and game_path is not None:
-            plugin.setGamePath(game_path)
+            plugin.setGamePath(game_path, store=store if store else None)
 
         # 1. Title
         self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v{APP_VERSION}")
@@ -1015,7 +1017,16 @@ class MainWindow(QMainWindow):
         active_count = sum(1 for e in visible_entries if e.enabled)
         self._log_panel.add_log("info", f"{len(visible_entries)} Mods geladen ({active_count} aktiv)")
 
-        # Framework detection (Cyberpunk, etc.)
+        # 5. Mod deployer + auto-deploy
+        from anvil.widgets.game_panel import _dlog
+        _dlog(f"[APPLY-INSTANCE] Setting instance path: {instance_path}")
+        _dlog(f"[APPLY-INSTANCE] Profile: {profile_name}")
+        _dlog(f"[APPLY-INSTANCE] Plugin: {getattr(plugin, 'GameName', None)}")
+        _dlog(f"[APPLY-INSTANCE] Game path: {game_path}")
+        self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
+        self._game_panel.silent_deploy()
+
+        # Framework detection (nach Deploy, damit Shims vorhanden sind)
         if plugin is not None:
             fw_list = []
             for fw, installed in plugin.get_installed_frameworks():
@@ -1027,15 +1038,6 @@ class MainWindow(QMainWindow):
             self._mod_list_view.load_frameworks(fw_list)
         else:
             self._mod_list_view.load_frameworks([])
-
-        # 5. Mod deployer + auto-deploy
-        from anvil.widgets.game_panel import _dlog
-        _dlog(f"[APPLY-INSTANCE] Setting instance path: {instance_path}")
-        _dlog(f"[APPLY-INSTANCE] Profile: {profile_name}")
-        _dlog(f"[APPLY-INSTANCE] Plugin: {getattr(plugin, 'GameName', None)}")
-        _dlog(f"[APPLY-INSTANCE] Game path: {game_path}")
-        self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
-        self._game_panel.silent_deploy()
 
         # 6. Status bar
         self._status_bar.update_instance(game_name, short_name, store)
