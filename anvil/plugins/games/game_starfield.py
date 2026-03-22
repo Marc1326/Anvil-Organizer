@@ -199,6 +199,14 @@ class StarfieldGame(BaseGame):
                 detect_installed=["version.dll"],
                 required_by=["SFSE"],
             ),
+            FrameworkMod(
+                name="Address Library for SFSE",
+                pattern=["versionlib-*.bin"],
+                target="Data/SFSE",
+                description="Adressdatenbank für SFSE-Plugins — wird von allen DLL-Mods benötigt",
+                detect_installed=["Data/SFSE/Plugins/versionlib-*.bin"],
+                required_by=["SFSE-Plugins"],
+            ),
         ]
 
     def get_proton_env_overrides(self) -> dict[str, str]:

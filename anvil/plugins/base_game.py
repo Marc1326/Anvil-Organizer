@@ -425,7 +425,14 @@ class BaseGame:
         for fw in self.get_framework_mods():
             for pattern in fw.pattern:
                 pat = pattern.lower().replace("\\", "/")
-                if any(pat in entry for entry in lower_contents):
+                if '*' in pat or '?' in pat:
+                    if any(
+                        fnmatch.fnmatch(entry, pat)
+                        or fnmatch.fnmatch(entry.split("/")[-1], pat)
+                        for entry in lower_contents
+                    ):
+                        return fw
+                elif any(pat in entry for entry in lower_contents):
                     return fw
         return None
 
