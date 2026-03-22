@@ -905,6 +905,11 @@ class MainWindow(QMainWindow):
         self._current_plugin = plugin
         self._current_game_path = game_path
 
+        # Sync plugin game path with instance config (instance may store a
+        # different path than what detectGame() found via store detection)
+        if plugin is not None and game_path is not None:
+            plugin.setGamePath(game_path)
+
         # 1. Title
         self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v{APP_VERSION}")
         self._log_panel.add_log("info", f"Instanz geladen: {game_name}")
@@ -1372,6 +1377,49 @@ class MainWindow(QMainWindow):
         self._install_archives([Path(p) for p in paths])
         self._game_panel.refresh_downloads()
 
+    def _auto_install_companion_frameworks(
+        self,
+        installed_name: str,
+        game_path: "Path",
+        frameworks_installed: list[str],
+    ) -> None:
+        """Auto-install bundled companion frameworks (e.g. F4SE Proton Shim when F4SE is installed).
+
+        Checks all FrameworkMods for the current game and installs any
+        companion whose ``required_by`` list contains *installed_name*.
+        The source files come from ``anvil/data/shims/<GameShortName>/``.
+        """
+        if self._current_plugin is None:
+            return
+
+        from anvil.core.resource_path import get_anvil_base
+        short_name = getattr(self._current_plugin, "GameShortName", "").lower()
+        shim_dir = get_anvil_base() / "data" / "shims" / short_name
+
+        for companion in self._current_plugin.get_framework_mods():
+            if installed_name not in companion.required_by:
+                continue
+            # Check if already installed (any detect_installed file present)
+            already = any(
+                (game_path / f).exists() for f in companion.detect_installed
+            )
+            if already:
+                continue
+            # Copy bundled shim files to game_path
+            copied = []
+            for fname in companion.detect_installed:
+                src = shim_dir / fname
+                if src.is_file():
+                    import shutil
+                    shutil.copy2(src, game_path / fname)
+                    copied.append(fname)
+            if copied:
+                frameworks_installed.append(companion.name)
+                print(
+                    f"[auto-companion] installed {companion.name}: {copied}",
+                    flush=True,
+                )
+
     def _install_archives(self, archives: list[Path], insert_at: int | None = None) -> None:
         """Install one or more archives as mods.
 
@@ -1417,8 +1465,8 @@ class MainWindow(QMainWindow):
                         if already_installed:
                             answer = QMessageBox.question(
                                 self,
-                                tr("framework_update_title"),
-                                tr("framework_update_message", name=fw.name),
+                                tr("status.framework_update_title"),
+                                tr("status.framework_update_message", name=fw.name),
                                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                 QMessageBox.StandardButton.Yes,
                             )
@@ -1428,6 +1476,9 @@ class MainWindow(QMainWindow):
                         result = installer.install_framework(temp_dir, fw, game_path)
                         if result:
                             frameworks_installed.append(result["name"])
+                            self._auto_install_companion_frameworks(
+                                result["name"], game_path, frameworks_installed
+                            )
                         continue
                     else:
                         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -4026,14 +4077,19 @@ class MainWindow(QMainWindow):
 
         for p in paths:
             archive = Path(p)
+            print(f"[FW-DROP] processing: {archive}", flush=True)
             temp_dir = installer.extract_to_temp(archive)
+            print(f"[FW-DROP] extract_to_temp → {temp_dir}", flush=True)
             if temp_dir is None:
+                print(f"[FW-DROP] SKIPPED (extract returned None): {archive.name}", flush=True)
                 continue
             file_list = [
                 str(f.relative_to(temp_dir))
                 for f in temp_dir.rglob("*") if f.is_file()
             ]
+            print(f"[FW-DROP] file_list ({len(file_list)} files): {file_list[:15]}", flush=True)
             fw = self._current_plugin.is_framework_mod(file_list)
+            print(f"[FW-DROP] is_framework_mod → {fw}", flush=True)
             shutil.rmtree(temp_dir, ignore_errors=True)
             if fw is not None:
                 fw_archives.append(archive)

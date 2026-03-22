@@ -436,6 +436,7 @@ class BaseGame:
         A framework is considered installed if *any* of its
         ``detect_installed`` paths exist in the game directory.
         """
+        print(f"[get_installed_frameworks] _game_path={self._game_path}", flush=True)
         result: list[tuple[FrameworkMod, bool]] = []
         for fw in self.get_framework_mods():
             installed = False
@@ -454,6 +455,7 @@ class BaseGame:
                         if (self._game_path / det_path).exists():
                             installed = True
                             break
+            print(f"[get_installed_frameworks]   fw={fw.name} installed={installed}", flush=True)
             result.append((fw, installed))
         return result
 

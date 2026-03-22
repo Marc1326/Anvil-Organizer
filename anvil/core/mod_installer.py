@@ -203,6 +203,22 @@ class ModInstaller:
             Path to temp directory, or None on failure.
             Caller must clean up the temp directory!
         """
+        if archive_path.is_dir():
+            print(f"[extract_to_temp] input is DIRECTORY: {archive_path}", flush=True)
+            tmp = Path(tempfile.mkdtemp(prefix="anvil_install_"))
+            for item in archive_path.iterdir():
+                dest = tmp / item.name
+                if item.is_dir():
+                    shutil.copytree(item, dest)
+                else:
+                    shutil.copy2(item, dest)
+            if not any(tmp.iterdir()):
+                print(f"[extract_to_temp] dir is EMPTY → returning None", flush=True)
+                shutil.rmtree(tmp, ignore_errors=True)
+                return None
+            print(f"[extract_to_temp] dir → temp={tmp}, items={[i.name for i in tmp.iterdir()]}", flush=True)
+            return tmp
+
         if not archive_path.is_file():
             print(f"mod_installer: file not found: {archive_path}", file=sys.stderr)
             return None
