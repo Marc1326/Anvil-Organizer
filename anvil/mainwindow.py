@@ -48,7 +48,7 @@ from anvil.dialogs.query_overwrite_dialog import QueryOverwriteDialog, Overwrite
 from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.instance_manager import InstanceManager
 from anvil.core.icon_manager import IconManager
-from anvil.core.mod_entry import scan_mods_directory
+from anvil.core.mod_entry import ModEntry, scan_mods_directory
 from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
 from anvil.core.fomod_parser import (
     detect_fomod, parse_fomod, parse_fomod_info,
@@ -183,17 +183,24 @@ class MainWindow(QMainWindow):
         self._mod_list_view._tree.doubleClicked.connect(self._on_mod_double_click)
         self._mod_list_view.context_menu_requested.connect(self._on_mod_context_menu)
 
-        # Stacked widget: standard mod list (index 0) / BG3 mod list (index 1)
+        # Stacked widget: standard mod list (index 0)
         self._mod_list_stack = QStackedWidget()
         self._mod_list_stack.addWidget(self._mod_list_view)
 
-        # Wrapper: Suche + ModList (nur über Mod-Liste, nicht über FilterPanel)
+        # BG3 Extras panel (Frameworks + Data-Overrides) — hidden by default
+        from anvil.widgets.bg3_extras_panel import BG3ExtrasPanel
+        self._bg3_extras_panel = BG3ExtrasPanel()
+        self._bg3_extras_panel.setVisible(False)
+        self._bg3_extras_panel.context_menu_requested.connect(self._on_bg3_extras_context_menu)
+
+        # Wrapper: Suche + ModList + BG3-Extras (nur über Mod-Liste, nicht über FilterPanel)
         mod_list_wrapper = QWidget()
         mod_list_layout = QVBoxLayout(mod_list_wrapper)
         mod_list_layout.setContentsMargins(0, 0, 0, 0)
         mod_list_layout.setSpacing(4)
         mod_list_layout.addWidget(self._mod_search)
         mod_list_layout.addWidget(self._mod_list_stack)
+        mod_list_layout.addWidget(self._bg3_extras_panel)
 
         # ── FilterPanel + ModList ────────────────────────────────────
         self._filter_panel = FilterPanel()
@@ -211,8 +218,7 @@ class MainWindow(QMainWindow):
 
         left_layout.addWidget(self._filter_splitter)
 
-        # BG3 mod list (lazy-created when needed)
-        self._bg3_mod_list: None = None  # BG3ModListView, created on demand
+        # BG3 installer (cached when BG3 instance is active)
         self._bg3_installer = None       # BG3ModInstaller, cached
         splitter.addWidget(left_pane)
         self._game_panel = GamePanel()
@@ -882,6 +888,7 @@ class MainWindow(QMainWindow):
             self._current_instance_path = None
             self._current_downloads_path = None
             self._bg3_installer = None
+            self._bg3_extras_panel.setVisible(False)
             self._toolbar.deploy_sep.setVisible(False)
             self._toolbar.deploy_action.setVisible(False)
             self._mod_list_stack.setCurrentWidget(self._mod_list_view)
@@ -948,6 +955,7 @@ class MainWindow(QMainWindow):
         self._toolbar.deploy_action.setVisible(False)
         self._mod_list_stack.setCurrentWidget(self._mod_list_view)
         self._bg3_installer = None
+        self._bg3_extras_panel.setVisible(False)
 
         # Load categories for this instance
         self._category_manager.load(instance_path)
@@ -1122,6 +1130,43 @@ class MainWindow(QMainWindow):
     def _on_mod_toggled(self, row: int, enabled: bool) -> None:
         """A mod checkbox was toggled — update entries and persist."""
         model = self._mod_list_view.source_model()
+
+        # ── BG3-Weiche: via BG3-Installer aktivieren/deaktivieren ──
+        if self._bg3_installer is not None:
+            if 0 <= row < len(model._rows):
+                row_data = model._rows[row]
+                uuid = row_data.folder_name  # folder_name = UUID for BG3
+                if row_data.is_separator:
+                    # Separator: nur lokalen State aendern
+                    for entry in self._current_mod_entries:
+                        if entry.name == row_data.folder_name:
+                            entry.enabled = enabled
+                            break
+                    self._write_current_modlist()
+                    self._update_active_count()
+                    return
+                if enabled:
+                    ok = self._bg3_installer.activate_mod(uuid)
+                else:
+                    ok = self._bg3_installer.deactivate_mod(uuid)
+                if ok:
+                    # Sync entry state
+                    for entry in self._current_mod_entries:
+                        if entry.name == uuid:
+                            entry.enabled = enabled
+                            break
+                    self._write_current_modlist()
+                    self._update_active_count()
+                    msg = tr("status.mod_activated") if enabled else tr("status.mod_deactivated")
+                    self.statusBar().showMessage(msg, 3000)
+                else:
+                    # Revert model checkbox
+                    self._bg3_reload_mod_list()
+                    msg = tr("status.mod_activation_failed") if enabled else tr("status.mod_deactivation_failed")
+                    self.statusBar().showMessage(msg, 5000)
+            return
+
+        # ── Standard-Pfad (nicht-BG3) ──
         if 0 <= row < len(model._rows):
             row_data = model._rows[row]
             # Find matching entry by unique folder name
@@ -1147,6 +1192,36 @@ class MainWindow(QMainWindow):
         model = self._mod_list_view.source_model()
         # Clear stale conflict highlights (row indices changed)
         model.set_conflict_highlight(set(), set())
+
+        # ── BG3-Weiche: UUID-Order an BG3-Installer ──
+        if self._bg3_installer is not None:
+            # Rebuild entries from new model order
+            new_entries = []
+            for i in range(model.rowCount()):
+                row_data = model._rows[i]
+                for entry in self._current_mod_entries:
+                    if entry.name == row_data.folder_name and entry not in new_entries:
+                        entry.priority = i
+                        new_entries.append(entry)
+                        break
+            self._current_mod_entries = new_entries
+            # Build UUID order for reorder_mods (skip separators)
+            uuid_order = [
+                row_data.folder_name
+                for row_data in model._rows
+                if not row_data.is_separator and row_data.enabled
+            ]
+            ok = self._bg3_installer.reorder_mods(uuid_order)
+            if ok:
+                self.statusBar().showMessage(tr("status.load_order_updated"), 3000)
+            else:
+                self.statusBar().showMessage(tr("status.load_order_failed"), 5000)
+            self._write_current_modlist()
+            self._update_active_count()
+            self._mod_list_view._tree._apply_separator_filter()
+            return
+
+        # ── Standard-Pfad (nicht-BG3) ──
         # Rebuild visible entries from the model's new order
         new_entries = []
         for i in range(model.rowCount()):
@@ -1203,10 +1278,7 @@ class MainWindow(QMainWindow):
     def _on_filter_changed(self) -> None:
         """Mod search or FilterPanel chip changed — update proxy filter."""
         text = self._mod_search.text().strip()
-        # BG3 uses its own proxy filter
-        if self._bg3_mod_list is not None and self._mod_list_stack.currentWidget() == self._bg3_mod_list:
-            self._bg3_mod_list._on_filter_changed(text)
-            return
+        # BG3 and standard games both use the normal proxy filter now
         proxy = self._mod_list_view._proxy_model
         proxy.set_filter_state(
             text.lower(),
@@ -1372,7 +1444,7 @@ class MainWindow(QMainWindow):
         if not self._current_instance_path:
             return
         # BG3 uses its own installer
-        if self._bg3_mod_list is not None:
+        if self._bg3_installer is not None:
             self._on_bg3_archives_dropped(paths)
             self._game_panel.refresh_downloads()
             return
@@ -1779,15 +1851,27 @@ class MainWindow(QMainWindow):
         mod_names = self._mod_list_view.get_visible_mod_names()
 
         while mod_name:
-            mod_path = str(self._current_instance_path / ".mods" / mod_name)
+            # BG3: find entry by display_name (mod_name is display_name here)
+            mod_entry = None
+            if self._bg3_installer is not None:
+                mod_entry = next(
+                    (e for e in self._current_mod_entries
+                     if (e.display_name or e.name) == mod_name),
+                    None,
+                )
+                # BG3 mods don't have folders in .mods/
+                mod_path = ""
+            else:
+                mod_entry = next(
+                    (e for e in self._current_mod_entries if e.name == mod_name),
+                    None,
+                )
+                mod_path = str(self._current_instance_path / ".mods" / mod_name)
+
             all_mods = [
                 {"name": e.name, "path": str(self._current_instance_path / ".mods" / e.name)}
-                for e in self._current_mod_entries if e.enabled
+                for e in self._current_mod_entries if e.enabled and not e.is_separator
             ]
-            mod_entry = next(
-                (e for e in self._current_mod_entries if e.name == mod_name),
-                None
-            )
             dlg = ModDetailDialog(
                 self, mod_name=mod_name, mod_path=mod_path,
                 all_mods=all_mods, game_plugin=self._current_plugin,
@@ -2547,9 +2631,11 @@ class MainWindow(QMainWindow):
 
         # 4. Load active mods from new profile and update checkboxes only
         new_active = read_active_mods(self._current_profile_path)
+
+        # Apply active state (both BG3 and standard)
         self._apply_active_state(new_active)
 
-        # 5. Collapsed separators für neues Profil laden
+        # 5. Collapsed separators fuer neues Profil laden (shared)
         if s.value("ModList/collapse_per_profile", False, type=bool) and self._current_profile_path:
             ui_state_file = self._current_profile_path / "ui_state.json"
             if ui_state_file.is_file():
@@ -2567,11 +2653,16 @@ class MainWindow(QMainWindow):
                 tree._collapsed_separators.clear()
             tree._apply_separator_filter()
 
-        # 6. Redeploy with new profile
-        self._redeploy_timer.stop()
-        self._game_panel.silent_purge()
-        self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
-        self._game_panel.silent_deploy()
+        # ── BG3-Weiche: Profil-Wechsel mit BG3-Installer sync ──
+        if self._bg3_installer is not None:
+            self._bg3_sync_active_state(new_active)
+            self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
+        else:
+            # 6. Redeploy with new profile (non-BG3 only)
+            self._redeploy_timer.stop()
+            self._game_panel.silent_purge()
+            self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
+            self._game_panel.silent_deploy()
 
     def _apply_active_state(self, active_mods: set[str]) -> None:
         """Update checkbox state for all mods without reloading.
@@ -2792,6 +2883,33 @@ class MainWindow(QMainWindow):
     def _ctx_enable_selected(self, rows: list[int], enabled: bool) -> None:
         """Enable or disable selected mods."""
         model = self._mod_list_view.source_model()
+
+        # ── BG3-Weiche: via BG3-Installer aktivieren/deaktivieren ──
+        if self._bg3_installer is not None:
+            for row in rows:
+                if 0 <= row < len(model._rows):
+                    row_data = model._rows[row]
+                    if row_data.is_separator:
+                        continue  # Separatoren nicht ueber BG3-Installer
+                    uuid = row_data.folder_name
+                    if enabled:
+                        self._bg3_installer.activate_mod(uuid)
+                    else:
+                        self._bg3_installer.deactivate_mod(uuid)
+                    row_data.enabled = enabled
+                    entry = self._entry_for_row(row)
+                    if entry:
+                        entry.enabled = enabled
+            model.dataChanged.emit(
+                model.index(0, 0),
+                model.index(model.rowCount() - 1, 0),
+                [Qt.ItemDataRole.CheckStateRole],
+            )
+            self._write_current_modlist()
+            self._update_active_count()
+            return
+
+        # ── Standard-Pfad (nicht-BG3) ──
         for row in rows:
             entry = self._entry_for_row(row)
             if entry:
@@ -3313,18 +3431,20 @@ class MainWindow(QMainWindow):
     def _ctx_remove_mods(self, rows: list[int]) -> None:
         """Remove selected mods (folder + modlist.txt entry)."""
         names = []
+        display_names = []
         for row in rows:
             entry = self._entry_for_row(row)
             if entry:
                 names.append(entry.name)
+                display_names.append(entry.display_name or entry.name)
         if not names:
             return
 
-        if len(names) == 1:
-            msg = tr("dialog.remove_mod_single", name=names[0])
+        if len(display_names) == 1:
+            msg = tr("dialog.remove_mod_single", name=display_names[0])
         else:
-            names_list = "\n".join(f"  • {n}" for n in names)
-            msg = tr("dialog.remove_mod_multi", count=len(names), list=names_list)
+            names_list = "\n".join(f"  - {n}" for n in display_names)
+            msg = tr("dialog.remove_mod_multi", count=len(display_names), list=names_list)
 
         reply = QMessageBox.question(
             self, tr("dialog.remove_mod_title"), msg,
@@ -3333,6 +3453,38 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
+        # ── BG3-Weiche: Uninstall ueber BG3-Installer ──
+        if self._bg3_installer is not None:
+            profiles_dir = self._current_instance_path / ".profiles"
+            for name in names:
+                if name.endswith("_separator"):
+                    # Separator: nur lokal entfernen
+                    sep_path = self._current_instance_path / ".mods" / name
+                    if sep_path.is_dir():
+                        shutil.rmtree(sep_path)
+                    remove_mod_globally(profiles_dir, name)
+                else:
+                    # BG3 mod: name = UUID, find filename
+                    entry = next((e for e in self._current_mod_entries if e.name == name), None)
+                    # Find the pak_file for this UUID from the installer
+                    mod_list = self._bg3_installer.get_mod_list()
+                    filename = ""
+                    all_bg3 = mod_list.get("active", []) + mod_list.get("inactive", [])
+                    for m in all_bg3:
+                        if m.get("uuid", "").lower() == name.lower():
+                            filename = m.get("pak_file", m.get("filename", ""))
+                            break
+                    ok = self._bg3_installer.uninstall_mod(name, filename)
+                    if ok:
+                        remove_mod_globally(profiles_dir, name)
+            self._bg3_reload_mod_list()
+            self._game_panel.refresh_downloads()
+            self.statusBar().showMessage(
+                tr("status.removed", names=", ".join(display_names)), 5000,
+            )
+            return
+
+        # ── Standard-Pfad (nicht-BG3) ──
         profiles_dir = self._current_instance_path / ".profiles"
         for name in names:
             mod_path = self._current_instance_path / ".mods" / name
@@ -3344,7 +3496,7 @@ class MainWindow(QMainWindow):
         self._reload_mod_list()
         self._do_redeploy()
         self._game_panel.refresh_downloads()
-        self.statusBar().showMessage(tr("status.removed", names=", ".join(names)), 5000)
+        self.statusBar().showMessage(tr("status.removed", names=", ".join(display_names)), 5000)
 
     def _ctx_open_explorer(self, row: int) -> None:
         """Open the mod folder in the file manager."""
@@ -3635,8 +3787,7 @@ class MainWindow(QMainWindow):
         # Flush debounced column-width writes
         self._mod_list_view.flush_column_widths()
         self._game_panel.flush_column_widths()
-        if self._bg3_mod_list is not None:
-            self._bg3_mod_list.flush_column_widths()
+        self._bg3_extras_panel.flush_column_widths()
 
         s = self._settings()
         s.setValue("splitter/state", self._splitter.saveState())
@@ -3701,9 +3852,9 @@ class MainWindow(QMainWindow):
         self._mod_list_view.restore_column_widths()
         self._mod_list_view.restore_framework_widths()
 
-        # BG3 mod list — visible when BG3 instance is active
-        if self._bg3_mod_list is not None:
-            self._bg3_mod_list.restore_column_widths()
+        # BG3 extras panel column widths
+        if self._bg3_extras_panel.isVisible():
+            self._bg3_extras_panel.restore_column_widths()
 
         # Game-panel tabs — only restore the currently visible tab;
         # hidden tabs are restored on first switch via _on_tab_changed()
@@ -3732,30 +3883,20 @@ class MainWindow(QMainWindow):
 
     # ── BG3-specific methods ─────────────────────────────────────────
 
-    def _ensure_bg3_mod_list(self) -> None:
-        """Lazily create the BG3ModListView and add it to the stack."""
-        if self._bg3_mod_list is not None:
-            return
-        from anvil.widgets.bg3_mod_list import BG3ModListView
-        self._bg3_mod_list = BG3ModListView()
-        self._mod_list_stack.addWidget(self._bg3_mod_list)
-
-        # Connect signals
-        self._bg3_mod_list.mod_activated.connect(self._on_bg3_mod_activated)
-        self._bg3_mod_list.mod_deactivated.connect(self._on_bg3_mod_deactivated)
-        self._bg3_mod_list.mods_reordered.connect(self._on_bg3_mods_reordered)
-        self._bg3_mod_list.archives_dropped.connect(self._on_bg3_archives_dropped)
-        self._bg3_mod_list.context_menu_requested.connect(self._on_bg3_context_menu)
-
     def _apply_bg3_instance(
         self, instance_name: str, data: dict, plugin, game_path,
     ) -> None:
-        """Load a BG3 instance with the BG3ModInstaller flow."""
-        self._ensure_bg3_mod_list()
-        self._mod_list_stack.setCurrentWidget(self._bg3_mod_list)
-        self._toolbar.deploy_sep.setVisible(True)
-        self._toolbar.deploy_action.setVisible(True)
-        self._toolbar.deploy_btn.setStyleSheet("")
+        """Load a BG3 instance using the NORMAL ModListView + BG3 Installer bridge."""
+        # BG3 uses the normal ModListView (same as Cyberpunk, Starfield etc.)
+        self._mod_list_stack.setCurrentWidget(self._mod_list_view)
+        # BG3: Auto-Deploy — kein Deploy-Button noetig
+        self._toolbar.deploy_sep.setVisible(False)
+        self._toolbar.deploy_action.setVisible(False)
+
+        # Show BG3 Extras panel
+        self._bg3_extras_panel.setVisible(True)
+        # Hide normal framework section (BG3 has its own in extras)
+        self._mod_list_view.load_frameworks([])
 
         # Instance path
         instance_path = self._current_instance_path
@@ -3785,76 +3926,172 @@ class MainWindow(QMainWindow):
                 tr("status.bg3_proton_missing"), 8000,
             )
 
-        # Load mod list
-        self._bg3_reload_mod_list()
+        # ── BG3 Profile laden ──
+        profiles_dir = instance_path / ".profiles"
+        profiles_dir.mkdir(parents=True, exist_ok=True)
 
-        # Profile path (for compatibility with shared code)
+        profile_folders = sorted(
+            [d.name for d in profiles_dir.iterdir() if d.is_dir()],
+        ) if profiles_dir.is_dir() else []
+        if not profile_folders:
+            (profiles_dir / "Default").mkdir(exist_ok=True)
+            profile_folders = ["Default"]
+
+        order_file = profiles_dir / "profiles_order.json"
+        if order_file.is_file():
+            try:
+                saved_order = json.loads(order_file.read_text())
+                ordered = [p for p in saved_order if p in profile_folders]
+                ordered += [p for p in profile_folders if p not in saved_order]
+                profile_folders = ordered
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         profile_name = data.get("selected_profile", "Default")
+        if profile_name not in profile_folders:
+            profile_name = profile_folders[0]
+
+        self._profile_bar.set_profiles(profile_folders, active=profile_name)
         self._current_profile_path = instance_path / ".profiles" / profile_name
 
-        # No auto-deploy for BG3 (user deploys manually)
+        # Categories for BG3
+        self._category_manager.load(instance_path)
+        self._mod_list_view.source_model().set_category_manager(self._category_manager)
+        self._mod_list_view._proxy_model.set_category_manager(self._category_manager)
+        self._filter_panel.set_categories(self._category_manager.all_categories())
+        self._filter_panel.reset_all()
+
+        # Load mod list (BG3 bridge: installer data -> ModEntry -> ModRow)
+        self._bg3_reload_mod_list()
+
+        # BG3: auto-deploy on every state change
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
 
-    def _bg3_mark_dirty(self) -> None:
-        """Show and highlight the Deploy button (unsaved changes)."""
-        self._toolbar.deploy_sep.setVisible(True)
-        self._toolbar.deploy_action.setVisible(True)
-        self._toolbar.deploy_btn.setStyleSheet(
-            "QToolButton { color: #4DE0D0; font-weight: bold; }"
-        )
-
-    def _bg3_mark_clean(self) -> None:
-        """Remove highlight from Deploy button (no unsaved changes)."""
-        self._toolbar.deploy_btn.setStyleSheet("")
-
     def _bg3_reload_mod_list(self) -> None:
-        """Reload the BG3 mod list from the installer."""
-        if self._bg3_installer is None or self._bg3_mod_list is None:
+        """Reload BG3 mod list: installer data -> ModEntry -> normal ModListView."""
+        if self._bg3_installer is None:
             return
+
         mod_list = self._bg3_installer.get_mod_list()
-        self._bg3_mod_list.load_mods(
-            mod_list["active"],
-            mod_list["inactive"],
+        # Combine active + inactive into unified list with enabled flag
+        bg3_mods = []
+        for m in mod_list.get("active", []):
+            bg3_mods.append({**m, "enabled": True})
+        for m in mod_list.get("inactive", []):
+            bg3_mods.append({**m, "enabled": False})
+
+        # Read local modlist.txt for separator order + positions
+        profiles_dir = self._current_instance_path / ".profiles" if self._current_instance_path else None
+        local_order = []
+        if profiles_dir:
+            from anvil.core.mod_list_io import read_global_modlist
+            local_order = read_global_modlist(profiles_dir)
+
+        # Read active_mods for this profile (for separator enable state)
+        active_mods = set()
+        if self._current_profile_path:
+            active_mods = read_active_mods(self._current_profile_path)
+
+        # Build a map of BG3 mods by UUID
+        bg3_by_uuid: dict[str, dict] = {}
+        for m in bg3_mods:
+            bg3_by_uuid[m.get("uuid", "").lower()] = m
+
+        # Build unified entries: merge local order (with separators) + BG3 data
+        entries: list[ModEntry] = []
+        seen_uuids: set[str] = set()
+
+        for item_name in local_order:
+            if item_name.endswith("_separator"):
+                # Separator from local modlist.txt
+                entry = ModEntry(
+                    name=item_name,
+                    enabled=item_name in active_mods,
+                    is_separator=True,
+                    priority=len(entries),
+                )
+                # Read color from .mods/ separator dir meta.ini
+                if self._current_instance_path:
+                    sep_path = self._current_instance_path / ".mods" / item_name
+                    if sep_path.is_dir():
+                        entry.install_path = sep_path
+                        from anvil.core.mod_metadata import read_meta_ini
+                        meta = read_meta_ini(sep_path)
+                        entry.color = meta.get("color", "")
+                entries.append(entry)
+            else:
+                # Check if this is a UUID (BG3 mod)
+                bg3_mod = bg3_by_uuid.get(item_name.lower())
+                if bg3_mod:
+                    entry = self._bg3_mod_to_entry(bg3_mod, len(entries))
+                    entries.append(entry)
+                    seen_uuids.add(bg3_mod.get("uuid", "").lower())
+
+        # Add BG3 mods not yet in local order (new mods)
+        for m in bg3_mods:
+            uuid = m.get("uuid", "").lower()
+            if uuid not in seen_uuids:
+                entry = self._bg3_mod_to_entry(m, len(entries))
+                entries.append(entry)
+                seen_uuids.add(uuid)
+
+        self._current_mod_entries = entries
+
+        # Convert to ModRows for the normal model
+        mod_rows = [mod_entry_to_row(e) for e in entries]
+        self._mod_list_view.source_model().set_mods(mod_rows)
+        self._mod_list_view._proxy_model.set_mod_entries(entries)
+        self._mod_list_view._tree._apply_separator_filter()
+        self._update_active_count()
+
+        # Write local modlist.txt + active_mods.json to keep in sync
+        self._write_current_modlist()
+
+        # Load extras (Frameworks + Data-Overrides)
+        self._bg3_extras_panel.load_extras(
             data_overrides=mod_list.get("data_overrides", []),
             frameworks=mod_list.get("frameworks", []),
         )
-        self._profile_bar.update_active_count(len(mod_list["active"]))
 
-    def _on_bg3_mod_activated(self, uuid: str) -> None:
-        """Activate a BG3 mod (add to ModOrder)."""
+    def _bg3_mod_to_entry(self, mod: dict, priority: int) -> ModEntry:
+        """Convert a BG3 installer mod dict to a ModEntry."""
+        uuid = mod.get("uuid", "")
+        return ModEntry(
+            name=uuid,  # folder_name = UUID (as identifier)
+            enabled=mod.get("enabled", False),
+            priority=priority,
+            display_name=mod.get("name", uuid),
+            version=mod.get("version", mod.get("version64", "")),
+            author=mod.get("author", ""),
+        )
+
+    def _bg3_sync_active_state(self, active_mods: set[str]) -> None:
+        """Sync the BG3 installer with the active mods from a profile.
+
+        For each mod, call activate_mod or deactivate_mod to update
+        modsettings.lsx.
+        """
         if self._bg3_installer is None:
             return
-        ok = self._bg3_installer.activate_mod(uuid)
-        if ok:
-            self._bg3_reload_mod_list()
-            self._bg3_mark_dirty()
-            self.statusBar().showMessage(tr("status.mod_activated"), 3000)
-        else:
-            self.statusBar().showMessage(tr("status.mod_activation_failed"), 5000)
-
-    def _on_bg3_mod_deactivated(self, uuid: str) -> None:
-        """Deactivate a BG3 mod (remove from ModOrder)."""
-        if self._bg3_installer is None:
-            return
-        ok = self._bg3_installer.deactivate_mod(uuid)
-        if ok:
-            self._bg3_reload_mod_list()
-            self._bg3_mark_dirty()
-            self.statusBar().showMessage(tr("status.mod_deactivated"), 3000)
-        else:
-            self.statusBar().showMessage(tr("status.mod_deactivation_failed"), 5000)
-
-    def _on_bg3_mods_reordered(self, uuid_order: list[str]) -> None:
-        """Reorder BG3 active mods."""
-        if self._bg3_installer is None:
-            return
-        ok = self._bg3_installer.reorder_mods(uuid_order)
-        if ok:
-            self._bg3_mark_dirty()
-            self.statusBar().showMessage(tr("status.load_order_updated"), 3000)
-        else:
-            self.statusBar().showMessage(tr("status.load_order_failed"), 5000)
-            self._bg3_reload_mod_list()
+        # Get current BG3 state
+        mod_list = self._bg3_installer.get_mod_list()
+        # Combine active + inactive
+        bg3_mods = []
+        for m in mod_list.get("active", []):
+            bg3_mods.append({**m, "enabled": True})
+        for m in mod_list.get("inactive", []):
+            bg3_mods.append({**m, "enabled": False})
+        active_lower = {a.lower() for a in active_mods}
+        for m in bg3_mods:
+            uuid = m.get("uuid", "")
+            is_active = m.get("enabled", False)
+            should_be_active = uuid in active_mods or uuid.lower() in active_lower
+            if should_be_active and not is_active:
+                self._bg3_installer.activate_mod(uuid)
+            elif not should_be_active and is_active:
+                self._bg3_installer.deactivate_mod(uuid)
+        # Reload to reflect changes
+        self._bg3_reload_mod_list()
 
     def _on_bg3_archives_dropped(self, paths: list) -> None:
         """Install BG3 mods from dropped archives/paks."""
@@ -3887,9 +4124,6 @@ class MainWindow(QMainWindow):
                 )
         if installed:
             self._bg3_reload_mod_list()
-            # Only mark dirty for pak mods (framework/data don't need deploy)
-            if any(t == "pak" for _, t in installed):
-                self._bg3_mark_dirty()
             names = ", ".join(n for n, _ in installed)
             types = set(t for _, t in installed)
             if types == {"pak"}:
@@ -3904,79 +4138,9 @@ class MainWindow(QMainWindow):
             return
         ok = self._bg3_installer.deploy()
         if ok:
-            self._bg3_mark_clean()
             self.statusBar().showMessage(tr("status.modlist_exported_check"), 5000)
         else:
             self.statusBar().showMessage(tr("status.deploy_failed"), 5000)
-
-    def _on_bg3_context_menu(self, global_pos, section: str, mod_data: dict) -> None:
-        """BG3-specific context menu."""
-        if self._bg3_installer is None:
-            return
-
-        # Extras section has its own menu
-        if section == "extras":
-            self._on_bg3_extras_context_menu(global_pos, mod_data)
-            return
-
-        has_mod = bool(mod_data.get("uuid"))
-        menu = QMenu(self)
-
-        if has_mod:
-            act_activate = None
-            act_deactivate = None
-            if section == "inactive":
-                act_activate = menu.addAction(tr("context.activate"))
-            else:
-                act_deactivate = menu.addAction(tr("context.deactivate"))
-
-            menu.addSeparator()
-            act_uninstall = menu.addAction(tr("context.uninstall"))
-        else:
-            act_activate = None
-            act_deactivate = None
-            act_uninstall = None
-
-        menu.addSeparator()
-        act_explorer = menu.addAction(tr("context.open_file_manager"))
-        act_explorer.setEnabled(has_mod)
-        menu.addSeparator()
-        act_reload = menu.addAction(tr("context.reload"))
-
-        chosen = menu.exec(global_pos)
-        if not chosen:
-            return
-
-        uuid = mod_data.get("uuid", "")
-        filename = mod_data.get("filename", "")
-
-        if chosen == act_reload:
-            self._bg3_reload_mod_list()
-            self.statusBar().showMessage(tr("status.mod_list_reloaded"), 3000)
-        elif act_activate is not None and chosen == act_activate:
-            self._on_bg3_mod_activated(uuid)
-        elif act_deactivate is not None and chosen == act_deactivate:
-            self._on_bg3_mod_deactivated(uuid)
-        elif chosen == act_uninstall and uuid:
-            name = mod_data.get("name", uuid)
-            reply = QMessageBox.question(
-                self, tr("dialog.uninstall_mod_title"),
-                tr("dialog.uninstall_mod_message", name=name),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                ok = self._bg3_installer.uninstall_mod(uuid, filename)
-                if ok:
-                    self._bg3_reload_mod_list()
-                    self._bg3_mark_dirty()
-                    self.statusBar().showMessage(tr("status.uninstalled", name=name), 5000)
-                else:
-                    self.statusBar().showMessage(tr("status.uninstall_failed"), 5000)
-        elif chosen == act_explorer:
-            import subprocess
-            mods_path = self._bg3_installer._mods_path
-            if mods_path and mods_path.is_dir():
-                subprocess.Popen(["xdg-open", str(mods_path)])
 
     # ── Framework context menu + handlers ──────────────────────────
 
