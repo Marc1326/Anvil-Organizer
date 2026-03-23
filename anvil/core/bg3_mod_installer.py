@@ -82,10 +82,10 @@ class BG3ModInstaller:
 
     def activate_mod(self, uuid: str) -> bool:
         """Move a mod from inactive to active (add to ModOrder)."""
-        if self._modsettings_path is None:
+        if self._state_file_path() is None and self._modsettings_path is None:
             return False
 
-        data = self._read_modsettings()
+        data = self._read_state()
         mod_order = data["mod_order"]
         mods = data["mods"]
 
@@ -115,7 +115,7 @@ class BG3ModInstaller:
 
         # Add to end of ModOrder
         mod_order.append(uuid)
-        self._write_modsettings(mod_order, mods)
+        self._write_state(mod_order, mods)
         return True
 
     def deactivate_mod(self, uuid: str) -> bool:
@@ -123,14 +123,14 @@ class BG3ModInstaller:
 
         The mod entry stays in the Mods node so it is not lost.
         """
-        if self._modsettings_path is None:
+        if self._state_file_path() is None and self._modsettings_path is None:
             return False
 
         if is_base_game_mod(uuid):
             print("bg3_installer: cannot deactivate Gustav/GustavDev", file=sys.stderr)
             return False
 
-        data = self._read_modsettings()
+        data = self._read_state()
         mod_order = data["mod_order"]
         mods = data["mods"]
 
@@ -140,7 +140,7 @@ class BG3ModInstaller:
             # Was not active
             return True
 
-        self._write_modsettings(new_order, mods)
+        self._write_state(new_order, mods)
         return True
 
     def reorder_mods(self, uuid_order: list[str]) -> bool:
@@ -150,10 +150,10 @@ class BG3ModInstaller:
         to and including the last Gustav/GustavDev entry stays fixed.
         The user-provided uuid_order replaces only the mods after that.
         """
-        if self._modsettings_path is None:
+        if self._state_file_path() is None and self._modsettings_path is None:
             return False
 
-        data = self._read_modsettings()
+        data = self._read_state()
         mods = data["mods"]
         current = data["mod_order"]
 
@@ -169,83 +169,105 @@ class BG3ModInstaller:
         user_mods = [u for u in uuid_order if not is_base_game_mod(u)]
 
         final_order = header + user_mods
-        self._write_modsettings(final_order, mods)
+        self._write_state(final_order, mods)
         return True
 
     def deploy(self) -> bool:
-        """Validate and create a final backup of modsettings.lsx."""
+        """Export bg3_modstate.json to modsettings.lsx for BG3.
+
+        Reads the master state and writes a fresh modsettings.lsx that
+        BG3 can read.  BG3 may overwrite it on next launch — that's OK,
+        the master state in bg3_modstate.json is unaffected.
+        """
         if self._modsettings_path is None:
             print("bg3_installer: modsettings.lsx path not available", file=sys.stderr)
             return False
 
-        if not self._modsettings_path.is_file():
-            print("bg3_installer: modsettings.lsx does not exist", file=sys.stderr)
-            return False
-
-        data = self._read_modsettings()
+        data = self._read_state()
         mod_order = data["mod_order"]
         mods = data["mods"]
 
-        # Validate: Gustav/GustavDev must be present in ModOrder
+        if not mod_order and not mods:
+            print("bg3_installer: no mods in state, nothing to deploy", file=sys.stderr)
+            return False
+
+        # Validate: Gustav/GustavDev must be present in active mods
         has_gustav = any(is_base_game_mod(u) for u in mod_order)
         if not has_gustav:
-            print("bg3_installer: Gustav/GustavDev not found in ModOrder!", file=sys.stderr)
+            print("bg3_installer: Gustav/GustavDev not in active mods!", file=sys.stderr)
             return False
 
         # Validate: all ModOrder UUIDs have a Mods entry
         mods_uuids = {m["uuid"].lower() for m in mods}
         missing = [u for u in mod_order if u.lower() not in mods_uuids]
         for uuid in missing:
-            print(f"bg3_installer: WARNING — UUID {uuid} in ModOrder but not in Mods", file=sys.stderr)
+            print(f"bg3_installer: WARNING — UUID {uuid} in ModOrder but not in Mods",
+                  file=sys.stderr)
 
-        # Final backup
-        backup = self._modsettings_path.parent / "modsettings.lsx.deploy_backup"
-        shutil.copy2(self._modsettings_path, backup)
-        print(f"bg3_installer: deploy OK — backup at {backup}")
+        # Backup existing modsettings.lsx before overwriting
+        if self._modsettings_path.is_file():
+            backup = self._modsettings_path.parent / "modsettings.lsx.deploy_backup"
+            try:
+                shutil.copy2(self._modsettings_path, backup)
+            except OSError as exc:
+                print(f"bg3_installer: backup failed: {exc}", file=sys.stderr)
+
+        # Write modsettings.lsx from master state
+        self._write_modsettings(mod_order, mods)
+
+        active_count = len([u for u in mod_order if not is_base_game_mod(u)])
+        total_count = len(mods)
+        print(
+            f"bg3_installer: deploy OK — {active_count} active mods, "
+            f"{total_count} total written to modsettings.lsx",
+            file=sys.stderr,
+        )
         return True
 
     def repair_modsettings(self) -> dict:
-        """Repair a broken modsettings.lsx file.
+        """Repair the mod state by rescanning all .pak files.
 
-        Reads the current file, creates a timestamped backup, then
-        rewrites it with:
-          - A proper ModOrder node (reconstructed from Mods entries)
-          - GustavX/Gustav at position 0
-          - No duplicate UUIDs
-          - All existing mods preserved
+        Reads bg3_modstate.json (or modsettings.lsx as fallback),
+        scans the Mods/ folder, merges missing paks, ensures Gustav
+        is present, removes duplicates, and rewrites the state.
 
         Returns:
             Dict with 'backup_path', 'mod_count', 'had_mod_order',
             'gustav_uuid' — or empty dict on error.
         """
-        if self._modsettings_path is None or not self._modsettings_path.is_file():
-            print("bg3_installer: repair — modsettings.lsx not found", file=sys.stderr)
-            return {}
-
-        path = self._modsettings_path
-
         # ── Read current state ────────────────────────────────────
-        data = ModsettingsParser.read(path)
-        mod_order = data["mod_order"]
-        mods = data["mods"]
+        data = self._read_state()
+        had_mod_order = bool(data["mod_order"])
+        mods = list(data["mods"])
 
-        # Check if ModOrder was actually present in the file
-        import xml.etree.ElementTree as ET2
-        try:
-            tree = ET2.parse(path)
-            root = tree.getroot()
-            had_mod_order = any(
-                elem.get("id") == "ModOrder"
-                for elem in root.iter("node")
-            )
-        except ET2.ParseError:
-            had_mod_order = False
+        # ── Backup state file ────────────────────────────────────
+        state_path = self._state_file_path()
+        backup = ""
+        if state_path and state_path.is_file():
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = state_path.parent / f"bg3_modstate.json.repair_backup_{ts}"
+            shutil.copy2(state_path, backup_path)
+            backup = str(backup_path)
+            print(f"bg3_installer: repair backup → {backup_path}", file=sys.stderr)
 
-        # ── Timestamped backup ────────────────────────────────────
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup = path.parent / f"modsettings.lsx.repair_backup_{ts}"
-        shutil.copy2(path, backup)
-        print(f"bg3_installer: repair backup → {backup}")
+        # ── Rescan all .pak files in Mods/ folder ─────────────────
+        known_uuids = {m["uuid"].lower() for m in mods}
+        if self._mods_path and self._mods_path.is_dir():
+            for pak in self._mods_path.glob("*.pak"):
+                meta = self._lspk.read_pak_metadata(pak)
+                if meta and meta.get("uuid"):
+                    pak_uuid = meta["uuid"].lower()
+                    if pak_uuid not in known_uuids:
+                        mods.append({
+                            "uuid": meta["uuid"],
+                            "name": meta.get("name", pak.stem),
+                            "folder": meta.get("folder", ""),
+                            "md5": "",
+                            "version64": meta.get("version", "0") or "0",
+                            "publish_handle": "0",
+                            "pak_file": pak.name,
+                        })
+                        known_uuids.add(pak_uuid)
 
         # ── Deduplicate mods ──────────────────────────────────────
         unique_mods: list[dict] = []
@@ -271,14 +293,15 @@ class BG3ModInstaller:
 
         final_order = [gustav_uuid] + other_uuids
 
-        # ── Write repaired file ───────────────────────────────────
-        self._write_modsettings(final_order, unique_mods)
+        # ── Write repaired state ──────────────────────────────────
+        self._write_state(final_order, unique_mods)
 
         print(f"bg3_installer: repair done — {len(unique_mods)} mods, "
-              f"ModOrder {'reconstructed' if not had_mod_order else 'deduplicated'}")
+              f"ModOrder {'reconstructed' if not had_mod_order else 'deduplicated'}",
+              file=sys.stderr)
 
         return {
-            "backup_path": str(backup),
+            "backup_path": backup,
             "mod_count": len(unique_mods),
             "had_mod_order": had_mod_order,
             "gustav_uuid": gustav_uuid,
@@ -290,14 +313,14 @@ class BG3ModInstaller:
         Returns:
             Dict with 'active', 'inactive', 'data_overrides', 'frameworks'.
         """
-        data = self._read_modsettings()
+        data = self._read_state()
         mod_order = data["mod_order"]
         mods = data["mods"]
 
         # Build set of active UUIDs (from ModOrder)
         active_uuids = {u.lower() for u in mod_order}
 
-        # Build UUID->mod-info map from modsettings
+        # Build UUID->mod-info map from state
         mods_by_uuid: dict[str, dict] = {}
         for m in mods:
             mods_by_uuid[m["uuid"].lower()] = m
@@ -336,14 +359,14 @@ class BG3ModInstaller:
 
         Removes from ModOrder, removes from Mods node, deletes .pak file.
         """
-        if self._modsettings_path is None:
+        if self._state_file_path() is None and self._modsettings_path is None:
             return False
 
         if is_base_game_mod(uuid):
             print("bg3_installer: cannot uninstall Gustav/GustavDev", file=sys.stderr)
             return False
 
-        data = self._read_modsettings()
+        data = self._read_state()
         mod_order = data["mod_order"]
         mods = data["mods"]
 
@@ -353,7 +376,7 @@ class BG3ModInstaller:
         # Remove from Mods list
         new_mods = [m for m in mods if m["uuid"].lower() != uuid.lower()]
 
-        self._write_modsettings(new_order, new_mods)
+        self._write_state(new_order, new_mods)
 
         # Delete .pak file
         if self._mods_path and pak_filename:
@@ -469,8 +492,8 @@ class BG3ModInstaller:
 
     def _install_pak_single(self, pak_path: Path) -> dict | None:
         """Install a single .pak file (no extraction needed)."""
-        if self._mods_path is None or self._modsettings_path is None:
-            print("bg3_installer: Proton prefix not found", file=sys.stderr)
+        if self._mods_path is None:
+            print("bg3_installer: Mods folder not found", file=sys.stderr)
             return None
 
         self._mods_path.mkdir(parents=True, exist_ok=True)
@@ -482,8 +505,8 @@ class BG3ModInstaller:
 
     def _install_pak_from_dir(self, temp_dir: Path) -> dict | None:
         """Install .pak files from an extracted archive."""
-        if self._mods_path is None or self._modsettings_path is None:
-            print("bg3_installer: Proton prefix not found", file=sys.stderr)
+        if self._mods_path is None:
+            print("bg3_installer: Mods folder not found", file=sys.stderr)
             return None
 
         self._mods_path.mkdir(parents=True, exist_ok=True)
@@ -504,12 +527,12 @@ class BG3ModInstaller:
         return result
 
     def _register_pak_files(self, pak_files: list[Path]) -> dict | None:
-        """Read metadata from paks and register in modsettings.lsx (inactive)."""
+        """Read metadata from paks and register in state (inactive)."""
         result_name = ""
         result_uuid = ""
         pak_names: list[str] = []
 
-        data = self._read_modsettings()
+        data = self._read_state()
         mod_order = data["mod_order"]
         mods = data["mods"]
         existing_uuids = {m["uuid"].lower() for m in mods}
@@ -532,11 +555,12 @@ class BG3ModInstaller:
                     "md5": "",
                     "version64": meta.get("version", "0") or "0",
                     "publish_handle": "0",
+                    "pak_file": pak.name,
                 })
                 existing_uuids.add(meta["uuid"].lower())
 
         # Write back — mod is in Mods but NOT in ModOrder (inactive)
-        self._write_modsettings(mod_order, mods)
+        self._write_state(mod_order, mods)
 
         result = {
             "name": result_name or pak_names[0],
@@ -723,6 +747,137 @@ class BG3ModInstaller:
             if meta and meta.get("uuid", "").lower() == uuid.lower():
                 return meta
         return None
+
+    # ── State file (bg3_modstate.json) — Master for all mod data ─────
+
+    def _state_file_path(self) -> Path | None:
+        """Return path to bg3_modstate.json in the instance directory."""
+        if self._instance_path is not None:
+            return self._instance_path / "bg3_modstate.json"
+        return None
+
+    def _read_state(self) -> dict:
+        """Read mod state from bg3_modstate.json (auto-migrates on first use).
+
+        Returns same format as _read_modsettings():
+            {"version": {...}, "mod_order": [...], "mods": [...]}
+        """
+        state_path = self._state_file_path()
+        if state_path is None:
+            # No instance path — fall back to modsettings.lsx directly
+            return self._read_modsettings()
+
+        if not state_path.is_file():
+            # First time: migrate from modsettings.lsx + pak scan
+            return self._migrate_state()
+
+        try:
+            raw = json.loads(state_path.read_text(encoding="utf-8"))
+            return {
+                "version": raw.get("xml_version", {
+                    "major": "4", "minor": "7", "revision": "1", "build": "3",
+                }),
+                "mod_order": raw.get("mod_order", []),
+                "mods": raw.get("mods", []),
+            }
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"bg3_installer: state read error: {exc}", file=sys.stderr)
+            return self._migrate_state()
+
+    def _write_state(
+        self,
+        mod_order: list[str],
+        all_mods: list[dict],
+    ) -> None:
+        """Write mod state to bg3_modstate.json."""
+        state_path = self._state_file_path()
+        if state_path is None:
+            # No instance path — fall back to modsettings.lsx directly
+            self._write_modsettings(mod_order, all_mods)
+            return
+
+        # Preserve xml_version from existing state
+        xml_version = {"major": "4", "minor": "7", "revision": "1", "build": "3"}
+        if state_path.is_file():
+            try:
+                existing = json.loads(state_path.read_text(encoding="utf-8"))
+                xml_version = existing.get("xml_version", xml_version)
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        state = {
+            "format_version": 1,
+            "xml_version": xml_version,
+            "mod_order": mod_order,
+            "mods": all_mods,
+        }
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(
+            json.dumps(state, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    def _migrate_state(self) -> dict:
+        """Migrate from modsettings.lsx + pak scan to bg3_modstate.json.
+
+        Called automatically on first _read_state() when no state file exists.
+        Reads modsettings.lsx, scans the Mods/ folder for unregistered .pak
+        files, and creates bg3_modstate.json as the new master.
+        """
+        # Read whatever is in modsettings.lsx
+        data = self._read_modsettings()
+        mod_order = list(data["mod_order"])
+        mods = list(data["mods"])
+        version = data["version"]
+
+        # Build UUID lookup
+        known_uuids = {m["uuid"].lower() for m in mods}
+
+        # Scan Mods/ folder for .pak files not yet registered
+        if self._mods_path and self._mods_path.is_dir():
+            uuid_to_pak: dict[str, str] = {}
+            for pak in self._mods_path.glob("*.pak"):
+                meta = self._lspk.read_pak_metadata(pak)
+                if meta and meta.get("uuid"):
+                    pak_uuid = meta["uuid"].lower()
+                    uuid_to_pak[pak_uuid] = pak.name
+
+                    if pak_uuid not in known_uuids:
+                        mods.append({
+                            "uuid": meta["uuid"],
+                            "name": meta.get("name", pak.stem),
+                            "folder": meta.get("folder", ""),
+                            "md5": "",
+                            "version64": meta.get("version", "0") or "0",
+                            "publish_handle": "0",
+                            "pak_file": pak.name,
+                        })
+                        known_uuids.add(pak_uuid)
+                        print(
+                            f"bg3_installer: migration — found unregistered pak: "
+                            f"{pak.name} ({meta.get('name', '?')})",
+                            file=sys.stderr,
+                        )
+
+            # Fill in pak_file for existing mods that don't have it
+            for m in mods:
+                if not m.get("pak_file"):
+                    m["pak_file"] = uuid_to_pak.get(m["uuid"].lower(), "")
+
+        # Write the new state file
+        self._write_state(mod_order, mods)
+
+        count_active = len(mod_order)
+        count_total = len(mods)
+        print(
+            f"bg3_installer: migrated to bg3_modstate.json — "
+            f"{count_total} mods, {count_active} active",
+            file=sys.stderr,
+        )
+
+        return {"version": version, "mod_order": mod_order, "mods": mods}
+
+    # ── Legacy modsettings.lsx I/O (used by migration + deploy) ───────
 
     def _read_modsettings(self) -> dict:
         """Read modsettings.lsx, return defaults if missing."""
