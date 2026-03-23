@@ -339,6 +339,7 @@ class GamePanel(QWidget):
         layout.addWidget(tabs)
 
         # Track current state for reload / icon updates
+        self._current_game_proc = None   # subprocess.Popen of running game
         self._current_game_path: Path | None = None
         self._current_short_name: str = ""
         self._current_plugin = None
@@ -1026,16 +1027,9 @@ class GamePanel(QWidget):
         )
 
         if is_steam:
-            force_proton = getattr(plugin, "GameLaunchViaProton", False)
-            is_main_binary = (
-                hasattr(plugin, "GameBinary") and binary == plugin.GameBinary
-            )
-            if is_main_binary and not force_proton:
-                # Main game binary -> launch via steam -applaunch
-                self._launch_via_steam(plugin)
-            else:
-                # Non-primary executable or GameLaunchViaProton flag -> launch via proton run
-                self._launch_via_proton(plugin, binary)
+            # Steam games always launch via steam -applaunch.
+            # Script extenders (SFSE, F4SE) are handled by Steam launch options.
+            self._launch_via_steam(plugin)
             return
 
         # Non-Steam game: direct start (GOG, Epic, etc.)
@@ -1079,18 +1073,11 @@ class GamePanel(QWidget):
             args.extend(plugin.GameLaunchArgs)
         success, pid = QProcess.startDetached(steam_bin, args)
         if success:
-            # Warn if Proton shim DLLs need WINEDLLOVERRIDES (Steam can't set env)
-            if hasattr(plugin, "get_proton_env_overrides"):
-                overrides = plugin.get_proton_env_overrides()
-                if "WINEDLLOVERRIDES" in overrides:
-                    QMessageBox.information(
-                        self, tr("game_panel.start"),
-                        tr("game_panel.shim_steam_hint",
-                           overrides=overrides["WINEDLLOVERRIDES"]),
-                    )
             self.game_started.emit(self._game_label.text(), -1)
-            # Watch for game process by SteamAppId / binary name
+            # Store info for stop_game() — steam launch has no proc handle
             binary_name = Path(getattr(plugin, "GameBinary", "")).name.lower()
+            self._watched_binary = binary_name
+            self._watched_app_id = str(steam_id)
             self._start_process_watcher(binary_name, app_id=str(steam_id))
         else:
             QMessageBox.warning(
@@ -1156,22 +1143,34 @@ class GamePanel(QWidget):
 
         working_dir = str(binary_path.parent)
 
-        # UMU_ID aktiviert den korrekten SLR-Pfad (wine64 <exe> statt wine64 steam.exe)
-        env["UMU_ID"] = f"umu-{steam_id}"
+        # Prefer umu-run (CachyOS, modern distros) over plain proton run
+        import shutil as _shutil
+        umu_bin = _shutil.which("umu-run")
+        if umu_bin:
+            env["GAMEID"] = f"umu-{steam_id}"
+            env["PROTONPATH"] = str(proton_script.parent)
+            env["STORE"] = "steam"
+            cmd = [umu_bin, str(binary_path)]
+        else:
+            # Fallback: standard proton run
+            env["UMU_ID"] = f"umu-{steam_id}"
+            cmd = [str(proton_script), "run", binary_path.name]
 
         try:
             proc = subprocess.Popen(
-                [str(proton_script), "run", binary_path.name],
+                cmd,
                 cwd=working_dir,
                 env=env,
+                start_new_session=True,  # eigene Prozessgruppe → killpg möglich
             )
+            self._current_game_proc = proc
             self.game_started.emit(self._game_label.text(), proc.pid)
             # Watch the actual game binary (GameBinary), not the launcher (e.g. f4se_loader.exe),
             # because launchers exit early after spawning the real game process.
-            # app_id=None: SteamAppId-Suche würde wine/proton Prozesse finden die auch zu früh sterben.
             game_binary = Path(getattr(plugin, "GameBinary", binary)).name.lower()
             self._start_process_watcher(game_binary, proc, app_id=None)
         except OSError as exc:
+            self._current_game_proc = None
             QMessageBox.warning(
                 self, tr("game_panel.start"),
                 tr("game_panel.proton_launch_failed", error=str(exc)),
@@ -1239,6 +1238,62 @@ class GamePanel(QWidget):
 
         t = threading.Thread(target=_watcher, daemon=True)
         t.start()
+
+    def stop_game(self) -> None:
+        """Kill the running game process.
+
+        Works for both umu-run launches (proc handle) and Steam launches
+        (find game PID via /proc scan).
+        """
+        import signal as _signal
+
+        # Method 1: umu-run proc handle (process group kill)
+        proc = getattr(self, "_current_game_proc", None)
+        if proc is not None:
+            self._current_game_proc = None
+            try:
+                os.killpg(os.getpgid(proc.pid), _signal.SIGTERM)
+                return
+            except OSError:
+                try:
+                    proc.terminate()
+                    return
+                except OSError:
+                    pass
+
+        # Method 2: Steam launch — find game process by binary name / SteamAppId
+        binary_name = getattr(self, "_watched_binary", "")
+        app_id = getattr(self, "_watched_app_id", "")
+        if not binary_name and not app_id:
+            return
+
+        killed = set()
+        try:
+            for entry in os.scandir("/proc"):
+                if not entry.name.isdigit():
+                    continue
+                pid = int(entry.name)
+                try:
+                    # Match via binary name in cmdline
+                    if binary_name:
+                        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes()
+                        if binary_name.encode() in cmdline.lower():
+                            os.kill(pid, _signal.SIGTERM)
+                            killed.add(pid)
+                            continue
+                    # Match via SteamAppId in environ
+                    if app_id:
+                        environ = Path(f"/proc/{pid}/environ").read_bytes()
+                        if f"SteamAppId={app_id}".encode() in environ:
+                            os.kill(pid, _signal.SIGTERM)
+                            killed.add(pid)
+                except OSError:
+                    pass
+        except OSError:
+            pass
+
+        self._watched_binary = ""
+        self._watched_app_id = ""
 
     def _populate_data_tree(self, game_path: Path | None) -> None:
         """Scan game_path and show top-level entries in the data tree."""

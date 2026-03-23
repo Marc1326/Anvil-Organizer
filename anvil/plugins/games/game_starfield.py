@@ -53,7 +53,7 @@ class StarfieldGame(BaseGame):
     GameEpicId = ""
 
     GameLauncher = ""  # No separate launcher
-    GameLaunchViaProton = True  # steam -applaunch unreliable; always use proton run
+    # Launch via steam -applaunch — SFSE/F4SE via Steam Launch-Optionen
 
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()
     GameSavesDirectory = ""     # resolved dynamically via gameSavesDirectory()
@@ -67,7 +67,7 @@ class StarfieldGame(BaseGame):
         "Game:-Starfield"
     )
 
-    ProtonShimFiles = ["version.dll"]
+    ProtonShimFiles: list[str] = []  # sfse_loader.exe handles injection directly (ProtonDB approach)
 
     # -- Primary & DLC Plugins (aus MO2) ------------------------------------
 
@@ -269,10 +269,10 @@ class StarfieldGame(BaseGame):
             {"name": "Starfield", "binary": self.GameBinary},
         ]
 
-        # Add SFSE if available
+        # Add SFSE if available (not on Steam — Steam launch options handle SFSE)
         if self._game_path is not None:
             sfse = self._game_path / self._SFSE_BINARY
-            if sfse.exists():
+            if sfse.exists() and self._detected_store != "steam":
                 result.insert(0, {"name": "SFSE", "binary": self._SFSE_BINARY})
 
             # Add Creation Kit if available

@@ -235,7 +235,7 @@ class MainWindow(QMainWindow):
         overlay_layout.addWidget(self._lock_label)
         self._unlock_btn = QPushButton(tr("status.game_lock.unlock_button"))
         self._unlock_btn.setFixedWidth(160)
-        self._unlock_btn.clicked.connect(lambda checked=False: self._unlock_ui())
+        self._unlock_btn.clicked.connect(lambda checked=False: (self._game_panel.stop_game(), self._unlock_ui()))
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         btn_layout.addWidget(self._unlock_btn)

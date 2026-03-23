@@ -50,7 +50,7 @@ class Fallout4Game(BaseGame):
     GameGogId = 1998527297  # Fallout 4: Game of the Year Edition
 
     GameLauncher = "Fallout4Launcher.exe"
-    GameLaunchViaProton = True  # steam -applaunch unreliable; always use proton run
+    # Launch via steam -applaunch — SFSE/F4SE via Steam Launch-Optionen
 
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()
     GameSavesDirectory = ""     # resolved dynamically via gameSavesDirectory()
@@ -64,7 +64,7 @@ class Fallout4Game(BaseGame):
         "Game:-Fallout-4"
     )
 
-    ProtonShimFiles = ["X3DAudio1_7.dll"]
+    ProtonShimFiles: list[str] = []  # F4SE via Steam Launch-Optionen, kein Shim nötig
 
     # -- Primary & DLC Plugins (aus MO2) ------------------------------------
 
@@ -259,10 +259,10 @@ class Fallout4Game(BaseGame):
             {"name": "Fallout 4 Launcher", "binary": self.GameLauncher},
         ]
 
-        # Add F4SE if available
+        # Add F4SE if available (not on Steam — Steam launch options handle F4SE)
         if self._game_path is not None:
             f4se = self._game_path / self._F4SE_BINARY
-            if f4se.exists():
+            if f4se.exists() and self._detected_store != "steam":
                 result.insert(0, {"name": "F4SE", "binary": self._F4SE_BINARY})
 
             # Add Creation Kit if available
