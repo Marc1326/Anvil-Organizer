@@ -50,7 +50,7 @@ class Fallout4Game(BaseGame):
     GameGogId = 1998527297  # Fallout 4: Game of the Year Edition
 
     GameLauncher = "Fallout4Launcher.exe"
-    # Launch via steam -applaunch — SFSE/F4SE via Steam Launch-Optionen
+    # Launch via steam -applaunch — F4SE via Steam Launch-Optionen
 
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()
     GameSavesDirectory = ""     # resolved dynamically via gameSavesDirectory()
@@ -64,7 +64,9 @@ class Fallout4Game(BaseGame):
         "Game:-Fallout-4"
     )
 
-    ProtonShimFiles: list[str] = []  # F4SE via Steam Launch-Optionen, kein Shim nötig
+    ProtonShimFiles: list[str] = []
+
+    ScriptExtenderDir = "F4SE"
 
     # -- Primary & DLC Plugins (aus MO2) ------------------------------------
 
@@ -190,23 +192,7 @@ class Fallout4Game(BaseGame):
                 detect_installed=["f4se_loader.exe"],
                 required_by=["F4SE-Plugins", "MCM", "Looksmenu"],
             ),
-            FrameworkMod(
-                name="F4SE Proton Shim",
-                pattern=["X3DAudio1_7.dll"],
-                target="",
-                description="Proxy-DLL — ermöglicht F4SE unter Linux/Proton",
-                detect_installed=["X3DAudio1_7.dll"],
-                required_by=["F4SE"],
-            ),
         ]
-
-    def get_proton_env_overrides(self) -> dict[str, str]:
-        """Return WINEDLLOVERRIDES for F4SE Proton shim."""
-        if self._game_path is None:
-            return {}
-        if (self._game_path / "X3DAudio1_7.dll").exists():
-            return {"WINEDLLOVERRIDES": "X3DAudio1_7=n,b"}
-        return {}
 
     # TODO: plugins.txt Parser/Writer -- Load-Order verwalten
     # TODO: .esp/.esm Scanner -- Mod-Dateien erkennen

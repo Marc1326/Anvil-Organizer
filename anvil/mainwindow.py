@@ -235,7 +235,7 @@ class MainWindow(QMainWindow):
         overlay_layout.addWidget(self._lock_label)
         self._unlock_btn = QPushButton(tr("status.game_lock.unlock_button"))
         self._unlock_btn.setFixedWidth(160)
-        self._unlock_btn.clicked.connect(lambda checked=False: (self._game_panel.stop_game(), self._unlock_ui()))
+        self._unlock_btn.clicked.connect(lambda checked=False: self._unlock_ui())
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         btn_layout.addWidget(self._unlock_btn)
@@ -1433,7 +1433,8 @@ class MainWindow(QMainWindow):
         Framework mods are detected and installed directly into the game directory.
         """
         flatten = getattr(self._current_plugin, "GameFlattenArchive", True) if self._current_plugin else True
-        installer = ModInstaller(self._current_instance_path, flatten=flatten)
+        se_dir = getattr(self._current_plugin, "ScriptExtenderDir", "") if self._current_plugin else ""
+        installer = ModInstaller(self._current_instance_path, flatten=flatten, script_extender_dir=se_dir)
         installed = []
         frameworks_installed = []
         _prev_inserted_name: str | None = None  # Track last inserted mod for multi-DnD
@@ -2701,7 +2702,8 @@ class MainWindow(QMainWindow):
 
         archive_path = Path(path)
         flatten = getattr(self._current_plugin, "GameFlattenArchive", True) if self._current_plugin else True
-        installer = ModInstaller(self._current_instance_path, flatten=flatten)
+        se_dir = getattr(self._current_plugin, "ScriptExtenderDir", "") if self._current_plugin else ""
+        installer = ModInstaller(self._current_instance_path, flatten=flatten, script_extender_dir=se_dir)
         result = installer.install_from_archive(archive_path)
 
         if result:
@@ -4073,7 +4075,8 @@ class MainWindow(QMainWindow):
 
         # Filter: only install archives that are actually framework mods
         flatten = getattr(self._current_plugin, "GameFlattenArchive", True)
-        installer = ModInstaller(self._current_instance_path, flatten=flatten)
+        se_dir = getattr(self._current_plugin, "ScriptExtenderDir", "")
+        installer = ModInstaller(self._current_instance_path, flatten=flatten, script_extender_dir=se_dir)
         fw_archives: list[Path] = []
         rejected: list[str] = []
 

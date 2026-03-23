@@ -129,6 +129,11 @@ class BaseGame:
     Example: ``{"winmm": "native,builtin", "version": "native,builtin"}``
     """
 
+    ScriptExtenderDir: str = ""
+    """Name of the Script Extender subdirectory inside Data/ (e.g. 'F4SE',
+    'SFSE').  Used by the mod installer to fix archives that ship a bare
+    ``Plugins/`` folder instead of ``<SE>/Plugins/``."""
+
     PRIMARY_PLUGINS: list[str] = []
     """Primary/DLC plugin files (.esm) that are always active.
     Only relevant for Bethesda Creation Engine games."""

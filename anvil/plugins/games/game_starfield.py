@@ -69,6 +69,8 @@ class StarfieldGame(BaseGame):
 
     ProtonShimFiles: list[str] = []  # sfse_loader.exe handles injection directly (ProtonDB approach)
 
+    ScriptExtenderDir = "SFSE"
+
     # -- Primary & DLC Plugins (aus MO2) ------------------------------------
 
     PRIMARY_PLUGINS = [
@@ -193,14 +195,6 @@ class StarfieldGame(BaseGame):
                 required_by=["SFSE-Plugins"],
             ),
             FrameworkMod(
-                name="SFSE Proton Shim",
-                pattern=["version.dll"],
-                target="",
-                description="Proxy-DLL — ermöglicht SFSE unter Linux/Proton",
-                detect_installed=["version.dll"],
-                required_by=["SFSE"],
-            ),
-            FrameworkMod(
                 name="Address Library for SFSE",
                 pattern=["versionlib-*.bin"],
                 target="Data/SFSE",
@@ -209,14 +203,6 @@ class StarfieldGame(BaseGame):
                 required_by=["SFSE-Plugins"],
             ),
         ]
-
-    def get_proton_env_overrides(self) -> dict[str, str]:
-        """Return WINEDLLOVERRIDES for SFSE Proton shim."""
-        if self._game_path is None:
-            return {}
-        if (self._game_path / "version.dll").exists():
-            return {"WINEDLLOVERRIDES": "version=n,b"}
-        return {}
 
     # TODO: plugins.txt Parser/Writer -- Load-Order verwalten
     # TODO: .esp/.esm Scanner -- Mod-Dateien erkennen

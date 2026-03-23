@@ -31,10 +31,12 @@ SUPPORTED_EXTENSIONS = {".zip", ".rar", ".7z"}
 class ModInstaller:
     """Extract archives and install them into an instance's ``.mods/`` folder."""
 
-    def __init__(self, instance_path: Path, flatten: bool = True) -> None:
+    def __init__(self, instance_path: Path, flatten: bool = True,
+                 script_extender_dir: str = "") -> None:
         self.instance_path = instance_path
         self.mods_path = instance_path / ".mods"
         self._flatten = flatten
+        self._se_dir = script_extender_dir
 
     # ── Public API ─────────────────────────────────────────────────────
 
@@ -166,6 +168,9 @@ class ModInstaller:
             if self._flatten:
                 self._flatten_single_subfolder(tmp)
 
+            # 3b. Fix Script Extender mods with bare Plugins/ folder
+            self._fix_se_plugins_dir(tmp)
+
             # 4. Check that we actually got files
             if not any(tmp.iterdir()):
                 print(
@@ -230,6 +235,8 @@ class ModInstaller:
 
         if self._flatten:
             self._flatten_single_subfolder(tmp)
+
+        self._fix_se_plugins_dir(tmp)
 
         if not any(tmp.iterdir()):
             print(f"mod_installer: archive is empty: {archive_path}", file=sys.stderr)
@@ -493,6 +500,32 @@ class ModInstaller:
             for item in single.iterdir():
                 shutil.move(str(item), str(extract_dir / item.name))
             single.rmdir()
+
+    def _fix_se_plugins_dir(self, extract_dir: Path) -> None:
+        """Fix Script Extender mods with bare ``Plugins/`` folder.
+
+        Some F4SE/SFSE mods ship archives with ``Plugins/foo.dll`` instead of
+        ``F4SE/Plugins/foo.dll``.  When ``ScriptExtenderDir`` is set on the
+        game plugin, this method detects the problem and wraps the folder:
+        ``Plugins/`` → ``<SE>/Plugins/``.
+        """
+        if not self._se_dir:
+            return
+        plugins_dir = extract_dir / "Plugins"
+        if not plugins_dir.is_dir():
+            return
+        # Already correct structure?
+        se_dir = extract_dir / self._se_dir
+        if se_dir.is_dir() and (se_dir / "Plugins").is_dir():
+            return
+        # Check that Plugins/ contains DLLs (not just random data)
+        has_dlls = any(f.suffix.lower() == ".dll" for f in plugins_dir.iterdir() if f.is_file())
+        if not has_dlls:
+            return
+        # Fix: Plugins/ → <SE>/Plugins/
+        se_dir.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(plugins_dir), str(se_dir / "Plugins"))
+        print(f"mod_installer: fixed SE structure — Plugins/ → {self._se_dir}/Plugins/")
 
     @staticmethod
     def check_tools() -> dict[str, bool]:
