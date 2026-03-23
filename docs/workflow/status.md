@@ -1,8 +1,7 @@
 # Workflow Status
-
-Feature: plugins.txt Fix (Case-Varianten + Diagnostik-Logging)
+Issue: #57
+Feature: BG3 Einheitliche Mod-Liste
+Branch: feat/issue-57
 Iteration: 1
-Checkliste: docs/workflow/checkliste-plugins-txt-fix.md
-Letzter QA-Report: docs/workflow/qa-report-plugins-txt-1.md
-Offene Punkte: keine
-Status: DONE
+Sub-Issues: []
+Status: DONE - Wartet auf Marc Review + Merge

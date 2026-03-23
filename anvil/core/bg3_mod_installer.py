@@ -116,6 +116,8 @@ class BG3ModInstaller:
         # Add to end of ModOrder
         mod_order.append(uuid)
         self._write_state(mod_order, mods)
+        # Auto-deploy: immediately write modsettings.lsx
+        self._write_modsettings(mod_order, mods)
         return True
 
     def deactivate_mod(self, uuid: str) -> bool:
@@ -141,6 +143,8 @@ class BG3ModInstaller:
             return True
 
         self._write_state(new_order, mods)
+        # Auto-deploy: immediately write modsettings.lsx
+        self._write_modsettings(new_order, mods)
         return True
 
     def reorder_mods(self, uuid_order: list[str]) -> bool:
@@ -170,6 +174,8 @@ class BG3ModInstaller:
 
         final_order = header + user_mods
         self._write_state(final_order, mods)
+        # Auto-deploy: immediately write modsettings.lsx
+        self._write_modsettings(final_order, mods)
         return True
 
     def deploy(self) -> bool:
@@ -308,10 +314,14 @@ class BG3ModInstaller:
         }
 
     def get_mod_list(self) -> dict:
-        """Return active, inactive, data_overrides, and frameworks.
+        """Return a unified mod list, data_overrides, and frameworks.
+
+        Every mod has an 'enabled' field (True = in ModOrder / active).
+        Active mods come first (in mod_order sequence), then inactive.
 
         Returns:
-            Dict with 'active', 'inactive', 'data_overrides', 'frameworks'.
+            Dict with 'mods' (unified list), 'active_count', 'total_count',
+            'data_overrides', 'frameworks'.
         """
         data = self._read_state()
         mod_order = data["mod_order"]
@@ -325,31 +335,36 @@ class BG3ModInstaller:
         for m in mods:
             mods_by_uuid[m["uuid"].lower()] = m
 
-        # Active mods (from ModOrder, with metadata)
-        active: list[dict] = []
+        # Unified list: active mods first (in mod_order sequence), then inactive
+        unified: list[dict] = []
+
+        # Active mods (from ModOrder, preserving order)
         for uuid in mod_order:
             if uuid.lower() in _HIDDEN_UUIDS:
                 continue
             info = mods_by_uuid.get(uuid.lower(), {"uuid": uuid, "name": uuid})
-            active.append(info)
+            unified.append({**info, "enabled": True})
 
         # Inactive mods: in Mods node but NOT in ModOrder
-        inactive: list[dict] = []
         for m in mods:
             m_uuid = m["uuid"].lower()
             if m_uuid in _HIDDEN_UUIDS:
                 continue
             if m_uuid in active_uuids:
                 continue
-            inactive.append(m)
+            unified.append({**m, "enabled": False})
+
+        active_count = len([u for u in mod_order if u.lower() not in _HIDDEN_UUIDS])
+        total_count = len(unified)
 
         # Data overrides and frameworks
         data_overrides = self.get_data_overrides()
         frameworks = self._get_frameworks()
 
         return {
-            "active": active,
-            "inactive": inactive,
+            "mods": unified,
+            "active_count": active_count,
+            "total_count": total_count,
             "data_overrides": data_overrides,
             "frameworks": frameworks,
         }
@@ -773,12 +788,34 @@ class BG3ModInstaller:
 
         try:
             raw = json.loads(state_path.read_text(encoding="utf-8"))
+            mod_order = raw.get("mod_order", [])
+            mods = raw.get("mods", [])
+
+            # Fix: ensure all mods are in mod_order (auto-repair)
+            mod_order_uuids = {u.lower() for u in mod_order}
+            repaired = False
+            for m in mods:
+                m_uuid = m["uuid"].lower()
+                if m_uuid in _HIDDEN_UUIDS or is_base_game_mod(m["uuid"]):
+                    continue
+                if m_uuid not in mod_order_uuids:
+                    mod_order.append(m["uuid"])
+                    mod_order_uuids.add(m_uuid)
+                    repaired = True
+                    print(
+                        f"bg3_installer: auto-repair — added missing UUID to mod_order: "
+                        f"{m.get('name', '?')} ({m['uuid']})",
+                        file=sys.stderr,
+                    )
+            if repaired:
+                self._write_state(mod_order, mods)
+
             return {
                 "version": raw.get("xml_version", {
                     "major": "4", "minor": "7", "revision": "1", "build": "3",
                 }),
-                "mod_order": raw.get("mod_order", []),
-                "mods": raw.get("mods", []),
+                "mod_order": mod_order,
+                "mods": mods,
             }
         except (json.JSONDecodeError, OSError) as exc:
             print(f"bg3_installer: state read error: {exc}", file=sys.stderr)
@@ -833,6 +870,9 @@ class BG3ModInstaller:
         # Build UUID lookup
         known_uuids = {m["uuid"].lower() for m in mods}
 
+        # Build set of UUIDs already in mod_order for quick lookup
+        mod_order_uuids = {u.lower() for u in mod_order}
+
         # Scan Mods/ folder for .pak files not yet registered
         if self._mods_path and self._mods_path.is_dir():
             uuid_to_pak: dict[str, str] = {}
@@ -853,6 +893,10 @@ class BG3ModInstaller:
                             "pak_file": pak.name,
                         })
                         known_uuids.add(pak_uuid)
+                        # Also add to mod_order so the mod appears as active
+                        if pak_uuid not in _HIDDEN_UUIDS and not is_base_game_mod(meta["uuid"]):
+                            mod_order.append(meta["uuid"])
+                            mod_order_uuids.add(pak_uuid)
                         print(
                             f"bg3_installer: migration — found unregistered pak: "
                             f"{pak.name} ({meta.get('name', '?')})",
@@ -863,6 +907,21 @@ class BG3ModInstaller:
             for m in mods:
                 if not m.get("pak_file"):
                     m["pak_file"] = uuid_to_pak.get(m["uuid"].lower(), "")
+
+        # Fix: ensure ALL mods in state are also in mod_order
+        # (fixes the 21-missing-UUIDs bug from previous versions)
+        for m in mods:
+            m_uuid = m["uuid"].lower()
+            if m_uuid in _HIDDEN_UUIDS or is_base_game_mod(m["uuid"]):
+                continue
+            if m_uuid not in mod_order_uuids:
+                mod_order.append(m["uuid"])
+                mod_order_uuids.add(m_uuid)
+                print(
+                    f"bg3_installer: migration — added missing UUID to mod_order: "
+                    f"{m.get('name', '?')} ({m['uuid']})",
+                    file=sys.stderr,
+                )
 
         # Write the new state file
         self._write_state(mod_order, mods)

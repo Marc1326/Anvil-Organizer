@@ -3753,9 +3753,9 @@ class MainWindow(QMainWindow):
         """Load a BG3 instance with the BG3ModInstaller flow."""
         self._ensure_bg3_mod_list()
         self._mod_list_stack.setCurrentWidget(self._bg3_mod_list)
-        self._toolbar.deploy_sep.setVisible(True)
-        self._toolbar.deploy_action.setVisible(True)
-        self._toolbar.deploy_btn.setStyleSheet("")
+        # BG3: Auto-Deploy — kein Deploy-Button noetig
+        self._toolbar.deploy_sep.setVisible(False)
+        self._toolbar.deploy_action.setVisible(False)
 
         # Instance path
         instance_path = self._current_instance_path
@@ -3792,7 +3792,7 @@ class MainWindow(QMainWindow):
         profile_name = data.get("selected_profile", "Default")
         self._current_profile_path = instance_path / ".profiles" / profile_name
 
-        # No auto-deploy for BG3 (user deploys manually)
+        # BG3: auto-deploy on every state change
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
 
     def _bg3_mark_dirty(self) -> None:
@@ -3813,44 +3813,42 @@ class MainWindow(QMainWindow):
             return
         mod_list = self._bg3_installer.get_mod_list()
         self._bg3_mod_list.load_mods(
-            mod_list["active"],
-            mod_list["inactive"],
+            mod_list["mods"],
             data_overrides=mod_list.get("data_overrides", []),
             frameworks=mod_list.get("frameworks", []),
         )
-        self._profile_bar.update_active_count(len(mod_list["active"]))
+        self._profile_bar.update_active_count(
+            mod_list["active_count"], mod_list["total_count"],
+        )
 
     def _on_bg3_mod_activated(self, uuid: str) -> None:
-        """Activate a BG3 mod (add to ModOrder)."""
+        """Activate a BG3 mod (add to ModOrder + auto-deploy)."""
         if self._bg3_installer is None:
             return
         ok = self._bg3_installer.activate_mod(uuid)
         if ok:
             self._bg3_reload_mod_list()
-            self._bg3_mark_dirty()
             self.statusBar().showMessage(tr("status.mod_activated"), 3000)
         else:
             self.statusBar().showMessage(tr("status.mod_activation_failed"), 5000)
 
     def _on_bg3_mod_deactivated(self, uuid: str) -> None:
-        """Deactivate a BG3 mod (remove from ModOrder)."""
+        """Deactivate a BG3 mod (remove from ModOrder + auto-deploy)."""
         if self._bg3_installer is None:
             return
         ok = self._bg3_installer.deactivate_mod(uuid)
         if ok:
             self._bg3_reload_mod_list()
-            self._bg3_mark_dirty()
             self.statusBar().showMessage(tr("status.mod_deactivated"), 3000)
         else:
             self.statusBar().showMessage(tr("status.mod_deactivation_failed"), 5000)
 
     def _on_bg3_mods_reordered(self, uuid_order: list[str]) -> None:
-        """Reorder BG3 active mods."""
+        """Reorder BG3 active mods (auto-deploy)."""
         if self._bg3_installer is None:
             return
         ok = self._bg3_installer.reorder_mods(uuid_order)
         if ok:
-            self._bg3_mark_dirty()
             self.statusBar().showMessage(tr("status.load_order_updated"), 3000)
         else:
             self.statusBar().showMessage(tr("status.load_order_failed"), 5000)
@@ -3887,9 +3885,6 @@ class MainWindow(QMainWindow):
                 )
         if installed:
             self._bg3_reload_mod_list()
-            # Only mark dirty for pak mods (framework/data don't need deploy)
-            if any(t == "pak" for _, t in installed):
-                self._bg3_mark_dirty()
             names = ", ".join(n for n, _ in installed)
             types = set(t for _, t in installed)
             if types == {"pak"}:
@@ -3922,19 +3917,19 @@ class MainWindow(QMainWindow):
         has_mod = bool(mod_data.get("uuid"))
         menu = QMenu(self)
 
+        act_activate = None
+        act_deactivate = None
         if has_mod:
-            act_activate = None
-            act_deactivate = None
-            if section == "inactive":
-                act_activate = menu.addAction(tr("context.activate"))
-            else:
+            # Unified list: show activate/deactivate based on mod's enabled state
+            is_enabled = mod_data.get("enabled", False)
+            if is_enabled:
                 act_deactivate = menu.addAction(tr("context.deactivate"))
+            else:
+                act_activate = menu.addAction(tr("context.activate"))
 
             menu.addSeparator()
             act_uninstall = menu.addAction(tr("context.uninstall"))
         else:
-            act_activate = None
-            act_deactivate = None
             act_uninstall = None
 
         menu.addSeparator()
@@ -3968,7 +3963,6 @@ class MainWindow(QMainWindow):
                 ok = self._bg3_installer.uninstall_mod(uuid, filename)
                 if ok:
                     self._bg3_reload_mod_list()
-                    self._bg3_mark_dirty()
                     self.statusBar().showMessage(tr("status.uninstalled", name=name), 5000)
                 else:
                     self.statusBar().showMessage(tr("status.uninstall_failed"), 5000)

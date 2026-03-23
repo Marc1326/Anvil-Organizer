@@ -114,8 +114,12 @@ class BG3ModListModel(QAbstractItemModel):
         self.endResetModel()
 
     def get_uuid_order(self) -> list[str]:
-        """Return current UUID ordering."""
+        """Return current UUID ordering (all mods)."""
         return [r.uuid for r in self._rows]
+
+    def get_active_uuid_order(self) -> list[str]:
+        """Return UUID ordering of enabled mods only."""
+        return [r.uuid for r in self._rows if r.enabled]
 
     def row_data(self, row: int) -> BG3ModRow | None:
         if 0 <= row < len(self._rows):

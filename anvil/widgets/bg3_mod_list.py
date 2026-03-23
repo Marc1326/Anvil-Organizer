@@ -1,4 +1,4 @@
-"""BG3-specific mod list widget: active / inactive / extras split with QSplitter."""
+"""BG3-specific mod list widget: unified mod list + extras with QSplitter."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QHBoxLayout,
     QHeaderView,
     QSplitter,
     QStyledItemDelegate,
@@ -16,7 +15,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import QModelIndex, QPoint, QRect, QSize, QSortFilterProxyModel, Qt, Signal
+from PySide6.QtCore import QPoint, QRect, QSize, QSortFilterProxyModel, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 
 from anvil.core.persistent_header import PersistentHeader
@@ -31,14 +30,13 @@ from anvil.models.bg3_mod_list_model import (
     COL_NAME,
     COL_VERSION,
     MIME_BG3_MOD_ROWS,
-    ROLE_UUID,
 )
 
 # Extensions accepted for external drops
 _DROP_EXTENSIONS = {".pak", ".zip", ".rar", ".7z"}
 
 
-# ── Checkbox delegate (same style as standard mod list) ──────────────
+# -- Checkbox delegate (same style as standard mod list) ----------------------
 
 class _BG3CheckboxDelegate(QStyledItemDelegate):
     """Green circle+check (enabled) / gray circle (disabled)."""
@@ -97,13 +95,12 @@ class _BG3CheckboxDelegate(QStyledItemDelegate):
         return False
 
 
-# ── Drop-enabled QTreeView ───────────────────────────────────────────
+# -- Drop-enabled QTreeView --------------------------------------------------
 
 class _BG3DropTreeView(QTreeView):
-    """QTreeView that accepts external archives AND cross-tree mod DnD."""
+    """QTreeView that accepts external archives and internal DnD reorder."""
 
     archives_dropped = Signal(list)   # list of file path strings
-    uuids_dropped = Signal(list)      # UUIDs dropped from the OTHER tree
 
     def dragEnterEvent(self, event):
         super().dragEnterEvent(event)
@@ -142,24 +139,15 @@ class _BG3DropTreeView(QTreeView):
                 event.acceptProposedAction()
                 self.archives_dropped.emit(paths)
                 return
-        # Cross-tree DnD (source is a different tree)
-        if md.hasFormat(MIME_BG3_MOD_ROWS) and event.source() is not self:
-            raw = bytes(md.data(MIME_BG3_MOD_ROWS))
-            uuids = [u for u in raw.decode("utf-8").split("\n") if u]
-            if uuids:
-                event.acceptProposedAction()
-                self.uuids_dropped.emit(uuids)
-                return
         # Internal DnD (reorder within same tree)
         super().dropEvent(event)
 
 
-# ── Helper: configure a tree view ────────────────────────────────────
+# -- Helper: configure a tree view -------------------------------------------
 
 def _setup_tree(
     tree: _BG3DropTreeView,
     model: BG3ModListModel,
-    allow_reorder: bool,
     settings_key: str,
 ) -> PersistentHeader:
     """Apply common settings to a BG3 mod tree view.
@@ -204,19 +192,13 @@ def _setup_tree(
 
     ph = PersistentHeader(header, settings_key, fixed_columns=frozenset({COL_CHECK}))
 
-    # Sorting for inactive tree only
-    if not allow_reorder:
-        header.setSortIndicatorShown(True)
-        header.setSectionsClickable(True)
-        header.sortIndicatorChanged.connect(proxy.sort)
-
     return ph
 
 
-# ── Main widget ──────────────────────────────────────────────────────
+# -- Main widget -------------------------------------------------------------
 
 class BG3ModListView(QWidget):
-    """BG3 mod list with active/inactive/extras split.
+    """BG3 mod list with unified mods + extras.
 
     Signals:
         archives_dropped(list): External archive paths dropped.
@@ -224,7 +206,7 @@ class BG3ModListView(QWidget):
         mod_deactivated(str): UUID of mod to deactivate.
         mods_reordered(list): New UUID order for active mods.
         context_menu_requested(QPoint, str, dict): (global_pos, section, mod_data)
-            section is 'active', 'inactive', or 'extras'.
+            section is 'mods' or 'extras'.
             mod_data is a dict with uuid, name, filename or empty if no selection.
         data_override_uninstall(str): mod_name to uninstall.
     """
@@ -241,62 +223,27 @@ class BG3ModListView(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # ── Splitter ──────────────────────────────────────────────
+        # -- Splitter -------------------------------------------------
         self._splitter = QSplitter(Qt.Orientation.Vertical)
 
-        # ── Active section ────────────────────────────────────────
-        active_pane = QWidget()
-        active_layout = QVBoxLayout(active_pane)
-        active_layout.setContentsMargins(0, 0, 0, 0)
-        active_layout.setSpacing(2)
+        # -- Unified mod list section ---------------------------------
+        mods_pane = QWidget()
+        mods_layout = QVBoxLayout(mods_pane)
+        mods_layout.setContentsMargins(0, 0, 0, 0)
+        mods_layout.setSpacing(0)
 
-        self._active_model = BG3ModListModel(allow_reorder=True)
-        self._active_tree = _BG3DropTreeView()
+        self._mod_model = BG3ModListModel(allow_reorder=True)
+        self._mod_tree = _BG3DropTreeView()
 
-        self._active_label = CollapsibleSectionBar(
-            tr("label.section_active_mods"), "bg3_active", self._active_tree,
-            style="QLabel { font-weight: bold; padding: 4px 6px; "
-                  "background: #1a3a1a; border-bottom: 1px solid #333; }",
-            container=active_pane,
+        self._ph_mods = _setup_tree(
+            self._mod_tree, self._mod_model,
+            settings_key="bg3_mods",
         )
-        self._active_label.set_count(0)
-        active_layout.addWidget(self._active_label)
-        self._ph_active = _setup_tree(
-            self._active_tree, self._active_model,
-            allow_reorder=True, settings_key="bg3_active",
-        )
-        active_layout.addWidget(self._active_tree)
+        mods_layout.addWidget(self._mod_tree)
 
-        self._splitter.addWidget(active_pane)
+        self._splitter.addWidget(mods_pane)
 
-        # ── Inactive section ──────────────────────────────────────
-        inactive_pane = QWidget()
-        inactive_layout = QVBoxLayout(inactive_pane)
-        inactive_layout.setContentsMargins(0, 0, 0, 0)
-        inactive_layout.setSpacing(0)
-
-        self._inactive_model = BG3ModListModel(allow_reorder=False)
-        self._inactive_tree = _BG3DropTreeView()
-
-        self._inactive_label = CollapsibleSectionBar(
-            tr("label.section_inactive_mods"), "bg3_inactive", self._inactive_tree,
-            style="QLabel { font-weight: bold; padding: 4px 6px; "
-                  "background: #3a1a1a; border-bottom: 1px solid #333; }",
-            container=inactive_pane,
-        )
-        self._inactive_label.set_count(0)
-        inactive_layout.addWidget(self._inactive_label)
-        self._ph_inactive = _setup_tree(
-            self._inactive_tree, self._inactive_model,
-            allow_reorder=False, settings_key="bg3_inactive",
-        )
-        inactive_layout.addWidget(self._inactive_tree)
-
-        inactive_pane.setMinimumHeight(28)
-        self._inactive_pane = inactive_pane
-        self._splitter.addWidget(inactive_pane)
-
-        # ── Extras section (Data-Overrides & Frameworks) ──────────
+        # -- Extras section (Data-Overrides & Frameworks) -- UNCHANGED
         extras_pane = QWidget()
         extras_layout = QVBoxLayout(extras_pane)
         extras_layout.setContentsMargins(0, 0, 0, 0)
@@ -334,55 +281,41 @@ class BG3ModListView(QWidget):
         self._extras_pane = extras_pane
         self._splitter.addWidget(extras_pane)
 
-        # Default splitter proportions: 55% active, 30% inactive, 15% extras
-        self._splitter.setSizes([400, 200, 100])
+        # Default splitter proportions: 85% mods, 15% extras
+        self._splitter.setSizes([600, 100])
         self._splitter.setChildrenCollapsible(False)
         self._splitter.splitterMoved.connect(self._on_extras_splitter_moved)
 
         layout.addWidget(self._splitter)
 
+        # -- Connect signals ------------------------------------------
+        self._mod_tree.archives_dropped.connect(self.archives_dropped)
 
-        # ── Connect signals ───────────────────────────────────────
-        self._active_tree.archives_dropped.connect(self.archives_dropped)
-        self._inactive_tree.archives_dropped.connect(self.archives_dropped)
+        # Checkbox toggle: emit mod_activated or mod_deactivated
+        self._mod_model.mod_toggled.connect(self._on_mod_toggled)
 
-        # Checkbox toggle: active unchecked -> deactivate, inactive checked -> activate
-        self._active_model.mod_toggled.connect(self._on_active_toggled)
-        self._inactive_model.mod_toggled.connect(self._on_inactive_toggled)
+        # Reorder in mod list
+        self._mod_model.mods_reordered.connect(self._on_reorder)
 
-        # Reorder in active list
-        self._active_model.mods_reordered.connect(self._on_reorder)
-
-        # Cross-tree DnD: dropped on active → activate, on inactive → deactivate
-        self._active_tree.uuids_dropped.connect(self._on_cross_drop_activate)
-        self._inactive_tree.uuids_dropped.connect(self._on_cross_drop_deactivate)
-
-        # Context menus
-        self._active_tree.customContextMenuRequested.connect(
-            lambda pos: self._emit_context_menu(self._active_tree, pos, "active"),
-        )
-        self._inactive_tree.customContextMenuRequested.connect(
-            lambda pos: self._emit_context_menu(self._inactive_tree, pos, "inactive"),
+        # Context menu
+        self._mod_tree.customContextMenuRequested.connect(
+            lambda pos: self._emit_context_menu(self._mod_tree, pos, "mods"),
         )
 
-    # ── Public API ─────────────────────────────────────────────────
+    # -- Public API ---------------------------------------------------
 
     def load_mods(
         self,
-        active: list[dict],
-        inactive: list[dict],
+        mods: list[dict],
         data_overrides: list[dict] | None = None,
         frameworks: list[dict] | None = None,
     ) -> None:
-        """Populate all three sections from installer data."""
-        active_rows = [self._dict_to_row(m, enabled=True) for m in active]
-        inactive_rows = [self._dict_to_row(m, enabled=False) for m in inactive]
+        """Populate unified mod list and extras from installer data.
 
-        self._active_model.set_mods(active_rows)
-        self._inactive_model.set_mods(inactive_rows)
-
-        self._active_label.set_count(len(active_rows))
-        self._inactive_label.set_count(len(inactive_rows))
+        Each mod dict must have an 'enabled' field.
+        """
+        rows = [self._dict_to_row(m) for m in mods]
+        self._mod_model.set_mods(rows)
 
         # Extras section
         overrides = data_overrides or []
@@ -390,39 +323,33 @@ class BG3ModListView(QWidget):
         self._load_extras(overrides, fws)
 
     def get_active_uuid_order(self) -> list[str]:
-        """Return UUID list of active mods in current order."""
-        return self._active_model.get_uuid_order()
+        """Return UUID list of active (enabled) mods in current order."""
+        return self._mod_model.get_active_uuid_order()
 
-    def active_header(self) -> QHeaderView:
-        """Return the active tree header for state persistence."""
-        return self._active_tree.header()
-
-    def inactive_header(self) -> QHeaderView:
-        """Return the inactive tree header for state persistence."""
-        return self._inactive_tree.header()
+    def mod_header(self) -> QHeaderView:
+        """Return the mod tree header for state persistence."""
+        return self._mod_tree.header()
 
     def extras_header(self) -> QHeaderView:
         """Return the extras tree header for state persistence."""
         return self._extras_tree.header()
 
     def restore_column_widths(self) -> None:
-        """Restore saved column widths for all three trees."""
-        self._ph_active.restore()
-        self._ph_inactive.restore()
+        """Restore saved column widths for both trees."""
+        self._ph_mods.restore()
         self._ph_extras.restore()
 
     def flush_column_widths(self) -> None:
         """Flush any pending debounced column-width writes."""
-        self._ph_active.flush()
-        self._ph_inactive.flush()
+        self._ph_mods.flush()
         self._ph_extras.flush()
 
-    def get_selected_mod(self, section: str) -> dict:
+    def get_selected_mod(self, section: str = "mods") -> dict:
         """Return data for the selected mod in the given section."""
         if section == "extras":
             return self._get_selected_extra()
-        tree = self._active_tree if section == "active" else self._inactive_tree
-        model = self._active_model if section == "active" else self._inactive_model
+        tree = self._mod_tree
+        model = self._mod_model
         proxy = tree.model()
 
         proxy_idx = tree.currentIndex()
@@ -439,11 +366,12 @@ class BG3ModListView(QWidget):
             "name": row.name,
             "filename": row.filename,
             "folder": row.folder,
+            "enabled": row.enabled,
         }
 
-    def get_selected_source_rows(self, section: str) -> list[int]:
-        """Return sorted source row indices for the given section."""
-        tree = self._active_tree if section == "active" else self._inactive_tree
+    def get_selected_source_rows(self, section: str = "mods") -> list[int]:
+        """Return sorted source row indices for the mod tree."""
+        tree = self._mod_tree
         proxy = tree.model()
         rows = set()
         for proxy_idx in tree.selectionModel().selectedRows():
@@ -451,7 +379,7 @@ class BG3ModListView(QWidget):
             rows.add(source_idx.row())
         return sorted(rows)
 
-    # ── Private: extras section ────────────────────────────────────
+    # -- Private: extras section --------------------------------------
 
     def _load_extras(self, data_overrides: list[dict], frameworks: list[dict]) -> None:
         """Populate the extras tree with data-overrides and frameworks."""
@@ -500,41 +428,26 @@ class BG3ModListView(QWidget):
             mod_data = item.data(0, Qt.ItemDataRole.UserRole) or {}
         self.context_menu_requested.emit(global_pos, "extras", mod_data)
 
-    # ── Private slots ──────────────────────────────────────────────
+    # -- Private slots ------------------------------------------------
 
-    def _on_active_toggled(self, row: int, enabled: bool) -> None:
-        """Active mod unchecked -> deactivate."""
-        if not enabled:
-            rd = self._active_model.row_data(row)
-            if rd and rd.uuid:
+    def _on_mod_toggled(self, row: int, enabled: bool) -> None:
+        """Mod checkbox toggled: emit activate or deactivate signal."""
+        rd = self._mod_model.row_data(row)
+        if rd and rd.uuid:
+            if enabled:
+                self.mod_activated.emit(rd.uuid)
+            else:
                 self.mod_deactivated.emit(rd.uuid)
 
-    def _on_inactive_toggled(self, row: int, enabled: bool) -> None:
-        """Inactive mod checked -> activate."""
-        if enabled:
-            rd = self._inactive_model.row_data(row)
-            if rd and rd.uuid:
-                self.mod_activated.emit(rd.uuid)
-
-    def _on_cross_drop_activate(self, uuids: list) -> None:
-        """Mods dropped from inactive onto active tree → activate."""
-        for uuid in uuids:
-            self.mod_activated.emit(uuid)
-
-    def _on_cross_drop_deactivate(self, uuids: list) -> None:
-        """Mods dropped from active onto inactive tree → deactivate."""
-        for uuid in uuids:
-            self.mod_deactivated.emit(uuid)
-
     def _on_reorder(self) -> None:
-        """Active mods reordered via DnD."""
-        self.mods_reordered.emit(self._active_model.get_uuid_order())
+        """Mods reordered via DnD."""
+        self.mods_reordered.emit(self._mod_model.get_uuid_order())
 
     def _emit_context_menu(self, tree: QTreeView, pos, section: str) -> None:
         """Emit context_menu_requested with mod data."""
         global_pos = tree.viewport().mapToGlobal(pos)
         proxy = tree.model()
-        model = self._active_model if section == "active" else self._inactive_model
+        model = self._mod_model
 
         proxy_idx = tree.indexAt(pos)
         mod_data: dict = {}
@@ -547,30 +460,28 @@ class BG3ModListView(QWidget):
                     "name": rd.name,
                     "filename": rd.filename,
                     "folder": rd.folder,
+                    "enabled": rd.enabled,
                 }
 
         self.context_menu_requested.emit(global_pos, section, mod_data)
 
     def _on_extras_splitter_moved(self) -> None:
-        """Hide/show trees based on available space (respects collapsed state)."""
-        if not self._inactive_label.collapsed:
-            self._inactive_tree.setVisible(self._inactive_pane.height() > 60)
+        """Hide/show extras tree based on available space (respects collapsed state)."""
         if not self._extras_label.collapsed:
             self._extras_tree.setVisible(self._extras_pane.height() > 60)
 
     def _on_filter_changed(self, text: str) -> None:
-        """Apply text filter to both proxy models."""
-        for tree in (self._active_tree, self._inactive_tree):
-            proxy = tree.model()
-            if isinstance(proxy, QSortFilterProxyModel):
-                proxy.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-                proxy.setFilterKeyColumn(COL_NAME)
-                proxy.setFilterFixedString(text)
+        """Apply text filter to the mod proxy model."""
+        proxy = self._mod_tree.model()
+        if isinstance(proxy, QSortFilterProxyModel):
+            proxy.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+            proxy.setFilterKeyColumn(COL_NAME)
+            proxy.setFilterFixedString(text)
 
-    # ── Helpers ────────────────────────────────────────────────────
+    # -- Helpers ------------------------------------------------------
 
     @staticmethod
-    def _dict_to_row(mod: dict, enabled: bool) -> BG3ModRow:
+    def _dict_to_row(mod: dict) -> BG3ModRow:
         """Convert an installer dict to a BG3ModRow."""
         return BG3ModRow(
             uuid=mod.get("uuid", ""),
@@ -579,7 +490,7 @@ class BG3ModListView(QWidget):
             author=mod.get("author", ""),
             version=mod.get("version", mod.get("version64", "")),
             filename=mod.get("filename", ""),
-            enabled=enabled,
+            enabled=mod.get("enabled", False),
             conflicts=mod.get("conflicts", ""),
             dependencies=mod.get("dependencies", []),
             source=mod.get("source", ""),
