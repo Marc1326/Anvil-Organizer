@@ -340,6 +340,33 @@ class ModDeployer:
 
                 if needs_copy:
                     deploy_type = "copy" if is_direct else "shim_copy"
+
+                    # Framework reverse-sync: wenn die Datei im Game-Verzeichnis
+                    # neuer ist als in .mods/, wurde sie extern aktualisiert.
+                    # → .mods/ mit der neueren Version aktualisieren.
+                    if is_direct and target.is_file() and not target.is_symlink():
+                        try:
+                            src_mtime = src_file.stat().st_mtime
+                            tgt_mtime = target.stat().st_mtime
+                            if tgt_mtime > src_mtime + 1:  # +1s Toleranz
+                                print(
+                                    f"[DEPLOY] REVERSE-SYNC: {rel} — "
+                                    f"Game-Version ist neuer, aktualisiere .mods/",
+                                    flush=True,
+                                )
+                                shutil.copy2(target, src_file)
+                                # Bereits aktuell im Game-Dir → kein erneutes Kopieren nötig
+                                symlinks.append({
+                                    "link": str(rel),
+                                    "target": str(src_file),
+                                    "mod": mod_name,
+                                    "type": deploy_type,
+                                })
+                                result.files_copied += 1
+                                continue
+                        except OSError:
+                            pass
+
                     print(f"[DEPLOY] COPY ({deploy_type}): {rel} -> {target}", flush=True)
                     try:
                         shutil.copy2(src_file, target)
