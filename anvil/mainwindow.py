@@ -3785,12 +3785,31 @@ class MainWindow(QMainWindow):
                 tr("status.bg3_proton_missing"), 8000,
             )
 
+        # ── BG3 Profile laden (eigene, getrennt von anderen Games) ──
+        profiles_dir = instance_path / ".profiles"
+        profile_folders = sorted(
+            [d.name for d in profiles_dir.iterdir() if d.is_dir()],
+        ) if profiles_dir.is_dir() else ["Default"]
+
+        order_file = profiles_dir / ".profile_order.json"
+        if order_file.is_file():
+            try:
+                saved_order = json.loads(order_file.read_text())
+                ordered = [p for p in saved_order if p in profile_folders]
+                ordered += [p for p in profile_folders if p not in saved_order]
+                profile_folders = ordered
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        profile_name = data.get("selected_profile", "Default")
+        if profile_name not in profile_folders:
+            profile_name = profile_folders[0]
+
+        self._profile_bar.set_profiles(profile_folders, active=profile_name)
+        self._current_profile_path = instance_path / ".profiles" / profile_name
+
         # Load mod list
         self._bg3_reload_mod_list()
-
-        # Profile path (for compatibility with shared code)
-        profile_name = data.get("selected_profile", "Default")
-        self._current_profile_path = instance_path / ".profiles" / profile_name
 
         # BG3: auto-deploy on every state change
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
