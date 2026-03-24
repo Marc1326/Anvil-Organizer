@@ -317,6 +317,14 @@ class BaldursGate3Game(BaseGame):
                 detect_installed=["bin/bink2w64_original.dll"],
                 required_by=["WASD", "Native Mods"],
             ),
+            FrameworkMod(
+                name="BG3WASD",
+                pattern=["BG3WASD.dll", "BG3WASD.toml"],
+                target="bin/NativeMods/",
+                description="WASD-Steuerung fuer BG3 (benoetigt NativeModLoader)",
+                detect_installed=["bin/NativeMods/BG3WASD.dll"],
+                required_by=[],
+            ),
         ]
 
     def get_data_override_path_rewrites(self) -> dict[str, str]:
