@@ -24,8 +24,13 @@ MO2 dominates on Windows — Anvil fills the gap on Linux.
 - **Nexus Mods integration** — SSO-Login, API Key, direct downloads, NXM link handler
 - **Conflict detection** — shows file conflicts between mods with visual highlighting
 - **Savegame browser** — view saves per game, open in file manager
-- **F4SE Proton Shim** — enables F4SE under Linux/Proton (world first!)
+- **F4SE / SFSE Proton Shims** — enables F4SE and SFSE under Linux/Proton (world first!)
 - **Auto-redeploy** — mods redeployed automatically on toggle/reorder
+- **Game Running Lock** — UI locked while a game is running to prevent accidental changes
+- **Nexus Info Tab** — fetch mod info from Nexus with one click, view details in mod dialog
+- **Mod detail navigation** — next/previous buttons to browse through your mod list
+- **BG3 Auto-Deploy** — every change is immediately written to modsettings.lsx
+- **Framework Reverse-Sync** — detects newer framework versions and preserves them
 - **Self-update** — checks GitHub for updates, one-click git pull + restart
 - **7 languages** — DE, EN, FR, ES, IT, PT, RU
 - **Dark theme** — multiple styles included
@@ -37,10 +42,10 @@ MO2 dominates on Windows — Anvil fills the gap on Linux.
 | Cyberpunk 2077 | ✅ Working | REDmod, CET, ASI frameworks |
 | Red Dead Redemption 2 | ✅ Working | ScriptHook, ASI Loader, LML |
 | The Witcher 3: Wild Hunt | ✅ Working | Multi-folder routing (mods/dlc/bin) |
-| Baldur's Gate 3 | ✅ Working | PAK mods, modsettings.lsx |
+| Baldur's Gate 3 | ✅ Working | Unified mod list, auto-deploy, profiles, NativeModLoader, WASD framework |
 | Skyrim Special Edition | 🔧 Partial | Needs load-order system for .esp/.esm |
-| Fallout 4 | ✅ Working | F4SE Proton Shim, plugins.txt, BA2 packing |
-| Starfield | 🔧 Partial | Needs load-order system for .esp/.esm |
+| Fallout 4 | ✅ Working | F4SE Proton Shim (auto-injection), BA2 packing, plugins.txt |
+| Starfield | ✅ Working | SFSE Proton Shim, Address Library detection |
 
 Works with **Steam** and **Heroic Games Launcher** (GOG/Epic via Proton/Wine).
 
@@ -77,8 +82,8 @@ Works with **Steam** and **Heroic Games Launcher** (GOG/Epic via Proton/Wine).
 No installation needed — download, make executable, run:
 
 ```bash
-chmod +x Anvil_Organizer-1.0.0-x86_64.AppImage
-./Anvil_Organizer-1.0.0-x86_64.AppImage
+chmod +x Anvil_Organizer-1.0.9-x86_64.AppImage
+./Anvil_Organizer-1.0.9-x86_64.AppImage
 ```
 
 Download from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest).
