@@ -4182,7 +4182,16 @@ class MainWindow(QMainWindow):
         elif chosen == act_explorer:
             if self._current_game_path and self._current_game_path.is_dir():
                 import subprocess
-                subprocess.Popen(["xdg-open", str(self._current_game_path)])
+                # Open the framework's target directory, not the game root
+                target_dir = self._current_game_path
+                if self._current_plugin:
+                    for fw in self._current_plugin.get_framework_mods():
+                        if fw.name == name:
+                            candidate = self._current_game_path / fw.target
+                            if candidate.is_dir():
+                                target_dir = candidate
+                            break
+                subprocess.Popen(["xdg-open", str(target_dir)])
 
     def _fw_reinstall(self, fw_name: str) -> None:
         """Reinstall a framework from its archive in the downloads directory."""
