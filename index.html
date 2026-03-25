@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anvil Organizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #060a10; --surface-dim: #0a1018; --surface: #0e1520; --surface-high: #141e2c;
+  --surface-highest: #1a2638; --surface-bright: #1f2d42;
+  --teal: #006868; --teal-bright: #00a3a3; --teal-glow: #00cccc; --teal-muted: #004d4d;
+  --teal-ghost: rgba(0,104,104,.08); --teal-ghost-strong: rgba(0,104,104,.15);
+  --on-surface: #d0dae8; --on-surface-dim: #8896aa; --on-surface-muted: #5a6a80;
+  --outline-ghost: rgba(138,160,190,.08);
+  --radius: 12px; --radius-sm: 6px; --radius-xl: 16px; --gap: 0.9rem;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body { font-family:'Space Grotesk',system-ui,sans-serif; background:var(--bg); color:var(--on-surface); line-height:1.6; overflow-x:hidden; -webkit-font-smoothing:antialiased; }
+.lang-switch { position:relative; }
+.lang-btn { background:var(--surface-high); border:1px solid var(--outline-ghost); border-radius:var(--radius-sm); color:var(--on-surface-dim); font-family:inherit; font-size:12px; font-weight:500; padding:6px 12px; cursor:pointer; transition:all .2s; display:flex; align-items:center; gap:5px; }
+.lang-btn:hover { background:var(--surface-highest); color:var(--on-surface); }
+.lang-menu { display:none; position:absolute; top:calc(100% + 6px); right:0; background:var(--surface-high); border:1px solid var(--outline-ghost); border-radius:var(--radius-sm); min-width:120px; padding:4px; z-index:200; backdrop-filter:blur(20px); box-shadow:0 12px 32px rgba(0,0,0,.4); }
+.lang-menu.open { display:block; }
+.lang-menu button { display:block; width:100%; text-align:left; padding:7px 12px; background:none; border:none; color:var(--on-surface-dim); font-family:inherit; font-size:12px; cursor:pointer; border-radius:4px; transition:background .15s; }
+.lang-menu button:hover { background:var(--teal-ghost-strong); color:var(--on-surface); }
+.lang-menu button.active { color:var(--teal-glow); }
+nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:14px 40px; display:flex; align-items:center; justify-content:space-between; background:rgba(6,10,16,.45); backdrop-filter:blur(32px) saturate(1.8); border-bottom:1px solid rgba(0,104,104,.1); }
+.nav-brand { display:flex; align-items:center; gap:12px; text-decoration:none; color:var(--on-surface); }
+.nav-brand svg { width:32px; height:26px; } .nav-brand span { font-size:16px; font-weight:600; letter-spacing:-.01em; }
+.nav-links { display:flex; gap:28px; list-style:none; }
+.nav-links a { color:var(--on-surface-dim); text-decoration:none; font-size:13px; font-weight:500; letter-spacing:.02em; transition:color .2s; }
+.nav-links a:hover { color:var(--teal-glow); }
+.hero { position:relative; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:140px 40px 80px; overflow:hidden; }
+.hero-glow { position:absolute; top:-20%; left:50%; transform:translateX(-50%); width:700px; height:700px; background:radial-gradient(circle,rgba(0,104,104,.12) 0%,rgba(0,104,104,.03) 40%,transparent 70%); pointer-events:none; }
+.hero-fade { position:absolute; bottom:0; left:0; right:0; height:180px; background:linear-gradient(to top,var(--bg),transparent); pointer-events:none; }
+.hero-badge { display:inline-flex; align-items:center; gap:8px; padding:5px 14px; background:var(--teal-ghost); border:1px solid rgba(0,104,104,.2); border-radius:100px; font-size:12px; color:var(--teal-bright); font-weight:500; margin-bottom:32px; letter-spacing:.03em; animation:fadeUp .7s ease forwards; opacity:0; }
+.hero-badge .dot { width:5px; height:5px; border-radius:50%; background:var(--teal-glow); animation:blink 2.5s ease infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.hero-logo { width:100px; height:80px; margin-bottom:36px; filter:drop-shadow(0 0 32px rgba(0,104,104,.35)); animation:fadeUp .7s ease .08s forwards; opacity:0; }
+.hero h1 { font-size:clamp(44px,6.5vw,78px); font-weight:700; line-height:1.0; letter-spacing:-.04em; animation:fadeUp .7s ease .16s forwards; opacity:0; }
+.hero-sub { font-size:clamp(15px,1.8vw,18px); color:var(--on-surface-dim); max-width:540px; line-height:1.7; margin-top:20px; font-weight:400; animation:fadeUp .7s ease .24s forwards; opacity:0; }
+.hero-tagline { margin-top:10px; font-size:14px; color:var(--teal-bright); font-weight:500; letter-spacing:.01em; animation:fadeUp .7s ease .3s forwards; opacity:0; }
+.hero-actions { display:flex; gap:14px; margin-top:40px; flex-wrap:wrap; justify-content:center; animation:fadeUp .7s ease .36s forwards; opacity:0; position:relative; z-index:2; }
+.btn-primary { display:inline-flex; align-items:center; gap:8px; padding:14px 32px; background:linear-gradient(135deg,var(--teal),var(--teal-bright)); color:#fff; border:none; border-radius:var(--radius-sm); font-family:inherit; font-size:15px; font-weight:600; text-decoration:none; transition:all .3s; cursor:pointer; }
+.btn-primary:hover { box-shadow:0 4px 32px rgba(0,163,163,.35); transform:translateY(-2px); }
+.btn-ghost { display:inline-flex; align-items:center; gap:8px; padding:14px 32px; background:var(--surface-high); color:var(--on-surface); border:1px solid var(--outline-ghost); border-radius:var(--radius-sm); font-family:inherit; font-size:15px; font-weight:500; text-decoration:none; transition:all .3s; cursor:pointer; }
+.btn-ghost:hover { background:var(--surface-highest); border-color:rgba(0,104,104,.2); transform:translateY(-2px); }
+@keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+.screenshot-section { padding:0 40px 100px; display:flex; justify-content:center; }
+.screenshot-wrap { max-width:1080px; width:100%; animation:fadeUp .7s ease .5s forwards; opacity:0; }
+.screenshot-frame { border-radius:var(--radius-xl); overflow:hidden; background:var(--surface); box-shadow:0 32px 64px -16px rgba(0,0,0,.5),0 0 0 1px var(--outline-ghost); }
+.screenshot-img { display:block; width:100%; height:auto; }
+.features { padding:100px 40px; max-width:1100px; margin:0 auto; }
+.sec-label { font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:var(--teal-bright); font-weight:600; margin-bottom:12px; }
+.sec-title { font-size:clamp(28px,3.5vw,42px); font-weight:700; letter-spacing:-.03em; line-height:1.1; margin-bottom:14px; }
+.sec-desc { font-size:16px; color:var(--on-surface-dim); max-width:500px; line-height:1.7; margin-bottom:56px; }
+.f-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:var(--gap); }
+.f-card { padding:28px; background:var(--surface); border-radius:var(--radius); transition:all .3s; }
+.f-card:hover { background:var(--surface-high); transform:translateY(-3px); box-shadow:0 16px 40px rgba(0,0,0,.25); }
+.f-card-icon { width:38px; height:38px; border-radius:8px; background:var(--teal-ghost-strong); display:flex; align-items:center; justify-content:center; margin-bottom:16px; font-size:17px; }
+.f-card h3 { font-size:16px; font-weight:600; margin-bottom:8px; }
+.f-card p { font-size:13px; color:var(--on-surface-dim); line-height:1.65; }
+.games { padding:100px 40px; max-width:1100px; margin:0 auto; }
+.g-list { display:flex; gap:10px; flex-wrap:wrap; }
+.g-chip { display:flex; align-items:center; gap:8px; padding:10px 20px; background:var(--surface); border-radius:100px; font-size:13px; font-weight:500; transition:all .2s; }
+.g-chip:hover { background:var(--surface-high); }
+.g-chip .s { width:7px; height:7px; border-radius:50%; background:#28ca41; }
+.tech { padding:100px 40px; max-width:1100px; margin:0 auto; }
+.t-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1px; background:var(--outline-ghost); border-radius:var(--radius); overflow:hidden; margin-top:40px; }
+.t-cell { padding:28px; background:var(--surface); }
+.t-cell .t-label { font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--on-surface-muted); margin-bottom:6px; }
+.t-cell .t-val { font-size:15px; font-weight:600; }
+.t-cell .t-val code { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--teal-glow); background:var(--teal-ghost); padding:2px 7px; border-radius:3px; }
+.dl-section { padding:100px 40px; display:flex; justify-content:center; position:relative; }
+.dl-glow { position:absolute; bottom:-10%; left:50%; transform:translateX(-50%); width:500px; height:500px; background:radial-gradient(circle,rgba(0,104,104,.08) 0%,transparent 70%); pointer-events:none; }
+.dl-card { max-width:580px; width:100%; padding:52px 44px; background:var(--surface); border-radius:var(--radius-xl); text-align:center; position:relative; }
+.dl-card h2 { font-size:32px; font-weight:700; letter-spacing:-.02em; margin-bottom:10px; }
+.dl-card > p { color:var(--on-surface-dim); margin-bottom:36px; font-size:15px; }
+.dl-opts { display:flex; flex-direction:column; gap:10px; margin-bottom:28px; }
+.dl-opt { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; background:var(--surface-high); border-radius:var(--radius-sm); text-decoration:none; color:var(--on-surface); transition:all .2s; }
+.dl-opt:hover { background:var(--surface-highest); }
+.dl-opt .info { display:flex; flex-direction:column; text-align:left; }
+.dl-opt .name { font-weight:600; font-size:14px; }
+.dl-opt .meta { font-size:11px; color:var(--on-surface-muted); font-family:'JetBrains Mono',monospace; }
+.dl-opt .icon { color:var(--teal-bright); font-size:18px; }
+.dl-links { display:flex; gap:20px; justify-content:center; font-size:13px; }
+.dl-links a { color:var(--on-surface-dim); text-decoration:none; transition:color .2s; }
+.dl-links a:hover { color:var(--teal-glow); }
+footer { padding:56px 40px 28px; max-width:1100px; margin:0 auto; }
+.ft-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:40px; flex-wrap:wrap; gap:36px; }
+.ft-brand { display:flex; align-items:center; gap:10px; }
+.ft-brand svg { width:24px; height:20px; } .ft-brand span { font-size:15px; font-weight:600; }
+.ft-col h4 { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--on-surface-muted); margin-bottom:14px; }
+.ft-col a { display:block; color:var(--on-surface-dim); text-decoration:none; font-size:13px; margin-bottom:8px; transition:color .2s; }
+.ft-col a:hover { color:var(--teal-glow); }
+.ft-bottom { display:flex; justify-content:space-between; align-items:center; padding-top:28px; border-top:1px solid var(--outline-ghost); font-size:11px; color:var(--on-surface-muted); }
+@media(max-width:768px) { nav{padding:12px 20px} .nav-links{display:none} .hero{padding:120px 20px 60px} .features,.games,.tech,.dl-section{padding:72px 20px} .f-grid{grid-template-columns:1fr} .dl-card{padding:36px 24px} .ft-top{flex-direction:column} .screenshot-section{padding:0 16px 72px} }
+</style>
+</head>
+<body>
+<svg style="display:none"><symbol id="anvil" viewBox="-2 18 84 64" fill="none"><path d="M40 80 L0 65 L40 50 L80 65 Z" fill="#003333" stroke="#004d4d" stroke-width="1"/><path d="M40 65 L0 50 L40 35 L80 50 Z" fill="#004d4d" stroke="#006868" stroke-width="1"/><path d="M40 50 L0 35 L40 20 L80 35 Z" fill="#006868" stroke="#008585" stroke-width="1"/></symbol></svg>
+<nav>
+  <a href="#" class="nav-brand"><svg><use href="#anvil"/></svg><span>Anvil Organizer</span></a>
+  <ul class="nav-links"><li><a href="#features">Features</a></li><li><a href="#games">Games</a></li><li><a href="https://github.com/Marc1326/Anvil-Organizer/wiki">Wiki</a></li><li><a href="https://github.com/Marc1326/Anvil-Organizer">GitHub</a></li><li><a href="https://www.nexusmods.com/site/mods/1141">NexusMods</a></li></ul>
+  <div class="lang-switch">
+    <button class="lang-btn" onclick="document.querySelector('.lang-menu').classList.toggle('open')">🌐 <span id="lang-current">DE</span></button>
+    <div class="lang-menu">
+      <button onclick="setLang('de')" class="active">🇩🇪 Deutsch</button>
+      <button onclick="setLang('en')">🇬🇧 English</button>
+      <button onclick="setLang('es')">🇪🇸 Español</button>
+      <button onclick="setLang('fr')">🇫🇷 Français</button>
+      <button onclick="setLang('it')">🇮🇹 Italiano</button>
+      <button onclick="setLang('pt')">🇧🇷 Português</button>
+      <button onclick="setLang('ru')">🇷🇺 Русский</button>
+    </div>
+  </div>
+</nav>
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-fade"></div>
+  <div class="hero-badge"><span class="dot"></span> v1.0.9 — Open Source</div>
+  <svg class="hero-logo"><use href="#anvil"/></svg>
+  <h1>Anvil Organizer</h1>
+  <p class="hero-sub" data-i18n="hero_sub">Der erste native Linux Mod Manager. Gebaut mit Python & Qt6 für CachyOS, Arch und jede Linux-Distribution.</p>
+  <p class="hero-tagline" data-i18n="hero_tagline">Inspiriert von MO2. Neu gedacht für Linux.</p>
+  <div class="hero-actions">
+    <a href="#download" class="btn-primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg><span data-i18n="hero_btn_download">AppImage herunterladen</span></a>
+    <a href="https://github.com/Marc1326/Anvil-Organizer" class="btn-ghost"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg><span data-i18n="hero_btn_source">Quellcode</span></a>
+  </div>
+</section>
+<section class="screenshot-section">
+  <div class="screenshot-wrap">
+    <div class="screenshot-frame">
+      <img class="screenshot-img" src="site/img/starfield.png" alt="Anvil Organizer — Starfield">
+    </div>
+  </div>
+</section>
+<section class="features" id="features">
+  <div class="sec-label" data-i18n="features_label">Features</div>
+  <h2 class="sec-title" data-i18n="features_title" data-i18n-html="1">Inspiriert von MO2.<br>Neu gedacht für Linux.</h2>
+  <p class="sec-desc" data-i18n="features_desc">Kein Wine, kein Proton-Wrapper. Anvil nutzt physische Symlinks statt USVFS und eine eigene Deploy-Kette — von Grund auf für Linux gebaut.</p>
+  <div class="f-grid">
+    <div class="f-card"><div class="f-card-icon">🔗</div><h3 data-i18n="f1_title">Symlink-basierter Deploy</h3><p data-i18n="f1_desc">Physische Symlinks statt virtuellem Dateisystem. Kein Overhead, keine Wine-Kompatibilitätsprobleme. Funktioniert mit jedem Proton-Prefix.</p></div>
+    <div class="f-card"><div class="f-card-icon">📋</div><h3 data-i18n="f2_title">Mod-Prioritäten & Konflikte</h3><p data-i18n="f2_desc">Drag & Drop Priorisierung mit automatischer Konflikterkennung. Sehe sofort welche Mod welche Dateien überschreibt.</p></div>
+    <div class="f-card"><div class="f-card-icon">🌐</div><h3 data-i18n="f3_title">NexusMods Integration</h3><p data-i18n="f3_desc">NXM Link Handler für "Mod Manager Download" direkt aus dem Browser. API-Anbindung für Mod-Infos und Updates.</p></div>
+    <div class="f-card"><div class="f-card-icon">📁</div><h3 data-i18n="f4_title">Profile & Separatoren</h3><p data-i18n="f4_desc">Mehrere Mod-Profile pro Game. Separatoren zum Gruppieren. Aktiviere verschiedene Mod-Sets per Profilwechsel.</p></div>
+    <div class="f-card"><div class="f-card-icon">🎮</div><h3 data-i18n="f5_title">Multi-Game Support</h3><p data-i18n="f5_desc">Ein Manager für alle Games. Plugin-Architektur: jedes Spiel hat sein eigenes Game-Plugin mit spezifischer Konfiguration.</p></div>
+    <div class="f-card"><div class="f-card-icon">⚙️</div><h3 data-i18n="f6_title">Framework-Erkennung</h3><p data-i18n="f6_desc">Automatische Erkennung und Installation von CET, RED4ext, Script Extender, F4SE. Framework-Status auf einen Blick.</p></div>
+  </div>
+</section>
+<section class="games" id="games">
+  <div class="sec-label" data-i18n="games_label">Unterstützte Spiele</div>
+  <p class="sec-desc" data-i18n="games_desc">Aktive Game-Plugins für die beliebtesten modbaren Spiele. Weitere Game-Plugins sind geplant.</p>
+  <div class="g-list">
+    <div class="g-chip"><span class="s"></span> Cyberpunk 2077</div>
+    <div class="g-chip"><span class="s"></span> Baldur's Gate 3</div>
+    <div class="g-chip"><span class="s"></span> Fallout 4</div>
+    <div class="g-chip"><span class="s"></span> The Witcher 3</div>
+    <div class="g-chip"><span class="s"></span> Red Dead Redemption 2</div>
+    <div class="g-chip"><span class="s"></span> Starfield</div>
+  </div>
+</section>
+<section class="tech" id="tech">
+  <div class="sec-label" data-i18n="tech_label">Technologie</div>
+  <div class="t-grid">
+    <div class="t-cell"><div class="t-label" data-i18n="tech_lang">Sprache</div><div class="t-val"><code>Python 3.13</code></div></div>
+    <div class="t-cell"><div class="t-label">UI Framework</div><div class="t-val"><code>PySide6 / Qt6</code></div></div>
+    <div class="t-cell"><div class="t-label" data-i18n="tech_deploy">Deploy-Methode</div><div class="t-val"><code>os.symlink()</code></div></div>
+    <div class="t-cell"><div class="t-label" data-i18n="tech_pkg">Paketformat</div><div class="t-val"><code>AppImage</code></div></div>
+    <div class="t-cell"><div class="t-label" data-i18n="tech_license">Lizenz</div><div class="t-val">GPL-3.0</div></div>
+    <div class="t-cell"><div class="t-label" data-i18n="tech_platform">Plattform</div><div class="t-val">Linux (x86_64)</div></div>
+    <div class="t-cell"><div class="t-label">Steam</div><div class="t-val">Proton / Native</div></div>
+  </div>
+</section>
+<section class="dl-section" id="download">
+  <div class="dl-glow"></div>
+  <div class="dl-card">
+    <h2 data-i18n="dl_title">Jetzt herunterladen</h2>
+    <p data-i18n="dl_desc">Anvil Organizer ist kostenlos und Open Source.</p>
+    <div class="dl-opts">
+      <a href="https://github.com/Marc1326/Anvil-Organizer/releases/latest" class="dl-opt"><div class="info"><span class="name" data-i18n="dl_appimage">AppImage (empfohlen)</span><span class="meta" data-i18n="dl_appimage_meta">~88 MB · Universell · Keine Installation nötig</span></div><span class="icon">↓</span></a>
+      <a href="https://github.com/Marc1326/Anvil-Organizer" class="dl-opt"><div class="info"><span class="name" data-i18n="dl_source">Quellcode (git clone)</span><span class="meta">python main.py · Python 3.13+, PySide6</span></div><span class="icon">→</span></a>
+    </div>
+    <div class="dl-links"><a href="https://www.nexusmods.com/site/mods/1141">NexusMods</a><a href="https://github.com/Marc1326/Anvil-Organizer/releases" data-i18n="dl_releases">Alle Releases</a><a href="https://github.com/Marc1326/Anvil-Organizer/issues" data-i18n="dl_bugs">Bug melden</a></div>
+  </div>
+</section>
+<footer>
+  <div class="ft-top">
+    <div class="ft-brand"><svg><use href="#anvil"/></svg><span>Anvil Organizer</span></div>
+    <div class="ft-col"><h4 data-i18n="ft_project">Projekt</h4><a href="https://github.com/Marc1326/Anvil-Organizer">GitHub</a><a href="https://www.nexusmods.com/site/mods/1141">NexusMods</a><a href="https://github.com/Marc1326/Anvil-Organizer/releases">Releases</a></div>
+    <div class="ft-col"><h4 data-i18n="ft_community">Community</h4><a href="https://github.com/Marc1326/Anvil-Organizer/issues">Issues</a><a href="https://github.com/Marc1326/Anvil-Organizer/discussions">Discussions</a></div>
+    <div class="ft-col"><h4 data-i18n="ft_dev">Entwicklung</h4><a href="#" data-i18n="ft_docs">Dokumentation</a><a href="#">Plugin-API</a></div>
+  </div>
+  <div class="ft-bottom"><span>© 2026 Nathuk. GPL-3.0 License.</span></div>
+</footer>
+<script>
+const T={de:{hero_sub:"Der erste native Linux Mod Manager. Gebaut mit Python & Qt6 für CachyOS, Arch und jede Linux-Distribution.",hero_tagline:"Inspiriert von MO2. Neu gedacht für Linux.",hero_btn_download:"AppImage herunterladen",hero_btn_source:"Quellcode",features_label:"Features",features_title:"Inspiriert von MO2.<br>Neu gedacht für Linux.",features_desc:"Kein Wine, kein Proton-Wrapper. Anvil nutzt physische Symlinks statt USVFS und eine eigene Deploy-Kette — von Grund auf für Linux gebaut.",f1_title:"Symlink-basierter Deploy",f1_desc:"Physische Symlinks statt virtuellem Dateisystem. Kein Overhead, keine Wine-Kompatibilitätsprobleme. Funktioniert mit jedem Proton-Prefix.",f2_title:"Mod-Prioritäten & Konflikte",f2_desc:"Drag & Drop Priorisierung mit automatischer Konflikterkennung. Sehe sofort welche Mod welche Dateien überschreibt.",f3_title:"NexusMods Integration",f3_desc:"NXM Link Handler für Mod Manager Download direkt aus dem Browser.",f4_title:"Profile & Separatoren",f4_desc:"Mehrere Mod-Profile pro Game. Separatoren zum Gruppieren. Aktiviere verschiedene Mod-Sets per Profilwechsel.",f5_title:"Multi-Game Support",f5_desc:"Ein Manager für alle Games. Plugin-Architektur: jedes Spiel hat sein eigenes Game-Plugin mit spezifischer Konfiguration.",f6_title:"Framework-Erkennung",f6_desc:"Automatische Erkennung und Installation von CET, RED4ext, Script Extender, F4SE. Framework-Status auf einen Blick.",games_label:"Unterstützte Spiele",games_desc:"Aktive Game-Plugins für die beliebtesten modbaren Spiele. Weitere Game-Plugins sind geplant.",tech_label:"Technologie",tech_lang:"Sprache",tech_deploy:"Deploy-Methode",tech_pkg:"Paketformat",tech_license:"Lizenz",tech_platform:"Plattform",dl_title:"Jetzt herunterladen",dl_desc:"Anvil Organizer ist kostenlos und Open Source.",dl_appimage:"AppImage (empfohlen)",dl_appimage_meta:"~88 MB · Universell · Keine Installation nötig",dl_source:"Quellcode (git clone)",dl_releases:"Alle Releases",dl_bugs:"Bug melden",ft_project:"Projekt",ft_community:"Community",ft_dev:"Entwicklung",ft_docs:"Dokumentation"},en:{hero_sub:"The first native Linux mod manager. Built with Python & Qt6 for CachyOS, Arch, and any Linux distribution.",hero_tagline:"Inspired by MO2. Reimagined for Linux.",hero_btn_download:"Download AppImage",hero_btn_source:"Source Code",features_label:"Features",features_title:"Inspired by MO2.<br>Reimagined for Linux.",features_desc:"No Wine, no Proton wrapper. Anvil uses physical symlinks instead of USVFS and its own deploy chain — built from the ground up for Linux.",f1_title:"Symlink-based Deploy",f1_desc:"Physical symlinks instead of a virtual file system. No overhead, no Wine compatibility issues. Works with any Proton prefix.",f2_title:"Mod Priorities & Conflicts",f2_desc:"Drag & drop prioritization with automatic conflict detection. See instantly which mod overwrites which files.",f3_title:"NexusMods Integration",f3_desc:"NXM link handler for Mod Manager Download directly from the browser.",f4_title:"Profiles & Separators",f4_desc:"Multiple mod profiles per game. Separators for grouping. Switch between different mod sets by changing profiles.",f5_title:"Multi-Game Support",f5_desc:"One manager for all games. Plugin architecture: each game has its own game plugin with specific configuration.",f6_title:"Framework Detection",f6_desc:"Automatic detection and installation of CET, RED4ext, Script Extender, F4SE. Framework status at a glance.",games_label:"Supported Games",games_desc:"Active game plugins for the most popular moddable games. More game plugins are planned.",tech_label:"Technology",tech_lang:"Language",tech_deploy:"Deploy Method",tech_pkg:"Package Format",tech_license:"License",tech_platform:"Platform",dl_title:"Download Now",dl_desc:"Anvil Organizer is free and open source.",dl_appimage:"AppImage (recommended)",dl_appimage_meta:"~88 MB · Universal · No installation required",dl_source:"Source Code (git clone)",dl_releases:"All Releases",dl_bugs:"Report Bug",ft_project:"Project",ft_community:"Community",ft_dev:"Development",ft_docs:"Documentation"},es:{hero_sub:"El primer gestor de mods nativo para Linux. Construido con Python y Qt6 para CachyOS, Arch y cualquier distribución Linux.",hero_tagline:"Inspirado en MO2. Reinventado para Linux.",hero_btn_download:"Descargar AppImage",hero_btn_source:"Código fuente",features_label:"Características",features_title:"Inspirado en MO2.<br>Reinventado para Linux.",features_desc:"Sin Wine, sin wrapper de Proton. Anvil usa enlaces simbólicos físicos en lugar de USVFS y su propia cadena de despliegue.",f1_title:"Despliegue con Symlinks",f1_desc:"Enlaces simbólicos físicos en lugar de un sistema de archivos virtual.",f2_title:"Prioridades y Conflictos",f2_desc:"Priorización con arrastrar y soltar con detección automática de conflictos.",f3_title:"Integración NexusMods",f3_desc:"Manejador de enlaces NXM para Mod Manager Download directamente desde el navegador.",f4_title:"Perfiles y Separadores",f4_desc:"Múltiples perfiles de mods por juego. Separadores para agrupar.",f5_title:"Soporte Multi-Juego",f5_desc:"Un gestor para todos los juegos. Arquitectura de plugins.",f6_title:"Detección de Frameworks",f6_desc:"Detección e instalación automática de CET, RED4ext, Script Extender, F4SE.",games_label:"Juegos Soportados",games_desc:"Plugins activos para los juegos más populares. Se planean más plugins.",tech_label:"Tecnología",tech_lang:"Lenguaje",tech_deploy:"Método de Despliegue",tech_pkg:"Formato de Paquete",tech_license:"Licencia",tech_platform:"Plataforma",dl_title:"Descargar ahora",dl_desc:"Anvil Organizer es gratuito y de código abierto.",dl_appimage:"AppImage (recomendado)",dl_appimage_meta:"~88 MB · Universal · Sin instalación",dl_source:"Código fuente (git clone)",dl_releases:"Todas las versiones",dl_bugs:"Reportar bug",ft_project:"Proyecto",ft_community:"Comunidad",ft_dev:"Desarrollo",ft_docs:"Documentación"},fr:{hero_sub:"Le premier gestionnaire de mods natif pour Linux. Construit avec Python et Qt6 pour CachyOS, Arch et toute distribution Linux.",hero_tagline:"Inspiré de MO2. Repensé pour Linux.",hero_btn_download:"Télécharger AppImage",hero_btn_source:"Code source",features_label:"Fonctionnalités",features_title:"Inspiré de MO2.<br>Repensé pour Linux.",features_desc:"Pas de Wine, pas de wrapper Proton. Anvil utilise des liens symboliques physiques au lieu d'USVFS.",f1_title:"Déploiement par Symlinks",f1_desc:"Liens symboliques physiques au lieu d'un système de fichiers virtuel.",f2_title:"Priorités et Conflits",f2_desc:"Priorisation par glisser-déposer avec détection automatique des conflits.",f3_title:"Intégration NexusMods",f3_desc:"Gestionnaire de liens NXM pour Mod Manager Download directement depuis le navigateur.",f4_title:"Profils et Séparateurs",f4_desc:"Plusieurs profils de mods par jeu. Séparateurs pour le regroupement.",f5_title:"Support Multi-Jeux",f5_desc:"Un gestionnaire pour tous les jeux. Architecture de plugins.",f6_title:"Détection de Frameworks",f6_desc:"Détection et installation automatique de CET, RED4ext, Script Extender, F4SE.",games_label:"Jeux Supportés",games_desc:"Plugins actifs pour les jeux moddables les plus populaires.",tech_label:"Technologie",tech_lang:"Langage",tech_deploy:"Méthode de Déploiement",tech_pkg:"Format de Paquet",tech_license:"Licence",tech_platform:"Plateforme",dl_title:"Télécharger maintenant",dl_desc:"Anvil Organizer est gratuit et open source.",dl_appimage:"AppImage (recommandé)",dl_appimage_meta:"~88 Mo · Universel · Aucune installation requise",dl_source:"Code source (git clone)",dl_releases:"Toutes les versions",dl_bugs:"Signaler un bug",ft_project:"Projet",ft_community:"Communauté",ft_dev:"Développement",ft_docs:"Documentation"},it:{hero_sub:"Il primo gestore di mod nativo per Linux. Costruito con Python e Qt6 per CachyOS, Arch e qualsiasi distribuzione Linux.",hero_tagline:"Ispirato a MO2. Ripensato per Linux.",hero_btn_download:"Scarica AppImage",hero_btn_source:"Codice sorgente",features_label:"Caratteristiche",features_title:"Ispirato a MO2.<br>Ripensato per Linux.",features_desc:"Niente Wine, niente wrapper Proton. Anvil usa symlink fisici invece di USVFS.",f1_title:"Deploy basato su Symlink",f1_desc:"Symlink fisici invece di un file system virtuale. Nessun overhead.",f2_title:"Priorità e Conflitti",f2_desc:"Prioritizzazione drag & drop con rilevamento automatico dei conflitti.",f3_title:"Integrazione NexusMods",f3_desc:"Gestore link NXM per Mod Manager Download direttamente dal browser.",f4_title:"Profili e Separatori",f4_desc:"Più profili mod per gioco. Separatori per raggruppare.",f5_title:"Supporto Multi-Gioco",f5_desc:"Un gestore per tutti i giochi. Architettura a plugin.",f6_title:"Rilevamento Framework",f6_desc:"Rilevamento e installazione automatica di CET, RED4ext, Script Extender, F4SE.",games_label:"Giochi Supportati",games_desc:"Plugin attivi per i giochi moddabili più popolari.",tech_label:"Tecnologia",tech_lang:"Linguaggio",tech_deploy:"Metodo di Deploy",tech_pkg:"Formato Pacchetto",tech_license:"Licenza",tech_platform:"Piattaforma",dl_title:"Scarica ora",dl_desc:"Anvil Organizer è gratuito e open source.",dl_appimage:"AppImage (consigliato)",dl_appimage_meta:"~88 MB · Universale · Nessuna installazione",dl_source:"Codice sorgente (git clone)",dl_releases:"Tutte le versioni",dl_bugs:"Segnala bug",ft_project:"Progetto",ft_community:"Comunità",ft_dev:"Sviluppo",ft_docs:"Documentazione"},pt:{hero_sub:"O primeiro gerenciador de mods nativo para Linux. Construído com Python e Qt6 para CachyOS, Arch e qualquer distribuição Linux.",hero_tagline:"Inspirado no MO2. Repensado para Linux.",hero_btn_download:"Baixar AppImage",hero_btn_source:"Código fonte",features_label:"Recursos",features_title:"Inspirado no MO2.<br>Repensado para Linux.",features_desc:"Sem Wine, sem wrapper Proton. Anvil usa symlinks físicos em vez de USVFS.",f1_title:"Deploy baseado em Symlinks",f1_desc:"Symlinks físicos em vez de sistema de arquivos virtual.",f2_title:"Prioridades e Conflitos",f2_desc:"Priorização com arrastar e soltar com detecção automática de conflitos.",f3_title:"Integração NexusMods",f3_desc:"Handler de links NXM para Mod Manager Download diretamente do navegador.",f4_title:"Perfis e Separadores",f4_desc:"Múltiplos perfis de mods por jogo. Separadores para agrupar.",f5_title:"Suporte Multi-Jogo",f5_desc:"Um gerenciador para todos os jogos. Arquitetura de plugins.",f6_title:"Detecção de Frameworks",f6_desc:"Detecção e instalação automática de CET, RED4ext, Script Extender, F4SE.",games_label:"Jogos Suportados",games_desc:"Plugins ativos para os jogos moddáveis mais populares.",tech_label:"Tecnologia",tech_lang:"Linguagem",tech_deploy:"Método de Deploy",tech_pkg:"Formato de Pacote",tech_license:"Licença",tech_platform:"Plataforma",dl_title:"Baixar agora",dl_desc:"Anvil Organizer é gratuito e open source.",dl_appimage:"AppImage (recomendado)",dl_appimage_meta:"~88 MB · Universal · Sem instalação",dl_source:"Código fonte (git clone)",dl_releases:"Todas as versões",dl_bugs:"Reportar bug",ft_project:"Projeto",ft_community:"Comunidade",ft_dev:"Desenvolvimento",ft_docs:"Documentação"},ru:{hero_sub:"Первый нативный менеджер модов для Linux. Создан на Python и Qt6 для CachyOS, Arch и любого дистрибутива Linux.",hero_tagline:"Вдохновлён MO2. Переосмыслен для Linux.",hero_btn_download:"Скачать AppImage",hero_btn_source:"Исходный код",features_label:"Возможности",features_title:"Вдохновлён MO2.<br>Переосмыслен для Linux.",features_desc:"Без Wine, без обёртки Proton. Anvil использует физические симлинки вместо USVFS.",f1_title:"Деплой на симлинках",f1_desc:"Физические симлинки вместо виртуальной файловой системы.",f2_title:"Приоритеты и конфликты",f2_desc:"Перетаскивание для приоритизации с автоматическим обнаружением конфликтов.",f3_title:"Интеграция NexusMods",f3_desc:"Обработчик NXM-ссылок для Mod Manager Download прямо из браузера.",f4_title:"Профили и разделители",f4_desc:"Несколько профилей модов для каждой игры. Разделители для группировки.",f5_title:"Мульти-игровая поддержка",f5_desc:"Один менеджер для всех игр. Архитектура плагинов.",f6_title:"Обнаружение фреймворков",f6_desc:"Автоматическое обнаружение и установка CET, RED4ext, Script Extender, F4SE.",games_label:"Поддерживаемые игры",games_desc:"Активные плагины для самых популярных моддируемых игр.",tech_label:"Технологии",tech_lang:"Язык",tech_deploy:"Метод деплоя",tech_pkg:"Формат пакета",tech_license:"Лицензия",tech_platform:"Платформа",dl_title:"Скачать сейчас",dl_desc:"Anvil Organizer бесплатен и с открытым исходным кодом.",dl_appimage:"AppImage (рекомендуется)",dl_appimage_meta:"~88 МБ · Универсальный · Установка не требуется",dl_source:"Исходный код (git clone)",dl_releases:"Все релизы",dl_bugs:"Сообщить об ошибке",ft_project:"Проект",ft_community:"Сообщество",ft_dev:"Разработка",ft_docs:"Документация"}};
+const langNames={de:'DE',en:'EN',es:'ES',fr:'FR',it:'IT',pt:'PT',ru:'RU'};
+function setLang(l){if(!T[l])return;document.querySelectorAll('[data-i18n]').forEach(e=>{const k=e.dataset.i18n;if(T[l][k]){if(e.dataset.i18nHtml)e.innerHTML=T[l][k];else e.textContent=T[l][k]}});document.getElementById('lang-current').textContent=langNames[l];document.querySelector('.lang-menu').classList.remove('open');document.querySelectorAll('.lang-menu button').forEach(b=>b.classList.remove('active'));document.querySelector('.lang-menu button[onclick*="'+l+'"]').classList.add('active');document.documentElement.lang=l;try{localStorage.setItem('anvil-lang',l)}catch(e){}}
+document.addEventListener('click',e=>{if(!e.target.closest('.lang-switch'))document.querySelector('.lang-menu').classList.remove('open')});
+try{const s=localStorage.getItem('anvil-lang');if(s&&T[s])setLang(s)}catch(e){const b=(navigator.language||'de').slice(0,2).toLowerCase();if(T[b])setLang(b)}
+</script>
+</body>
+</html>
