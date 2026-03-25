@@ -1427,7 +1427,7 @@ class MainWindow(QMainWindow):
         short_name = getattr(self._current_plugin, "GameShortName", "").lower()
         shim_dir = get_anvil_base() / "data" / "shims" / short_name
 
-        for companion in self._current_plugin.get_framework_mods():
+        for companion in self._current_plugin.all_framework_mods():
             if installed_name not in companion.required_by:
                 continue
             # Check if already installed (any detect_installed file present)
@@ -4185,7 +4185,7 @@ class MainWindow(QMainWindow):
                 # Open the directory where the framework is actually installed
                 target_dir = self._current_game_path
                 if self._current_plugin:
-                    for fw in self._current_plugin.get_framework_mods():
+                    for fw in self._current_plugin.all_framework_mods():
                         if fw.name == name:
                             # Use last existing detect_installed path (most specific)
                             for det in fw.detect_installed:
@@ -4227,7 +4227,7 @@ class MainWindow(QMainWindow):
         if not self._current_plugin or not self._current_game_path:
             return
         fw_obj = None
-        for fw in self._current_plugin.get_framework_mods():
+        for fw in self._current_plugin.all_framework_mods():
             if fw.name == fw_name:
                 fw_obj = fw
                 break

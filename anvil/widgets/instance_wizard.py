@@ -699,7 +699,8 @@ class CreateInstanceWizard(QDialog):
             gd = plugin.gameDirectory()
             store = plugin.detectedStore() or ""
             detail = f"{store}  \u2014  {gd}" if gd else store
-            text = f"{plugin.GameName}  \u2014  {detail}"
+            beta = " [Beta]" if not getattr(plugin, "Tested", True) else ""
+            text = f"{plugin.GameName}{beta}  \u2014  {detail}"
 
             item = QStandardItem(text)
             item.setData(plugin.GameShortName, Qt.ItemDataRole.UserRole)
