@@ -49,7 +49,6 @@ MO2 dominates on Windows — Anvil fills the gap on Linux.
 | Skyrim Special Edition | SKSE64 Proton Shim, BA2 packing, plugins.txt, 7 frameworks |
 | Fallout 4 | F4SE Proton Shim (auto-injection), BA2 packing, plugins.txt |
 | Starfield | SFSE Proton Shim, Address Library detection |
-| The Witcher 3: Wild Hunt | Multi-folder routing (mods/dlc/bin) |
 
 ### Beta (27) — [Feedback welcome!](https://github.com/Marc1326/Anvil-Organizer/issues)
 
