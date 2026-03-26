@@ -24,7 +24,8 @@ MO2 dominates on Windows — Anvil fills the gap on Linux.
 - **Nexus Mods integration** — SSO-Login, API Key, direct downloads, NXM link handler
 - **Conflict detection** — shows file conflicts between mods with visual highlighting
 - **Savegame browser** — view saves per game, open in file manager
-- **F4SE / SFSE Proton Shims** — enables F4SE and SFSE under Linux/Proton (world first!)
+- **Open Plugin System** — add new games via UI wizard (File → Create Game Plugin) or minimal Python code
+- **F4SE / SFSE / SKSE64 Proton Shims** — enables script extenders under Linux/Proton (world first!)
 - **Auto-redeploy** — mods redeployed automatically on toggle/reorder
 - **Game Running Lock** — UI locked while a game is running to prevent accidental changes
 - **Nexus Info Tab** — fetch mod info from Nexus with one click, view details in mod dialog
@@ -35,19 +36,44 @@ MO2 dominates on Windows — Anvil fills the gap on Linux.
 - **7 languages** — DE, EN, FR, ES, IT, PT, RU
 - **Dark theme** — multiple styles included
 
-## Supported Games
+## Supported Games (35)
 
-| Game | Status | Notes |
-|------|--------|-------|
-| Cyberpunk 2077 | ✅ Working | REDmod, CET, ASI frameworks |
-| Red Dead Redemption 2 | ✅ Working | ScriptHook, ASI Loader, LML |
-| The Witcher 3: Wild Hunt | ✅ Working | Multi-folder routing (mods/dlc/bin) |
-| Baldur's Gate 3 | ✅ Working | Unified mod list, auto-deploy, profiles, NativeModLoader, WASD framework |
-| Skyrim Special Edition | 🔧 Partial | Needs load-order system for .esp/.esm |
-| Fallout 4 | ✅ Working | F4SE Proton Shim (auto-injection), BA2 packing, plugins.txt |
-| Starfield | ✅ Working | SFSE Proton Shim, Address Library detection |
+### Fully Supported (8)
+
+| Game | Notes |
+|------|-------|
+| Cyberpunk 2077 | REDmod, CET, ASI frameworks |
+| Red Dead Redemption 2 | ScriptHook, ASI Loader, LML |
+| The Witcher 3: Wild Hunt | Multi-folder routing (mods/dlc/bin) |
+| Baldur's Gate 3 | Unified mod list, auto-deploy, profiles, NativeModLoader, WASD |
+| Skyrim Special Edition | SKSE64 Proton Shim, BA2 packing, plugins.txt, 7 frameworks |
+| Fallout 4 | F4SE Proton Shim (auto-injection), BA2 packing, plugins.txt |
+| Starfield | SFSE Proton Shim, Address Library detection |
+| The Witcher 3: Wild Hunt | Multi-folder routing (mods/dlc/bin) |
+
+### Beta (27) — [Feedback welcome!](https://github.com/Marc1326/Anvil-Organizer/issues)
+
+| Game | Steam | GOG | Game | Steam | GOG |
+|------|:-----:|:---:|------|:-----:|:---:|
+| Bannerlord | ✅ | ✅ | Monster Hunter: World | ✅ | — |
+| Blade & Sorcery | ✅ | — | Morrowind | ✅ | ✅ |
+| Control | ✅ | ✅ | NieR: Automata | ✅ | — |
+| Dark Souls | ✅ | — | No Man's Sky | ✅ | ✅ |
+| Darkest Dungeon | ✅ | ✅ | Oblivion Remastered | ✅ | — |
+| Divinity: Original Sin EE | ✅ | ✅ | Sekiro | ✅ | — |
+| Dragon Age 2 | ✅ | — | Stardew Valley | ✅ | ✅ |
+| Dragon Age: Origins | ✅ | ✅ | Stellar Blade | ✅ | — |
+| Dragon's Dogma | ✅ | ✅ | Subnautica | ✅ | — |
+| Elden Ring | ✅ | — | The Witcher | ✅ | ✅ |
+| Fallout 3 | ✅ | ✅ | The Witcher 2 | ✅ | ✅ |
+| Fallout: New Vegas | ✅ | ✅ | Valheim | ✅ | — |
+| FF VII Remake | ✅ | — | | | |
+| Hogwarts Legacy | ✅ | ✅ | | | |
+| Kingdom Come: Deliverance | ✅ | ✅ | | | |
 
 Works with **Steam** and **Heroic Games Launcher** (GOG/Epic via Proton/Wine).
+
+> 💡 **Missing your game?** Use **File → Create Game Plugin** to add any game — no coding required!
 
 ---
 
@@ -82,8 +108,8 @@ Works with **Steam** and **Heroic Games Launcher** (GOG/Epic via Proton/Wine).
 No installation needed — download, make executable, run:
 
 ```bash
-chmod +x Anvil_Organizer-1.0.9-x86_64.AppImage
-./Anvil_Organizer-1.0.9-x86_64.AppImage
+chmod +x Anvil_Organizer-1.1.0-x86_64.AppImage
+./Anvil_Organizer-1.1.0-x86_64.AppImage
 ```
 
 Download from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest).
