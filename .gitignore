@@ -21,8 +21,8 @@ AnvilOrganizer.AppDir/
 _dev/
 ..bfg-report/
 
-# WIP game plugins (not ready for release)
-anvil/plugins/games/_wip/
+# WIP game plugins — jetzt als Beta geladen (Tested = False)
+# anvil/plugins/games/_wip/  # Entfernt: Plugins werden seit v2 geladen
 
 # Claude Code (nicht veröffentlichen)
 CLAUDE.md

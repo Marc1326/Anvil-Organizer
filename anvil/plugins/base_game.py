@@ -11,6 +11,8 @@ Proton prefix support, .exe-agnostic binary lookup).
 from __future__ import annotations
 
 import fnmatch
+import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -157,6 +159,32 @@ class BaseGame:
 
     Ba2IniFile: str = ""
     """Custom INI filename ('Fallout4Custom.ini')."""
+
+    # ── Proton-Pfade (fuer automatische Aufloesung) ──────────────────
+
+    _WIN_DOCUMENTS: str = ""
+    """Windows-Pfad relativ zum Proton-Prefix fuer das Documents-Verzeichnis.
+
+    Beispiel: 'drive_c/users/steamuser/Documents/My Games/Skyrim Special Edition'
+    Wenn gesetzt und die Methode gameDocumentsDirectory() NICHT ueberschrieben wird,
+    wird der Pfad automatisch aufgeloest.
+    """
+
+    _WIN_SAVES: str = ""
+    """Windows-Pfad relativ zum Proton-Prefix fuer das Saves-Verzeichnis.
+
+    Beispiel: 'drive_c/users/steamuser/Documents/My Games/Skyrim Special Edition/Saves'
+    Wenn gesetzt und die Methode gameSavesDirectory() NICHT ueberschrieben wird,
+    wird der Pfad automatisch aufgeloest.
+    """
+
+    # ── Beta-Markierung ───────────────────────────────────────────────
+
+    Tested: bool = True
+    """Ob das Plugin vollstaendig getestet ist.
+
+    WIP-Plugins setzen dies auf False. Die UI zeigt dann '[Beta]' im Namen.
+    """
 
     # ── Interner State ────────────────────────────────────────────────
 
@@ -384,6 +412,42 @@ class BaseGame:
         """
         return None
 
+    # ── Proton-Pfad-Aufloesung (Default-Implementierungen) ───────────
+
+    def gameDocumentsDirectory(self) -> Path | None:
+        """Return the game's documents directory, or None.
+
+        Default: Wenn ``_WIN_DOCUMENTS`` gesetzt ist, wird der Pfad
+        automatisch ueber den Proton-Prefix aufgeloest.
+        Subklassen koennen diese Methode ueberschreiben — der Override
+        gewinnt via Python MRO.
+        """
+        if not self._WIN_DOCUMENTS:
+            return None
+        prefix = self.protonPrefix()
+        if prefix is not None:
+            path = prefix / self._WIN_DOCUMENTS
+            if path.is_dir():
+                return path
+        return None
+
+    def gameSavesDirectory(self) -> Path | None:
+        """Return the save game directory, or None.
+
+        Default: Wenn ``_WIN_SAVES`` gesetzt ist, wird der Pfad
+        automatisch ueber den Proton-Prefix aufgeloest.
+        Subklassen koennen diese Methode ueberschreiben — der Override
+        gewinnt via Python MRO.
+        """
+        if not self._WIN_SAVES:
+            return None
+        prefix = self.protonPrefix()
+        if prefix is not None:
+            path = prefix / self._WIN_SAVES
+            if path.is_dir():
+                return path
+        return None
+
     # ── Plugin-Liste (Bethesda) ──────────────────────────────────────
 
     def has_plugins_txt(self) -> bool:
@@ -415,11 +479,65 @@ class BaseGame:
         """
         return []
 
+    def all_framework_mods(self) -> list[FrameworkMod]:
+        """Kombiniert Python- und JSON-Framework-Definitionen.
+
+        Dies ist die Methode die der Core aufrufen soll.
+        Python-Defs haben Vorrang bei Namenskonflikten.
+        """
+        python_fws = self.get_framework_mods()
+        json_fws = self._load_json_frameworks()
+
+        # Merge: Python gewinnt bei gleichem Namen
+        known_names = {fw.name.lower() for fw in python_fws}
+        for jfw in json_fws:
+            if jfw.name.lower() not in known_names:
+                python_fws.append(jfw)
+                known_names.add(jfw.name.lower())
+
+        return python_fws
+
+    def _load_json_frameworks(self) -> list[FrameworkMod]:
+        """Laedt FrameworkMod-Eintraege aus JSON-Dateien."""
+        results: list[FrameworkMod] = []
+        short = self.GameShortName.lower()
+        json_name = f"game_{short}.json"
+
+        for directory in self._framework_json_dirs():
+            json_path = directory / json_name
+            if not json_path.is_file():
+                continue
+            try:
+                data = json.loads(json_path.read_text(encoding="utf-8"))
+                for entry in data.get("frameworks", []):
+                    results.append(FrameworkMod(
+                        name=entry["name"],
+                        pattern=entry.get("pattern", []),
+                        target=entry.get("target", ""),
+                        description=entry.get("description", ""),
+                        detect_installed=entry.get("detect_installed", []),
+                        required_by=entry.get("required_by", []),
+                    ))
+            except Exception as exc:
+                print(
+                    f"plugin: failed to load {json_path}: {exc}",
+                    file=sys.stderr,
+                )
+        return results
+
+    def _framework_json_dirs(self) -> list[Path]:
+        """Verzeichnisse in denen nach JSON-Framework-Dateien gesucht wird."""
+        from anvil.core.resource_path import get_anvil_base
+        return [
+            get_anvil_base() / "plugins" / "games",
+            Path.home() / ".anvil-organizer" / "plugins" / "games",
+        ]
+
     def is_framework_mod(self, archive_contents: list[str]) -> FrameworkMod | None:
         """Check if an archive contains a known framework mod.
 
         Compares the file paths in *archive_contents* against the
-        patterns declared by ``get_framework_mods()``.  Returns the
+        patterns declared by ``all_framework_mods()``.  Returns the
         first matching FrameworkMod, or None.
 
         Args:
@@ -427,7 +545,7 @@ class BaseGame:
                               (e.g. from zipfile.namelist()).
         """
         lower_contents = [f.lower().replace("\\", "/") for f in archive_contents]
-        for fw in self.get_framework_mods():
+        for fw in self.all_framework_mods():
             for pattern in fw.pattern:
                 pat = pattern.lower().replace("\\", "/")
                 if '*' in pat or '?' in pat:
@@ -450,7 +568,7 @@ class BaseGame:
         """
         print(f"[get_installed_frameworks] _game_path={self._game_path}", flush=True)
         result: list[tuple[FrameworkMod, bool]] = []
-        for fw in self.get_framework_mods():
+        for fw in self.all_framework_mods():
             installed = False
             if self._game_path is not None:
                 for det_path in fw.detect_installed:

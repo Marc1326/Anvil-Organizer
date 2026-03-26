@@ -191,6 +191,14 @@ class Fallout4Game(BaseGame):
                 detect_installed=["f4se_loader.exe"],
                 required_by=["F4SE-Plugins", "MCM", "Looksmenu"],
             ),
+            FrameworkMod(
+                name="F4SE Proton Shim",
+                pattern=["X3DAudio1_7.dll"],
+                target="",
+                description="Proxy-DLL — ermöglicht F4SE unter Linux/Proton",
+                detect_installed=["X3DAudio1_7.dll"],
+                required_by=["F4SE"],
+            ),
         ]
 
     # TODO: plugins.txt Parser/Writer -- Load-Order verwalten

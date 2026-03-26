@@ -34,36 +34,130 @@ _BUILTIN_GAMES_DIR = get_anvil_base() / "plugins" / "games"
 _USER_GAMES_DIR = Path.home() / ".anvil-organizer" / "plugins" / "games"
 
 _USER_README = """\
-# Eigene Spiel-Plugins für Anvil Organizer
+# Eigene Spiel-Plugins fuer Anvil Organizer
 
 Lege hier eigene Game-Plugin-Dateien ab (z.B. `game_meingame.py`).
 
-## Anleitung
+## Schnellstart
 
 1. Erstelle eine Python-Datei `game_SPIELNAME.py`
-2. Importiere BaseGame und erbe davon:
+2. Importiere BaseGame und erbe davon
+3. Starte Anvil Organizer neu — das Plugin wird automatisch geladen
+
+## Minimales Plugin-Beispiel
 
 ```python
 from anvil.plugins.base_game import BaseGame
 
 class MeinGamePlugin(BaseGame):
+    # -- Pflicht-Attribute --
     Name = "Mein Spiel Support Plugin"
     Author = "Dein Name"
     Version = "1.0.0"
     GameName = "Mein Spiel"
     GameShortName = "meinspiel"
     GameBinary = "bin/game.exe"
-    GameDataPath = ""
-    GameSteamId = 123456       # Mindestens eine Store-ID setzen
-    # GameGogId = 0
-    # GameEpicId = ""
+    GameDataPath = ""               # "" = Game Root, "Data" = Data-Ordner, "Mods" = Mods-Ordner
+    GameSteamId = 123456            # Mindestens EINE Store-ID setzen!
+
+    # -- Optional: Proton-Pfade (automatische Aufloesung) --
+    _WIN_DOCUMENTS = "drive_c/users/steamuser/Documents/My Games/MeinSpiel"
+    _WIN_SAVES = "drive_c/users/steamuser/Documents/My Games/MeinSpiel/Saves"
 ```
 
-3. Starte Anvil Organizer neu — das Plugin wird automatisch geladen.
+## Vollstaendige Attribut-Referenz
 
-## Beispiel
+### Pflicht-Attribute
 
-Siehe das Cyberpunk-Plugin: `anvil/plugins/games/game_cyberpunk2077.py`
+| Attribut        | Typ           | Beschreibung |
+|-----------------|---------------|--------------|
+| `Name`          | `str`         | Plugin-Anzeigename (z.B. "Skyrim SE Support Plugin") |
+| `Author`        | `str`         | Autor des Plugins |
+| `Version`       | `str`         | Versions-String (z.B. "1.0.0") |
+| `GameName`      | `str`         | Spielname (z.B. "Skyrim Special Edition") |
+| `GameShortName` | `str`         | Eindeutiger Kurzname (z.B. "SkyrimSE") — wird fuer Dateinamen verwendet |
+| `GameBinary`    | `str`         | Pfad zur Spiel-EXE relativ zum Spielordner |
+| `GameDataPath`  | `str`         | Mod-Verzeichnis relativ zum Spielordner ("" = Root) |
+
+### Store-IDs (mindestens eine setzen!)
+
+| Attribut       | Typ                | Wo finden? |
+|----------------|--------------------|------------|
+| `GameSteamId`  | `int` oder `list[int]` | https://store.steampowered.com/app/NUMMER |
+| `GameGogId`    | `int` oder `list[int]` | https://www.gog.com/game/SPIELNAME → Seiten-Quelltext: "productId" |
+| `GameEpicId`   | `str` oder `list[str]` | `legendary list-installed` oder Epic Store URL-Slug |
+
+### Optionale Attribute
+
+| Attribut               | Typ           | Default | Beschreibung |
+|------------------------|---------------|---------|--------------|
+| `GameLauncher`         | `str`         | `""`    | Alternativer Launcher relativ zum Spielordner |
+| `GameDocumentsDirectory` | `str`       | `""`    | Dokument-Pfad (unterstuetzt ~) |
+| `GameSavesDirectory`   | `str`         | `""`    | Savegame-Pfad (Fallback: GameDocumentsDirectory) |
+| `GameSaveExtension`    | `str`         | `"save"` | Dateiendung fuer Savegames (ohne Punkt) |
+| `GameNexusId`          | `int`         | `0`     | Nexus Mods Game-ID |
+| `GameNexusName`        | `str`         | `""`    | Nexus Mods URL-Slug (Fallback: GameShortName) |
+| `GameSupportURL`       | `str`         | `""`    | Link zu Wiki/Modding-Anleitung |
+| `GameLaunchArgs`       | `list[str]`   | `[]`    | Extra Startargumente (z.B. `['--launcher-skip']`) |
+| `GameDirectInstallMods` | `list[str]`  | `[]`    | Framework-Mods die direkt kopiert werden |
+| `GameLMLPath`          | `str`         | `""`    | LML-Mod-Pfad (z.B. "lml" fuer RDR2) |
+| `GameCopyDeployPaths`  | `list[str]`   | `[]`    | Pfade wo Kopien statt Symlinks noetig sind |
+
+### Proton-Pfade (automatische Aufloesung)
+
+| Attribut          | Typ   | Beschreibung |
+|-------------------|-------|--------------|
+| `_WIN_DOCUMENTS`  | `str` | Windows-Pfad relativ zum Proton-Prefix (z.B. "drive_c/users/steamuser/Documents/My Games/MeinSpiel") |
+| `_WIN_SAVES`      | `str` | Windows-Pfad fuer Savegames relativ zum Proton-Prefix |
+
+Wenn gesetzt, werden `gameDocumentsDirectory()` und `gameSavesDirectory()` automatisch aufgeloest.
+Du kannst die Methoden auch manuell ueberschreiben — dein Override gewinnt immer.
+
+### Bethesda-spezifisch (optional)
+
+| Attribut           | Typ           | Beschreibung |
+|--------------------|---------------|--------------|
+| `PRIMARY_PLUGINS`  | `list[str]`   | Immer aktive Plugin-Dateien (.esm) |
+| `NeedsBa2Packing`  | `bool`        | Loose Files in BA2-Archive packen |
+| `Ba2Format`        | `str`         | BSArch-Format ("fo4", "sse") |
+| `Ba2IniFile`       | `str`         | Custom-INI Dateiname |
+| `ScriptExtenderDir`| `str`         | SE-Unterordner in Data/ ("F4SE", "SFSE") |
+
+### Beta-Markierung
+
+| Attribut  | Typ    | Default | Beschreibung |
+|-----------|--------|---------|--------------|
+| `Tested`  | `bool` | `True`  | Auf `False` setzen fuer ungetestete Plugins → zeigt "[Beta]" in der UI |
+
+## Framework-Mods per JSON definieren
+
+Statt Python-Code kannst du Frameworks auch per JSON-Datei definieren.
+Dateiname: `game_<GameShortName>.json` (lowercase), in diesem Ordner.
+
+```json
+{
+  "frameworks": [
+    {
+      "name": "Mein Framework",
+      "pattern": ["framework.dll", "framework_*.dll"],
+      "target": "",
+      "description": "Was das Framework macht",
+      "detect_installed": ["framework.dll"],
+      "required_by": ["Framework-Mods"]
+    }
+  ]
+}
+```
+
+JSON-Frameworks werden mit Python-Frameworks zusammengefuehrt.
+Bei gleichem Namen gewinnt die Python-Definition.
+
+## Tipps
+
+- GameShortName muss EINDEUTIG sein — kein anderes Plugin darf denselben verwenden
+- Teste mit `Tested = False` bis du sicher bist, dass alles funktioniert
+- Lies die bestehenden Plugins als Vorlage: `anvil/plugins/games/`
+- Wiki: https://github.com/Marc1326/Anvil-Organizer/wiki
 """
 
 
@@ -112,8 +206,9 @@ class PluginLoader:
         # Step 1: Scan stores
         self._store_manager.scan_all_stores()
 
-        # Step 2+3: Load plugin files
+        # Step 2+3: Load plugin files (inkl. _wip/ Unterverzeichnis)
         self._scan_directory(_BUILTIN_GAMES_DIR)
+        self._scan_directory(_BUILTIN_GAMES_DIR / "_wip")
         ensure_user_plugin_dir()
         self._scan_directory(_USER_GAMES_DIR)
 
@@ -180,7 +275,21 @@ class PluginLoader:
 
                 try:
                     instance = cls()
-                    self._plugins.append(instance)
+                    # Duplikat-Check: User-Plugin ersetzt Built-in
+                    short = instance.GameShortName
+                    replaced = False
+                    for i, existing in enumerate(self._plugins):
+                        if existing.GameShortName == short:
+                            print(
+                                f"plugin_loader: {name} ({py_file.name}) "
+                                f"ersetzt {existing.__class__.__name__} "
+                                f"(gleicher GameShortName: {short})",
+                            )
+                            self._plugins[i] = instance
+                            replaced = True
+                            break
+                    if not replaced:
+                        self._plugins.append(instance)
                 except Exception as exc:
                     print(
                         f"plugin_loader: failed to instantiate {name}: {exc}",

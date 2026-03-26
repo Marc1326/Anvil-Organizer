@@ -1,7 +1,8 @@
 # Workflow Status
-Issue: #57
-Feature: BG3 Einheitliche Mod-Liste
-Branch: feat/issue-57
+Issue: #63
+Feature: Plugin-System v2 — Offenes Plugin-System
+Branch: feat/issue-63-plugin-system-v2
 Iteration: 1
 Sub-Issues: []
-Status: DONE - Wartet auf Marc Review + Merge
+Status: DONE
+Phase: ALLE 4 PHASEN + QA-REVIEW BESTANDEN

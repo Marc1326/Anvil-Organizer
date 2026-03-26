@@ -553,7 +553,8 @@ class SettingsDialog(QDialog):
 
         if self._plugin_loader:
             for plugin in self._plugin_loader.all_plugins():
-                item = QTreeWidgetItem(games_root, [plugin.Name, plugin.Version])
+                beta = " [Beta]" if not getattr(plugin, "Tested", True) else ""
+                item = QTreeWidgetItem(games_root, [f"{plugin.Name}{beta}", plugin.Version])
                 item.setCheckState(0, Qt.CheckState.Checked)
                 item.setData(0, Qt.ItemDataRole.UserRole, plugin.GameShortName)
                 if not plugin.isInstalled():
@@ -758,7 +759,8 @@ class SettingsDialog(QDialog):
 
         self._pl_author.setText(plugin.Author)
         self._pl_version.setText(plugin.Version)
-        self._pl_game_name.setText(plugin.GameName)
+        beta = " [Beta]" if not getattr(plugin, "Tested", True) else ""
+        self._pl_game_name.setText(f"{plugin.GameName}{beta}")
         self._pl_store.setText(plugin.detectedStore() or "—")
         gd = plugin.gameDirectory()
         self._pl_path.setText(str(gd) if gd else "—")
