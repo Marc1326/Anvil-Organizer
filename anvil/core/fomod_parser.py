@@ -8,10 +8,13 @@ Reference: MO2 installerFomod plugin.
 
 from __future__ import annotations
 
+import json
 import shutil
+import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -491,3 +494,159 @@ def assemble_fomod_files(source_dir: Path, files: list[FomodFile]) -> Path | Non
 
     shutil.rmtree(dest, ignore_errors=True)
     return None
+
+
+# ── FOMOD Selection Memory ────────────────────────────────────────────
+
+_CHOICES_FILENAME = "fomod_choices.json"
+
+
+def _build_config_fingerprint(config: FomodConfig) -> list[dict]:
+    """Build a fingerprint of the FOMOD config structure for compatibility checks.
+
+    Captures step count, group count per step, and plugin count per group.
+    If the FOMOD XML changes (different steps/groups/plugins), the fingerprint
+    will differ and saved choices will be ignored.
+    """
+    fingerprint: list[dict] = []
+    for step in config.install_steps:
+        groups: list[dict] = []
+        for group in step.groups:
+            groups.append({
+                "name": group.name,
+                "type": group.group_type,
+                "plugin_count": len(group.plugins),
+            })
+        fingerprint.append({
+            "name": step.name,
+            "groups": groups,
+        })
+    return fingerprint
+
+
+def save_fomod_choices(
+    mod_path: Path,
+    config: FomodConfig,
+    step_selections: dict[int, dict[int, list[int]]],
+    flags: dict[str, str],
+) -> None:
+    """Save FOMOD wizard selections to ``fomod_choices.json`` in the mod folder.
+
+    Args:
+        mod_path: Path to the mod folder (e.g. ``.mods/MyMod/``).
+        config: The parsed FOMOD config (for module name and fingerprint).
+        step_selections: ``{step_index: {group_index: [plugin_indices]}}``.
+        flags: Final flag state after wizard completion.
+    """
+    # Convert int keys to strings for JSON serialization
+    steps_json: dict[str, dict[str, list[int]]] = {}
+    for step_idx, group_sels in step_selections.items():
+        group_json: dict[str, list[int]] = {}
+        for grp_idx, plugin_indices in group_sels.items():
+            group_json[str(grp_idx)] = list(plugin_indices)
+        steps_json[str(step_idx)] = group_json
+
+    data = {
+        "fomod_module": config.module_name,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "fingerprint": _build_config_fingerprint(config),
+        "steps": steps_json,
+        "flags": dict(flags),
+    }
+
+    choices_path = mod_path / _CHOICES_FILENAME
+    try:
+        mod_path.mkdir(parents=True, exist_ok=True)
+        choices_path.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        print(
+            f"fomod_parser: failed to save choices to {choices_path}: {exc}",
+            file=sys.stderr,
+        )
+
+
+def load_fomod_choices(
+    mod_path: Path,
+    config: FomodConfig,
+) -> dict[int, dict[int, list[int]]] | None:
+    """Load saved FOMOD wizard selections from ``fomod_choices.json``.
+
+    Validates that the saved fingerprint matches the current FOMOD config.
+    Returns *None* if no choices are saved, the file is invalid, or the
+    FOMOD config has changed since the last installation.
+
+    Args:
+        mod_path: Path to the mod folder.
+        config: The current parsed FOMOD config.
+
+    Returns:
+        ``{step_index: {group_index: [plugin_indices]}}``, or *None*.
+    """
+    choices_path = mod_path / _CHOICES_FILENAME
+    if not choices_path.is_file():
+        return None
+
+    try:
+        raw = choices_path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"fomod_parser: failed to load choices from {choices_path}: {exc}",
+            file=sys.stderr,
+        )
+        return None
+
+    if not isinstance(data, dict):
+        return None
+
+    # Validate fingerprint — if config structure changed, ignore saved choices
+    saved_fp = data.get("fingerprint")
+    current_fp = _build_config_fingerprint(config)
+    if saved_fp != current_fp:
+        print(
+            f"fomod_parser: ignoring saved choices — config structure changed",
+            flush=True,
+        )
+        return None
+
+    # Parse steps back to int-keyed dicts
+    steps_raw = data.get("steps")
+    if not isinstance(steps_raw, dict):
+        return None
+
+    result: dict[int, dict[int, list[int]]] = {}
+    for step_key, group_sels in steps_raw.items():
+        try:
+            step_idx = int(step_key)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(group_sels, dict):
+            continue
+
+        group_map: dict[int, list[int]] = {}
+        for grp_key, plugin_indices in group_sels.items():
+            try:
+                grp_idx = int(grp_key)
+            except (ValueError, TypeError):
+                continue
+            if isinstance(plugin_indices, list):
+                # Validate indices are within bounds
+                step = config.install_steps[step_idx] if step_idx < len(config.install_steps) else None
+                if step is None:
+                    continue
+                group = step.groups[grp_idx] if grp_idx < len(step.groups) else None
+                if group is None:
+                    continue
+                valid_indices = [
+                    pi for pi in plugin_indices
+                    if isinstance(pi, int) and 0 <= pi < len(group.plugins)
+                ]
+                group_map[grp_idx] = valid_indices
+
+        if group_map:
+            result[step_idx] = group_map
+
+    return result if result else None

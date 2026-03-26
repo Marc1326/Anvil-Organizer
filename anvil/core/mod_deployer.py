@@ -30,7 +30,7 @@ from pathlib import Path
 from anvil.core.mod_list_io import read_global_modlist, read_active_mods
 
 # Files inside mod folders that are metadata, not game content.
-_SKIP_FILES = {"meta.ini", "codes.txt"}
+_SKIP_FILES = {"meta.ini", "codes.txt", "fomod_choices.json"}
 
 # Directories inside mod folders that are installer metadata (like MO2).
 _SKIP_DIRS = {"fomod"}

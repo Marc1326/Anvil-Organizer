@@ -49,13 +49,17 @@ class FomodDialog(QDialog):
         config: FomodConfig,
         temp_dir: Path,
         parent=None,
+        previous_choices: dict[int, dict[int, list[int]]] | None = None,
     ):
         super().__init__(parent)
         self._config = config
         self._temp_dir = temp_dir
         self._flags: dict[str, str] = {}
         # step_index -> {group_index: [plugin_indices]}
-        self._step_selections: dict[int, dict[int, list[int]]] = {}
+        # Pre-populate with previous choices if available (FOMOD Selection Memory)
+        self._step_selections: dict[int, dict[int, list[int]]] = (
+            dict(previous_choices) if previous_choices else {}
+        )
         self._visible_steps: list[int] = []
         self._current_vis_idx = 0
         # Current step's widgets: [(grp_idx, [widget, ...])]
@@ -162,6 +166,15 @@ class FomodDialog(QDialog):
         """Return the final flag state after all selections."""
         self._save_current_step()
         return dict(self._flags)
+
+    def step_selections(self) -> dict[int, dict[int, list[int]]]:
+        """Return all step selections for persistence (FOMOD Selection Memory).
+
+        Returns:
+            ``{step_index: {group_index: [plugin_indices]}}``
+        """
+        self._save_current_step()
+        return dict(self._step_selections)
 
     # -- Step navigation ---------------------------------------------------
 

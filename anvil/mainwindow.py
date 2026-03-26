@@ -53,6 +53,7 @@ from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
 from anvil.core.fomod_parser import (
     detect_fomod, parse_fomod, parse_fomod_info,
     collect_fomod_files, assemble_fomod_files,
+    save_fomod_choices, load_fomod_choices,
 )
 from anvil.dialogs.fomod_dialog import FomodDialog
 from anvil.core.mod_list_io import (
@@ -1479,7 +1480,8 @@ class MainWindow(QMainWindow):
                     flush=True,
                 )
 
-    def _install_archives(self, archives: list[Path], insert_at: int | None = None) -> None:
+    def _install_archives(self, archives: list[Path], insert_at: int | None = None,
+                          reinstall_mod_path: Path | None = None) -> None:
         """Install one or more archives as mods.
 
         MO2-Pattern (testOverwrite):
@@ -1546,16 +1548,48 @@ class MainWindow(QMainWindow):
 
             # 3. FOMOD installer check
             fomod_name_override = None
+            fomod_config_for_save = None   # held for post-install choices save
+            fomod_selections_for_save = None
+            fomod_flags_for_save = None
             fomod_xml = detect_fomod(temp_dir)
             if fomod_xml is not None:
                 print(f"DEBUG _install_archives: FOMOD detected: {fomod_xml}", flush=True)
                 config = parse_fomod(fomod_xml)
                 if config is not None and config.install_steps:
-                    dlg = FomodDialog(config, temp_dir, parent=self)
+                    # FOMOD Selection Memory: try to load previous choices
+                    previous_choices = None
+                    # Priority 1: explicit reinstall path (from context menu)
+                    if reinstall_mod_path and reinstall_mod_path.is_dir():
+                        previous_choices = load_fomod_choices(reinstall_mod_path, config)
+                    # Priority 2: check by FOMOD info name
+                    if previous_choices is None:
+                        candidate_name = None
+                        info_pre = parse_fomod_info(fomod_xml.parent)
+                        if "name" in info_pre:
+                            candidate_name = info_pre["name"]
+                        elif config.module_name and config.module_name != "FOMOD Package":
+                            candidate_name = config.module_name
+                        if candidate_name:
+                            candidate_path = installer.mods_path / candidate_name
+                            if candidate_path.is_dir():
+                                previous_choices = load_fomod_choices(candidate_path, config)
+                    # Priority 3: check by archive stem name
+                    if previous_choices is None:
+                        stem_name = installer.suggest_name(archive)
+                        stem_path = installer.mods_path / stem_name
+                        if stem_path.is_dir():
+                            previous_choices = load_fomod_choices(stem_path, config)
+
+                    dlg = FomodDialog(config, temp_dir, parent=self,
+                                      previous_choices=previous_choices)
                     _center_on_parent(dlg)
                     if dlg.exec() != QDialog.DialogCode.Accepted:
                         shutil.rmtree(temp_dir, ignore_errors=True)
                         continue
+                    # Save choices data for post-install persistence
+                    fomod_config_for_save = config
+                    fomod_selections_for_save = dlg.step_selections()
+                    fomod_flags_for_save = dlg.flags()
                     all_files = collect_fomod_files(
                         config, dlg.selected_plugins(), dlg.flags()
                     )
@@ -1627,6 +1661,13 @@ class MainWindow(QMainWindow):
             # Install from extracted temp dir
             mod_path = installer.install_from_extracted(temp_dir, mod_name)
             if mod_path:
+                # FOMOD Selection Memory: save choices after installation
+                if fomod_config_for_save and fomod_selections_for_save is not None:
+                    save_fomod_choices(
+                        mod_path, fomod_config_for_save,
+                        fomod_selections_for_save, fomod_flags_for_save or {},
+                    )
+
                 # Transfer Nexus info from download .meta to mod meta.ini
                 meta_file = Path(str(archive) + ".meta")
                 if meta_file.is_file():
@@ -3491,7 +3532,9 @@ class MainWindow(QMainWindow):
             )
             return
 
-        self._install_archives([archive])
+        # Pass existing mod path for FOMOD Selection Memory
+        mod_path = self._current_instance_path / ".mods" / entry.name
+        self._install_archives([archive], reinstall_mod_path=mod_path)
         self._game_panel.refresh_downloads()
         self._do_redeploy()
 
