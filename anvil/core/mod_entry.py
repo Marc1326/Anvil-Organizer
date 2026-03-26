@@ -54,6 +54,9 @@ class ModEntry:
     # Separator color (from meta.ini, MO2-compatible)
     color: str = ""                        # Hex color e.g. "#FF0000", empty = no custom color
 
+    # Group membership (set by GroupManager, NOT from meta.ini)
+    group: str = ""                        # Group name this mod belongs to
+
     # Computed from filesystem
     file_count: int = 0
     total_size: int = 0                    # Bytes

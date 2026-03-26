@@ -69,7 +69,8 @@ from anvil.core.update_checker import UpdateChecker
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nxm_handler import parse_nxm_url, check_cli_for_nxm
 from anvil.core.conflict_scanner import ConflictScanner
-from anvil.models.mod_list_model import mod_entry_to_row, COL_COUNT
+from anvil.models.mod_list_model import mod_entry_to_row, COL_COUNT, ROLE_GROUP_NAME, ROLE_IS_GROUP_HEAD
+from anvil.core.mod_groups import GroupManager
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 from anvil.widgets.category_dialog import CategoryDialog
 from anvil.widgets.log_panel import LogPanel
@@ -280,6 +281,10 @@ class MainWindow(QMainWindow):
         # ── Category manager ────────────────────────────────────────────
         self._category_manager = CategoryManager()
         self._filter_panel.set_category_manager(self._category_manager)
+
+        # ── Group manager ──────────────────────────────────────────────
+        self._group_manager = GroupManager()
+        self._mod_list_view.set_group_manager(self._group_manager)
 
         # ── Nexus API ────────────────────────────────────────────────
         self._nexus_api = NexusAPI(self)
@@ -1021,6 +1026,15 @@ class MainWindow(QMainWindow):
 
         self._profile_bar.set_profiles(profile_folders, active=profile_name)
         self._current_profile_path = instance_path / ".profiles" / profile_name
+
+        # Load groups for this profile
+        self._group_manager.load(self._current_profile_path)
+        # Cleanup orphaned group members
+        mods_dir = instance_path / ".mods"
+        if mods_dir.is_dir():
+            existing_folders = {d.name for d in mods_dir.iterdir() if d.is_dir()}
+            self._group_manager.cleanup_orphans(existing_folders)
+
         include_ext = self._settings().value("ModList/show_external_mods", True, type=bool)
         self._current_mod_entries = scan_mods_directory(
             instance_path, self._current_profile_path,
@@ -1037,7 +1051,7 @@ class MainWindow(QMainWindow):
         conflict_data = self._compute_conflict_data()
         # Filter out framework (direct-install) mods from the main list
         visible_entries = [e for e in self._current_mod_entries if not e.is_direct_install]
-        mod_rows = [mod_entry_to_row(e, conflict_data) for e in visible_entries]
+        mod_rows = [mod_entry_to_row(e, conflict_data, self._group_manager) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         # Provide visible entries to proxy for filter logic
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
@@ -1238,8 +1252,95 @@ class MainWindow(QMainWindow):
             model.index(0, 0),
             model.index(model.rowCount() - 1, model.columnCount() - 1),
         )
+        # Check group consistency after DnD (Kriterium 4 + 13)
+        self._check_group_consistency_after_reorder(model)
         self._mod_list_view._tree._apply_separator_filter()
         self._schedule_redeploy()
+
+    def _check_group_consistency_after_reorder(self, model) -> None:
+        """After DnD, check if any group members were moved out of their group.
+
+        - Kriterium 4: If a single member is no longer contiguous with its
+          group, remove it from the group.
+        - Kriterium 13: If a member crossed a separator boundary, remove it
+          from the group.
+        """
+        changed = False
+        for gname in list(self._group_manager.all_groups().keys()):
+            members = self._group_manager.get_members(gname)
+            if not members:
+                continue
+
+            # Find rows for each member
+            member_rows: dict[str, int] = {}
+            for i, r in enumerate(model._rows):
+                if r.folder_name in members:
+                    member_rows[r.folder_name] = i
+
+            # Find separator for each member
+            member_seps: dict[str, str] = {}
+            for folder_name, row_idx in member_rows.items():
+                sep = ""
+                for j in range(row_idx, -1, -1):
+                    if j < len(model._rows) and model._rows[j].is_separator:
+                        sep = model._rows[j].folder_name
+                        break
+                member_seps[folder_name] = sep
+
+            # All members must be in the same separator
+            seps = set(member_seps.values())
+            if len(seps) > 1:
+                # Some members crossed separator boundary
+                # Keep members that are in the majority separator
+                from collections import Counter
+                sep_counts = Counter(member_seps.values())
+                main_sep = sep_counts.most_common(1)[0][0]
+                for folder_name, sep in member_seps.items():
+                    if sep != main_sep:
+                        self._group_manager.remove_member(folder_name)
+                        changed = True
+
+            # Check contiguity: if a single mod was dragged out
+            rows_list = sorted(member_rows.values())
+            if len(rows_list) >= 2:
+                expected_span = rows_list[-1] - rows_list[0] + 1
+                if expected_span != len(rows_list):
+                    # Non-contiguous: find which members are isolated
+                    # Keep the largest contiguous block, remove outliers
+                    blocks: list[list[int]] = []
+                    current_block = [rows_list[0]]
+                    for ri in range(1, len(rows_list)):
+                        if rows_list[ri] == current_block[-1] + 1:
+                            current_block.append(rows_list[ri])
+                        else:
+                            blocks.append(current_block)
+                            current_block = [rows_list[ri]]
+                    blocks.append(current_block)
+
+                    # Find the largest block
+                    largest = max(blocks, key=len)
+                    largest_set = set(largest)
+
+                    # Remove members not in the largest block
+                    row_to_folder = {v: k for k, v in member_rows.items()}
+                    for row_idx in rows_list:
+                        if row_idx not in largest_set:
+                            folder = row_to_folder.get(row_idx, "")
+                            if folder:
+                                self._group_manager.remove_member(folder)
+                                changed = True
+
+        if changed:
+            # Refresh the model to reflect group changes
+            conflict_data = self._compute_conflict_data()
+            for i, r in enumerate(model._rows):
+                gname = self._group_manager.get_group_for_mod(r.folder_name)
+                r.group_name = gname
+                r.is_group_head = bool(gname and self._group_manager.is_group_head(r.folder_name))
+            model.dataChanged.emit(
+                model.index(0, 0),
+                model.index(model.rowCount() - 1, model.columnCount() - 1),
+            )
 
     def _update_active_count(self) -> None:
         """Update the active mod counter in the profile bar."""
@@ -2115,6 +2216,55 @@ class MainWindow(QMainWindow):
 
         menu.addSeparator()
 
+        # ── Gruppen ───────────────────────────────────────────────
+        act_create_group = None
+        act_dissolve_group = None
+        act_rename_group = None
+        act_add_to_group = None
+        act_remove_from_group = None
+        act_group_color = None
+        _selected_group_name = ""
+
+        if has_selection and not has_separator_in_selection:
+            # Check if selected mods form a group or can be grouped
+            model = self._mod_list_view.source_model()
+
+            if len(selected_rows) >= 2:
+                # Multiple mods selected → "Gruppe erstellen"
+                act_create_group = menu.addAction(tr("context.create_group"))
+
+            if single:
+                row = selected_rows[0]
+                if 0 <= row < len(model._rows):
+                    row_data = model._rows[row]
+                    if row_data.group_name:
+                        _selected_group_name = row_data.group_name
+                        if row_data.is_group_head:
+                            act_dissolve_group = menu.addAction(tr("context.dissolve_group"))
+                            act_rename_group = menu.addAction(tr("context.rename_group"))
+                            act_group_color = menu.addAction(tr("context.group_color"))
+                        else:
+                            act_remove_from_group = menu.addAction(tr("context.remove_from_group"))
+                    else:
+                        # Mod not in a group → show "Add to group" if groups exist
+                        group_names = self._group_manager.group_names()
+                        if group_names:
+                            add_group_menu = menu.addMenu(tr("context.add_to_group"))
+                            for gn in group_names:
+                                act_g = add_group_menu.addAction(gn)
+                                act_g.setData(gn)
+                            act_add_to_group = add_group_menu
+            elif len(selected_rows) >= 2:
+                # Multiple selected, show "Remove from group" for grouped mods
+                has_grouped = any(
+                    0 <= r < len(model._rows) and model._rows[r].group_name
+                    for r in selected_rows
+                )
+                if has_grouped:
+                    act_remove_from_group = menu.addAction(tr("context.remove_from_group"))
+
+        menu.addSeparator()
+
         # ── Senden / Mod-Aktionen ────────────────────────────────
         send_to_menu = menu.addMenu(tr("context.send_to"))
         send_to_menu.setEnabled(False)
@@ -2229,6 +2379,20 @@ class MainWindow(QMainWindow):
             self._ctx_select_separator_color(selected_rows[0])
         elif chosen is not None and chosen == act_reset_color and act_reset_color:
             self._ctx_reset_separator_color(selected_rows[0])
+        elif act_create_group is not None and chosen == act_create_group:
+            self._ctx_create_group(selected_rows)
+        elif act_dissolve_group is not None and chosen == act_dissolve_group:
+            self._ctx_dissolve_group(_selected_group_name)
+        elif act_rename_group is not None and chosen == act_rename_group:
+            self._ctx_rename_group(_selected_group_name)
+        elif act_group_color is not None and chosen == act_group_color:
+            self._ctx_group_color(_selected_group_name)
+        elif act_remove_from_group is not None and chosen == act_remove_from_group:
+            self._ctx_remove_from_group(selected_rows)
+        elif act_add_to_group is not None and isinstance(act_add_to_group, QMenu):
+            # "Add to group" submenu actions
+            if chosen and chosen.data() is not None and chosen.parent() == act_add_to_group:
+                self._ctx_add_to_group(selected_rows[0], chosen.data())
 
     # ── Context menu actions ───────────────────────────────────────
 
@@ -2332,6 +2496,163 @@ class MainWindow(QMainWindow):
             )
         # Repaint scrollbar
         self._mod_list_view._tree.verticalScrollBar().update()
+
+    # ── Group context menu actions ──────────────────────────────────
+
+    def _get_separator_for_row(self, source_row: int) -> str:
+        """Find the separator folder_name that contains the given row."""
+        model = self._mod_list_view.source_model()
+        for i in range(source_row, -1, -1):
+            if i < len(model._rows) and model._rows[i].is_separator:
+                return model._rows[i].folder_name
+        return ""
+
+    def _ctx_create_group(self, source_rows: list[int]) -> None:
+        """Create a new group from selected mods."""
+        if len(source_rows) < 2:
+            return
+
+        model = self._mod_list_view.source_model()
+
+        # Validate: all mods must be in the same separator (Kriterium 6)
+        sep_names = set()
+        folder_names = []
+        for row in source_rows:
+            if row >= len(model._rows):
+                return
+            if model._rows[row].is_separator:
+                return  # Can't group separators
+            sep = self._get_separator_for_row(row)
+            sep_names.add(sep)
+            folder_names.append(model._rows[row].folder_name)
+
+        if len(sep_names) > 1:
+            QMessageBox.warning(
+                self, tr("dialog.create_group_title"),
+                tr("dialog.group_cross_separator"),
+            )
+            return
+
+        # Ask for group name
+        name, ok = get_text_input(
+            self, tr("dialog.create_group_title"), tr("dialog.create_group_prompt"),
+        )
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+
+        # Check duplicate name (Kriterium 14)
+        if self._group_manager.group_exists(name):
+            QMessageBox.warning(
+                self, tr("dialog.create_group_title"),
+                tr("dialog.group_name_exists"),
+            )
+            return
+
+        self._group_manager.create_group(name, folder_names)
+        self._reload_mod_list()
+        self.statusBar().showMessage(tr("context.create_group").replace("...", f": {name}"), 5000)
+
+    def _ctx_dissolve_group(self, group_name: str) -> None:
+        """Dissolve a group, keeping mods in place (Kriterium 5)."""
+        if not group_name:
+            return
+
+        reply = QMessageBox.question(
+            self, tr("context.dissolve_group"),
+            tr("dialog.dissolve_confirm", name=group_name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        self._group_manager.dissolve_group(group_name)
+        self._reload_mod_list()
+
+    def _ctx_rename_group(self, group_name: str) -> None:
+        """Rename a group (Kriterium 11)."""
+        if not group_name:
+            return
+
+        new_name, ok = get_text_input(
+            self, tr("dialog.rename_group_title"), tr("dialog.rename_group_prompt"),
+            text=group_name,
+        )
+        if not ok or not new_name.strip():
+            return
+        new_name = new_name.strip()
+
+        if new_name == group_name:
+            return
+
+        if self._group_manager.group_exists(new_name):
+            QMessageBox.warning(
+                self, tr("dialog.rename_group_title"),
+                tr("dialog.group_name_exists"),
+            )
+            return
+
+        self._group_manager.rename_group(group_name, new_name)
+        self._reload_mod_list()
+
+    def _ctx_group_color(self, group_name: str) -> None:
+        """Change group color."""
+        if not group_name:
+            return
+
+        from PySide6.QtWidgets import QColorDialog
+
+        current = QColor(self._group_manager.get_group_color(group_name))
+        color = QColorDialog.getColor(current, self, tr("context.group_color"))
+        if color.isValid():
+            self._group_manager.set_color(group_name, color.name())
+            self._reload_mod_list()
+
+    def _ctx_add_to_group(self, source_row: int, group_name: str) -> None:
+        """Add a mod to an existing group (Kriterium 8)."""
+        model = self._mod_list_view.source_model()
+        if source_row >= len(model._rows):
+            return
+        folder_name = model._rows[source_row].folder_name
+
+        # Check if already in this group
+        current_group = self._group_manager.get_group_for_mod(folder_name)
+        if current_group == group_name:
+            QMessageBox.information(
+                self, tr("context.add_to_group"),
+                tr("dialog.group_already_member", mod=folder_name, group=group_name),
+            )
+            return
+
+        # Validate same separator as group head
+        members = self._group_manager.get_members(group_name)
+        if members:
+            head_folder = members[0]
+            # Find head row
+            head_sep = ""
+            mod_sep = self._get_separator_for_row(source_row)
+            for i, r in enumerate(model._rows):
+                if r.folder_name == head_folder:
+                    head_sep = self._get_separator_for_row(i)
+                    break
+            if head_sep != mod_sep:
+                QMessageBox.warning(
+                    self, tr("context.add_to_group"),
+                    tr("dialog.group_cross_separator"),
+                )
+                return
+
+        self._group_manager.add_member(group_name, folder_name)
+        self._reload_mod_list()
+
+    def _ctx_remove_from_group(self, source_rows: list[int]) -> None:
+        """Remove mods from their groups (Kriterium 4 manual)."""
+        model = self._mod_list_view.source_model()
+        for row in source_rows:
+            if row < len(model._rows):
+                folder_name = model._rows[row].folder_name
+                self._group_manager.remove_member(folder_name)
+        self._reload_mod_list()
 
     def _open_mods_folder(self) -> None:
         """Open the mods folder in file manager."""
@@ -2675,6 +2996,14 @@ class MainWindow(QMainWindow):
 
         # 2. Update profile path
         self._current_profile_path = new_profile_path
+
+        # 2b. Load groups for new profile
+        self._group_manager.load(self._current_profile_path)
+        if self._current_instance_path:
+            mods_dir = self._current_instance_path / ".mods"
+            if mods_dir.is_dir():
+                existing_folders = {d.name for d in mods_dir.iterdir() if d.is_dir()}
+                self._group_manager.cleanup_orphans(existing_folders)
 
         # 3. Save selected profile to instance data
         current_instance = self.instance_manager.current_instance()
@@ -3547,6 +3876,8 @@ class MainWindow(QMainWindow):
 
         profiles_dir = self._current_instance_path / ".profiles"
         for name in names:
+            # Remove from group before deleting (Kriterium 7)
+            self._group_manager.remove_member(name)
             mod_path = self._current_instance_path / ".mods" / name
             if mod_path.is_dir():
                 shutil.rmtree(mod_path)
@@ -3643,9 +3974,15 @@ class MainWindow(QMainWindow):
                 name_lower = (entry.display_name or entry.name).lower()
                 if _matches_direct_install(name_lower, lp):
                     entry.is_direct_install = True
+        # Cleanup orphaned group members
+        if self._current_instance_path:
+            mods_dir = self._current_instance_path / ".mods"
+            if mods_dir.is_dir():
+                existing_folders = {d.name for d in mods_dir.iterdir() if d.is_dir()}
+                self._group_manager.cleanup_orphans(existing_folders)
         conflict_data = self._compute_conflict_data()
         visible_entries = [e for e in self._current_mod_entries if not e.is_direct_install]
-        mod_rows = [mod_entry_to_row(e, conflict_data) for e in visible_entries]
+        mod_rows = [mod_entry_to_row(e, conflict_data, self._group_manager) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
         self._mod_list_view._tree._apply_separator_filter()

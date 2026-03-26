@@ -101,7 +101,14 @@
 
     "lock_mod": "Bloquear mod",
     "unlock_mod": "Desbloquear mod",
-    "toggle_lock": "Alternar bloqueio"
+    "toggle_lock": "Alternar bloqueio",
+
+    "create_group": "Criar grupo...",
+    "dissolve_group": "Dissolver grupo",
+    "rename_group": "Renomear grupo...",
+    "add_to_group": "Adicionar ao grupo",
+    "remove_from_group": "Remover do grupo",
+    "group_color": "Alterar cor do grupo..."
   },
 
   "toolbar": {
@@ -156,6 +163,15 @@
     "create_separator_title": "Criar separador",
     "create_separator_prompt": "Nome do separador:",
     "separator_exists": "Já existe um separador com o nome \"{name}\".",
+
+    "create_group_title": "Criar grupo",
+    "create_group_prompt": "Nome do novo grupo:",
+    "group_name_exists": "Já existe um grupo com este nome.",
+    "group_cross_separator": "Todos os mods devem estar no mesmo separador.",
+    "dissolve_confirm": "Dissolver grupo '{name}'? Os mods serão mantidos.",
+    "rename_group_title": "Renomear grupo",
+    "rename_group_prompt": "Novo nome:",
+    "group_already_member": "'{mod}' já está no grupo '{group}'.",
 
     "rename_mod_title": "Renomear Mod",
     "rename_mod_prompt": "Novo nome:",
@@ -292,7 +308,8 @@
     "manual_install": "Instalação manual — controlo total sobre a instalação",
     "save_ctrl_s": "Guardar (Ctrl+S)",
     "move_to_optional": "Desativar plugins selecionados (mover para optional/)",
-    "move_to_active": "Ativar plugins selecionados (voltar para raiz do mod)"
+    "move_to_active": "Ativar plugins selecionados (voltar para raiz do mod)",
+    "group_collapsed": "{count} mod(s) no grupo"
   },
 
   "label": {

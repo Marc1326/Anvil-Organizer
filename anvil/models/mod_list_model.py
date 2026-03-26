@@ -38,12 +38,14 @@ ROLE_FOLDER_NAME = Qt.ItemDataRole.UserRole + 2
 ROLE_IS_COLLAPSED = Qt.ItemDataRole.UserRole + 3  # Whether separator is collapsed (set by view)
 ROLE_SEP_COLOR = Qt.ItemDataRole.UserRole + 4     # Separator color string (hex, e.g. "#FF0000")
 ROLE_IS_LOCKED = Qt.ItemDataRole.UserRole + 5     # Whether mod is locked (always enabled)
+ROLE_GROUP_NAME = Qt.ItemDataRole.UserRole + 6    # Group name this mod belongs to (str)
+ROLE_IS_GROUP_HEAD = Qt.ItemDataRole.UserRole + 7 # True if mod is the first member of its group
 
 
 class ModRow:
-    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name", "color", "file_count", "is_locked")
+    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name", "color", "file_count", "is_locked", "group_name", "is_group_head")
 
-    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name="", color="", file_count=0, is_locked=False):
+    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name="", color="", file_count=0, is_locked=False, group_name="", is_group_head=False):
         self.enabled = enabled
         self.name = name
         self.conflicts = conflicts
@@ -58,19 +60,30 @@ class ModRow:
         self.color = color
         self.file_count = file_count
         self.is_locked = is_locked
+        self.group_name = group_name
+        self.is_group_head = is_group_head
 
 
-def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None) -> ModRow:
+def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_manager=None) -> ModRow:
     """Convert a ModEntry (data layer) to a ModRow (view layer).
 
     Args:
         entry: The mod entry from the data layer.
         conflict_data: Optional dict mapping mod folder names to conflict
             info dicts with keys: type, wins, losses, win_mods, lose_mods.
+        group_manager: Optional GroupManager for resolving group membership.
     """
     conflicts = ""
     if conflict_data and entry.name in conflict_data:
         conflicts = conflict_data[entry.name]
+
+    group_name = ""
+    is_group_head = False
+    if group_manager is not None:
+        group_name = group_manager.get_group_for_mod(entry.name)
+        if group_name:
+            is_group_head = group_manager.is_group_head(entry.name)
+
     return ModRow(
         enabled=entry.enabled,
         name=entry.display_name or entry.name,
@@ -86,6 +99,8 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None) -> ModR
         color=entry.color,
         file_count=getattr(entry, "file_count", 0),
         is_locked=getattr(entry, "is_locked", False),
+        group_name=group_name,
+        is_group_head=is_group_head,
     )
 
 
@@ -353,6 +368,10 @@ class ModListModel(QAbstractItemModel):
             return r.color if r.is_separator else ""
         if role == ROLE_IS_LOCKED:
             return r.is_locked
+        if role == ROLE_GROUP_NAME:
+            return r.group_name
+        if role == ROLE_IS_GROUP_HEAD:
+            return r.is_group_head
         return None
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
@@ -442,6 +461,9 @@ class ModListModel(QAbstractItemModel):
             source_row = source_rows[0]
             if self._rows[source_row].is_separator:
                 return self._move_separator_block(source_row, target)
+            # Group-head: move entire group block
+            if self._rows[source_row].is_group_head and self._rows[source_row].group_name:
+                return self._move_group_block(source_row, target)
             return self._move_single_row(source_row, target)
         else:
             # Mehrfachauswahl: Separatoren herausfiltern, nur Mods verschieben
@@ -543,6 +565,61 @@ class ModListModel(QAbstractItemModel):
 
             # Block entfernen und an neuer Position einfügen
             del self._rows[source_row:end_row]
+            for i, row_data in enumerate(block):
+                self._rows.insert(target + i, row_data)
+
+        self.endMoveRows()
+        self._update_priorities()
+        return True
+
+    def _get_group_member_rows(self, group_name: str) -> list[int]:
+        """Return sorted list of source row indices for all members of *group_name*."""
+        rows = []
+        for i, r in enumerate(self._rows):
+            if r.group_name == group_name:
+                rows.append(i)
+        return rows
+
+    def _move_group_block(self, source_row: int, target: int) -> bool:
+        """Move a group-head with all group members as a block.
+
+        Similar to _move_separator_block but for groups.
+        """
+        group_name = self._rows[source_row].group_name
+        if not group_name:
+            return self._move_single_row(source_row, target)
+
+        member_rows = self._get_group_member_rows(group_name)
+        if not member_rows:
+            return self._move_single_row(source_row, target)
+
+        first_row = member_rows[0]
+        last_row = member_rows[-1]
+        block_size = last_row - first_row + 1
+
+        # Check if members are contiguous
+        if block_size != len(member_rows):
+            # Members are not contiguous; move them as multiple rows
+            return self._move_multiple_rows(member_rows, target)
+
+        # No move needed if target is within the block
+        if target >= first_row and target <= last_row + 1:
+            return False
+
+        p = QModelIndex()
+        block = self._rows[first_row:last_row + 1]
+
+        if first_row < target:
+            adjusted_target = target - block_size
+            if not self.beginMoveRows(p, first_row, last_row, p, target):
+                return False
+            del self._rows[first_row:last_row + 1]
+            for i, row_data in enumerate(block):
+                self._rows.insert(adjusted_target + i, row_data)
+        else:
+            if not self.beginMoveRows(p, first_row, last_row, p, target):
+                return False
+            del self._rows[first_row:last_row + 1]
             for i, row_data in enumerate(block):
                 self._rows.insert(target + i, row_data)
 

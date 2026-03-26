@@ -101,7 +101,14 @@
 
     "lock_mod": "Lock Mod",
     "unlock_mod": "Unlock Mod",
-    "toggle_lock": "Toggle Lock"
+    "toggle_lock": "Toggle Lock",
+
+    "create_group": "Create Group...",
+    "dissolve_group": "Dissolve Group",
+    "rename_group": "Rename Group...",
+    "add_to_group": "Add to Group",
+    "remove_from_group": "Remove from Group",
+    "group_color": "Change Group Color..."
   },
 
   "toolbar": {
@@ -156,6 +163,15 @@
     "create_separator_title": "Create Separator",
     "create_separator_prompt": "Separator name:",
     "separator_exists": "A separator named \"{name}\" already exists.",
+
+    "create_group_title": "Create Group",
+    "create_group_prompt": "Name for new group:",
+    "group_name_exists": "A group with this name already exists.",
+    "group_cross_separator": "All mods must be in the same separator.",
+    "dissolve_confirm": "Dissolve group '{name}'? Mods will be kept.",
+    "rename_group_title": "Rename Group",
+    "rename_group_prompt": "New name:",
+    "group_already_member": "'{mod}' is already in group '{group}'.",
 
     "rename_mod_title": "Rename Mod",
     "rename_mod_prompt": "New name:",
@@ -292,7 +308,8 @@
     "manual_install": "Manual install — full control over the installation",
     "save_ctrl_s": "Save (Ctrl+S)",
     "move_to_optional": "Deactivate selected plugins (move to optional/)",
-    "move_to_active": "Activate selected plugins (back to mod root)"
+    "move_to_active": "Activate selected plugins (back to mod root)",
+    "group_collapsed": "{count} mod(s) in group"
   },
 
   "label": {

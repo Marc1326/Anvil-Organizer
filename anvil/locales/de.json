@@ -101,7 +101,14 @@
 
     "lock_mod": "Mod sperren",
     "unlock_mod": "Mod entsperren",
-    "toggle_lock": "Sperre umschalten"
+    "toggle_lock": "Sperre umschalten",
+
+    "create_group": "Gruppe erstellen...",
+    "dissolve_group": "Gruppe auflösen",
+    "rename_group": "Gruppe umbenennen...",
+    "add_to_group": "Zur Gruppe hinzufügen",
+    "remove_from_group": "Aus Gruppe entfernen",
+    "group_color": "Gruppenfarbe ändern..."
   },
 
   "toolbar": {
@@ -156,6 +163,15 @@
     "create_separator_title": "Trenner erstellen",
     "create_separator_prompt": "Name des Trenners:",
     "separator_exists": "Ein Trenner mit dem Namen \"{name}\" existiert bereits.",
+
+    "create_group_title": "Gruppe erstellen",
+    "create_group_prompt": "Name der neuen Gruppe:",
+    "group_name_exists": "Gruppe mit diesem Namen existiert bereits.",
+    "group_cross_separator": "Alle Mods müssen im selben Trenner liegen.",
+    "dissolve_confirm": "Gruppe '{name}' auflösen? Die Mods bleiben erhalten.",
+    "rename_group_title": "Gruppe umbenennen",
+    "rename_group_prompt": "Neuer Name:",
+    "group_already_member": "'{mod}' ist bereits in Gruppe '{group}'.",
 
     "rename_mod_title": "Mod umbenennen",
     "rename_mod_prompt": "Neuer Name:",
@@ -292,7 +308,8 @@
     "manual_install": "Manuell installieren — volle Kontrolle über die Installation",
     "save_ctrl_s": "Speichern (Strg+S)",
     "move_to_optional": "Ausgewählte Plugins deaktivieren (nach optional/ verschieben)",
-    "move_to_active": "Ausgewählte Plugins aktivieren (zurück in Mod-Root)"
+    "move_to_active": "Ausgewählte Plugins aktivieren (zurück in Mod-Root)",
+    "group_collapsed": "{count} Mod(s) in Gruppe"
   },
 
   "label": {
