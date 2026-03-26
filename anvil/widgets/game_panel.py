@@ -665,6 +665,14 @@ class GamePanel(QWidget):
             result_path = writer.write()
             if result_path is None:
                 print("[GamePanel] plugins.txt write failed or skipped", flush=True)
+
+            # Optional: LOOT auto-sort on deploy
+            from PySide6.QtCore import QSettings
+            if QSettings().value("LOOT/auto_sort_on_deploy", False, type=bool):
+                loot_name = getattr(self._current_plugin, "LootGameName", "")
+                if loot_name:
+                    self._auto_loot_sort(writer)
+
             self._refresh_plugins_tab()
 
         # Deploy Proton shim DLLs (e.g. F4SE version.dll)
@@ -951,6 +959,14 @@ class GamePanel(QWidget):
             )
         except (OSError, json.JSONDecodeError) as exc:
             print(f"[BA2] Failed to update manifest: {exc}", flush=True)
+
+    def _auto_loot_sort(self, writer: PluginsTxtWriter) -> None:
+        """Auto-sort via LOOT on deploy — disabled.
+
+        LOOT is a GUI application and does not support silent CLI sorting.
+        Users should sort via the LOOT toolbar button instead.
+        """
+        pass
 
     def _refresh_plugins_tab(self) -> None:
         """Populate the plugins tree with scanned plugin files."""

@@ -232,7 +232,7 @@ class SkyrimSEGame(BaseGame):
     # TODO: .bsa Archive -- Bethesda-Archive
     # TODO: SKSE64 Integration (Version check, plugin loading)
     # TODO: Creation Kit Integration (Steam ID 1946180)
-    # TODO: LOOT-Integration (--game="Skyrim Special Edition")
+    LootGameName = "Skyrim Special Edition"
     # TODO: Creation Club / Skyrim.ccc Parser
     # TODO: Save-Game Metadata Parsing (.ess/.skse)
 

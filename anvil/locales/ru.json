@@ -117,7 +117,8 @@
     "open_ao_plugins_folder": "Открыть папку плагинов AO",
     "open_ao_styles_folder": "Открыть папку стилей AO",
     "open_ao_logs_folder": "Открыть папку журналов AO",
-    "open_saves_folder": "Открыть сохранения"
+    "open_saves_folder": "Открыть сохранения",
+    "loot_sort": "Сортировка плагинов (LOOT)"
   },
 
   "dialog": {
@@ -717,6 +718,15 @@
     "diag_max_crash_dumps": "Максимум хранимых дампов:",
     "diag_integrated_loot": "Встроенный LOOT",
     "diag_loot_log_level": "Уровень журнала LOOT:",
+    "tab_loot": "LOOT",
+    "loot_binary_path": "Путь к LOOT:",
+    "loot_browse": "Обзор...",
+    "loot_auto_sort": "Автоматическая сортировка при развёртывании",
+    "loot_update_masterlist": "Обновить мастерлист перед сортировкой",
+    "loot_install_hint": "Установить LOOT: AUR (loot) или Flatpak (io.github.loot.loot)",
+    "loot_detected": "✓ LOOT обнаружен: {path}",
+    "loot_not_found": "✗ LOOT не найден — установите или укажите путь",
+    "loot_auto_detected": "Авто-обнаружен: {path}",
     "diag_hint": "Журналы и дампы сбоев хранятся в вашем текущем экземпляре в каталогах logs и crashDumps. Отправка журналов и/или дампов сбоев разработчикам может помочь в исследовании проблем. Рекомендуется сжимать большие файлы журналов и DMP перед отправкой.",
     "tab_diagnostics": "Диагностика",
     "nexus_key_received": "API-ключ получен.",
@@ -936,5 +946,17 @@
     "success_title": "Плагин создан",
     "success_message": "Плагин игры создан:\n\n{path}\n\nПерезапустите Anvil для загрузки плагина.",
     "restart_hint": "Перезапустите Anvil для загрузки нового плагина."
+  },
+
+  "loot": {
+    "dialog_title": "LOOT — Оптимизация порядка загрузки",
+    "restart_button": "Перезапустить LOOT",
+    "close_button": "Закрыть",
+    "loot_running": "LOOT запущен — отсортируйте в LOOT и закройте его по завершении.",
+    "loot_closed": "LOOT закрыт. plugins.txt был перечитан.",
+    "plugins_reloaded": "plugins.txt перечитан",
+    "sorting_failed": "Ошибка LOOT",
+    "no_binary": "LOOT не найден. Укажите путь в Настройках.",
+    "not_bethesda": "LOOT доступен только для игр Bethesda."
   }
 }

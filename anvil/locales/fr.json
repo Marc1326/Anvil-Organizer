@@ -117,7 +117,8 @@
     "open_ao_plugins_folder": "Ouvrir le dossier Plugins AO",
     "open_ao_styles_folder": "Ouvrir le dossier des feuilles de style AO",
     "open_ao_logs_folder": "Ouvrir le dossier des journaux AO",
-    "open_saves_folder": "Ouvrir le dossier des sauvegardes"
+    "open_saves_folder": "Ouvrir le dossier des sauvegardes",
+    "loot_sort": "Trier les Plugins (LOOT)"
   },
 
   "dialog": {
@@ -717,6 +718,15 @@
     "diag_max_crash_dumps": "Maximum de vidages à conserver :",
     "diag_integrated_loot": "LOOT intégré",
     "diag_loot_log_level": "Niveau de journal LOOT :",
+    "tab_loot": "LOOT",
+    "loot_binary_path": "Chemin LOOT:",
+    "loot_browse": "Parcourir...",
+    "loot_auto_sort": "Trier automatiquement lors du déploiement",
+    "loot_update_masterlist": "Mettre à jour la masterlist avant le tri",
+    "loot_install_hint": "Installer LOOT: AUR (loot) ou Flatpak (io.github.loot.loot)",
+    "loot_detected": "✓ LOOT détecté : {path}",
+    "loot_not_found": "✗ LOOT introuvable — veuillez installer ou configurer le chemin",
+    "loot_auto_detected": "Auto-détecté : {path}",
     "diag_hint": "Les journaux et vidages mémoire sont stockés dans votre instance actuelle dans les répertoires logs et crashDumps. L'envoi de journaux et/ou vidages aux développeurs peut aider à enquêter sur les problèmes.",
     "tab_diagnostics": "Diagnostic",
     "nexus_key_received": "Clé API reçue.",
@@ -936,5 +946,17 @@
     "success_title": "Plugin Créé",
     "success_message": "Plugin de jeu créé :\n\n{path}\n\nRedémarrez Anvil pour charger le plugin.",
     "restart_hint": "Redémarrez Anvil pour charger le nouveau plugin."
+  },
+
+  "loot": {
+    "dialog_title": "LOOT — Optimisation de l'ordre de chargement",
+    "restart_button": "Relancer LOOT",
+    "close_button": "Fermer",
+    "loot_running": "LOOT est en cours d'exécution — triez dans LOOT et fermez-le quand c'est fini.",
+    "loot_closed": "LOOT a été fermé. plugins.txt a été relu.",
+    "plugins_reloaded": "plugins.txt relu",
+    "sorting_failed": "Erreur LOOT",
+    "no_binary": "LOOT introuvable. Configurez le chemin dans les Paramètres.",
+    "not_bethesda": "LOOT n'est disponible que pour les jeux Bethesda."
   }
 }

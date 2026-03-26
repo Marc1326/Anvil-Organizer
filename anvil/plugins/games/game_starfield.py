@@ -209,7 +209,7 @@ class StarfieldGame(BaseGame):
     # TODO: .ba2 Archive -- Bethesda-Archive
     # TODO: SFSE Integration (Version check, plugin loading)
     # TODO: Creation Kit Integration
-    # TODO: LOOT-Integration (--game="Starfield")
+    LootGameName = "Starfield"
     # TODO: Creation Club / ContentCatalog.txt Parser
     # TODO: sTestFile-Diagnostik (StarfieldCustom.ini)
     # TODO: Save-Game Metadata Parsing (.sfs/.sfse)

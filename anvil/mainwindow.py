@@ -969,6 +969,16 @@ class MainWindow(QMainWindow):
         self._mod_list_stack.setCurrentWidget(self._mod_list_view)
         self._bg3_installer = None
 
+        # LOOT button visibility (Bethesda games only)
+        has_loot = (
+            plugin is not None
+            and getattr(plugin, "LootGameName", "") != ""
+            and hasattr(plugin, "has_plugins_txt")
+            and plugin.has_plugins_txt()
+        )
+        self._toolbar.loot_sep.setVisible(has_loot)
+        self._toolbar.loot_action.setVisible(has_loot)
+
         # Load categories for this instance
         self._category_manager.load(instance_path)
         self._mod_list_view.source_model().set_category_manager(self._category_manager)
@@ -3964,6 +3974,9 @@ class MainWindow(QMainWindow):
         # BG3: Auto-Deploy — kein Deploy-Button noetig
         self._toolbar.deploy_sep.setVisible(False)
         self._toolbar.deploy_action.setVisible(False)
+        # BG3 has no LOOT support
+        self._toolbar.loot_sep.setVisible(False)
+        self._toolbar.loot_action.setVisible(False)
 
         # Instance path
         instance_path = self._current_instance_path
@@ -4215,6 +4228,25 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(tr("status.modlist_exported_check"), 5000)
         else:
             self.statusBar().showMessage(tr("status.deploy_failed"), 5000)
+
+    def _on_loot_sort_clicked(self) -> None:
+        """Open the LOOT sort dialog for the current Bethesda instance."""
+        plugin = self._current_plugin
+        if plugin is None:
+            return
+        loot_name = getattr(plugin, "LootGameName", "")
+        if not loot_name or not plugin.has_plugins_txt():
+            self.statusBar().showMessage(tr("loot.not_bethesda"), 5000)
+            return
+
+        game_path = self._current_game_path
+        instance_path = self._current_instance_path
+        if game_path is None or instance_path is None:
+            return
+
+        from anvil.widgets.loot_dialog import LootDialog
+        dlg = LootDialog(self, plugin, game_path, instance_path)
+        dlg.exec()
 
     def _on_bg3_context_menu(self, global_pos, section: str, mod_data: dict) -> None:
         """BG3-specific context menu."""

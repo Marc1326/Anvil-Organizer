@@ -117,7 +117,8 @@
     "open_ao_plugins_folder": "Apri cartella Plugin AO",
     "open_ao_styles_folder": "Apri cartella stili AO",
     "open_ao_logs_folder": "Apri cartella log AO",
-    "open_saves_folder": "Apri cartella salvataggi"
+    "open_saves_folder": "Apri cartella salvataggi",
+    "loot_sort": "Ordina Plugin (LOOT)"
   },
 
   "dialog": {
@@ -717,6 +718,15 @@
     "diag_max_crash_dumps": "Massimo dump da conservare:",
     "diag_integrated_loot": "LOOT integrato",
     "diag_loot_log_level": "Livello log LOOT:",
+    "tab_loot": "LOOT",
+    "loot_binary_path": "Percorso LOOT:",
+    "loot_browse": "Sfoglia...",
+    "loot_auto_sort": "Ordina automaticamente durante il deploy",
+    "loot_update_masterlist": "Aggiorna masterlist prima dell'ordinamento",
+    "loot_install_hint": "Installa LOOT: AUR (loot) o Flatpak (io.github.loot.loot)",
+    "loot_detected": "✓ LOOT rilevato: {path}",
+    "loot_not_found": "✗ LOOT non trovato — installare o configurare il percorso",
+    "loot_auto_detected": "Auto-rilevato: {path}",
     "diag_hint": "I log e i dump crash sono archiviati nella tua istanza corrente nelle directory logs e crashDumps. L'invio di log e/o dump agli sviluppatori può aiutare a indagare i problemi.",
     "tab_diagnostics": "Diagnostica",
     "nexus_key_received": "Chiave API ricevuta.",
@@ -936,5 +946,17 @@
     "success_title": "Plugin Creato",
     "success_message": "Plugin di gioco creato:\n\n{path}\n\nRiavvia Anvil per caricare il plugin.",
     "restart_hint": "Riavvia Anvil per caricare il nuovo plugin."
+  },
+
+  "loot": {
+    "dialog_title": "LOOT — Ottimizzazione ordine di caricamento",
+    "restart_button": "Riavvia LOOT",
+    "close_button": "Chiudi",
+    "loot_running": "LOOT è in esecuzione — ordina in LOOT e chiudilo quando hai finito.",
+    "loot_closed": "LOOT è stato chiuso. plugins.txt è stato riletto.",
+    "plugins_reloaded": "plugins.txt riletto",
+    "sorting_failed": "Errore LOOT",
+    "no_binary": "LOOT non trovato. Configura il percorso nelle Impostazioni.",
+    "not_bethesda": "LOOT è disponibile solo per i giochi Bethesda."
   }
 }

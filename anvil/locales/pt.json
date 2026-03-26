@@ -117,7 +117,8 @@
     "open_ao_plugins_folder": "Abrir pasta de Plugins do AO",
     "open_ao_styles_folder": "Abrir pasta de estilos do AO",
     "open_ao_logs_folder": "Abrir pasta de registos do AO",
-    "open_saves_folder": "Abrir pasta de saves"
+    "open_saves_folder": "Abrir pasta de saves",
+    "loot_sort": "Ordenar Plugins (LOOT)"
   },
 
   "dialog": {
@@ -717,6 +718,15 @@
     "diag_max_crash_dumps": "Máximo de dumps a manter:",
     "diag_integrated_loot": "LOOT integrado",
     "diag_loot_log_level": "Nível de log do LOOT:",
+    "tab_loot": "LOOT",
+    "loot_binary_path": "Caminho LOOT:",
+    "loot_browse": "Procurar...",
+    "loot_auto_sort": "Ordenar automaticamente ao implantar",
+    "loot_update_masterlist": "Atualizar masterlist antes de ordenar",
+    "loot_install_hint": "Instalar LOOT: AUR (loot) ou Flatpak (io.github.loot.loot)",
+    "loot_detected": "✓ LOOT detectado: {path}",
+    "loot_not_found": "✗ LOOT não encontrado — instale ou configure o caminho",
+    "loot_auto_detected": "Auto-detectado: {path}",
     "diag_hint": "Logs e dumps de falha são armazenados na sua instância atual nos diretórios logs e crashDumps. Enviar logs e/ou dumps aos desenvolvedores pode ajudar a investigar problemas.",
     "tab_diagnostics": "Diagnóstico",
     "nexus_key_received": "Chave API recebida.",
@@ -936,5 +946,17 @@
     "success_title": "Plugin Criado",
     "success_message": "Plugin de jogo criado:\n\n{path}\n\nReinicie o Anvil para carregar o plugin.",
     "restart_hint": "Reinicie o Anvil para carregar o novo plugin."
+  },
+
+  "loot": {
+    "dialog_title": "LOOT — Otimização da ordem de carregamento",
+    "restart_button": "Reiniciar LOOT",
+    "close_button": "Fechar",
+    "loot_running": "LOOT está em execução — ordene no LOOT e feche-o quando terminar.",
+    "loot_closed": "LOOT foi fechado. plugins.txt foi relido.",
+    "plugins_reloaded": "plugins.txt relido",
+    "sorting_failed": "Erro do LOOT",
+    "no_binary": "LOOT não encontrado. Configure o caminho nas Configurações.",
+    "not_bethesda": "LOOT só está disponível para jogos Bethesda."
   }
 }

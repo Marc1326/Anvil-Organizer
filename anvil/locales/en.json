@@ -117,7 +117,8 @@
     "open_ao_plugins_folder": "Open AO Plugins Folder",
     "open_ao_styles_folder": "Open AO Stylesheets Folder",
     "open_ao_logs_folder": "Open AO Logs Folder",
-    "open_saves_folder": "Open Save Folder"
+    "open_saves_folder": "Open Save Folder",
+    "loot_sort": "Sort Plugins (LOOT)"
   },
 
   "dialog": {
@@ -717,6 +718,15 @@
     "diag_max_crash_dumps": "Maximum Crash Dumps to Keep:",
     "diag_integrated_loot": "Integrated LOOT",
     "diag_loot_log_level": "LOOT Log Level:",
+    "tab_loot": "LOOT",
+    "loot_binary_path": "LOOT Path:",
+    "loot_browse": "Browse...",
+    "loot_auto_sort": "Automatically sort on deploy",
+    "loot_update_masterlist": "Update masterlist before sorting",
+    "loot_install_hint": "Install LOOT: AUR (loot) or Flatpak (io.github.loot.loot)",
+    "loot_detected": "✓ LOOT detected: {path}",
+    "loot_not_found": "✗ LOOT not found — please install or set path manually",
+    "loot_auto_detected": "Auto-detected: {path}",
     "diag_hint": "Logs and crash dumps are stored under your current instance in the logs and crashDumps directories. Sending logs and/or crash dumps to the developers can help investigate issues. It is recommended to compress large log and DMP files before sending.",
     "tab_diagnostics": "Diagnostics",
     "nexus_key_received": "API key received.",
@@ -936,5 +946,17 @@
     "success_title": "Plugin Created",
     "success_message": "Game plugin has been created:\n\n{path}\n\nRestart Anvil to load the plugin.",
     "restart_hint": "Restart Anvil to load the new plugin."
+  },
+
+  "loot": {
+    "dialog_title": "LOOT — Load Order Optimisation",
+    "restart_button": "Restart LOOT",
+    "close_button": "Close",
+    "loot_running": "LOOT is running — sort in LOOT and close it when done.",
+    "loot_closed": "LOOT was closed. plugins.txt has been re-read.",
+    "plugins_reloaded": "plugins.txt re-read",
+    "sorting_failed": "LOOT error",
+    "no_binary": "LOOT not found. Configure path in Settings.",
+    "not_bethesda": "LOOT is only available for Bethesda games."
   }
 }

@@ -53,6 +53,8 @@ class FalloutNVGame(BaseGame):
     GameNexusId = 130
     GameNexusName = "newvegas"
 
+    LootGameName = "FalloutNV"
+
     # -- Primary & DLC Plugins ----------------------------------------------
 
     PRIMARY_PLUGINS = [

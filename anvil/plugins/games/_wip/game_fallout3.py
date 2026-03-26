@@ -53,6 +53,8 @@ class Fallout3Game(BaseGame):
     GameNexusId = 120
     GameNexusName = "fallout3"
 
+    LootGameName = "Fallout3"
+
     # -- Primary & DLC Plugins ----------------------------------------------
 
     PRIMARY_PLUGINS = [

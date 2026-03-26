@@ -117,7 +117,8 @@
     "open_ao_plugins_folder": "AO Plugins Ordner öffnen",
     "open_ao_styles_folder": "AO Stylesheets Ordner öffnen",
     "open_ao_logs_folder": "AO Log Ordner öffnen",
-    "open_saves_folder": "Spielstände öffnen"
+    "open_saves_folder": "Spielstände öffnen",
+    "loot_sort": "Plugins sortieren (LOOT)"
   },
 
   "dialog": {
@@ -717,6 +718,15 @@
     "diag_max_crash_dumps": "Maximale Absturzabbilder zu behalten:",
     "diag_integrated_loot": "Integriertes LOOT",
     "diag_loot_log_level": "LOOT Log Stufe:",
+    "tab_loot": "LOOT",
+    "loot_binary_path": "LOOT-Pfad:",
+    "loot_browse": "Durchsuchen...",
+    "loot_auto_sort": "Automatisch bei Deploy sortieren",
+    "loot_update_masterlist": "Masterlist vor Sortierung aktualisieren",
+    "loot_install_hint": "LOOT installieren: AUR (loot) oder Flatpak (io.github.loot.loot)",
+    "loot_detected": "✓ LOOT erkannt: {path}",
+    "loot_not_found": "✗ LOOT nicht gefunden — bitte installieren oder Pfad angeben",
+    "loot_auto_detected": "Auto-erkannt: {path}",
     "diag_hint": "Protokolle und Absturzabbilder werden unter Ihrer aktuellen Instanz in den Verzeichnissen logs und crashDumps gespeichert. Das Senden von Protokollen und/oder Absturzabbildern an die Entwickler kann bei der Untersuchung von Problemen hilfreich sein. Es wird empfohlen, vor dem Senden große Protokoll- und DMP-Dateien zu komprimieren.",
     "tab_diagnostics": "Diagnose",
     "nexus_key_received": "API-Schlüssel erhalten.",
@@ -936,5 +946,17 @@
     "success_title": "Gespeichert",
     "success_message": "Game Plugin wurde erstellt:\n\n{path}\n\nStarte Anvil neu um das Plugin zu laden.",
     "restart_hint": "Starte Anvil neu um die Änderungen zu laden."
+  },
+
+  "loot": {
+    "dialog_title": "LOOT — Ladereihenfolge-Optimierung",
+    "restart_button": "LOOT neu starten",
+    "close_button": "Schliessen",
+    "loot_running": "LOOT laeuft — sortiere in LOOT und schliesse es wenn fertig.",
+    "loot_closed": "LOOT wurde geschlossen. plugins.txt wurde neu eingelesen.",
+    "plugins_reloaded": "plugins.txt neu eingelesen",
+    "sorting_failed": "LOOT-Fehler",
+    "no_binary": "LOOT nicht gefunden. Pfad in Einstellungen konfigurieren.",
+    "not_bethesda": "LOOT ist nur fuer Bethesda-Spiele verfuegbar."
   }
 }

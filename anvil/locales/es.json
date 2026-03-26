@@ -117,7 +117,8 @@
     "open_ao_plugins_folder": "Abrir carpeta de Plugins de AO",
     "open_ao_styles_folder": "Abrir carpeta de estilos de AO",
     "open_ao_logs_folder": "Abrir carpeta de registros de AO",
-    "open_saves_folder": "Abrir carpeta de guardados"
+    "open_saves_folder": "Abrir carpeta de guardados",
+    "loot_sort": "Ordenar Plugins (LOOT)"
   },
 
   "dialog": {
@@ -717,6 +718,15 @@
     "diag_max_crash_dumps": "Máximo de volcados a conservar:",
     "diag_integrated_loot": "LOOT integrado",
     "diag_loot_log_level": "Nivel de log de LOOT:",
+    "tab_loot": "LOOT",
+    "loot_binary_path": "Ruta de LOOT:",
+    "loot_browse": "Examinar...",
+    "loot_auto_sort": "Ordenar automáticamente al desplegar",
+    "loot_update_masterlist": "Actualizar masterlist antes de ordenar",
+    "loot_install_hint": "Instalar LOOT: AUR (loot) o Flatpak (io.github.loot.loot)",
+    "loot_detected": "✓ LOOT detectado: {path}",
+    "loot_not_found": "✗ LOOT no encontrado — instálelo o configure la ruta",
+    "loot_auto_detected": "Auto-detectado: {path}",
     "diag_hint": "Los logs y volcados de memoria se almacenan en tu instancia actual en los directorios logs y crashDumps. Enviar logs y/o volcados a los desarrolladores puede ayudar a investigar problemas.",
     "tab_diagnostics": "Diagnóstico",
     "nexus_key_received": "Clave API recibida.",
@@ -936,5 +946,17 @@
     "success_title": "Plugin Creado",
     "success_message": "Plugin de juego creado:\n\n{path}\n\nReinicia Anvil para cargar el plugin.",
     "restart_hint": "Reinicia Anvil para cargar el nuevo plugin."
+  },
+
+  "loot": {
+    "dialog_title": "LOOT — Optimización del orden de carga",
+    "restart_button": "Reiniciar LOOT",
+    "close_button": "Cerrar",
+    "loot_running": "LOOT se está ejecutando — ordena en LOOT y ciérralo cuando termines.",
+    "loot_closed": "LOOT se cerró. plugins.txt fue releído.",
+    "plugins_reloaded": "plugins.txt releído",
+    "sorting_failed": "Error de LOOT",
+    "no_binary": "LOOT no encontrado. Configura la ruta en Ajustes.",
+    "not_bethesda": "LOOT solo está disponible para juegos de Bethesda."
   }
 }
