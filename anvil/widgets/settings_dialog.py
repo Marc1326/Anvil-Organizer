@@ -722,6 +722,61 @@ class SettingsDialog(QDialog):
         diag_layout.addWidget(diag_scroll)
         # self._tabs.addTab(diagnose_tab, tr("settings.tab_diagnostics"))
 
+        # Tab Script Merger
+        sm_tab = QWidget()
+        sm_layout = QVBoxLayout(sm_tab)
+        sm_scroll = QScrollArea()
+        sm_scroll.setWidgetResizable(True)
+        sm_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        sm_content = QWidget()
+        sm_content_layout = QVBoxLayout(sm_content)
+
+        # Gruppe: Konflikte scannen
+        sm_scan_grp = QGroupBox(tr("settings.sm_scan_group"))
+        sm_scan_layout = QVBoxLayout(sm_scan_grp)
+        self._cb_sm_check_scripts = QCheckBox(tr("settings.sm_check_scripts"))
+        self._cb_sm_check_xml = QCheckBox(tr("settings.sm_check_xml"))
+        sm_scan_layout.addWidget(self._cb_sm_check_scripts)
+        sm_scan_layout.addWidget(self._cb_sm_check_xml)
+        sm_content_layout.addWidget(sm_scan_grp)
+
+        # Gruppe: Merge-Tool
+        sm_tool_grp = QGroupBox(tr("settings.sm_merge_tool_group"))
+        sm_tool_layout = QFormLayout(sm_tool_grp)
+        kdiff3_row = QHBoxLayout()
+        self._le_sm_kdiff3_path = QLineEdit()
+        kdiff3_row.addWidget(self._le_sm_kdiff3_path)
+        sm_browse_btn = QPushButton(tr("settings.sm_browse"))
+        sm_browse_btn.clicked.connect(lambda checked=False: self._browse_kdiff3())
+        kdiff3_row.addWidget(sm_browse_btn)
+        sm_tool_layout.addRow(tr("settings.sm_kdiff3_path"), kdiff3_row)
+        self._cb_sm_review_in_kdiff3 = QCheckBox(tr("settings.sm_review_in_kdiff3"))
+        sm_tool_layout.addRow(self._cb_sm_review_in_kdiff3)
+        sm_content_layout.addWidget(sm_tool_grp)
+
+        # Gruppe: Automatisierung
+        sm_auto_grp = QGroupBox(tr("settings.sm_automation_group"))
+        sm_auto_layout = QVBoxLayout(sm_auto_grp)
+        self._cb_sm_auto_delete_stale = QCheckBox(tr("settings.sm_auto_delete_stale"))
+        self._cb_sm_auto_overwrite = QCheckBox(tr("settings.sm_auto_overwrite"))
+        sm_auto_layout.addWidget(self._cb_sm_auto_delete_stale)
+        sm_auto_layout.addWidget(self._cb_sm_auto_overwrite)
+        sm_content_layout.addWidget(sm_auto_grp)
+
+        sm_content_layout.addStretch()
+        sm_scroll.setWidget(sm_content)
+        sm_layout.addWidget(sm_scroll)
+
+        # Settings laden
+        self._cb_sm_check_scripts.setChecked(settings.value("ScriptMerger/check_scripts", True, type=bool))
+        self._cb_sm_check_xml.setChecked(settings.value("ScriptMerger/check_xml", True, type=bool))
+        self._le_sm_kdiff3_path.setText(settings.value("ScriptMerger/kdiff3_path", "kdiff3", type=str))
+        self._cb_sm_review_in_kdiff3.setChecked(settings.value("ScriptMerger/review_in_kdiff3", False, type=bool))
+        self._cb_sm_auto_delete_stale.setChecked(settings.value("ScriptMerger/auto_delete_stale", True, type=bool))
+        self._cb_sm_auto_overwrite.setChecked(settings.value("ScriptMerger/auto_overwrite", True, type=bool))
+
+        self._tabs.addTab(sm_tab, tr("settings.tab_script_merger"))
+
         layout.addWidget(self._tabs)
 
         # Letzten Tab-Index wiederherstellen (MO2-Pattern)
@@ -792,6 +847,16 @@ class SettingsDialog(QDialog):
         """Open the user plugin directory in the file manager."""
         path = ensure_user_plugin_dir()
         subprocess.Popen(["xdg-open", str(path)])
+
+    # ── Script-Merger-Tab helpers ────────────────────────────────────
+
+    def _browse_kdiff3(self) -> None:
+        """Oeffnet einen Dateidialog zum Auswaehlen der KDiff3-Executable."""
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("settings.sm_kdiff3_path"), self._le_sm_kdiff3_path.text(),
+        )
+        if path:
+            self._le_sm_kdiff3_path.setText(path)
 
     # ── Mod-Liste-Tab helpers ────────────────────────────────────────
 
@@ -869,6 +934,13 @@ class SettingsDialog(QDialog):
         settings.setValue("ModList/symbol_flags", self._cb_sym_flags.isChecked())
         settings.setValue("ModList/symbol_content", self._cb_sym_content.isChecked())
         settings.setValue("ModList/symbol_version", self._cb_sym_version.isChecked())
+        # Tab Script Merger
+        settings.setValue("ScriptMerger/check_scripts", self._cb_sm_check_scripts.isChecked())
+        settings.setValue("ScriptMerger/check_xml", self._cb_sm_check_xml.isChecked())
+        settings.setValue("ScriptMerger/kdiff3_path", self._le_sm_kdiff3_path.text())
+        settings.setValue("ScriptMerger/review_in_kdiff3", self._cb_sm_review_in_kdiff3.isChecked())
+        settings.setValue("ScriptMerger/auto_delete_stale", self._cb_sm_auto_delete_stale.isChecked())
+        settings.setValue("ScriptMerger/auto_overwrite", self._cb_sm_auto_overwrite.isChecked())
         # Tab-Index merken
         settings.setValue("SettingsDialog/tab_index", self._tabs.currentIndex())
         settings.sync()  # Sicherstellen dass Änderungen geschrieben werden

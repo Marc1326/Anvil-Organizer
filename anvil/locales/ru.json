@@ -1,20 +1,16 @@
 {
   "_language_name": "Русский",
-
   "label.filter": "Фильтр",
-
   "menu": {
     "file": "Файл",
     "view": "Вид",
     "tools": "Инструменты",
     "help": "Справка",
-
     "manage_instances": "Управление экземплярами...",
     "install_mod": "Установить мод...",
     "visit_nexus": "Открыть страницу Nexus",
     "create_plugin": "Создать плагин игры...",
     "quit": "Выход",
-
     "reload": "Обновить",
     "menubar": "Строка меню",
     "toolbar": "Панель инструментов",
@@ -28,12 +24,10 @@
     "filter_panel": "Панель фильтров",
     "log": "Журнал",
     "notifications": "Уведомления...",
-
     "profiles": "Профили...",
     "executables": "Исполняемые файлы...",
     "tool_plugins": "Плагины инструментов",
     "settings": "Настройки...",
-
     "help_item": "Справка",
     "ui_help": "Справка по интерфейсу",
     "documentation": "Документация",
@@ -42,7 +36,6 @@
     "about_anvil": "О программе Anvil Organizer",
     "about_qt": "О Qt"
   },
-
   "context": {
     "all_mods": "Все моды",
     "install_mod": "Установить мод...",
@@ -56,12 +49,10 @@
     "auto_assign_categories": "Назначить категории автоматически",
     "reload": "Обновить",
     "export_csv": "Экспортировать как CSV...",
-
     "force_update_check": "Принудительная проверка обновлений",
     "ignore_update": "Игнорировать обновление",
     "enable_selected": "Включить выбранные",
     "disable_selected": "Отключить выбранные",
-
     "send_to": "Отправить в...",
     "move_to_separator": "Переместить в разделитель",
     "rename_mod": "Переименовать мод...",
@@ -74,36 +65,29 @@
     "visit_nexus": "Открыть страницу Nexus",
     "open_explorer": "Открыть в проводнике",
     "information": "Информация...",
-
     "other_categories": "Другие категории",
     "set_primary": "★ Сделать основной",
-
     "activate": "Активировать",
     "deactivate": "Деактивировать",
     "uninstall": "Удалить...",
     "open_file_manager": "Открыть в файловом менеджере",
     "reinstall_framework": "Переустановить фреймворк...",
     "uninstall_framework": "Удалить фреймворк...",
-
     "copy": "Копировать",
     "copy_all": "Копировать все",
     "clear_all": "Очистить все",
-
     "add": "Добавить",
     "rename": "Переименовать",
     "delete": "Удалить",
     "delete_nexus": "Удалить Nexus",
     "delete_profile": "Удалить профиль",
-
     "select_color": "Изменить цвет...",
     "reset_color": "Сбросить цвет",
-    "nexus_query": "\u0417\u0430\u043f\u0440\u043e\u0441\u0438\u0442\u044c \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044e Nexus",
-
-    "lock_mod": "\u0417\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043c\u043e\u0434",
-    "unlock_mod": "\u0420\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043c\u043e\u0434",
-    "toggle_lock": "\u041f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0443"
+    "nexus_query": "Запросить информацию Nexus",
+    "lock_mod": "Заблокировать мод",
+    "unlock_mod": "Разблокировать мод",
+    "toggle_lock": "Переключить блокировку"
   },
-
   "toolbar": {
     "deploy": "Развернуть",
     "open_game_folder": "Открыть папку игры",
@@ -117,9 +101,9 @@
     "open_ao_plugins_folder": "Открыть папку плагинов AO",
     "open_ao_styles_folder": "Открыть папку стилей AO",
     "open_ao_logs_folder": "Открыть папку журналов AO",
-    "open_saves_folder": "Открыть сохранения"
+    "open_saves_folder": "Открыть сохранения",
+    "script_merger": "Script Merger"
   },
-
   "dialog": {
     "backup_title": "Восстановление из резервной копии",
     "backup_select": "Выберите резервную копию для восстановления:",
@@ -127,7 +111,6 @@
     "backup_delete_confirm": "Действительно удалить резервную копию?\n\n{name}",
     "backup_none": "Нет резервных копий для восстановления.",
     "no_backups_title": "Нет резервных копий",
-
     "settings_title": "Настройки",
     "profiles_title": "Профили",
     "categories_title": "Управление категориями",
@@ -140,60 +123,45 @@
     "mod_exists": "Мод уже существует",
     "mod_details": "Подробности мода: {name}",
     "quick_install": "Быстрая установка",
-
     "info_title": "Информация: {name}",
-
-    "remove_locked_warning": "\u0412\u043d\u0438\u043c\u0430\u043d\u0438\u0435: {count} \u043c\u043e\u0434(\u043e\u0432) \u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d\u044b!",
-    "remove_mod_title": "\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043c\u043e\u0434",
+    "remove_locked_warning": "Внимание: {count} мод(ов) заблокированы!",
+    "remove_mod_title": "Удалить мод",
     "remove_mod_single": "Действительно удалить мод \"{name}\"?\n\nПапка мода будет безвозвратно удалена.",
     "remove_mod_multi": "Действительно удалить {count} модов?\n\n{list}\n\nПапки модов будут безвозвратно удалены.",
-
     "create_empty_mod_title": "Создать пустой мод",
     "create_empty_mod_prompt": "Имя мода:",
     "mod_exists_message": "Мод с именем \"{name}\" уже существует.",
-
     "create_separator_title": "Создать разделитель",
     "create_separator_prompt": "Имя разделителя:",
     "separator_exists": "Разделитель с именем \"{name}\" уже существует.",
-
     "rename_mod_title": "Переименовать мод",
     "rename_mod_prompt": "Новое имя:",
-
     "export_modlist_title": "Экспорт списка модов",
-
     "select_mod_archive": "Выберите архив(ы) мода",
     "select_mod_archive_single": "Выберите архив мода",
     "mod_files_filter": "Файлы модов (*.zip *.rar *.7z *.pak);;Все файлы (*)",
     "archive_filter": "Архивы (*.zip *.rar *.7z);;Все файлы (*)",
     "csv_filter": "CSV-файлы (*.csv)",
-
     "delete_category_title": "Удалить категорию",
     "delete_category_confirm": "Действительно удалить категорию \"{name}\"?\n\nКатегория будет удалена из всех модов.",
     "delete_category_message": "Категория будет удалена из всех модов.",
     "delete_category_with_mods": "Категория назначена {count} моду(ам) и будет оттуда удалена.",
-
     "add_category_title": "Добавить категорию",
     "add_category_label": "Имя категории:",
     "rename_category_title": "Переименовать категорию",
     "rename_category_label": "Новое имя:",
-
     "uninstall_mod_title": "Удалить мод",
     "uninstall_mod_message": "Действительно удалить мод \"{name}\"?\n\nФайл .pak будет удалён, а запись будет\nубрана из списка модов.",
-
     "uninstall_data_override_title": "Удалить Data-Override",
     "uninstall_data_override_message": "Действительно удалить Data-Override \"{name}\"?\n\nВсе связанные файлы будут удалены из Data/.",
-
     "reinstall_title": "Переустановить",
     "no_matching_archive": "Не найден подходящий архив для \"{name}\" в .downloads/.",
-
     "uninstall_framework_title": "Удалить фреймворк",
     "uninstall_framework_message": "Действительно удалить фреймворк \"{name}\"?\n\nСвязанные файлы будут удалены из папки игры.",
     "uninstall_framework_warning": "ВНИМАНИЕ: \"{name}\" — критический фреймворк!\n\nДругие моды зависят от него и могут вылетать без него.\n\nПри проблемах можно переустановить через правый клик → Переустановить.\n\nВсё равно удалить?",
     "not_a_framework_title": "Не фреймворк",
     "not_a_framework_message": "Следующие архивы не являются известными фреймворками и не были установлены:\n\n{names}",
-
     "select_game_hint": "Выберите игру, для которой хотите создать экземпляр:",
-
     "new_category": "Новая категория",
     "category_exists": "Категория уже существует",
     "category_exists_message": "Категория с именем \"{name}\" уже существует.",
@@ -201,7 +169,6 @@
     "select_category_first": "Сначала выберите категорию.",
     "rename_category": "Переименовать категорию",
     "name_taken": "Имя занято",
-
     "welcome_hint": "Добро пожаловать в Anvil Organizer! Создайте первый экземпляр, чтобы начать.",
     "create_new_instance": "+ Создать новый экземпляр",
     "what_is_instance": "Что такое экземпляр?",
@@ -213,7 +180,6 @@
     "delete_instance_confirm": "Действительно удалить экземпляр \"{name}\"?\n\nВсе моды, загрузки и профили этого экземпляра будут безвозвратно удалены!",
     "active_suffix": "(активен)",
     "plugin_loader_error": "Загрузчик плагинов недоступен.",
-
     "wizard_intro_title": "Создать новый экземпляр",
     "wizard_intro_text": "Экземпляр — это полный набор модов, загрузок, профилей и настроек для игры.\n\nКаждая игра должна управляться в своём экземпляре. Anvil Organizer позволяет легко переключаться между экземплярами.",
     "wizard_skip_checkbox": "Больше не показывать эту страницу",
@@ -241,7 +207,6 @@
     "nexus_query_title": "Введите Nexus Mod-ID",
     "nexus_query_prompt": "Nexus Mod-ID (из URL, например 107658):"
   },
-
   "button": {
     "cancel": "Отмена",
     "restore": "Восстановить",
@@ -266,7 +231,6 @@
     "open_in_explorer": "Открыть мод в проводнике",
     "folder": "Папка"
   },
-
   "tooltip": {
     "new_profile": "Создать новый профиль",
     "create_backup": "Создать резервную копию",
@@ -293,7 +257,6 @@
     "move_to_optional": "Деактивировать выбранные плагины (переместить в optional/)",
     "move_to_active": "Активировать выбранные плагины (вернуть в корень мода)"
   },
-
   "label": {
     "active": "Активные:",
     "programs": "Программы",
@@ -352,7 +315,6 @@
     "no_game_selected": "Игра не выбрана",
     "no_instance_selected": "Экземпляр не выбран",
     "name": "Имя",
-
     "enable_when_sorted": "Включать при сортировке по",
     "show_conflicts_plugins": "Показывать конфликты и плагины",
     "show_separator_symbols": "Показывать символы на разделителях",
@@ -361,7 +323,6 @@
     "known_servers": "Известные серверы (обновляются при загрузке)",
     "preferred_servers": "Предпочтительные серверы (перетаскивание)",
     "workarounds_hint": "Это обходные решения для проблем с Anvil Organizer. Обязательно прочитайте подсказки перед изменением настроек.",
-
     "ini_files_found": "{count} INI-файл(ов) найдено",
     "plugins_count": "{count} плагинов",
     "no_mod_folder": "Нет папки мода",
@@ -371,16 +332,13 @@
     "categories_not_available": "Категории недоступны.",
     "images_placeholder": "Заглушка — Изображения",
     "nexus_placeholder": "Заглушка — Информация Nexus",
-
     "file_overwrites": "Файл",
     "overwrites_mod": "Перезаписывает мод",
     "overwritten_by": "Перезаписан модом",
-
     "plugin_loader_not_available": "Загрузчик плагинов недоступен",
     "file": "Файл",
     "filter": "Фильтр"
   },
-
   "placeholder": {
     "no_file_selected": "Файл не выбран",
     "select_file": "Выберите файл…",
@@ -388,7 +346,6 @@
     "filter": "Фильтр",
     "profile_name": "Имя профиля..."
   },
-
   "status": {
     "no_instance": "Экземпляр не выбран",
     "notifications": "Уведомления",
@@ -441,10 +398,10 @@
     "separator_created": "Разделитель создан: {name}",
     "separators_collapsed": "Все разделители свёрнуты ({count})",
     "separators_expanded": "Все разделители развёрнуты",
-    "renamed": "\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u043e: {old} \u2192 {new}",
-    "removed": "\u0423\u0434\u0430\u043b\u0435\u043d\u043e: {names}",
-    "mod_locked": "\u041c\u043e\u0434 \u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d: {name}",
-    "mod_unlocked": "\u041c\u043e\u0434 \u0440\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d: {name}",
+    "renamed": "Переименовано: {old} → {new}",
+    "removed": "Удалено: {names}",
+    "mod_locked": "Мод заблокирован: {name}",
+    "mod_unlocked": "Мод разблокирован: {name}",
     "uninstalled": "Удалено: {name}",
     "uninstall_failed": "Удаление не удалось",
     "data_override_uninstalled": "Data-Override удалён: {name}",
@@ -463,7 +420,6 @@
     "nexus_no_id_found": "Nexus-ID не найден. Загрузите мод через Nexus.",
     "nexus_no_game_slug": "Название игры для Nexus не настроено."
   },
-
   "toast": {
     "backup_created": "{count} модов сохранено | {name} | {size}",
     "backup_restored": "Резервная копия восстановлена: {name}",
@@ -472,7 +428,6 @@
     "profile_deleted": "Профиль '{name}' удалён",
     "delete_error": "Ошибка при удалении: {error}"
   },
-
   "error": {
     "load_file": "Ошибка при загрузке: {error}",
     "save_file": "Ошибка: {error}",
@@ -488,7 +443,6 @@
     "rename_failed_title": "Переименование не удалось",
     "export_failed_title": "Экспорт не удался"
   },
-
   "game_panel": {
     "install": "Установить",
     "visit_nexus": "Открыть страницу Nexus",
@@ -561,7 +515,6 @@
     "query_nexus_enter_id": "Введите Nexus Mod-ID (из URL):",
     "query_nexus_parsed_id": "Определено из имени файла: Mod-ID {id}. Использовать?"
   },
-
   "filter": {
     "delete_all_data": "Все связанные файлы будут удалены из Data/.",
     "search_placeholder": "Поиск мода...",
@@ -575,11 +528,10 @@
     "prop_has_notes": "Есть заметки",
     "prop_has_category": "Есть категория",
     "prop_no_category": "Без категории",
-    "prop_conflict_win": "\u041a\u043e\u043d\u0444\u043b\u0438\u043a\u0442\u044b (\u043f\u043e\u0431\u0435\u0434\u0438\u0442\u0435\u043b\u044c)",
-    "prop_conflict_lose": "\u041a\u043e\u043d\u0444\u043b\u0438\u043a\u0442\u044b (\u043f\u0440\u043e\u0438\u0433\u0440\u0430\u0432\u0448\u0438\u0439)",
-    "prop_locked": "\u0417\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d\u043e"
+    "prop_conflict_win": "Конфликты (победитель)",
+    "prop_conflict_lose": "Конфликты (проигравший)",
+    "prop_locked": "Заблокировано"
   },
-
   "category": {
     "animations": "Анимации",
     "armor_clothing": "Броня и одежда",
@@ -599,7 +551,6 @@
     "utilities": "Утилиты",
     "weapons": "Оружие"
   },
-
   "settings": {
     "language": "Язык",
     "language_restart_hint": "Язык изменён — некоторые тексты будут обновлены только после перезапуска.",
@@ -730,9 +681,19 @@
     "nxm_handler_title": "Обработчик nxm://",
     "nxm_handler_success": "Anvil Organizer зарегистрирован как обработчик nxm://.\nСсылки для скачивания с Nexus Mods теперь будут обрабатываться Anvil.",
     "nxm_handler_failed": "Регистрация не удалась.\nНастройте файл .desktop вручную.",
-    "coming_soon": "Пока недоступно"
+    "coming_soon": "Пока недоступно",
+    "tab_script_merger": "Script Merger",
+    "sm_scan_group": "Поиск конфликтов",
+    "sm_check_scripts": "Проверять скрипты (.ws)",
+    "sm_check_xml": "Проверять XML-файлы",
+    "sm_merge_tool_group": "Инструмент слияния",
+    "sm_kdiff3_path": "Путь к KDiff3",
+    "sm_browse": "Обзор...",
+    "sm_review_in_kdiff3": "Просматривать каждое успешное слияние в KDiff3",
+    "sm_automation_group": "Автоматизация",
+    "sm_auto_delete_stale": "Автоматически удалять устаревшие слияния",
+    "sm_auto_overwrite": "Автоматически перезаписывать старые слияния"
   },
-
   "mod_detail": {
     "open_in_explorer": "Открыть мод в проводнике",
     "tab_textfiles": "Текстовые файлы",
@@ -780,14 +741,12 @@
     "nexus_last_query": "Последний запрос:",
     "nexus_description": "Описание:"
   },
-
   "filetree": {
     "name": "Имя",
     "size": "Размер",
     "type": "Тип",
     "date_modified": "Дата изменения"
   },
-
   "instance": {
     "manager_title": "Менеджер экземпляров",
     "welcome_hint": "Добро пожаловать в Anvil Organizer! Создайте первый экземпляр, чтобы начать.",
@@ -811,7 +770,6 @@
     "delete_confirm": "Действительно удалить экземпляр \"{name}\"?\n\nСледующие файлы будут удалены:",
     "delete_total": "Итого: {size}"
   },
-
   "wizard": {
     "title": "Создать новый экземпляр",
     "btn_back": "< Назад",
@@ -872,7 +830,6 @@
     "create_error": "Не удалось создать экземпляр:\n{error}",
     "browse_folder_title": "Выбрать папку"
   },
-
   "update": {
     "commits_available": "{count} новых коммитов доступно",
     "changelog_title": "Доступно обновление",
@@ -885,7 +842,6 @@
     "dirty_tree": "Обнаружены локальные изменения. Сначала сделайте коммит.",
     "pip_updated": "Зависимости Python обновлены"
   },
-
   "fomod": {
     "title": "Установщик FOMOD",
     "step_of": "Шаг {current} из {total}: {name}",
@@ -901,7 +857,6 @@
     "no_image": "Предпросмотр недоступен",
     "validation_required": "Пожалуйста, сделайте выбор в группе \"{group}\"."
   },
-
   "plugin_creator": {
     "title": "Создать плагин игры",
     "game_info": "Информация об игре",
@@ -936,5 +891,46 @@
     "success_title": "Плагин создан",
     "success_message": "Плагин игры создан:\n\n{path}\n\nПерезапустите Anvil для загрузки плагина.",
     "restart_hint": "Перезапустите Anvil для загрузки нового плагина."
+  },
+  "script_merger": {
+    "title": "Script Merger — Ведьмак 3",
+    "info": "Ванильные скрипты: {vanilla_dir}\nАктивных модов: {active_count}",
+    "scan": "Сканировать",
+    "auto_merge": "Авто-слияние",
+    "merge_all": "Объединить все",
+    "create_mod": "Создать мод слияния",
+    "cleanup": "Очистить",
+    "ignore": "Игнорировать",
+    "close": "Закрыть",
+    "scanning": "Сканирование модов... {current}/{total}",
+    "merging": "Объединение... {current}/{total}",
+    "no_conflicts": "Конфликтов скриптов не найдено.",
+    "stale_merges": "{count} слияние(й) устарело (исходные моды изменены):\n{files}",
+    "detail_file": "Файл: {path}",
+    "detail_status": "Статус: {status}",
+    "detail_mods": "Участвующие моды:",
+    "detail_mod_entry": "  {anvil_name} ({witcher_name})",
+    "detail_hunk": "    Блок: строка {start}-{end} (ванилла: {vanilla_count} → мод: {mod_count})",
+    "detail_no_hunks": "    (нет блоков различий)",
+    "detail_no_vanilla": "⚠ Нет ванильного аналога — требуется ручное слияние",
+    "detail_vanilla": "Ванилла: {path}",
+    "merge_error": "Ошибка при слиянии: {error}",
+    "merge_failed": "Слияние не удалось: {error}",
+    "merge_all_done": "{success} успешно объединено, {failed} не удалось.",
+    "write_error": "Ошибка записи {path}: {error}",
+    "nothing_to_write": "Нет объединённых файлов для записи.",
+    "modlist_error": "Ошибка при обновлении списка модов: {error}",
+    "mod_created": "Мод слияния создан с {count} файлом(ами).",
+    "cleanup_title": "Очистка слияний",
+    "cleanup_confirm": "Удалить мод слияния и инвентарь?\nОригинальные моды останутся без изменений.",
+    "cleanup_error": "Ошибка при очистке: {error}",
+    "tooltip_status": "Статус: {status}",
+    "no_vanilla_dir": "Каталог ванильных скриптов не найден. Игра установлена?",
+    "kdiff3": "KDiff3",
+    "kdiff3_not_found": "KDiff3 не найден. Настройте путь в Настройках.",
+    "kdiff3_running": "KDiff3 запущен...",
+    "kdiff3_finished": "KDiff3 завершён. Результат слияния применён.",
+    "kdiff3_no_output": "KDiff3 не создал результата.",
+    "kdiff3_too_many_mods": "Задействовано более 2 модов. KDiff3 покажет только Vanilla + первые 2 мода."
   }
 }

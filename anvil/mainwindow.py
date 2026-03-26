@@ -966,6 +966,11 @@ class MainWindow(QMainWindow):
         # Hide BG3 deploy button, switch to standard mod list
         self._toolbar.deploy_sep.setVisible(False)
         self._toolbar.deploy_action.setVisible(False)
+
+        # Witcher 3: Script Merger Button einblenden
+        is_witcher3 = short_name == "witcher3"
+        self._toolbar.merger_sep.setVisible(is_witcher3)
+        self._toolbar.merger_action.setVisible(is_witcher3)
         self._mod_list_stack.setCurrentWidget(self._mod_list_view)
         self._bg3_installer = None
 
@@ -4215,6 +4220,49 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(tr("status.modlist_exported_check"), 5000)
         else:
             self.statusBar().showMessage(tr("status.deploy_failed"), 5000)
+
+    def _on_script_merger_clicked(self) -> None:
+        """Oeffnet den Script Merger Dialog fuer Witcher 3."""
+        plugin = self._current_plugin
+        if plugin is None or getattr(plugin, "GameShortName", "") != "witcher3":
+            return
+
+        vanilla_dir = plugin.vanilla_scripts_dir()
+        if vanilla_dir is None:
+            QMessageBox.warning(
+                self,
+                tr("script_merger.title"),
+                tr("script_merger.no_vanilla_dir"),
+            )
+            return
+
+        instance_path = self._current_instance_path
+        mods_dir = instance_path / ".mods"
+        profiles_dir = instance_path / ".profiles"
+
+        # Aktive Mods aus aktuellem Profil lesen
+        active = read_active_mods(
+            profiles_dir / self._profile_bar.current_profile()
+        )
+        active_names = [
+            n for n in read_global_modlist(profiles_dir)
+            if n in active and n != "_merged_"
+        ]
+
+        from anvil.widgets.script_merger_dialog import ScriptMergerDialog
+        dlg = ScriptMergerDialog(
+            parent=self,
+            vanilla_scripts_dir=vanilla_dir,
+            mods_dir=mods_dir,
+            active_mod_names=active_names,
+            profiles_dir=profiles_dir,
+            instance_path=instance_path,
+        )
+        dlg.exec()
+
+        if dlg.has_changes:
+            self._reload_mod_list()
+            self._schedule_redeploy()
 
     def _on_bg3_context_menu(self, global_pos, section: str, mod_data: dict) -> None:
         """BG3-specific context menu."""

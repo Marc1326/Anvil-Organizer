@@ -135,6 +135,27 @@ def create_toolbar(parent=None):
     bar.deploy_action = deploy_action  # For visibility
     bar.deploy_sep = deploy_sep        # Separator tied to deploy
 
+    # Script Merger Button (Witcher 3-spezifisch, standardmäßig unsichtbar)
+    merger_sep = bar.addSeparator()
+    merger_sep.setVisible(False)
+
+    merger_btn = QToolButton(bar)
+    merger_btn.setIcon(_icon("tools.svg"))
+    merger_btn.setToolTip(tr("toolbar.script_merger"))
+    merger_btn.setText(tr("toolbar.script_merger"))
+    merger_action = bar.addWidget(merger_btn)
+    merger_action.setVisible(False)
+
+    def _on_script_merger():
+        win = bar.window()
+        if win and hasattr(win, "_on_script_merger_clicked"):
+            win._on_script_merger_clicked()
+
+    merger_btn.clicked.connect(_on_script_merger)
+    bar.merger_btn = merger_btn
+    bar.merger_action = merger_action
+    bar.merger_sep = merger_sep
+
     # Spacer: rechte Icons bündig rechts
     spacer = QWidget()
     spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)

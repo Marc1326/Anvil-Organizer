@@ -1,20 +1,16 @@
 {
   "_language_name": "Português",
-
   "label.filter": "Filtro",
-
   "menu": {
     "file": "Ficheiro",
     "view": "Ver",
     "tools": "Ferramentas",
     "help": "Ajuda",
-
     "manage_instances": "Gerir instâncias...",
     "install_mod": "Instalar Mod...",
     "visit_nexus": "Abrir página do Nexus",
     "create_plugin": "Criar Plugin de Jogo...",
     "quit": "Sair",
-
     "reload": "Recarregar",
     "menubar": "Barra de menus",
     "toolbar": "Barra de ferramentas",
@@ -28,12 +24,10 @@
     "filter_panel": "Painel de filtros",
     "log": "Registo",
     "notifications": "Notificações...",
-
     "profiles": "Perfis...",
     "executables": "Executáveis...",
     "tool_plugins": "Plugins de ferramentas",
     "settings": "Definições...",
-
     "help_item": "Ajuda",
     "ui_help": "Ajuda da interface",
     "documentation": "Documentação",
@@ -42,7 +36,6 @@
     "about_anvil": "Sobre o Anvil Organizer",
     "about_qt": "Sobre o Qt"
   },
-
   "context": {
     "all_mods": "Todos os Mods",
     "install_mod": "Instalar Mod...",
@@ -56,12 +49,10 @@
     "auto_assign_categories": "Atribuir categorias automaticamente",
     "reload": "Recarregar",
     "export_csv": "Exportar como CSV...",
-
     "force_update_check": "Forçar verificação de atualizações",
     "ignore_update": "Ignorar atualização",
     "enable_selected": "Ativar selecionados",
     "disable_selected": "Desativar selecionados",
-
     "send_to": "Enviar para...",
     "move_to_separator": "Mover para o separador",
     "rename_mod": "Renomear Mod...",
@@ -74,36 +65,29 @@
     "visit_nexus": "Abrir página do Nexus",
     "open_explorer": "Abrir no explorador",
     "information": "Informações...",
-
     "other_categories": "Outras categorias",
     "set_primary": "★ Definir como principal",
-
     "activate": "Ativar",
     "deactivate": "Desativar",
     "uninstall": "Desinstalar...",
     "open_file_manager": "Abrir no gestor de ficheiros",
     "reinstall_framework": "Reinstalar framework...",
     "uninstall_framework": "Desinstalar framework...",
-
     "copy": "Copiar",
     "copy_all": "Copiar tudo",
     "clear_all": "Limpar tudo",
-
     "add": "Adicionar",
     "rename": "Renomear",
     "delete": "Eliminar",
     "delete_nexus": "Eliminar Nexus",
     "delete_profile": "Eliminar perfil",
-
     "select_color": "Alterar cor...",
     "reset_color": "Remover cor",
     "nexus_query": "Consultar info do Nexus",
-
     "lock_mod": "Bloquear mod",
     "unlock_mod": "Desbloquear mod",
     "toggle_lock": "Alternar bloqueio"
   },
-
   "toolbar": {
     "deploy": "Deploy",
     "open_game_folder": "Abrir pasta do jogo",
@@ -117,9 +101,9 @@
     "open_ao_plugins_folder": "Abrir pasta de Plugins do AO",
     "open_ao_styles_folder": "Abrir pasta de estilos do AO",
     "open_ao_logs_folder": "Abrir pasta de registos do AO",
-    "open_saves_folder": "Abrir pasta de saves"
+    "open_saves_folder": "Abrir pasta de saves",
+    "script_merger": "Script Merger"
   },
-
   "dialog": {
     "backup_title": "Restaurar cópia de segurança",
     "backup_select": "Selecione uma cópia de segurança para restaurar:",
@@ -127,7 +111,6 @@
     "backup_delete_confirm": "Eliminar realmente a cópia de segurança?\n\n{name}",
     "backup_none": "Não há cópias de segurança disponíveis para restaurar.",
     "no_backups_title": "Sem cópias de segurança",
-
     "settings_title": "Definições",
     "profiles_title": "Perfis",
     "categories_title": "Gerir categorias",
@@ -140,60 +123,45 @@
     "mod_exists": "O Mod já existe",
     "mod_details": "Detalhes do Mod: {name}",
     "quick_install": "Instalação rápida",
-
     "info_title": "Informações: {name}",
-
-    "remove_locked_warning": "Aten\u00e7\u00e3o: {count} mod(s) est\u00e3o bloqueados!",
+    "remove_locked_warning": "Atenção: {count} mod(s) estão bloqueados!",
     "remove_mod_title": "Remover Mod",
     "remove_mod_single": "Eliminar realmente o Mod \"{name}\"?\n\nA pasta do Mod será eliminada permanentemente.",
     "remove_mod_multi": "Eliminar realmente {count} Mods?\n\n{list}\n\nAs pastas dos Mods serão eliminadas permanentemente.",
-
     "create_empty_mod_title": "Criar Mod vazio",
     "create_empty_mod_prompt": "Nome do Mod:",
     "mod_exists_message": "Já existe um Mod com o nome \"{name}\".",
-
     "create_separator_title": "Criar separador",
     "create_separator_prompt": "Nome do separador:",
     "separator_exists": "Já existe um separador com o nome \"{name}\".",
-
     "rename_mod_title": "Renomear Mod",
     "rename_mod_prompt": "Novo nome:",
-
     "export_modlist_title": "Exportar lista de Mods",
-
     "select_mod_archive": "Selecionar arquivos de Mods",
     "select_mod_archive_single": "Selecionar arquivo de Mod",
     "mod_files_filter": "Ficheiros de Mod (*.zip *.rar *.7z *.pak);;Todos os ficheiros (*)",
     "archive_filter": "Arquivos (*.zip *.rar *.7z);;Todos os ficheiros (*)",
     "csv_filter": "Ficheiros CSV (*.csv)",
-
     "delete_category_title": "Eliminar categoria",
     "delete_category_confirm": "Eliminar realmente a categoria \"{name}\"?\n\nA categoria será removida de todos os Mods.",
     "delete_category_message": "A categoria será removida de todos os Mods.",
     "delete_category_with_mods": "A categoria está atribuída a {count} Mod(s) e será removida deles.",
-
     "add_category_title": "Adicionar categoria",
     "add_category_label": "Nome da categoria:",
     "rename_category_title": "Renomear categoria",
     "rename_category_label": "Novo nome:",
-
     "uninstall_mod_title": "Desinstalar Mod",
     "uninstall_mod_message": "Desinstalar realmente o Mod \"{name}\"?\n\nO ficheiro .pak será eliminado e a entrada será removida\nda lista de Mods.",
-
     "uninstall_data_override_title": "Desinstalar Data-Override",
     "uninstall_data_override_message": "Desinstalar realmente o Data-Override \"{name}\"?\n\nTodos os ficheiros associados serão eliminados de Data/.",
-
     "reinstall_title": "Reinstalar",
     "no_matching_archive": "Não foi encontrado um arquivo correspondente para \"{name}\" em .downloads/.",
-
     "uninstall_framework_title": "Desinstalar framework",
     "uninstall_framework_message": "Desinstalar realmente o framework \"{name}\"?\n\nOs ficheiros associados serão eliminados do diretório do jogo.",
     "uninstall_framework_warning": "ATENÇÃO: \"{name}\" é um framework crítico!\n\nOutros mods dependem dele e podem falhar sem ele.\n\nSe tiver problemas, pode reinstalá-lo com clique direito → Reinstalar.\n\nDesinstalar mesmo assim?",
     "not_a_framework_title": "Não é um framework",
     "not_a_framework_message": "Os seguintes arquivos não são frameworks conhecidos e não foram instalados:\n\n{names}",
-
     "select_game_hint": "Selecione o jogo para o qual pretende criar uma instância:",
-
     "new_category": "Nova categoria",
     "category_exists": "A categoria já existe",
     "category_exists_message": "Já existe uma categoria com o nome \"{name}\".",
@@ -203,7 +171,6 @@
     "select_category_first": "Por favor, selecione primeiro uma categoria.",
     "rename_category": "Renomear categoria",
     "name_taken": "Nome já em uso",
-
     "welcome_hint": "Bem-vindo ao Anvil Organizer! Crie a sua primeira instância para começar.",
     "create_new_instance": "+ Criar nova instância",
     "what_is_instance": "O que é uma instância?",
@@ -215,7 +182,6 @@
     "delete_instance_confirm": "Eliminar realmente a instância \"{name}\"?\n\nTodos os Mods, downloads e perfis desta instância serão eliminados permanentemente!",
     "active_suffix": "(ativa)",
     "plugin_loader_error": "Carregador de Plugin não disponível.",
-
     "wizard_intro_title": "Criar uma nova instância",
     "wizard_intro_text": "Uma instância é um conjunto completo de Mods, downloads, perfis e configurações para um jogo.\n\nCada jogo deve ser gerido na sua própria instância. O Anvil Organizer pode alternar facilmente entre instâncias.",
     "wizard_skip_checkbox": "Não mostrar esta página novamente",
@@ -241,7 +207,6 @@
     "saves_not_found_title": "Pasta de saves não encontrada",
     "saves_not_found_message": "A pasta de saves não foi encontrada. Já iniciou o jogo pelo menos uma vez?"
   },
-
   "button": {
     "cancel": "Cancelar",
     "restore": "Restaurar",
@@ -266,7 +231,6 @@
     "open_in_explorer": "Abrir Mod no explorador",
     "folder": "Pasta"
   },
-
   "tooltip": {
     "new_profile": "Criar novo perfil",
     "create_backup": "Criar cópia de segurança",
@@ -293,7 +257,6 @@
     "move_to_optional": "Desativar plugins selecionados (mover para optional/)",
     "move_to_active": "Ativar plugins selecionados (voltar para raiz do mod)"
   },
-
   "label": {
     "active": "Ativo:",
     "programs": "Programas",
@@ -352,7 +315,6 @@
     "no_game_selected": "Nenhum jogo selecionado",
     "no_instance_selected": "Nenhuma instância selecionada",
     "name": "Nome",
-
     "enable_when_sorted": "Ativar quando ordenado por",
     "show_conflicts_plugins": "Mostrar conflitos e Plugins",
     "show_separator_symbols": "Mostrar símbolos nos separadores",
@@ -361,7 +323,6 @@
     "known_servers": "Servidores conhecidos (atualizado no download)",
     "preferred_servers": "Servidores preferidos (arrastar e largar)",
     "workarounds_hint": "Estas são soluções alternativas para problemas com o Anvil Organizer. Por favor, leia os textos de ajuda antes de alterar algo aqui.",
-
     "ini_files_found": "{count} ficheiro(s) INI encontrado(s)",
     "plugins_count": "{count} Plugins",
     "no_mod_folder": "Sem pasta de Mod",
@@ -371,16 +332,13 @@
     "categories_not_available": "Categorias não disponíveis.",
     "images_placeholder": "Espaço reservado — Imagens",
     "nexus_placeholder": "Espaço reservado — Info Nexus",
-
     "file_overwrites": "Ficheiro",
     "overwrites_mod": "Substitui Mod",
     "overwritten_by": "Substituído por Mod",
-
     "plugin_loader_not_available": "Carregador de Plugin não disponível",
     "file": "Ficheiro",
     "filter": "Filtro"
   },
-
   "placeholder": {
     "no_file_selected": "Nenhum ficheiro selecionado",
     "select_file": "Selecionar ficheiro…",
@@ -388,7 +346,6 @@
     "filter": "Filtrar",
     "profile_name": "Nome do perfil..."
   },
-
   "status": {
     "no_instance": "Nenhuma instância selecionada",
     "notifications": "Notificações",
@@ -441,7 +398,7 @@
     "separator_created": "Separador criado: {name}",
     "separators_collapsed": "Todos os separadores recolhidos ({count})",
     "separators_expanded": "Todos os separadores expandidos",
-    "renamed": "Renomeado: {old} \u2192 {new}",
+    "renamed": "Renomeado: {old} → {new}",
     "removed": "Removido: {names}",
     "mod_locked": "Mod bloqueado: {name}",
     "mod_unlocked": "Mod desbloqueado: {name}",
@@ -463,7 +420,6 @@
     "nexus_no_id_found": "Nenhum ID Nexus encontrado. Baixe o mod pelo Nexus.",
     "nexus_no_game_slug": "Nenhum slug de jogo Nexus configurado."
   },
-
   "toast": {
     "backup_created": "{count} Mods guardados | {name} | {size}",
     "backup_restored": "Cópia de segurança restaurada: {name}",
@@ -472,7 +428,6 @@
     "profile_deleted": "Perfil '{name}' eliminado",
     "delete_error": "Erro ao eliminar: {error}"
   },
-
   "error": {
     "load_file": "Erro ao carregar: {error}",
     "save_file": "Erro: {error}",
@@ -488,7 +443,6 @@
     "rename_failed_title": "Renomeação falhou",
     "export_failed_title": "Exportação falhou"
   },
-
   "game_panel": {
     "install": "Instalar",
     "visit_nexus": "Abrir página do Nexus",
@@ -561,7 +515,6 @@
     "query_nexus_enter_id": "Inserir ID do Mod do Nexus (do URL):",
     "query_nexus_parsed_id": "Detetado do nome do ficheiro: Mod ID {id}. Usar?"
   },
-
   "filter": {
     "delete_all_data": "Todos os ficheiros associados serão eliminados de Data/.",
     "search_placeholder": "Procurar Mod...",
@@ -579,7 +532,6 @@
     "prop_conflict_lose": "Conflitos (perdedor)",
     "prop_locked": "Bloqueado"
   },
-
   "category": {
     "animations": "Animações",
     "armor_clothing": "Armaduras e Roupas",
@@ -599,7 +551,6 @@
     "utilities": "Utilitários",
     "weapons": "Armas"
   },
-
   "settings": {
     "language": "Idioma",
     "language_restart_hint": "Idioma alterado — alguns textos serão atualizados após reiniciar.",
@@ -730,9 +681,19 @@
     "nxm_handler_title": "Manipulador nxm://",
     "nxm_handler_success": "Anvil Organizer foi registrado como manipulador nxm://.\nLinks de download do Nexus Mods serão processados pelo Anvil.",
     "nxm_handler_failed": "Registro falhou.\nPor favor configure manualmente o arquivo .desktop.",
-    "coming_soon": "Ainda não disponível"
+    "coming_soon": "Ainda não disponível",
+    "tab_script_merger": "Script Merger",
+    "sm_scan_group": "Verificar conflitos",
+    "sm_check_scripts": "Verificar scripts (.ws)",
+    "sm_check_xml": "Verificar arquivos XML",
+    "sm_merge_tool_group": "Ferramenta de merge",
+    "sm_kdiff3_path": "Caminho para KDiff3",
+    "sm_browse": "Procurar...",
+    "sm_review_in_kdiff3": "Revisar cada merge bem-sucedido no KDiff3",
+    "sm_automation_group": "Automação",
+    "sm_auto_delete_stale": "Excluir merges obsoletos automaticamente",
+    "sm_auto_overwrite": "Sobrescrever merges antigos automaticamente"
   },
-
   "mod_detail": {
     "open_in_explorer": "Abrir Mod no explorador",
     "tab_textfiles": "Arquivos de Texto",
@@ -780,14 +741,12 @@
     "nexus_last_query": "Última consulta:",
     "nexus_description": "Descrição:"
   },
-
   "filetree": {
     "name": "Nome",
     "size": "Tamanho",
     "type": "Tipo",
     "date_modified": "Data de modificação"
   },
-
   "instance": {
     "manager_title": "Gestor de Instancias",
     "welcome_hint": "Bem-vindo ao Anvil Organizer! Crie a sua primeira instancia para comecar.",
@@ -811,7 +770,6 @@
     "delete_confirm": "Eliminar realmente a instância \"{name}\"?\n\nOs seguintes arquivos serão removidos:",
     "delete_total": "Total: {size}"
   },
-
   "wizard": {
     "title": "Criar Nova Instancia",
     "btn_back": "< Anterior",
@@ -872,7 +830,6 @@
     "create_error": "Nao foi possivel criar a instancia:\n{error}",
     "browse_folder_title": "Selecionar pasta"
   },
-
   "update": {
     "commits_available": "{count} novos commits disponíveis",
     "changelog_title": "Atualização disponível",
@@ -885,7 +842,6 @@
     "dirty_tree": "Alterações locais detetadas. Por favor, faça commit primeiro.",
     "pip_updated": "Dependências Python atualizadas"
   },
-
   "fomod": {
     "title": "Instalador FOMOD",
     "step_of": "Passo {current} de {total}: {name}",
@@ -901,7 +857,6 @@
     "no_image": "Nenhuma pré-visualização disponível",
     "validation_required": "Por favor, faz uma seleção no grupo \"{group}\"."
   },
-
   "plugin_creator": {
     "title": "Criar Plugin de Jogo",
     "game_info": "Informações do Jogo",
@@ -936,5 +891,46 @@
     "success_title": "Plugin Criado",
     "success_message": "Plugin de jogo criado:\n\n{path}\n\nReinicie o Anvil para carregar o plugin.",
     "restart_hint": "Reinicie o Anvil para carregar o novo plugin."
+  },
+  "script_merger": {
+    "title": "Script Merger — Witcher 3",
+    "info": "Scripts vanilla: {vanilla_dir}\nMods ativos: {active_count}",
+    "scan": "Verificar",
+    "auto_merge": "Auto-Merge",
+    "merge_all": "Mesclar todos",
+    "create_mod": "Criar mod de mesclagem",
+    "cleanup": "Limpar",
+    "ignore": "Ignorar",
+    "close": "Fechar",
+    "scanning": "Verificando mods... {current}/{total}",
+    "merging": "Mesclando... {current}/{total}",
+    "no_conflicts": "Nenhum conflito de scripts encontrado.",
+    "stale_merges": "{count} mesclagem(ns) desatualizada(s) (mods fonte alterados):\n{files}",
+    "detail_file": "Arquivo: {path}",
+    "detail_status": "Estado: {status}",
+    "detail_mods": "Mods envolvidos:",
+    "detail_mod_entry": "  {anvil_name} ({witcher_name})",
+    "detail_hunk": "    Hunk: linha {start}-{end} (vanilla: {vanilla_count} → mod: {mod_count})",
+    "detail_no_hunks": "    (sem blocos de diferenças)",
+    "detail_no_vanilla": "⚠ Sem correspondente vanilla — mesclagem manual necessária",
+    "detail_vanilla": "Vanilla: {path}",
+    "merge_error": "Erro durante a mesclagem: {error}",
+    "merge_failed": "Mesclagem falhou: {error}",
+    "merge_all_done": "{success} mesclados com sucesso, {failed} falharam.",
+    "write_error": "Erro ao escrever {path}: {error}",
+    "nothing_to_write": "Nenhum arquivo mesclado para escrever.",
+    "modlist_error": "Erro ao atualizar a lista de mods: {error}",
+    "mod_created": "Mod de mesclagem criado com {count} arquivo(s).",
+    "cleanup_title": "Limpar mesclagens",
+    "cleanup_confirm": "Excluir mod de mesclagem e inventário?\nOs mods originais permanecem inalterados.",
+    "cleanup_error": "Erro ao limpar: {error}",
+    "tooltip_status": "Estado: {status}",
+    "no_vanilla_dir": "Diretório de scripts vanilla não encontrado. O jogo está instalado?",
+    "kdiff3": "KDiff3",
+    "kdiff3_not_found": "KDiff3 não encontrado. Configure o caminho nas Configurações.",
+    "kdiff3_running": "KDiff3 em execução...",
+    "kdiff3_finished": "KDiff3 concluído. Resultado do merge aplicado.",
+    "kdiff3_no_output": "KDiff3 não produziu nenhum resultado.",
+    "kdiff3_too_many_mods": "Mais de 2 mods envolvidos. KDiff3 mostrará apenas Vanilla + os 2 primeiros mods."
   }
 }
