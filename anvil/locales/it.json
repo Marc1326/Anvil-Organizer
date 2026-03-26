@@ -188,6 +188,7 @@
 
     "uninstall_framework_title": "Disinstalla framework",
     "uninstall_framework_message": "Disinstallare davvero il framework \"{name}\"?\n\nI file associati verranno eliminati dalla directory del gioco.",
+    "uninstall_framework_warning": "ATTENZIONE: \"{name}\" è un framework critico!\n\nAltri mod dipendono da esso e possono crashare senza.\n\nIn caso di problemi, puoi reinstallarlo tramite clic destro → Reinstalla.\n\nDisinstallare comunque?",
     "not_a_framework_title": "Non è un framework",
     "not_a_framework_message": "I seguenti archivi non sono framework conosciuti e non sono stati installati:\n\n{names}",
 

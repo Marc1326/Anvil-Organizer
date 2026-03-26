@@ -4360,9 +4360,9 @@ class MainWindow(QMainWindow):
                 break
         if not fw_obj:
             return
-        reply = QMessageBox.question(
+        reply = QMessageBox.warning(
             self, tr("dialog.uninstall_framework_title"),
-            tr("dialog.uninstall_framework_message", name=fw_name),
+            tr("dialog.uninstall_framework_warning", name=fw_name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
