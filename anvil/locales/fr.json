@@ -12,6 +12,7 @@
     "manage_instances": "Gérer les instances...",
     "install_mod": "Installer un Mod...",
     "visit_nexus": "Ouvrir la page Nexus",
+    "create_plugin": "Créer un Plugin de Jeu...",
     "quit": "Quitter",
 
     "reload": "Recharger",
@@ -890,5 +891,35 @@
     "no_description": "Aucune description disponible.",
     "no_image": "Aucun aperçu disponible",
     "validation_required": "Veuillez faire une sélection dans le groupe \"{group}\"."
+  },
+
+  "plugin_creator": {
+    "title": "Créer un Plugin de Jeu",
+    "game_info": "Informations du Jeu",
+    "game_name": "Nom du Jeu",
+    "short_name": "Nom Court",
+    "binary": "EXE du Jeu",
+    "steam_id": "Steam ID",
+    "data_path": "Dossier de Mods",
+    "optional": "Paramètres Optionnels",
+    "documents": "Chemin Documents (Proton)",
+    "saves": "Chemin Sauvegardes (Proton)",
+    "save_ext": "Extension de Sauvegarde",
+    "nexus_game_id": "Nexus Game ID",
+    "frameworks": "Frameworks (optionnel)",
+    "fw_name": "Nom",
+    "fw_target": "Dossier Cible",
+    "fw_nexus_id": "Nexus ID",
+    "fw_detect": "Chemin de Détection",
+    "fw_add": "Ajouter",
+    "fw_remove": "Supprimer",
+    "create": "Créer",
+    "error_title": "Erreur",
+    "error_required": "Nom du Jeu, Nom Court, EXE et Steam ID sont obligatoires.",
+    "error_steam_id": "Steam ID doit être un nombre.",
+    "error_exists": "Le fichier plugin \"{name}\" existe déjà.",
+    "success_title": "Plugin Créé",
+    "success_message": "Plugin de jeu créé :\n\n{path}\n\nRedémarrez Anvil pour charger le plugin.",
+    "restart_hint": "Redémarrez Anvil pour charger le nouveau plugin."
   }
 }

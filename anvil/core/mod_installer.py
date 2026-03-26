@@ -56,6 +56,7 @@ class ModInstaller:
         "archive", "bin", "r6", "red4ext", "mods",
         "engine", "data", "pc", "dlc",
         "tools", "lml", "content",
+        "skse", "f4se", "sfse", "obse", "nvse",
     }
 
     @staticmethod

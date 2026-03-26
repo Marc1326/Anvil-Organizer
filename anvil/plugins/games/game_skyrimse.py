@@ -25,8 +25,6 @@ TODO (future):
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from anvil.plugins.base_game import BaseGame
 from anvil.plugins.framework_mod import FrameworkMod
 
@@ -34,7 +32,7 @@ from anvil.plugins.framework_mod import FrameworkMod
 class SkyrimSEGame(BaseGame):
     """Skyrim Special Edition support plugin."""
 
-    Tested = False
+    Tested = True
 
     # -- Plugin-Metadaten ---------------------------------------------------
 
@@ -66,6 +64,10 @@ class SkyrimSEGame(BaseGame):
         "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
         "Game:-Skyrim-Special-Edition"
     )
+
+    ProtonShimFiles: list[str] = ["winhttp.dll"]
+
+    ScriptExtenderDir = "SKSE"
 
     GameDirectInstallMods = [
         "SKSE64",
@@ -128,35 +130,6 @@ class SkyrimSEGame(BaseGame):
     _CK_BINARY = "CreationKit.exe"
     _CK_STEAM_ID = 1946180
 
-    # -- Ueberschriebene Methoden -------------------------------------------
-
-    def gameDocumentsDirectory(self) -> Path | None:
-        """Return the game's documents directory.
-
-        For Steam (Proton): derived from the Proton prefix.
-        For GOG: may be in a Wine prefix managed by Heroic/Lutris.
-        Returns None if no prefix is found.
-        """
-        prefix = self.protonPrefix()
-        if prefix is not None:
-            path = prefix / self._WIN_DOCUMENTS
-            if path.is_dir():
-                return path
-        return None
-
-    def gameSavesDirectory(self) -> Path | None:
-        """Return the save game directory.
-
-        For Steam (Proton): derived from the Proton prefix.
-        Returns None if no prefix is found.
-        """
-        prefix = self.protonPrefix()
-        if prefix is not None:
-            path = prefix / self._WIN_SAVES
-            if path.is_dir():
-                return path
-        return None
-
     # -- Skyrim SE-spezifische Pfade ----------------------------------------
 
     def plugins_txt_path(self) -> Path | None:
@@ -193,7 +166,7 @@ class SkyrimSEGame(BaseGame):
         return [
             FrameworkMod(
                 name="SKSE64",
-                pattern=["skse64_loader.exe", "skse64_*.dll"],
+                pattern=["skse64_loader.exe", "skse64_1_6_1170.dll"],
                 target="",
                 description="Skyrim Script Extender 64 — erweitert die Scripting-Engine",
                 detect_installed=["skse64_loader.exe"],
@@ -201,7 +174,7 @@ class SkyrimSEGame(BaseGame):
             ),
             FrameworkMod(
                 name="Address Library for SKSE Plugins",
-                pattern=["Data/SKSE/Plugins/versionlib*.bin"],
+                pattern=["SKSE/Plugins/versionlib*.bin", "Data/SKSE/Plugins/versionlib*.bin"],
                 target="Data",
                 description="Adressen-Datenbank fuer SKSE-Plugins (versions-unabhaengig)",
                 detect_installed=["Data/SKSE/Plugins/versionlib*.bin"],
@@ -243,6 +216,14 @@ class SkyrimSEGame(BaseGame):
                 description="Verteilt Spells, Perks und Items an NPCs",
                 detect_installed=["Data/SKSE/Plugins/SpellPerkItemDistributor.dll"],
                 required_by=["SPID-Patches"],
+            ),
+            FrameworkMod(
+                name="SKSE64 Proton Shim",
+                pattern=["winhttp.dll"],
+                target="",
+                description="Proxy-DLL — ermoeglicht SKSE64 unter Linux/Proton",
+                detect_installed=["winhttp.dll"],
+                required_by=["SKSE64"],
             ),
         ]
 
@@ -300,12 +281,9 @@ class SkyrimSEGame(BaseGame):
             {"name": "Skyrim SE Launcher", "binary": self.GameLauncher},
         ]
 
-        # Add SKSE64 if available
+        # SKSE64 injection is handled by the winhttp.dll Proton shim —
+        # skse64_loader.exe is not needed and would cause double injection.
         if self._game_path is not None:
-            skse = self._game_path / self._SKSE_BINARY
-            if skse.exists():
-                result.insert(0, {"name": "SKSE64", "binary": self._SKSE_BINARY})
-
             # Add Creation Kit if available
             ck = self._game_path / self._CK_BINARY
             if ck.exists():

@@ -371,6 +371,11 @@ class MainWindow(QMainWindow):
 
         fm.addSeparator()
 
+        act = fm.addAction(tr("menu.create_plugin"))
+        act.triggered.connect(self._on_create_plugin)
+
+        fm.addSeparator()
+
         act = fm.addAction(tr("menu.quit"))
         act.triggered.connect(self.close)
 
@@ -539,6 +544,16 @@ class MainWindow(QMainWindow):
         dlg.exec()
         if dlg.switched_to:
             self.switch_instance(dlg.switched_to)
+
+    def _on_create_plugin(self) -> None:
+        """Datei → Game Plugin erstellen..."""
+        from anvil.widgets.plugin_creator_dialog import PluginCreatorDialog
+        dlg = PluginCreatorDialog(self)
+        if dlg.exec() == PluginCreatorDialog.DialogCode.Accepted:
+            QMessageBox.information(
+                self, "Neustart",
+                tr("plugin_creator.restart_hint"),
+            )
 
     def _on_menu_visit_nexus(self) -> None:
         """Datei → Nexus besuchen."""

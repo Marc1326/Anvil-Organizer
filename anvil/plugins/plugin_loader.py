@@ -275,7 +275,21 @@ class PluginLoader:
 
                 try:
                     instance = cls()
-                    self._plugins.append(instance)
+                    # Duplikat-Check: User-Plugin ersetzt Built-in
+                    short = instance.GameShortName
+                    replaced = False
+                    for i, existing in enumerate(self._plugins):
+                        if existing.GameShortName == short:
+                            print(
+                                f"plugin_loader: {name} ({py_file.name}) "
+                                f"ersetzt {existing.__class__.__name__} "
+                                f"(gleicher GameShortName: {short})",
+                            )
+                            self._plugins[i] = instance
+                            replaced = True
+                            break
+                    if not replaced:
+                        self._plugins.append(instance)
                 except Exception as exc:
                     print(
                         f"plugin_loader: failed to instantiate {name}: {exc}",

@@ -12,6 +12,7 @@
     "manage_instances": "Instanzen verwalten...",
     "install_mod": "Mod installieren...",
     "visit_nexus": "Nexus-Seite öffnen",
+    "create_plugin": "Game Plugin erstellen...",
     "quit": "Beenden",
 
     "reload": "Neu laden",
@@ -890,5 +891,35 @@
     "no_description": "Keine Beschreibung verfügbar.",
     "no_image": "Keine Vorschau verfügbar",
     "validation_required": "Bitte eine Auswahl in der Gruppe \"{group}\" treffen."
+  },
+
+  "plugin_creator": {
+    "title": "Game Plugin erstellen",
+    "game_info": "Spiel-Informationen",
+    "game_name": "Spielname",
+    "short_name": "Kurzname",
+    "binary": "Game-EXE",
+    "steam_id": "Steam-ID",
+    "data_path": "Mod-Ordner",
+    "optional": "Optionale Einstellungen",
+    "documents": "Documents-Pfad (Proton)",
+    "saves": "Saves-Pfad (Proton)",
+    "save_ext": "Savegame-Endung",
+    "nexus_game_id": "Nexus Game-ID",
+    "frameworks": "Frameworks (optional)",
+    "fw_name": "Name",
+    "fw_target": "Ziel-Ordner",
+    "fw_nexus_id": "Nexus-ID",
+    "fw_detect": "Prüf-Pfad",
+    "fw_add": "Hinzufügen",
+    "fw_remove": "Entfernen",
+    "create": "Erstellen",
+    "error_title": "Fehler",
+    "error_required": "Spielname, Kurzname, Game-EXE und Steam-ID sind Pflichtfelder.",
+    "error_steam_id": "Steam-ID muss eine Zahl sein.",
+    "error_exists": "Plugin-Datei \"{name}\" existiert bereits.",
+    "success_title": "Plugin erstellt",
+    "success_message": "Game Plugin wurde erstellt:\n\n{path}\n\nStarte Anvil neu um das Plugin zu laden.",
+    "restart_hint": "Starte Anvil neu um das neue Plugin zu laden."
   }
 }
