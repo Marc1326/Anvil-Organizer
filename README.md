@@ -8,6 +8,9 @@ MO2 dominates on Windows — Anvil fills the gap on Linux.
 ![Qt](https://img.shields.io/badge/GUI-PySide6%20(Qt6)-green)
 ![License](https://img.shields.io/badge/License-GPL--3.0-orange)
 ![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey)
+![GitHub stars](https://img.shields.io/github/stars/Marc1326/Anvil-Organizer)
+![GitHub Downloads](https://img.shields.io/github/downloads/Marc1326/Anvil-Organizer/total)
+![Latest Release](https://img.shields.io/github/v/release/Marc1326/Anvil-Organizer)
 
 > ⚠️ **Early Development** — Anvil Organizer is under active development. Expect bugs and breaking changes. Feedback and bug reports are welcome!
 
