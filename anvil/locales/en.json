@@ -108,7 +108,10 @@
     "rename_group": "Rename Group...",
     "add_to_group": "Add to Group",
     "remove_from_group": "Remove from Group",
-    "group_color": "Change Group Color..."
+    "group_color": "Change Group Color...",
+
+    "set_deploy_path": "Set deploy path...",
+    "reset_deploy_path": "Reset deploy path"
   },
 
   "toolbar": {
@@ -163,6 +166,10 @@
     "create_separator_title": "Create Separator",
     "create_separator_prompt": "Separator name:",
     "separator_exists": "A separator named \"{name}\" already exists.",
+
+    "deploy_path_title": "Choose deploy path",
+    "deploy_path_set": "Deploy path for '{name}' set: {path}",
+    "deploy_path_reset": "Deploy path for '{name}' reset.",
 
     "create_group_title": "Create Group",
     "create_group_prompt": "Name for new group:",

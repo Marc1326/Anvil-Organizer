@@ -349,6 +349,7 @@ class GamePanel(QWidget):
         self._instance_path: Path | None = None
         self._current_profile_name: str = "Default"
         self._deployer: ModDeployer | None = None
+        self._separator_deploy_paths: dict[str, str] = {}
         # Map row index → archive Path for installation
         self._dl_archives: list[Path] = []
         # Hidden downloads toggle (MO2: showHidden)
@@ -426,7 +427,7 @@ class GamePanel(QWidget):
         ba2_packing = getattr(game_plugin, "NeedsBa2Packing", False) if game_plugin else False
         copy_paths = getattr(game_plugin, "GameCopyDeployPaths", []) if game_plugin else []
         if self._instance_path and game_path:
-            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths)
+            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, separator_deploy_paths=self._separator_deploy_paths)
 
         # Update label
         self._game_label.setText(game_name or tr("game_panel.no_game_selected"))
@@ -596,6 +597,20 @@ class GamePanel(QWidget):
         mods_path = getattr(self, "_mods_path", None)
         if mods_path and mods_path.is_dir():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(mods_path)))
+
+    # ── Separator deploy paths ────────────────────────────────────────
+
+    def set_separator_deploy_paths(self, paths: dict[str, str]) -> None:
+        """Set custom deploy paths per separator.
+
+        Args:
+            paths: Mapping of separator folder names to deploy paths.
+                   Empty paths are ignored (fallback to game path).
+        """
+        self._separator_deploy_paths = {k: v for k, v in paths.items() if v}
+        # Update deployer if already initialized
+        if self._deployer is not None:
+            self._deployer._separator_deploy_paths = self._separator_deploy_paths
 
     # ── Silent deploy / purge (called from MainWindow) ──────────────
 
@@ -1347,7 +1362,7 @@ class GamePanel(QWidget):
         ba2_packing = getattr(self._current_plugin, "NeedsBa2Packing", False) if self._current_plugin else False
         copy_paths = getattr(self._current_plugin, "GameCopyDeployPaths", []) if self._current_plugin else []
         if self._current_game_path and instance_path:
-            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths)
+            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, separator_deploy_paths=self._separator_deploy_paths)
         else:
             self._deployer = None
 

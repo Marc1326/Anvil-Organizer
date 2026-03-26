@@ -43,9 +43,9 @@ ROLE_IS_GROUP_HEAD = Qt.ItemDataRole.UserRole + 7 # True if mod is the first mem
 
 
 class ModRow:
-    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name", "color", "file_count", "is_locked", "group_name", "is_group_head")
+    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name", "color", "file_count", "is_locked", "group_name", "is_group_head", "deploy_path")
 
-    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name="", color="", file_count=0, is_locked=False, group_name="", is_group_head=False):
+    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name="", color="", file_count=0, is_locked=False, group_name="", is_group_head=False, deploy_path=""):
         self.enabled = enabled
         self.name = name
         self.conflicts = conflicts
@@ -62,6 +62,7 @@ class ModRow:
         self.is_locked = is_locked
         self.group_name = group_name
         self.is_group_head = is_group_head
+        self.deploy_path = deploy_path
 
 
 def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_manager=None) -> ModRow:
@@ -101,6 +102,7 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_m
         is_locked=getattr(entry, "is_locked", False),
         group_name=group_name,
         is_group_head=is_group_head,
+        deploy_path=getattr(entry, "deploy_path", ""),
     )
 
 
@@ -339,6 +341,9 @@ class ModListModel(QAbstractItemModel):
                         return tr("tooltip.conflict_both", wins=wins, losses=losses)
             if r.is_framework and c == COL_NAME:
                 return tr("tooltip.direct_install")
+            # Separator with custom deploy path shows path as tooltip
+            if r.is_separator and c == COL_NAME and getattr(r, "deploy_path", ""):
+                return f"Deploy \u2192 {r.deploy_path}"
         if role == Qt.ItemDataRole.BackgroundRole:
             row_idx = index.row()
             # Conflict highlighting (highest priority for temp highlights)

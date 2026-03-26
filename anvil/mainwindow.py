@@ -1068,6 +1068,7 @@ class MainWindow(QMainWindow):
         _dlog(f"[APPLY-INSTANCE] Plugin: {getattr(plugin, 'GameName', None)}")
         _dlog(f"[APPLY-INSTANCE] Game path: {game_path}")
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
+        self._sync_separator_deploy_paths()
         self._game_panel.silent_deploy()
 
         # Framework detection (nach Deploy, damit Shims vorhanden sind)
@@ -1141,6 +1142,14 @@ class MainWindow(QMainWindow):
                 if entry.name == folder:
                     return entry
         return None
+
+    def _sync_separator_deploy_paths(self) -> None:
+        """Extract custom deploy paths from separator ModEntries and sync to GamePanel."""
+        paths: dict[str, str] = {}
+        for entry in self._current_mod_entries:
+            if entry.is_separator and entry.deploy_path:
+                paths[entry.name] = entry.deploy_path
+        self._game_panel.set_separator_deploy_paths(paths)
 
     # ── Mod list persistence ─────────────────────────────────────────
 
@@ -1368,6 +1377,7 @@ class MainWindow(QMainWindow):
         print("[PURGE] Auto-redeploy: purging current deployment", flush=True)
         self._game_panel.silent_purge()
         print("[DEPLOY] Auto-redeploy: deploying mods (fast, no BA2)", flush=True)
+        self._sync_separator_deploy_paths()
         self._game_panel.silent_deploy_fast()
         self.statusBar().showMessage(tr("status.deployed"), 3000)
 
@@ -1488,6 +1498,7 @@ class MainWindow(QMainWindow):
             print("[PURGE] Pre-launch purge", flush=True)
             self._game_panel.silent_purge()
             print("[DEPLOY] Pre-launch full deploy (with BA2)", flush=True)
+            self._sync_separator_deploy_paths()
             self._game_panel.silent_deploy()
         from PySide6.QtCore import QProcess
         success, pid = QProcess.startDetached(binary_path, [], working_dir)
@@ -2307,6 +2318,8 @@ class MainWindow(QMainWindow):
         # ── Separator-Farbe ──────────────────────────────────────
         act_select_color = None
         act_reset_color = None
+        act_set_deploy_path = None
+        act_reset_deploy_path = None
         _sep_entry = None
         if single and _ctx_entry:
             _sep_entry = _ctx_entry
@@ -2315,6 +2328,10 @@ class MainWindow(QMainWindow):
                 act_select_color = menu.addAction(tr("context.select_color"))
                 if _sep_entry.color:
                     act_reset_color = menu.addAction(tr("context.reset_color"))
+                menu.addSeparator()
+                act_set_deploy_path = menu.addAction(tr("context.set_deploy_path"))
+                if _sep_entry.deploy_path:
+                    act_reset_deploy_path = menu.addAction(tr("context.reset_deploy_path"))
 
         # ── Execute ───────────────────────────────────────────────
         chosen = menu.exec(global_pos)
@@ -2379,6 +2396,10 @@ class MainWindow(QMainWindow):
             self._ctx_select_separator_color(selected_rows[0])
         elif chosen is not None and chosen == act_reset_color and act_reset_color:
             self._ctx_reset_separator_color(selected_rows[0])
+        elif chosen is not None and chosen == act_set_deploy_path and act_set_deploy_path:
+            self._ctx_set_deploy_path(selected_rows[0])
+        elif chosen is not None and chosen == act_reset_deploy_path and act_reset_deploy_path:
+            self._ctx_reset_deploy_path(selected_rows[0])
         elif act_create_group is not None and chosen == act_create_group:
             self._ctx_create_group(selected_rows)
         elif act_dissolve_group is not None and chosen == act_dissolve_group:
@@ -2496,6 +2517,82 @@ class MainWindow(QMainWindow):
             )
         # Repaint scrollbar
         self._mod_list_view._tree.verticalScrollBar().update()
+
+    # ── Deploy path context menu actions ─────────────────────────────
+
+    def _ctx_set_deploy_path(self, source_row: int) -> None:
+        """Open QFileDialog for separator and save chosen deploy path."""
+        if source_row >= len(self._current_mod_entries):
+            return
+        entry = self._entry_for_row(source_row)
+        if entry is None or not entry.is_separator:
+            return
+
+        chosen_path = QFileDialog.getExistingDirectory(
+            self,
+            tr("dialog.deploy_path_title"),
+            entry.deploy_path or str(Path.home()),
+        )
+        if not chosen_path:
+            return  # User cancelled
+
+        # Persist to meta.ini
+        from anvil.core.mod_metadata import write_meta_ini
+        write_meta_ini(entry.install_path, {"deploy_path": chosen_path})
+
+        # Update in-memory data
+        entry.deploy_path = chosen_path
+
+        # Update ModRow tooltip in model
+        model = self._mod_list_view.source_model()
+        rows = model._rows
+        if source_row < len(rows):
+            rows[source_row].deploy_path = chosen_path
+            model.dataChanged.emit(
+                model.index(source_row, 0),
+                model.index(source_row, COL_COUNT - 1),
+                [Qt.ItemDataRole.ToolTipRole],
+            )
+
+        # Log
+        sep_name = entry.display_name or entry.name
+        self._log_panel.add_log(
+            "info",
+            tr("dialog.deploy_path_set", name=sep_name, path=chosen_path),
+        )
+
+    def _ctx_reset_deploy_path(self, source_row: int) -> None:
+        """Remove custom deploy path from separator."""
+        if source_row >= len(self._current_mod_entries):
+            return
+        entry = self._entry_for_row(source_row)
+        if entry is None or not entry.is_separator:
+            return
+
+        # Persist empty deploy_path to meta.ini
+        from anvil.core.mod_metadata import write_meta_ini
+        write_meta_ini(entry.install_path, {"deploy_path": ""})
+
+        # Update in-memory data
+        entry.deploy_path = ""
+
+        # Update ModRow tooltip in model
+        model = self._mod_list_view.source_model()
+        rows = model._rows
+        if source_row < len(rows):
+            rows[source_row].deploy_path = ""
+            model.dataChanged.emit(
+                model.index(source_row, 0),
+                model.index(source_row, COL_COUNT - 1),
+                [Qt.ItemDataRole.ToolTipRole],
+            )
+
+        # Log
+        sep_name = entry.display_name or entry.name
+        self._log_panel.add_log(
+            "info",
+            tr("dialog.deploy_path_reset", name=sep_name),
+        )
 
     # ── Group context menu actions ──────────────────────────────────
 
@@ -3039,6 +3136,7 @@ class MainWindow(QMainWindow):
         self._redeploy_timer.stop()
         self._game_panel.silent_purge()
         self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
+        self._sync_separator_deploy_paths()
         self._game_panel.silent_deploy()
 
     def _apply_active_state(self, active_mods: set[str]) -> None:

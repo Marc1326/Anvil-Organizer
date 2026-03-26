@@ -108,7 +108,10 @@
     "rename_group": "Renomear grupo...",
     "add_to_group": "Adicionar ao grupo",
     "remove_from_group": "Remover do grupo",
-    "group_color": "Alterar cor do grupo..."
+    "group_color": "Alterar cor do grupo...",
+
+    "set_deploy_path": "Definir caminho de deploy...",
+    "reset_deploy_path": "Redefinir caminho de deploy"
   },
 
   "toolbar": {
@@ -163,6 +166,10 @@
     "create_separator_title": "Criar separador",
     "create_separator_prompt": "Nome do separador:",
     "separator_exists": "Já existe um separador com o nome \"{name}\".",
+
+    "deploy_path_title": "Escolher caminho de deploy",
+    "deploy_path_set": "Caminho de deploy para '{name}' definido: {path}",
+    "deploy_path_reset": "Caminho de deploy para '{name}' redefinido.",
 
     "create_group_title": "Criar grupo",
     "create_group_prompt": "Nome do novo grupo:",

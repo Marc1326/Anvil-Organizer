@@ -108,7 +108,10 @@
     "rename_group": "Gruppe umbenennen...",
     "add_to_group": "Zur Gruppe hinzufügen",
     "remove_from_group": "Aus Gruppe entfernen",
-    "group_color": "Gruppenfarbe ändern..."
+    "group_color": "Gruppenfarbe ändern...",
+
+    "set_deploy_path": "Deploy-Pfad setzen...",
+    "reset_deploy_path": "Deploy-Pfad zurücksetzen"
   },
 
   "toolbar": {
@@ -163,6 +166,10 @@
     "create_separator_title": "Trenner erstellen",
     "create_separator_prompt": "Name des Trenners:",
     "separator_exists": "Ein Trenner mit dem Namen \"{name}\" existiert bereits.",
+
+    "deploy_path_title": "Deploy-Pfad wählen",
+    "deploy_path_set": "Deploy-Pfad für '{name}' gesetzt: {path}",
+    "deploy_path_reset": "Deploy-Pfad für '{name}' zurückgesetzt.",
 
     "create_group_title": "Gruppe erstellen",
     "create_group_prompt": "Name der neuen Gruppe:",
