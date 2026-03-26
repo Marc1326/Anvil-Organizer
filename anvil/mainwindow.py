@@ -546,9 +546,13 @@ class MainWindow(QMainWindow):
             self.switch_instance(dlg.switched_to)
 
     def _on_create_plugin(self) -> None:
-        """Datei → Game Plugin erstellen..."""
+        """Datei → Game Plugin erstellen / bearbeiten..."""
         from anvil.widgets.plugin_creator_dialog import PluginCreatorDialog
-        dlg = PluginCreatorDialog(self)
+        dlg = PluginCreatorDialog(
+            self,
+            plugin=self._current_plugin,
+            icon_manager=self._game_panel._icon_manager if self._game_panel else None,
+        )
         if dlg.exec() == PluginCreatorDialog.DialogCode.Accepted:
             QMessageBox.information(
                 self, "Neustart",
