@@ -97,7 +97,11 @@
 
     "select_color": "Изменить цвет...",
     "reset_color": "Сбросить цвет",
-    "nexus_query": "Запросить информацию Nexus"
+    "nexus_query": "\u0417\u0430\u043f\u0440\u043e\u0441\u0438\u0442\u044c \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044e Nexus",
+
+    "lock_mod": "\u0417\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043c\u043e\u0434",
+    "unlock_mod": "\u0420\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043c\u043e\u0434",
+    "toggle_lock": "\u041f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0443"
   },
 
   "toolbar": {
@@ -139,7 +143,8 @@
 
     "info_title": "Информация: {name}",
 
-    "remove_mod_title": "Удалить мод",
+    "remove_locked_warning": "\u0412\u043d\u0438\u043c\u0430\u043d\u0438\u0435: {count} \u043c\u043e\u0434(\u043e\u0432) \u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d\u044b!",
+    "remove_mod_title": "\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043c\u043e\u0434",
     "remove_mod_single": "Действительно удалить мод \"{name}\"?\n\nПапка мода будет безвозвратно удалена.",
     "remove_mod_multi": "Действительно удалить {count} модов?\n\n{list}\n\nПапки модов будут безвозвратно удалены.",
 
@@ -435,8 +440,10 @@
     "separator_created": "Разделитель создан: {name}",
     "separators_collapsed": "Все разделители свёрнуты ({count})",
     "separators_expanded": "Все разделители развёрнуты",
-    "renamed": "Переименовано: {old} → {new}",
-    "removed": "Удалено: {names}",
+    "renamed": "\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u043e: {old} \u2192 {new}",
+    "removed": "\u0423\u0434\u0430\u043b\u0435\u043d\u043e: {names}",
+    "mod_locked": "\u041c\u043e\u0434 \u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d: {name}",
+    "mod_unlocked": "\u041c\u043e\u0434 \u0440\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d: {name}",
     "uninstalled": "Удалено: {name}",
     "uninstall_failed": "Удаление не удалось",
     "data_override_uninstalled": "Data-Override удалён: {name}",
@@ -567,8 +574,9 @@
     "prop_has_notes": "Есть заметки",
     "prop_has_category": "Есть категория",
     "prop_no_category": "Без категории",
-    "prop_conflict_win": "Конфликты (победитель)",
-    "prop_conflict_lose": "Конфликты (проигравший)"
+    "prop_conflict_win": "\u041a\u043e\u043d\u0444\u043b\u0438\u043a\u0442\u044b (\u043f\u043e\u0431\u0435\u0434\u0438\u0442\u0435\u043b\u044c)",
+    "prop_conflict_lose": "\u041a\u043e\u043d\u0444\u043b\u0438\u043a\u0442\u044b (\u043f\u0440\u043e\u0438\u0433\u0440\u0430\u0432\u0448\u0438\u0439)",
+    "prop_locked": "\u0417\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d\u043e"
   },
 
   "category": {

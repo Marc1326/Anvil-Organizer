@@ -61,6 +61,7 @@ from anvil.core.mod_list_io import (
     rename_mod_in_modlist, read_active_mods, write_active_mods,
     read_global_modlist, write_global_modlist, migrate_to_global_modlist,
     migrate_modlist_order, insert_mod_in_modlist, rename_mod_globally, remove_mod_globally,
+    read_locked_mods, write_locked_mods,
 )
 from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
 from anvil.version import APP_VERSION
@@ -1124,6 +1125,7 @@ class MainWindow(QMainWindow):
 
         - Global modlist.txt in .profiles/ contains load order only
         - Profile-specific active_mods.json contains enabled mod names
+        - Locked mods are always included in active_mods
         """
         if self._current_profile_path is None or self._current_instance_path is None:
             return
@@ -1134,8 +1136,11 @@ class MainWindow(QMainWindow):
         mod_names = [e.name for e in self._current_mod_entries]
         write_global_modlist(profiles_dir, mod_names)
 
-        # 2. Write active mods to current profile
+        # 2. Write active mods to current profile (locked mods always included)
         active_mods = {e.name for e in self._current_mod_entries if e.enabled}
+        # Guard: ensure locked mods are always in active set
+        locked = read_locked_mods(profiles_dir)
+        active_mods |= {name for name in locked if any(e.name == name for e in self._current_mod_entries)}
         write_active_mods(self._current_profile_path, active_mods)
 
     def _on_mod_toggled(self, row: int, enabled: bool) -> None:
@@ -1144,6 +1149,10 @@ class MainWindow(QMainWindow):
         if not (0 <= row < len(model._rows)):
             return
         row_data = model._rows[row]
+
+        # Guard: locked mods cannot be toggled
+        if row_data.is_locked:
+            return
 
         # ── BG3-Weiche: über Installer aktivieren/deaktivieren ──
         if self._bg3_installer is not None:
@@ -2070,6 +2079,30 @@ class MainWindow(QMainWindow):
         act_enable.setEnabled(has_selection)
         act_disable = menu.addAction(tr("context.disable_selected"))
         act_disable.setEnabled(has_selection)
+
+        # ── Mod sperren/entsperren ───────────────────────────────
+        act_lock = None
+        # Only show lock option if selection has no separators
+        has_separator_in_selection = False
+        if has_selection:
+            model = self._mod_list_view.source_model()
+            for row in selected_rows:
+                if 0 <= row < len(model._rows) and model._rows[row].is_separator:
+                    has_separator_in_selection = True
+                    break
+
+        if has_selection and not has_separator_in_selection:
+            # Determine lock label based on current state
+            if single:
+                entry = self._entry_for_row(selected_rows[0])
+                if entry and getattr(entry, "is_locked", False):
+                    lock_label = tr("context.unlock_mod")
+                else:
+                    lock_label = tr("context.lock_mod")
+            else:
+                lock_label = tr("context.toggle_lock")
+            act_lock = menu.addAction(lock_label)
+
         menu.addSeparator()
 
         # ── Senden / Mod-Aktionen ────────────────────────────────
@@ -2164,6 +2197,8 @@ class MainWindow(QMainWindow):
             self._ctx_enable_selected(selected_rows, True)
         elif chosen == act_disable:
             self._ctx_enable_selected(selected_rows, False)
+        elif act_lock is not None and chosen == act_lock:
+            self._ctx_lock_mods(selected_rows)
         elif chosen == act_rename:
             self._ctx_rename_mod(selected_rows[0])
         elif chosen == act_reinstall:
@@ -2673,13 +2708,19 @@ class MainWindow(QMainWindow):
         Args:
             active_mods: Set of mod names that should be enabled.
         """
-        # Update internal entries
+        # Update internal entries (locked mods stay enabled)
         for entry in self._current_mod_entries:
-            entry.enabled = entry.name in active_mods
+            if getattr(entry, "is_locked", False):
+                entry.enabled = True
+            else:
+                entry.enabled = entry.name in active_mods
 
         # Update model rows to reflect new state
         model = self._mod_list_view.source_model()
         for i, row_data in enumerate(model._rows):
+            if row_data.is_locked:
+                row_data.enabled = True
+                continue
             folder = row_data.folder_name
             new_enabled = folder in active_mods
             if row_data.enabled != new_enabled:
@@ -2884,11 +2925,14 @@ class MainWindow(QMainWindow):
             )
 
     def _ctx_enable_selected(self, rows: list[int], enabled: bool) -> None:
-        """Enable or disable selected mods."""
+        """Enable or disable selected mods (locked mods are skipped)."""
         model = self._mod_list_view.source_model()
         for row in rows:
+            # Guard: skip locked mods
+            if 0 <= row < len(model._rows) and model._rows[row].is_locked:
+                continue
             entry = self._entry_for_row(row)
-            if entry:
+            if entry and not getattr(entry, "is_locked", False):
                 entry.enabled = enabled
             if 0 <= row < len(model._rows):
                 model._rows[row].enabled = enabled
@@ -2896,6 +2940,53 @@ class MainWindow(QMainWindow):
             model.index(0, 0),
             model.index(model.rowCount() - 1, 0),
             [Qt.ItemDataRole.CheckStateRole],
+        )
+        self._write_current_modlist()
+        self._update_active_count()
+        self._schedule_redeploy()
+
+    def _ctx_lock_mods(self, rows: list[int]) -> None:
+        """Toggle lock state for selected mods."""
+        if not self._current_instance_path:
+            return
+
+        profiles_dir = self._current_instance_path / ".profiles"
+        locked = read_locked_mods(profiles_dir)
+        model = self._mod_list_view.source_model()
+
+        for row in rows:
+            entry = self._entry_for_row(row)
+            if not entry or entry.is_separator:
+                continue
+            name = entry.name
+
+            if name in locked:
+                # Unlock
+                locked.discard(name)
+                entry.is_locked = False
+                if 0 <= row < len(model._rows):
+                    model._rows[row].is_locked = False
+                self.statusBar().showMessage(
+                    tr("status.mod_unlocked", name=entry.display_name or name), 3000,
+                )
+            else:
+                # Lock
+                locked.add(name)
+                entry.is_locked = True
+                entry.enabled = True  # Locked mods are always enabled
+                if 0 <= row < len(model._rows):
+                    model._rows[row].is_locked = True
+                    model._rows[row].enabled = True
+                self.statusBar().showMessage(
+                    tr("status.mod_locked", name=entry.display_name or name), 3000,
+                )
+
+        write_locked_mods(profiles_dir, locked)
+
+        # Refresh view
+        model.dataChanged.emit(
+            model.index(0, 0),
+            model.index(model.rowCount() - 1, model.columnCount() - 1),
         )
         self._write_current_modlist()
         self._update_active_count()
@@ -3407,25 +3498,42 @@ class MainWindow(QMainWindow):
     def _ctx_remove_mods(self, rows: list[int]) -> None:
         """Remove selected mods (folder + modlist.txt entry)."""
         names = []
+        locked_names = []
         for row in rows:
             entry = self._entry_for_row(row)
             if entry:
                 names.append(entry.name)
+                if getattr(entry, "is_locked", False):
+                    locked_names.append(entry.display_name or entry.name)
         if not names:
             return
 
-        if len(names) == 1:
-            msg = tr("dialog.remove_mod_single", name=names[0])
+        # Extra warning if any locked mods are in the selection
+        if locked_names:
+            locked_warning = tr("dialog.remove_locked_warning", count=len(locked_names))
+            locked_list = "\n".join(f"  • {n}" for n in locked_names)
+            reply = QMessageBox.warning(
+                self, tr("dialog.remove_mod_title"),
+                f"{locked_warning}\n\n{locked_list}\n\n"
+                + tr("dialog.remove_mod_multi", count=len(names),
+                     list="\n".join(f"  • {n}" for n in names)),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
         else:
-            names_list = "\n".join(f"  • {n}" for n in names)
-            msg = tr("dialog.remove_mod_multi", count=len(names), list=names_list)
+            if len(names) == 1:
+                msg = tr("dialog.remove_mod_single", name=names[0])
+            else:
+                names_list = "\n".join(f"  • {n}" for n in names)
+                msg = tr("dialog.remove_mod_multi", count=len(names), list=names_list)
 
-        reply = QMessageBox.question(
-            self, tr("dialog.remove_mod_title"), msg,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
+            reply = QMessageBox.question(
+                self, tr("dialog.remove_mod_title"), msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
 
         profiles_dir = self._current_instance_path / ".profiles"
         for name in names:

@@ -97,7 +97,11 @@
 
     "select_color": "Cambiar color...",
     "reset_color": "Eliminar color",
-    "nexus_query": "Consultar info de Nexus"
+    "nexus_query": "Consultar info de Nexus",
+
+    "lock_mod": "Bloquear mod",
+    "unlock_mod": "Desbloquear mod",
+    "toggle_lock": "Alternar bloqueo"
   },
 
   "toolbar": {
@@ -139,6 +143,7 @@
 
     "info_title": "Información: {name}",
 
+    "remove_locked_warning": "Atenci\u00f3n: {count} mod(s) est\u00e1n bloqueados!",
     "remove_mod_title": "Eliminar Mod",
     "remove_mod_single": "¿Eliminar realmente el Mod \"{name}\"?\n\nLa carpeta del Mod se eliminará permanentemente.",
     "remove_mod_multi": "¿Eliminar realmente {count} Mods?\n\n{list}\n\nLas carpetas de los Mods se eliminarán permanentemente.",
@@ -437,6 +442,8 @@
     "separators_expanded": "Todos los separadores expandidos",
     "renamed": "Renombrado: {old} → {new}",
     "removed": "Eliminado: {names}",
+    "mod_locked": "Mod bloqueado: {name}",
+    "mod_unlocked": "Mod desbloqueado: {name}",
     "uninstalled": "Desinstalado: {name}",
     "uninstall_failed": "Desinstalación fallida",
     "data_override_uninstalled": "Data-Override desinstalado: {name}",
@@ -568,7 +575,8 @@
     "prop_has_category": "Tiene categoría",
     "prop_no_category": "Sin categoría",
     "prop_conflict_win": "Conflictos (ganador)",
-    "prop_conflict_lose": "Conflictos (perdedor)"
+    "prop_conflict_lose": "Conflictos (perdedor)",
+    "prop_locked": "Bloqueado"
   },
 
   "category": {

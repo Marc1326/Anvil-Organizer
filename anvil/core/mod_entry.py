@@ -19,6 +19,7 @@ from pathlib import Path
 from anvil.core.mod_list_io import (
     read_active_mods,
     read_global_modlist,
+    read_locked_mods,
     read_modlist,
 )
 from anvil.core.mod_metadata import read_meta_ini
@@ -48,6 +49,7 @@ class ModEntry:
     # Special types
     is_separator: bool = False             # True for _separator dirs
     is_direct_install: bool = False        # True for framework mods (copy, not symlink)
+    is_locked: bool = False                # True for locked mods (always enabled)
 
     # Separator color (from meta.ini, MO2-compatible)
     color: str = ""                        # Hex color e.g. "#FF0000", empty = no custom color
@@ -195,7 +197,10 @@ def scan_mods_directory(
         active_mods = {name for name, enabled in legacy if enabled}
         use_global = False
 
-    # 2. Discover actual mod folders on disk
+    # 2. Read locked mods
+    locked_mods = read_locked_mods(profiles_dir)
+
+    # 3. Discover actual mod folders on disk
     on_disk: set[str] = set()
     if mods_dir.is_dir():
         try:
@@ -208,7 +213,7 @@ def scan_mods_directory(
                 file=sys.stderr,
             )
 
-    # 3. Build entries from modlist order (skip missing)
+    # 4. Build entries from modlist order (skip missing)
     result: list[ModEntry] = []
     seen: set[str] = set()
     priority = 0
@@ -218,16 +223,25 @@ def scan_mods_directory(
             continue  # deleted from disk
         seen.add(name)
         enabled = name in active_mods
-        result.append(_build_entry(name, enabled, priority, mods_dir))
+        entry = _build_entry(name, enabled, priority, mods_dir)
+        # Apply lock state: locked mods are always enabled
+        if name in locked_mods:
+            entry.is_locked = True
+            entry.enabled = True
+        result.append(entry)
         priority += 1
 
-    # 4. Append new mods (on disk but not in modlist)
+    # 5. Append new mods (on disk but not in modlist)
     # New mods default to enabled
     # When include_external=False, skip mods not listed in modlist.txt
     if include_external:
         new_mods = sorted(on_disk - seen)
         for name in new_mods:
-            result.append(_build_entry(name, True, priority, mods_dir))
+            entry = _build_entry(name, True, priority, mods_dir)
+            if name in locked_mods:
+                entry.is_locked = True
+                entry.enabled = True
+            result.append(entry)
             priority += 1
 
     return result

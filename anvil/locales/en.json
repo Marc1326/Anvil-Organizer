@@ -97,7 +97,11 @@
 
     "select_color": "Select Color...",
     "reset_color": "Reset Color",
-    "nexus_query": "Query Nexus Info"
+    "nexus_query": "Query Nexus Info",
+
+    "lock_mod": "Lock Mod",
+    "unlock_mod": "Unlock Mod",
+    "toggle_lock": "Toggle Lock"
   },
 
   "toolbar": {
@@ -139,6 +143,7 @@
 
     "info_title": "Information: {name}",
 
+    "remove_locked_warning": "Warning: {count} mod(s) are locked!",
     "remove_mod_title": "Remove Mod",
     "remove_mod_single": "Really delete mod \"{name}\"?\n\nThe mod folder will be permanently deleted.",
     "remove_mod_multi": "Really delete {count} mods?\n\n{list}\n\nThe mod folders will be permanently deleted.",
@@ -437,6 +442,8 @@
     "separators_expanded": "All separators expanded",
     "renamed": "Renamed: {old} → {new}",
     "removed": "Removed: {names}",
+    "mod_locked": "Mod locked: {name}",
+    "mod_unlocked": "Mod unlocked: {name}",
     "uninstalled": "Uninstalled: {name}",
     "uninstall_failed": "Uninstall failed",
     "data_override_uninstalled": "Data override uninstalled: {name}",
@@ -568,7 +575,8 @@
     "prop_has_category": "Has Category",
     "prop_no_category": "No Category",
     "prop_conflict_win": "Conflicts (Winner)",
-    "prop_conflict_lose": "Conflicts (Loser)"
+    "prop_conflict_lose": "Conflicts (Loser)",
+    "prop_locked": "Locked"
   },
 
   "category": {

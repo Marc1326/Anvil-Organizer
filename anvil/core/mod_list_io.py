@@ -391,6 +391,61 @@ def migrate_modlist_order(profiles_dir: Path) -> bool:
     return True
 
 
+# ─────────────────────────────────────────────────────────────────────
+# Locked mods (locked_mods.json)
+# ─────────────────────────────────────────────────────────────────────
+
+def read_locked_mods(profiles_dir: Path) -> set[str]:
+    """Read ``locked_mods.json`` from the .profiles directory.
+
+    Args:
+        profiles_dir: Path to the .profiles directory.
+
+    Returns:
+        Set of mod names that are locked.
+        Empty set if file doesn't exist.
+    """
+    json_file = profiles_dir / "locked_mods.json"
+    if not json_file.is_file():
+        return set()
+
+    try:
+        text = json_file.read_text(encoding="utf-8")
+        data = json.loads(text)
+        if isinstance(data, list):
+            return set(data)
+        return set()
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"mod_list_io: failed to read {json_file}: {exc}",
+            file=sys.stderr,
+        )
+        return set()
+
+
+def write_locked_mods(profiles_dir: Path, locked_mods: set[str]) -> None:
+    """Write ``locked_mods.json`` to the .profiles directory.
+
+    Args:
+        profiles_dir: Path to the .profiles directory.
+        locked_mods: Set of mod names that are locked.
+    """
+    json_file = profiles_dir / "locked_mods.json"
+
+    try:
+        profiles_dir.mkdir(parents=True, exist_ok=True)
+        # Sort for consistent output
+        json_file.write_text(
+            json.dumps(sorted(locked_mods), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        print(
+            f"mod_list_io: failed to write {json_file}: {exc}",
+            file=sys.stderr,
+        )
+
+
 def rename_mod_globally(
     profiles_dir: Path, old_name: str, new_name: str,
 ) -> None:
@@ -418,6 +473,13 @@ def rename_mod_globally(
             active.add(new_name)
             write_active_mods(profile_dir, active)
 
+    # 3. Update locked_mods.json
+    locked = read_locked_mods(profiles_dir)
+    if old_name in locked:
+        locked.discard(old_name)
+        locked.add(new_name)
+        write_locked_mods(profiles_dir, locked)
+
 
 def remove_mod_globally(profiles_dir: Path, mod_name: str) -> None:
     """Remove a mod from global modlist.txt and active_mods.json in ALL profiles.
@@ -442,6 +504,12 @@ def remove_mod_globally(profiles_dir: Path, mod_name: str) -> None:
         if mod_name in active:
             active.discard(mod_name)
             write_active_mods(profile_dir, active)
+
+    # 3. Update locked_mods.json
+    locked = read_locked_mods(profiles_dir)
+    if mod_name in locked:
+        locked.discard(mod_name)
+        write_locked_mods(profiles_dir, locked)
 
 
 def migrate_to_global_modlist(profiles_dir: Path) -> bool:

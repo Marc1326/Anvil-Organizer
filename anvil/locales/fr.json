@@ -97,7 +97,11 @@
 
     "select_color": "Changer la couleur...",
     "reset_color": "Supprimer la couleur",
-    "nexus_query": "Interroger les infos Nexus"
+    "nexus_query": "Interroger les infos Nexus",
+
+    "lock_mod": "Verrouiller le mod",
+    "unlock_mod": "D\u00e9verrouiller le mod",
+    "toggle_lock": "Basculer le verrouillage"
   },
 
   "toolbar": {
@@ -139,6 +143,7 @@
 
     "info_title": "Informations : {name}",
 
+    "remove_locked_warning": "Attention : {count} mod(s) sont verrouill\u00e9s !",
     "remove_mod_title": "Supprimer le Mod",
     "remove_mod_single": "Voulez-vous vraiment supprimer le Mod \"{name}\" ?\n\nLe dossier du Mod sera supprimé définitivement.",
     "remove_mod_multi": "Voulez-vous vraiment supprimer {count} Mods ?\n\n{list}\n\nLes dossiers des Mods seront supprimés définitivement.",
@@ -435,8 +440,10 @@
     "separator_created": "Séparateur créé : {name}",
     "separators_collapsed": "Tous les séparateurs réduits ({count})",
     "separators_expanded": "Tous les séparateurs développés",
-    "renamed": "Renommé : {old} → {new}",
-    "removed": "Supprimé : {names}",
+    "renamed": "Renomm\u00e9 : {old} \u2192 {new}",
+    "removed": "Supprim\u00e9 : {names}",
+    "mod_locked": "Mod verrouill\u00e9 : {name}",
+    "mod_unlocked": "Mod d\u00e9verrouill\u00e9 : {name}",
     "uninstalled": "Désinstallé : {name}",
     "uninstall_failed": "Désinstallation échouée",
     "data_override_uninstalled": "Data-Override désinstallé : {name}",
@@ -568,7 +575,8 @@
     "prop_has_category": "A une catégorie",
     "prop_no_category": "Sans catégorie",
     "prop_conflict_win": "Conflits (gagnant)",
-    "prop_conflict_lose": "Conflits (perdant)"
+    "prop_conflict_lose": "Conflits (perdant)",
+    "prop_locked": "Verrouill\u00e9"
   },
 
   "category": {
