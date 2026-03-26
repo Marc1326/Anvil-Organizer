@@ -40,7 +40,36 @@
     "discord": "Chat en Discord",
     "report_issue": "Reportar un problema",
     "about_anvil": "Acerca de Anvil Organizer",
-    "about_qt": "Acerca de Qt"
+    "about_qt": "Acerca de Qt",
+    "reshade_wizard": "ReShade Wizard..."
+  },
+
+  "reshade": {
+    "title": "ReShade Wizard",
+    "tab_status": "Estado e instalacion",
+    "tab_presets": "Presets",
+    "api_label": "API de renderizado:",
+    "dll_label": "DLL de ReShade:",
+    "dll_placeholder": "Ruta a la DLL de ReShade descargada...",
+    "browse": "Explorar...",
+    "download_link": "Descargar ReShade (reshade.me)",
+    "install": "Instalar",
+    "uninstall": "Desinstalar",
+    "close": "Cerrar",
+    "status_installed": "ReShade esta instalado ({api}, {dll})",
+    "status_not_installed": "ReShade no esta instalado",
+    "presets_title": "Presets disponibles",
+    "active_preset": "Preset activo: {name}",
+    "no_active_preset": "Ningun preset activo",
+    "preset_add": "Agregar...",
+    "preset_activate": "Activar",
+    "preset_remove": "Eliminar",
+    "select_dll": "Seleccionar DLL de ReShade",
+    "select_preset": "Seleccionar archivo de preset",
+    "error_no_dll": "Por favor, selecciona primero una DLL de ReShade.",
+    "error_invalid_dll": "El archivo seleccionado no es una DLL valida.",
+    "confirm_uninstall": "Desinstalar ReShade?\n\nLa DLL y la configuracion de ReShade se eliminaran del directorio del juego.",
+    "confirm_remove_preset": "Eliminar el preset \"{name}\"?"
   },
 
   "context": {

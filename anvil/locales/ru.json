@@ -40,7 +40,36 @@
     "discord": "Чат в Discord",
     "report_issue": "Сообщить о проблеме",
     "about_anvil": "О программе Anvil Organizer",
-    "about_qt": "О Qt"
+    "about_qt": "О Qt",
+    "reshade_wizard": "ReShade Wizard..."
+  },
+
+  "reshade": {
+    "title": "ReShade Wizard",
+    "tab_status": "Статус и установка",
+    "tab_presets": "Пресеты",
+    "api_label": "API рендеринга:",
+    "dll_label": "DLL ReShade:",
+    "dll_placeholder": "Путь к скачанной DLL ReShade...",
+    "browse": "Обзор...",
+    "download_link": "Скачать ReShade (reshade.me)",
+    "install": "Установить",
+    "uninstall": "Удалить",
+    "close": "Закрыть",
+    "status_installed": "ReShade установлен ({api}, {dll})",
+    "status_not_installed": "ReShade не установлен",
+    "presets_title": "Доступные пресеты",
+    "active_preset": "Активный пресет: {name}",
+    "no_active_preset": "Нет активного пресета",
+    "preset_add": "Добавить...",
+    "preset_activate": "Активировать",
+    "preset_remove": "Удалить",
+    "select_dll": "Выбрать DLL ReShade",
+    "select_preset": "Выбрать файл пресета",
+    "error_no_dll": "Пожалуйста, сначала выберите DLL ReShade.",
+    "error_invalid_dll": "Выбранный файл не является допустимой DLL.",
+    "confirm_uninstall": "Удалить ReShade?\n\nDLL и конфигурация ReShade будут удалены из каталога игры.",
+    "confirm_remove_preset": "Удалить пресет \"{name}\"?"
   },
 
   "context": {

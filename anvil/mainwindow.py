@@ -486,6 +486,9 @@ class MainWindow(QMainWindow):
         act.setShortcut(QKeySequence("Ctrl+I"))
         act.setEnabled(False)
 
+        self._act_reshade = tm.addAction(tr("menu.reshade_wizard"))
+        self._act_reshade.triggered.connect(self._on_reshade_wizard)
+
         tm.addSeparator()
 
         act = tm.addAction(tr("menu.settings"))
@@ -666,6 +669,22 @@ class MainWindow(QMainWindow):
             # Reload current instance to apply changed paths
             if self.instance_manager.current_instance():
                 self._apply_instance(self.instance_manager.current_instance())
+
+    def _on_reshade_wizard(self) -> None:
+        """Werkzeuge → ReShade Wizard."""
+        from anvil.dialogs.reshade_wizard import ReshadeWizard
+
+        game_path = self._current_game_path
+        if game_path is None:
+            return
+
+        plugin = self._current_plugin
+        game_binary = getattr(plugin, "GameBinary", "") if plugin else ""
+        instance_name = self.instance_manager.current_instance() or ""
+
+        dlg = ReshadeWizard(game_path, game_binary, instance_name, self)
+        _center_on_parent(dlg)
+        dlg.exec()
 
     def _on_menu_help(self) -> None:
         """Hilfe → Hilfe (Strg+H)."""
@@ -907,6 +926,7 @@ class MainWindow(QMainWindow):
             self._mod_list_stack.setCurrentWidget(self._mod_list_view)
             self._update_active_count()
             self._status_bar.clear_instance()
+            self._act_reshade.setEnabled(False)
             return
 
         game_name = data.get("game_name", instance_name)
@@ -931,6 +951,9 @@ class MainWindow(QMainWindow):
         # different path than what detectGame() found via store detection)
         if plugin is not None and game_path is not None:
             plugin.setGamePath(game_path, store=store if store else None)
+
+        # ReShade menu item: enable when game path is available
+        self._act_reshade.setEnabled(game_path is not None)
 
         # 1. Title
         self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v{APP_VERSION}")

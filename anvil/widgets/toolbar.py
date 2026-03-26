@@ -102,6 +102,8 @@ def create_toolbar(parent=None):
     tools_menu.addAction(tr("menu.profiles"), lambda: _call_win("_on_menu_profiles"))
     tools_menu.addAction(tr("menu.executables"), lambda: _call_win("_on_menu_executables"))
     tools_menu.addSeparator()
+    tools_menu.addAction(tr("menu.reshade_wizard"), lambda: _call_win("_on_reshade_wizard"))
+    tools_menu.addSeparator()
     tools_menu.addAction(tr("menu.settings"), lambda: _call_win("_on_menu_settings"))
     tools_btn.setMenu(tools_menu)
 
