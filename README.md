@@ -79,6 +79,31 @@ Works with **Steam** and **Heroic Games Launcher** (GOG/Epic via Proton/Wine).
 
 ---
 
+## Comparison
+
+| Feature | Anvil Organizer | MO2 (via Wine) | Vortex (via Wine) |
+|---------|:-:|:-:|:-:|
+| **Native Linux** | **Yes** | No (Wine) | No (Wine) |
+| **Proton Script Extender Shims** (SKSE64/F4SE/SFSE) | **Yes** | No | No |
+| **MO2-style virtual filesystem** | Symlinks | VFS driver | Hardlinks |
+| **Drag & drop load order** | **Yes** | Yes | Limited |
+| **Multi-instance / Multi-game** | **Yes** | Yes | Yes |
+| **Profile system** | **Yes** | Yes | Yes |
+| **Nexus Mods integration** | **Yes** | Yes | Yes |
+| **Conflict detection** | **Yes** | Yes | Yes |
+| **Plugin System (add games via UI)** | **Yes** | No | No |
+| **LOOT integration** | Planned | Yes | Yes |
+| **Nexus Collections** | Planned | No | Yes |
+| **BA2/BSA packing** | **Yes** | No | No |
+| **Framework auto-detection** | **Yes** | No | No |
+| **Languages** | 7 | 1 | 10+ |
+| **Steam Deck ready** | **Yes** | Manual | Manual |
+| **Open Source** | GPL-3.0 | GPL-3.0 | GPL-3.0 |
+
+> **TL;DR** — Anvil is the only mod manager built *for* Linux. No Wine, no workarounds, and the only tool with native Proton Script Extender support.
+
+---
+
 ## Screenshots
 
 <table>
