@@ -159,6 +159,8 @@ class ProfileBar(QWidget):
     create_separator_requested = Signal()
     enable_all_requested = Signal()
     disable_all_requested = Signal()
+    export_collection_requested = Signal()
+    import_collection_requested = Signal()
 
     # New signals for tabs
     profile_changed = Signal(str)
@@ -285,6 +287,9 @@ class ProfileBar(QWidget):
         menu1.addAction(QAction(tr("context.reload"), self, triggered=lambda checked: self.reload_requested.emit()))
         menu1.addSeparator()
         menu1.addAction(QAction(tr("context.export_csv"), self, triggered=lambda checked: self.export_csv_requested.emit()))
+        menu1.addSeparator()
+        menu1.addAction(QAction(tr("collection.export_menu"), self, triggered=lambda checked: self.export_collection_requested.emit()))
+        menu1.addAction(QAction(tr("collection.import_menu"), self, triggered=lambda checked: self.import_collection_requested.emit()))
         menu1.addSeparator()
         menu1.addAction(QAction(tr("context.create_backup"), self, triggered=lambda checked: self.backup_requested.emit()))
         menu1.addAction(QAction(tr("tooltip.restore_backup"), self, triggered=lambda checked: self.restore_requested.emit()))
