@@ -906,7 +906,7 @@
     "saves": "Ruta de Guardados (Proton)",
     "save_ext": "Extensión de Guardado",
     "nexus_game_id": "Nexus Game ID",
-    "frameworks": "Frameworks (opcional)",
+    "frameworks": "Frameworks",
     "fw_name": "Nombre",
     "fw_target": "Carpeta Destino",
     "fw_nexus_id": "Nexus ID",

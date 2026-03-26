@@ -906,7 +906,7 @@
     "saves": "Percorso Salvataggi (Proton)",
     "save_ext": "Estensione Salvataggio",
     "nexus_game_id": "Nexus Game ID",
-    "frameworks": "Frameworks (opzionale)",
+    "frameworks": "Frameworks",
     "fw_name": "Nome",
     "fw_target": "Cartella Destinazione",
     "fw_nexus_id": "Nexus ID",

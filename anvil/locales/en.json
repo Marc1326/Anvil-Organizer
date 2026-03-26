@@ -906,7 +906,7 @@
     "saves": "Saves Path (Proton)",
     "save_ext": "Save Extension",
     "nexus_game_id": "Nexus Game ID",
-    "frameworks": "Frameworks (optional)",
+    "frameworks": "Frameworks",
     "fw_name": "Name",
     "fw_target": "Target Folder",
     "fw_nexus_id": "Nexus ID",

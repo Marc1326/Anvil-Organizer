@@ -906,7 +906,7 @@
     "saves": "Chemin Sauvegardes (Proton)",
     "save_ext": "Extension de Sauvegarde",
     "nexus_game_id": "Nexus Game ID",
-    "frameworks": "Frameworks (optionnel)",
+    "frameworks": "Frameworks",
     "fw_name": "Nom",
     "fw_target": "Dossier Cible",
     "fw_nexus_id": "Nexus ID",

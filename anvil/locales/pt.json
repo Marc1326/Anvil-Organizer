@@ -906,7 +906,7 @@
     "saves": "Caminho Saves (Proton)",
     "save_ext": "Extensão de Save",
     "nexus_game_id": "Nexus Game ID",
-    "frameworks": "Frameworks (opcional)",
+    "frameworks": "Frameworks",
     "fw_name": "Nome",
     "fw_target": "Pasta Destino",
     "fw_nexus_id": "Nexus ID",

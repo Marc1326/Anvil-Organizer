@@ -906,7 +906,7 @@
     "saves": "Путь к сохранениям (Proton)",
     "save_ext": "Расширение сохранений",
     "nexus_game_id": "Nexus Game ID",
-    "frameworks": "Фреймворки (необязательно)",
+    "frameworks": "Фреймворки",
     "fw_name": "Название",
     "fw_target": "Целевая папка",
     "fw_nexus_id": "Nexus ID",
