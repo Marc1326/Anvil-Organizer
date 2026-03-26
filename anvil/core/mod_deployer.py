@@ -26,8 +26,12 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from anvil.core.mod_list_io import read_global_modlist, read_active_mods
+
+if TYPE_CHECKING:
+    from anvil.core.modindex import ModIndex
 
 # Files inside mod folders that are metadata, not game content.
 _SKIP_FILES = {"meta.ini", "codes.txt", "fomod_choices.json"}
@@ -90,6 +94,7 @@ class ModDeployer:
         multi_folder_routes: dict[str, str] | None = None,
         needs_ba2_packing: bool = False,
         copy_deploy_paths: list[str] | None = None,
+        mod_index: ModIndex | None = None,
     ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
@@ -104,6 +109,7 @@ class ModDeployer:
         self._direct_patterns = [p.lower() for p in (direct_install_patterns or [])]
         self._needs_ba2_packing = needs_ba2_packing
         self._copy_deploy_paths = [p.replace("\\", "/") for p in (copy_deploy_paths or [])]
+        self._mod_index = mod_index
 
     def is_direct_install(self, mod_name: str) -> bool:
         """Return True if *mod_name* matches a direct-install pattern.
@@ -216,8 +222,13 @@ class ModDeployer:
                     result.errors.append(f"lml symlink {mod_name}: {exc}")
                 continue  # Keine Einzel-Dateien symlinken
 
-            # Walk all files in this mod
-            for src_file in mod_dir.rglob("*"):
+            # Walk all files in this mod (use cache when available)
+            if self._mod_index is not None:
+                cached_files = self._mod_index.get_file_list(mod_name)
+                file_iter = (mod_dir / finfo["rel"] for finfo in cached_files)
+            else:
+                file_iter = (f for f in mod_dir.rglob("*") if f.is_file())
+            for src_file in file_iter:
                 if not src_file.is_file():
                     continue
 

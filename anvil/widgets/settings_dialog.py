@@ -42,10 +42,11 @@ from anvil.core.translator import Translator, tr
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, plugin_loader: PluginLoader | None = None,
-                 instance_manager=None):
+                 instance_manager=None, on_clear_modindex=None):
         super().__init__(parent)
         self._plugin_loader = plugin_loader
         self._instance_manager = instance_manager
+        self._on_clear_modindex = on_clear_modindex
         self.setWindowTitle(tr("dialog.settings_title"))
         self.setMinimumSize(960, 600)
         self.resize(960, 600)
@@ -390,6 +391,19 @@ class SettingsDialog(QDialog):
         pf_game_form = QFormLayout()
         self._le_game_path = add_path_row(pf_game_form, tr("settings.path_managed_game"), _game_path, False)
         pf_content_layout.addLayout(pf_game_form)
+        # Mod-Index Cache Button
+        _clear_idx_btn = QPushButton(tr("settings.clear_modindex_cache"))
+        _clear_idx_btn.setToolTip(tr("settings.clear_modindex_tooltip"))
+        if self._on_clear_modindex is not None:
+            _clear_idx_btn.clicked.connect(lambda checked=False: self._on_clear_modindex())
+        else:
+            _clear_idx_btn.setEnabled(False)
+        _clear_row = QHBoxLayout()
+        _clear_row.addWidget(_clear_idx_btn)
+        _clear_row.addStretch()
+        pf_content_layout.addSpacing(8)
+        pf_content_layout.addLayout(_clear_row)
+
         pf_content_layout.addStretch()
         pf_content_layout.addWidget(QLabel(tr("label.writable_dirs_hint")))
         pf_scroll.setWidget(pf_content)

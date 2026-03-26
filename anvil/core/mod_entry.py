@@ -7,7 +7,7 @@ merging data from three sources:
 1. ``modlist.txt`` — global load order (in .profiles/)
 2. ``active_mods.json`` — profile-specific enabled state
 3. ``meta.ini``   — display name, version, author, etc.
-4. Filesystem     — file count and total size
+4. Filesystem     — file count and total size (via ModIndex cache)
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from anvil.core.mod_list_io import (
     read_active_mods,
@@ -23,6 +24,9 @@ from anvil.core.mod_list_io import (
     read_modlist,
 )
 from anvil.core.mod_metadata import read_meta_ini
+
+if TYPE_CHECKING:
+    from anvil.core.modindex import ModIndex
 
 
 @dataclass
@@ -85,12 +89,20 @@ def _build_entry(
     enabled: bool,
     priority: int,
     mods_dir: Path,
+    mod_index: ModIndex | None = None,
 ) -> ModEntry:
-    """Build a ModEntry from filesystem + meta.ini."""
+    """Build a ModEntry from filesystem + meta.ini.
+
+    When *mod_index* is provided, file_count and total_size are read
+    from the cache instead of scanning the filesystem.
+    """
     mod_path = mods_dir / name
     meta = read_meta_ini(mod_path)
 
-    file_count, total_size = _count_files(mod_path)
+    if mod_index is not None:
+        file_count, total_size = mod_index.get_stats(name)
+    else:
+        file_count, total_size = _count_files(mod_path)
 
     nexus_id = 0
     raw_id = meta.get("modid", "0")
@@ -152,6 +164,7 @@ def scan_mods_directory(
     instance_path: Path,
     profile_path: Path,
     include_external: bool = True,
+    mod_index: ModIndex | None = None,
 ) -> list[ModEntry]:
     """Scan an instance's mods and return a sorted list of ModEntry.
 
@@ -175,6 +188,8 @@ def scan_mods_directory(
                       (e.g. ``instance_path/.profiles/Default/``).
         include_external: When ``False``, mods on disk but not in
                           ``modlist.txt`` are excluded from the result.
+        mod_index: Optional :class:`ModIndex` instance for cached
+                   file counts and sizes.
 
     Returns:
         List of :class:`ModEntry`, ordered by priority
@@ -223,7 +238,7 @@ def scan_mods_directory(
             continue  # deleted from disk
         seen.add(name)
         enabled = name in active_mods
-        entry = _build_entry(name, enabled, priority, mods_dir)
+        entry = _build_entry(name, enabled, priority, mods_dir, mod_index)
         # Apply lock state: locked mods are always enabled
         if name in locked_mods:
             entry.is_locked = True
@@ -237,7 +252,7 @@ def scan_mods_directory(
     if include_external:
         new_mods = sorted(on_disk - seen)
         for name in new_mods:
-            entry = _build_entry(name, True, priority, mods_dir)
+            entry = _build_entry(name, True, priority, mods_dir, mod_index)
             if name in locked_mods:
                 entry.is_locked = True
                 entry.enabled = True

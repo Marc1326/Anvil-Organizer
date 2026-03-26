@@ -349,6 +349,7 @@ class GamePanel(QWidget):
         self._instance_path: Path | None = None
         self._current_profile_name: str = "Default"
         self._deployer: ModDeployer | None = None
+        self._mod_index = None  # ModIndex, set from mainwindow
         # Map row index → archive Path for installation
         self._dl_archives: list[Path] = []
         # Hidden downloads toggle (MO2: showHidden)
@@ -426,7 +427,7 @@ class GamePanel(QWidget):
         ba2_packing = getattr(game_plugin, "NeedsBa2Packing", False) if game_plugin else False
         copy_paths = getattr(game_plugin, "GameCopyDeployPaths", []) if game_plugin else []
         if self._instance_path and game_path:
-            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths)
+            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index)
 
         # Update label
         self._game_label.setText(game_name or tr("game_panel.no_game_selected"))
@@ -1319,6 +1320,10 @@ class GamePanel(QWidget):
 
     # ── Downloads-Tab ──────────────────────────────────────────────
 
+    def set_mod_index(self, mod_index) -> None:
+        """Set the ModIndex for cached file lists during deployment."""
+        self._mod_index = mod_index
+
     def set_instance_path(self, instance_path: Path, profile_name: str = "Default") -> None:
         """Set instance path and initialize the deployer."""
         self._instance_path = instance_path
@@ -1331,7 +1336,7 @@ class GamePanel(QWidget):
         ba2_packing = getattr(self._current_plugin, "NeedsBa2Packing", False) if self._current_plugin else False
         copy_paths = getattr(self._current_plugin, "GameCopyDeployPaths", []) if self._current_plugin else []
         if self._current_game_path and instance_path:
-            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths)
+            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index)
         else:
             self._deployer = None
 

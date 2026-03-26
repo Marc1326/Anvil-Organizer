@@ -461,7 +461,8 @@
     "nexus_query_success": "Nexus info updated: {name}",
     "nexus_query_invalid_id": "Invalid Mod ID entered.",
     "nexus_no_id_found": "No Nexus ID found. Download the mod via Nexus.",
-    "nexus_no_game_slug": "No Nexus game slug configured."
+    "nexus_no_game_slug": "No Nexus game slug configured.",
+    "modindex_cleared": "Mod index cache cleared. Will be rebuilt on next load."
   },
 
   "toast": {
@@ -665,6 +666,8 @@
     "path_profiles": "Profiles:",
     "path_overwrite": "Overwrite:",
     "path_managed_game": "Managed Game:",
+    "clear_modindex_cache": "Clear Mod Index Cache",
+    "clear_modindex_tooltip": "Deletes the cached file index of all mods. Will be rebuilt automatically on next load.",
     "tab_paths": "Paths",
     "nexus_account": "Nexus Account",
     "nexus_user_id": "User ID:",

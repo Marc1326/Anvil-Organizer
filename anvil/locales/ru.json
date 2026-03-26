@@ -461,7 +461,8 @@
     "nexus_query_success": "Информация Nexus обновлена: {name}",
     "nexus_query_invalid_id": "Введён недопустимый Mod-ID.",
     "nexus_no_id_found": "Nexus-ID не найден. Загрузите мод через Nexus.",
-    "nexus_no_game_slug": "Название игры для Nexus не настроено."
+    "nexus_no_game_slug": "Название игры для Nexus не настроено.",
+    "modindex_cleared": "Кэш индекса модов очищен. Будет перестроен при следующей загрузке."
   },
 
   "toast": {
@@ -665,6 +666,8 @@
     "path_profiles": "Профили:",
     "path_overwrite": "Перезапись:",
     "path_managed_game": "Управляемая игра:",
+    "clear_modindex_cache": "Очистить кэш индекса модов",
+    "clear_modindex_tooltip": "Удаляет кэшированный индекс файлов всех модов. Будет автоматически перестроен при следующей загрузке.",
     "tab_paths": "Пути",
     "nexus_account": "Учётная запись Nexus",
     "nexus_user_id": "ID пользователя:",
