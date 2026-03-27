@@ -169,6 +169,8 @@ class MainWindow(QMainWindow):
         self._profile_bar.create_separator_requested.connect(self._ctx_create_separator)
         self._profile_bar.enable_all_requested.connect(lambda: self._ctx_enable_all(True))
         self._profile_bar.disable_all_requested.connect(lambda: self._ctx_enable_all(False))
+        self._profile_bar.export_collection_requested.connect(self._export_collection)
+        self._profile_bar.import_collection_requested.connect(self._import_collection)
         self._profile_bar.profile_create_confirmed.connect(self._on_profile_created)
         self._profile_bar.profile_renamed.connect(self._on_profile_renamed)
         self._profile_bar.profile_changed.connect(self._on_profile_changed)
@@ -372,6 +374,14 @@ class MainWindow(QMainWindow):
         act = fm.addAction(tr("menu.visit_nexus"))
         act.setShortcut(QKeySequence("Ctrl+N"))
         act.triggered.connect(self._on_menu_visit_nexus)
+
+        fm.addSeparator()
+
+        act = fm.addAction(tr("collection.export_menu"))
+        act.triggered.connect(self._export_collection)
+
+        act = fm.addAction(tr("collection.import_menu"))
+        act.triggered.connect(self._import_collection)
 
         fm.addSeparator()
 
@@ -2982,6 +2992,195 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self, tr("error.export_failed_title"), str(exc),
             )
+
+    # ── Collection Export / Import ──────────────────────────────────
+
+    def _export_collection(self) -> None:
+        """Export the current mod setup as a .anvilpack collection."""
+        from anvil.core.collection_io import build_manifest, export_collection
+        from anvil.dialogs.collection_export_dialog import CollectionExportDialog
+
+        if not self._current_instance_path or not self._current_profile_path:
+            return
+
+        # Gather info
+        game_name = ""
+        game_short = ""
+        game_nexus = ""
+        if self._current_plugin:
+            game_name = getattr(self._current_plugin, "GameName", "")
+            game_short = getattr(self._current_plugin, "GameShortName", "")
+            game_nexus = (
+                getattr(self._current_plugin, "GameNexusName", "")
+                or game_short
+            )
+
+        # Count mods and separators
+        mod_count = 0
+        sep_count = 0
+        for entry in self._current_mod_entries:
+            if entry.is_separator:
+                sep_count += 1
+            else:
+                mod_count += 1
+
+        # Show export dialog
+        dialog = CollectionExportDialog(
+            self,
+            game_name=game_name,
+            mod_count=mod_count,
+            separator_count=sep_count,
+        )
+        _center_on_parent(dialog)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        coll_name = dialog.collection_name()
+        coll_desc = dialog.collection_description()
+        coll_author = dialog.collection_author()
+
+        # Build manifest
+        manifest = build_manifest(
+            instance_path=self._current_instance_path,
+            profile_path=self._current_profile_path,
+            game_name=game_name,
+            game_short_name=game_short,
+            game_nexus_name=game_nexus,
+            collection_name=coll_name,
+            collection_description=coll_desc,
+            collection_author=coll_author,
+        )
+
+        # Choose save location
+        suggested = str(Path.home() / f"{coll_name}.anvilpack")
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            tr("collection.save_dialog_title"),
+            suggested,
+            tr("collection.file_filter"),
+        )
+        if not path:
+            return
+
+        # Ensure extension
+        if not path.endswith(".anvilpack"):
+            path += ".anvilpack"
+
+        try:
+            cats_path = self._current_instance_path / "categories.json"
+            export_collection(manifest, Path(path), cats_path)
+
+            from anvil.widgets.toast import Toast
+            Toast(
+                self,
+                tr(
+                    "collection.export_success",
+                    name=coll_name,
+                    count=len(manifest.mods),
+                ),
+            )
+            self.statusBar().showMessage(
+                tr("collection.export_status", path=path), 5000,
+            )
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                tr("collection.export_error_title"),
+                str(exc),
+            )
+
+    def _import_collection(self) -> None:
+        """Import a .anvilpack collection into the current instance."""
+        import zipfile
+        from anvil.core.collection_io import (
+            read_collection,
+            read_collection_categories,
+            analyze_collection,
+            apply_collection,
+        )
+        from anvil.dialogs.collection_import_dialog import CollectionImportDialog
+
+        if not self._current_instance_path or not self._current_profile_path:
+            return
+
+        # Choose file
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            tr("collection.open_dialog_title"),
+            str(Path.home()),
+            tr("collection.file_filter"),
+        )
+        if not path:
+            return
+
+        zip_path = Path(path)
+
+        # Read manifest
+        try:
+            manifest = read_collection(zip_path)
+        except (ValueError, zipfile.BadZipFile) as exc:
+            QMessageBox.warning(
+                self,
+                tr("collection.import_error_title"),
+                str(exc),
+            )
+            return
+
+        # Analyze against installed mods
+        result = analyze_collection(manifest, self._current_instance_path)
+
+        # Get current game short name
+        current_game_short = ""
+        if self._current_plugin:
+            current_game_short = getattr(
+                self._current_plugin, "GameShortName", ""
+            )
+
+        # Show import dialog
+        dialog = CollectionImportDialog(
+            self,
+            result=result,
+            current_game_short=current_game_short,
+        )
+        _center_on_parent(dialog)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        # Read categories from archive if needed
+        cats_data = None
+        if dialog.apply_categories():
+            cats_data = read_collection_categories(zip_path)
+
+        # Apply collection
+        try:
+            missing = apply_collection(
+                manifest=manifest,
+                instance_path=self._current_instance_path,
+                profile_path=self._current_profile_path,
+                apply_categories=dialog.apply_categories(),
+                categories_data=cats_data,
+            )
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                tr("collection.import_error_title"),
+                str(exc),
+            )
+            return
+
+        # Reload
+        self._reload_mod_list()
+        self._do_redeploy()
+
+        from anvil.widgets.toast import Toast
+        Toast(
+            self,
+            tr(
+                "collection.import_success",
+                name=manifest.collection_name,
+                missing=missing,
+            ),
+        )
 
     def _ctx_enable_selected(self, rows: list[int], enabled: bool) -> None:
         """Enable or disable selected mods (locked mods are skipped)."""
