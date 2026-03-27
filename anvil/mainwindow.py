@@ -152,7 +152,10 @@ class MainWindow(QMainWindow):
         self._profile_bar.collapse_all_requested.connect(self._collapse_all_separators)
         self._profile_bar.expand_all_requested.connect(self._expand_all_separators)
         self._profile_bar.reload_requested.connect(self._on_menu_refresh)
-        self._profile_bar.export_import_requested.connect(self._open_export_import)
+        self._profile_bar.export_csv_requested.connect(self._ctx_export_csv)
+        self._profile_bar.export_anvilpack_requested.connect(self._export_collection)
+        self._profile_bar.import_csv_requested.connect(self._import_csv)
+        self._profile_bar.import_anvilpack_requested.connect(self._import_collection)
         self._profile_bar.open_game_requested.connect(self._open_game_folder)
         self._profile_bar.open_mygames_requested.connect(self._open_mygames_folder)
         self._profile_bar.open_ini_requested.connect(self._open_ini_folder)
@@ -170,7 +173,7 @@ class MainWindow(QMainWindow):
         self._profile_bar.create_separator_requested.connect(self._ctx_create_separator)
         self._profile_bar.enable_all_requested.connect(lambda: self._ctx_enable_all(True))
         self._profile_bar.disable_all_requested.connect(lambda: self._ctx_enable_all(False))
-        # export_import_requested ist oben verbunden
+        # export/import signals sind oben einzeln verbunden
         self._profile_bar.profile_create_confirmed.connect(self._on_profile_created)
         self._profile_bar.profile_renamed.connect(self._on_profile_renamed)
         self._profile_bar.profile_changed.connect(self._on_profile_changed)
@@ -376,8 +379,17 @@ class MainWindow(QMainWindow):
 
         fm.addSeparator()
 
-        act = fm.addAction(tr("export_import.menu_entry"))
-        act.triggered.connect(self._open_export_import)
+        export_menu = fm.addMenu(tr("export_import.export_radio"))
+        act = export_menu.addAction(tr("export_import.csv_radio"))
+        act.triggered.connect(self._ctx_export_csv)
+        act = export_menu.addAction(tr("export_import.anvilpack_radio"))
+        act.triggered.connect(self._export_collection)
+
+        import_menu = fm.addMenu(tr("export_import.import_radio"))
+        act = import_menu.addAction(tr("export_import.csv_radio"))
+        act.triggered.connect(self._import_csv)
+        act = import_menu.addAction(tr("export_import.anvilpack_radio"))
+        act.triggered.connect(self._import_collection)
 
         fm.addSeparator()
 
@@ -2950,33 +2962,6 @@ class MainWindow(QMainWindow):
         add_mod_to_modlist(self._current_profile_path, name, False)
         self._reload_mod_list()
         self.statusBar().showMessage(tr("status.empty_mod_created", name=name), 5000)
-
-    def _open_export_import(self) -> None:
-        """Zeigt den Export/Import-Auswahldialog und leitet weiter."""
-        from anvil.dialogs.export_import_dialog import ExportImportDialog
-
-        dialog = ExportImportDialog(self)
-        _center_on_parent(dialog)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-
-        action = dialog.action()
-        fmt = dialog.format_type()
-
-        if action == "export" and fmt == "csv":
-            self._ctx_export_csv()
-        elif action == "export" and fmt == "anvilpack":
-            self._export_collection()
-        elif action == "import" and fmt == "csv":
-            self._import_csv()
-        elif action == "import" and fmt == "anvilpack":
-            self._import_collection()
-        elif action == "backup":
-            bak = dialog.backup_action()
-            if bak == "create":
-                self._create_backup()
-            else:
-                self._restore_backup()
 
     def _import_csv(self) -> None:
         """CSV importieren: Mods aktivieren/deaktivieren basierend auf CSV."""
