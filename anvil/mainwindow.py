@@ -70,6 +70,7 @@ from anvil.core.update_checker import UpdateChecker
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nxm_handler import parse_nxm_url, check_cli_for_nxm
 from anvil.core.conflict_scanner import ConflictScanner
+from anvil.core.modindex import ModIndex
 from anvil.models.mod_list_model import mod_entry_to_row, COL_COUNT
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 from anvil.widgets.category_dialog import CategoryDialog
@@ -216,6 +217,7 @@ class MainWindow(QMainWindow):
         # BG3 mod list (lazy-created when needed)
         self._bg3_mod_list: None = None  # BG3ModListView, created on demand
         self._bg3_installer = None       # BG3ModInstaller, cached
+        self._mod_index: ModIndex | None = None  # Central file index cache
         splitter.addWidget(left_pane)
         self._game_panel = GamePanel()
         splitter.addWidget(self._game_panel)
@@ -661,6 +663,7 @@ class MainWindow(QMainWindow):
             self,
             self.plugin_loader,
             self.instance_manager,
+            on_clear_modindex=self._clear_modindex_cache,
         )
         _center_on_parent(dlg)
         if dlg.exec() == SettingsDialog.DialogCode.Accepted:
@@ -673,6 +676,12 @@ class MainWindow(QMainWindow):
         QDesktopServices.openUrl(
             QUrl("https://github.com/Marc1326/Anvil-Organizer")
         )
+
+    def _clear_modindex_cache(self) -> None:
+        """Clear the mod file index cache and trigger a full re-scan."""
+        if self._mod_index is not None:
+            self._mod_index.clear()
+            self.statusBar().showMessage(tr("status.modindex_cleared"), 3000)
 
     # ── View settings persistence ────────────────────────────────────
 
@@ -1012,10 +1021,16 @@ class MainWindow(QMainWindow):
 
         self._profile_bar.set_profiles(profile_folders, active=profile_name)
         self._current_profile_path = instance_path / ".profiles" / profile_name
+
+        # Rebuild mod file index (only re-scans changed mods)
+        self._mod_index = ModIndex(instance_path)
+        self._mod_index.rebuild()
+
         include_ext = self._settings().value("ModList/show_external_mods", True, type=bool)
         self._current_mod_entries = scan_mods_directory(
             instance_path, self._current_profile_path,
             include_external=include_ext,
+            mod_index=self._mod_index,
         )
         # Mark direct-install (framework) mods
         direct_patterns = getattr(plugin, "GameDirectInstallMods", []) if plugin else []
@@ -1044,6 +1059,7 @@ class MainWindow(QMainWindow):
         _dlog(f"[APPLY-INSTANCE] Profile: {profile_name}")
         _dlog(f"[APPLY-INSTANCE] Plugin: {getattr(plugin, 'GameName', None)}")
         _dlog(f"[APPLY-INSTANCE] Game path: {game_path}")
+        self._game_panel.set_mod_index(self._mod_index)
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
         self._game_panel.silent_deploy()
 
@@ -1287,7 +1303,9 @@ class MainWindow(QMainWindow):
         ]
         if not all_mods:
             return {}
-        result = ConflictScanner().scan_conflicts(all_mods, self._current_plugin)
+        result = ConflictScanner().scan_conflicts(
+            all_mods, self._current_plugin, mod_index=self._mod_index,
+        )
         # Build per-mod conflict counts
         per_mod: dict[str, dict] = {}
         for conflict in result["conflicts"]:
@@ -3497,6 +3515,9 @@ class MainWindow(QMainWindow):
         profiles_dir = self._current_instance_path / ".profiles"
         rename_mod_globally(profiles_dir, old_name, new_name)
         self._update_install_meta_name(old_name, new_name)
+        # Update mod index cache for the renamed mod
+        if self._mod_index is not None:
+            self._mod_index.rename(old_name, new_name)
         self._reload_mod_list()
         self._do_redeploy()
         self._game_panel.refresh_downloads()
@@ -3585,6 +3606,9 @@ class MainWindow(QMainWindow):
                 shutil.rmtree(mod_path)
             remove_mod_globally(profiles_dir, name)
             self._clear_install_meta(name)
+            # Remove deleted mod from index cache
+            if self._mod_index is not None:
+                self._mod_index.invalidate(name)
 
         self._reload_mod_list()
         self._do_redeploy()
@@ -3662,10 +3686,16 @@ class MainWindow(QMainWindow):
         if self._bg3_installer is not None:
             self._bg3_reload_mod_list()
             return
+
+        # Rebuild mod file index (only re-scans changed mods)
+        if self._mod_index is not None:
+            self._mod_index.rebuild()
+
         include_ext = self._settings().value("ModList/show_external_mods", True, type=bool)
         self._current_mod_entries = scan_mods_directory(
             self._current_instance_path, self._current_profile_path,
             include_external=include_ext,
+            mod_index=self._mod_index,
         )
         # Re-mark direct-install mods
         plugin = self._current_plugin

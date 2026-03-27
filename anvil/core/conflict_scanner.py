@@ -18,6 +18,10 @@ from __future__ import annotations
 
 from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from anvil.core.modindex import ModIndex
 
 
 def _match_ignore(rel_path: str, pattern: str) -> bool:
@@ -66,6 +70,7 @@ class ConflictScanner:
         self,
         mods: list[dict],
         game_plugin=None,
+        mod_index: ModIndex | None = None,
     ) -> dict:
         """Scan *mods* for file conflicts.
 
@@ -77,6 +82,8 @@ class ConflictScanner:
                          ``get_conflict_ignores()`` is called to obtain
                          patterns for harmless files that should be
                          filtered out.
+            mod_index: Optional :class:`ModIndex` for cached file lists.
+                       When provided, avoids expensive ``rglob`` calls.
 
         Returns:
             Dict with two keys:
@@ -98,6 +105,27 @@ class ConflictScanner:
 
         for mod in mods:
             mod_name = mod["name"]
+
+            # Try cached file list first
+            if mod_index is not None:
+                cached_files = mod_index.get_file_list(mod_name)
+                if cached_files:
+                    for finfo in cached_files:
+                        rel = finfo["rel"]
+                        # Extract filename for internal-file check
+                        fname = rel.rsplit("/", 1)[-1] if "/" in rel else rel
+                        if fname in self._INTERNAL_FILES:
+                            continue
+                        # Extract extension for ignored-extension check
+                        dot_pos = fname.rfind(".")
+                        ext = fname[dot_pos:].lower() if dot_pos >= 0 else ""
+                        if ext in self._IGNORED_EXTENSIONS:
+                            continue
+                        owners = file_owners.setdefault(rel, [])
+                        owners.append(mod_name)
+                    continue
+
+            # Fallback: scan filesystem directly
             mod_root = Path(mod["path"])
 
             if not mod_root.is_dir():

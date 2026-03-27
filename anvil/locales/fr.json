@@ -461,7 +461,8 @@
     "nexus_query_success": "Infos Nexus mises \u00e0 jour : {name}",
     "nexus_query_invalid_id": "ID de Mod invalide.",
     "nexus_no_id_found": "Aucun ID Nexus trouvé. Téléchargez le mod via Nexus.",
-    "nexus_no_game_slug": "Aucun slug de jeu Nexus configuré."
+    "nexus_no_game_slug": "Aucun slug de jeu Nexus configuré.",
+    "modindex_cleared": "Cache de l'index des mods vidé. Sera reconstruit au prochain chargement."
   },
 
   "toast": {
@@ -665,6 +666,8 @@
     "path_profiles": "Profils :",
     "path_overwrite": "Écrasement :",
     "path_managed_game": "Jeu géré :",
+    "clear_modindex_cache": "Vider le cache de l'index des mods",
+    "clear_modindex_tooltip": "Supprime l'index de fichiers en cache de tous les mods. Sera reconstruit automatiquement au prochain chargement.",
     "tab_paths": "Chemins",
     "nexus_account": "Compte Nexus",
     "nexus_user_id": "ID utilisateur :",

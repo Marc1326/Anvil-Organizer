@@ -461,7 +461,8 @@
     "nexus_query_success": "Nexus-Info aktualisiert: {name}",
     "nexus_query_invalid_id": "Ungültige Mod-ID eingegeben.",
     "nexus_no_id_found": "Keine Nexus-ID gefunden. Lade die Mod über Nexus herunter.",
-    "nexus_no_game_slug": "Kein Nexus-Spielname konfiguriert."
+    "nexus_no_game_slug": "Kein Nexus-Spielname konfiguriert.",
+    "modindex_cleared": "Mod-Index Cache geleert. Wird beim naechsten Laden neu aufgebaut."
   },
 
   "toast": {
@@ -665,6 +666,8 @@
     "path_profiles": "Profile:",
     "path_overwrite": "Overwrite:",
     "path_managed_game": "Verwaltetes Spiel:",
+    "clear_modindex_cache": "Mod-Index Cache leeren",
+    "clear_modindex_tooltip": "Loescht den gecachten Datei-Index aller Mods. Wird beim naechsten Laden automatisch neu aufgebaut.",
     "tab_paths": "Pfade",
     "nexus_account": "Nexus-Konto",
     "nexus_user_id": "User ID:",

@@ -461,7 +461,8 @@
     "nexus_query_success": "Info do Nexus atualizada: {name}",
     "nexus_query_invalid_id": "ID do Mod inválido.",
     "nexus_no_id_found": "Nenhum ID Nexus encontrado. Baixe o mod pelo Nexus.",
-    "nexus_no_game_slug": "Nenhum slug de jogo Nexus configurado."
+    "nexus_no_game_slug": "Nenhum slug de jogo Nexus configurado.",
+    "modindex_cleared": "Cache do indice de mods limpo. Sera reconstruido no proximo carregamento."
   },
 
   "toast": {
@@ -665,6 +666,8 @@
     "path_profiles": "Perfis:",
     "path_overwrite": "Sobrescrever:",
     "path_managed_game": "Jogo gerenciado:",
+    "clear_modindex_cache": "Limpar cache do indice de mods",
+    "clear_modindex_tooltip": "Exclui o indice de arquivos em cache de todos os mods. Sera reconstruido automaticamente no proximo carregamento.",
     "tab_paths": "Caminhos",
     "nexus_account": "Conta Nexus",
     "nexus_user_id": "ID do usuário:",
