@@ -554,12 +554,48 @@ class SettingsDialog(QDialog):
         pl_left = QVBoxLayout()
         self._pl_tree = QTreeWidget()
         self._pl_tree.setHeaderLabels([tr("label.header_plugin"), tr("label.header_version")])
-        self._pl_tree.setMinimumWidth(280)
-        self._pl_tree.setColumnWidth(0, 220)
+        self._pl_tree.setMinimumWidth(400)
+        self._pl_tree.header().setStretchLastSection(False)
+        self._pl_tree.header().setSectionResizeMode(0, self._pl_tree.header().ResizeMode.Stretch)
+        self._pl_tree.header().setSectionResizeMode(1, self._pl_tree.header().ResizeMode.ResizeToContents)
 
         _italic_font = QFont()
         _italic_font.setItalic(True)
 
+        # ── Installer Kategorie ──
+        installer_root = QTreeWidgetItem(self._pl_tree, [tr("settings.plugins_installer"), ""])
+        installer_root.setExpanded(True)
+        for name, ver, enabled in [
+            ("FOMOD Installer", "1.0", True),
+            ("BAIN Installer", "—", False),
+            ("Simple Installer", "1.0", True),
+        ]:
+            item = QTreeWidgetItem(installer_root, [name, ver])
+            item.setData(0, Qt.ItemDataRole.UserRole, f"__installer__{name}")
+            if not enabled:
+                item.setFont(0, _italic_font)
+                item.setFont(1, _italic_font)
+
+        # ── Diagnose Kategorie ──
+        diagnose_root = QTreeWidgetItem(self._pl_tree, [tr("settings.plugins_diagnose"), ""])
+        diagnose_root.setExpanded(True)
+        for name, ver, enabled in [
+            ("LOOT Plugin Checker", "1.0", True),
+            ("Script Extender Checker", "1.0", True),
+        ]:
+            item = QTreeWidgetItem(diagnose_root, [name, ver])
+            item.setData(0, Qt.ItemDataRole.UserRole, f"__diagnose__{name}")
+
+        # ── Tool Kategorie ──
+        tool_root = QTreeWidgetItem(self._pl_tree, [tr("settings.plugins_tool"), ""])
+        tool_root.setExpanded(True)
+        for name, ver, enabled in [
+            ("BA2/BSA Packer", "1.0", True),
+        ]:
+            item = QTreeWidgetItem(tool_root, [name, ver])
+            item.setData(0, Qt.ItemDataRole.UserRole, f"__tool__{name}")
+
+        # ── Game Kategorie ──
         games_root = QTreeWidgetItem(self._pl_tree, [tr("settings.plugins_games"), ""])
         games_root.setExpanded(True)
 
@@ -569,7 +605,6 @@ class SettingsDialog(QDialog):
             for plugin in self._plugin_loader.all_plugins():
                 beta = " [Beta]" if not getattr(plugin, "Tested", True) else ""
                 item = QTreeWidgetItem(games_root, [f"{plugin.Name}{beta}", plugin.Version])
-                item.setCheckState(0, Qt.CheckState.Checked)
                 item.setData(0, Qt.ItemDataRole.UserRole, plugin.GameShortName)
                 if not plugin.isInstalled():
                     item.setFont(0, _italic_font)
