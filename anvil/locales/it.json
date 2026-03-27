@@ -441,7 +441,8 @@
     "start_failed_title": "Avvio fallito",
     "start_failed_message": "Impossibile avviare:\n{path}",
     "rename_failed_title": "Rinomina fallita",
-    "export_failed_title": "Esportazione fallita"
+    "export_failed_title": "Esportazione fallita",
+    "import_failed_title": "Importazione fallita"
   },
   "game_panel": {
     "install": "Installa",
@@ -911,5 +912,26 @@
     "open_nexus": "Nexus",
     "apply_categories": "Applica assegnazioni categorie",
     "game_mismatch": "Questa collezione e per {expected}, ma l'istanza attuale e {current}. Importazione non possibile."
+  },
+  "export_import": {
+    "title": "Esporta / Importa lista mod",
+    "action_label": "Azione",
+    "export_radio": "Esporta",
+    "import_radio": "Importa",
+    "format_label": "Formato",
+    "csv_radio": "File CSV",
+    "csv_desc": "Tabella semplice con nomi mod, categoria, versione, priorita e stato. Per condividere o confrontare liste di mod.",
+    "anvilpack_radio": "Collezione Anvilpack",
+    "anvilpack_desc": "Configurazione completa dei mod inclusi ordine, separatori e categorie. Per ripristinare o condividere con altri utenti Anvil.",
+    "next_button": "Avanti",
+    "menu_entry": "Esporta / Importa lista mod...",
+    "import_csv_title": "Importa lista mod CSV",
+    "import_csv_status": "{count} mod sono stati aggiornati",
+    "backup_radio": "Backup",
+    "backup_action_label": "Azione di backup",
+    "backup_create": "Crea backup",
+    "backup_create_desc": "Crea un backup completo di tutti i mod, profili e impostazioni dell'istanza corrente.",
+    "backup_restore": "Ripristina backup",
+    "backup_restore_desc": "Ripristina un backup creato in precedenza. I dati esistenti verranno sovrascritti."
   }
 }

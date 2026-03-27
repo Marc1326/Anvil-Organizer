@@ -36,6 +36,9 @@ class CollectionExportDialog(QDialog):
             & ~Qt.WindowType.WindowContextHelpButtonHint
         )
 
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet("CollectionExportDialog { background: #2B2B2B; }")
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)

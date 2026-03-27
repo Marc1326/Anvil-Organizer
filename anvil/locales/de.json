@@ -441,7 +441,8 @@
     "start_failed_title": "Starten fehlgeschlagen",
     "start_failed_message": "Konnte nicht gestartet werden:\n{path}",
     "rename_failed_title": "Umbenennen fehlgeschlagen",
-    "export_failed_title": "Export fehlgeschlagen"
+    "export_failed_title": "Export fehlgeschlagen",
+    "import_failed_title": "Import fehlgeschlagen"
   },
   "game_panel": {
     "install": "Installieren",
@@ -911,5 +912,26 @@
     "open_nexus": "Nexus",
     "apply_categories": "Kategorie-Zuweisungen uebernehmen",
     "game_mismatch": "Diese Collection ist fuer {expected}, aber die aktuelle Instanz ist {current}. Import nicht moeglich."
+  },
+  "export_import": {
+    "title": "Modliste exportieren / importieren",
+    "action_label": "Aktion",
+    "export_radio": "Exportieren",
+    "import_radio": "Importieren",
+    "format_label": "Format",
+    "csv_radio": "CSV-Datei",
+    "csv_desc": "Einfache Tabelle mit Mod-Namen, Kategorie, Version, Prioritaet und Status. Zum Teilen oder Vergleichen von Modlisten.",
+    "anvilpack_radio": "Anvilpack-Collection",
+    "anvilpack_desc": "Komplettes Mod-Setup inkl. Reihenfolge, Trennern und Kategorien. Zum Wiederherstellen oder Teilen mit anderen Anvil-Nutzern.",
+    "next_button": "Weiter",
+    "menu_entry": "Modliste exportieren / importieren...",
+    "import_csv_title": "CSV-Modliste importieren",
+    "import_csv_status": "{count} Mods wurden aktualisiert",
+    "backup_radio": "Sicherung",
+    "backup_action_label": "Sicherungsaktion",
+    "backup_create": "Sicherung erstellen",
+    "backup_create_desc": "Erstellt eine vollstaendige Sicherung aller Mods, Profile und Einstellungen der aktuellen Instanz.",
+    "backup_restore": "Sicherung wiederherstellen",
+    "backup_restore_desc": "Stellt eine zuvor erstellte Sicherung wieder her. Vorhandene Daten werden ueberschrieben."
   }
 }

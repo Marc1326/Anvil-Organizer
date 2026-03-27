@@ -1,10 +1,15 @@
 """Entry Point Anvil Organizer."""
 
+import os
 import sys
 from pathlib import Path
 
+# KDE-Portal für native Dialoge aktivieren — MUSS vor Qt-Imports stehen
+os.environ.setdefault("QT_QPA_PLATFORMTHEME", "kde")
+
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QSettings, QTranslator, QLibraryInfo
+from PySide6.QtGui import QIcon
 
 from anvil.mainwindow import MainWindow
 from anvil.core.translator import Translator
@@ -26,6 +31,15 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Anvil Organizer")
     app.setApplicationVersion(APP_VERSION)
+
+    # Icon-Theme für sichtbare Dialog-Icons (dark + light kompatibel)
+    if not QIcon.themeName():
+        QIcon.setThemeName("breeze-dark")
+    QIcon.setFallbackThemeName("breeze-dark")
+
+    # ProxyStyle: Standard-Icons durch Theme-Icons ersetzen (QFileDialog etc.)
+    from anvil.styles.icon_proxy_style import IconProxyStyle
+    app.setStyle(IconProxyStyle(app.style()))
 
     # ── Single-instance check ────────────────────────────────
     single = SingleInstance(app)

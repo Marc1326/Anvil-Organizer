@@ -11,6 +11,7 @@ import shutil
 import sys
 
 from PySide6.QtWidgets import (
+    QApplication,
     QMainWindow,
     QWidget,
     QVBoxLayout,
@@ -151,7 +152,7 @@ class MainWindow(QMainWindow):
         self._profile_bar.collapse_all_requested.connect(self._collapse_all_separators)
         self._profile_bar.expand_all_requested.connect(self._expand_all_separators)
         self._profile_bar.reload_requested.connect(self._on_menu_refresh)
-        self._profile_bar.export_csv_requested.connect(self._ctx_export_csv)
+        self._profile_bar.export_import_requested.connect(self._open_export_import)
         self._profile_bar.open_game_requested.connect(self._open_game_folder)
         self._profile_bar.open_mygames_requested.connect(self._open_mygames_folder)
         self._profile_bar.open_ini_requested.connect(self._open_ini_folder)
@@ -169,8 +170,7 @@ class MainWindow(QMainWindow):
         self._profile_bar.create_separator_requested.connect(self._ctx_create_separator)
         self._profile_bar.enable_all_requested.connect(lambda: self._ctx_enable_all(True))
         self._profile_bar.disable_all_requested.connect(lambda: self._ctx_enable_all(False))
-        self._profile_bar.export_collection_requested.connect(self._export_collection)
-        self._profile_bar.import_collection_requested.connect(self._import_collection)
+        # export_import_requested ist oben verbunden
         self._profile_bar.profile_create_confirmed.connect(self._on_profile_created)
         self._profile_bar.profile_renamed.connect(self._on_profile_renamed)
         self._profile_bar.profile_changed.connect(self._on_profile_changed)
@@ -343,7 +343,6 @@ class MainWindow(QMainWindow):
         self._check_first_start()
 
         # App-weiter Event-Filter für ContextMenu-Events (Wayland-Kompatibilität)
-        from PySide6.QtWidgets import QApplication
         QApplication.instance().installEventFilter(self)
 
         # ── Update-Check (im Hintergrund, 3s nach Start) ────────────
@@ -377,11 +376,8 @@ class MainWindow(QMainWindow):
 
         fm.addSeparator()
 
-        act = fm.addAction(tr("collection.export_menu"))
-        act.triggered.connect(self._export_collection)
-
-        act = fm.addAction(tr("collection.import_menu"))
-        act.triggered.connect(self._import_collection)
+        act = fm.addAction(tr("export_import.menu_entry"))
+        act.triggered.connect(self._open_export_import)
 
         fm.addSeparator()
 
@@ -2954,6 +2950,93 @@ class MainWindow(QMainWindow):
         add_mod_to_modlist(self._current_profile_path, name, False)
         self._reload_mod_list()
         self.statusBar().showMessage(tr("status.empty_mod_created", name=name), 5000)
+
+    def _open_export_import(self) -> None:
+        """Zeigt den Export/Import-Auswahldialog und leitet weiter."""
+        from anvil.dialogs.export_import_dialog import ExportImportDialog
+
+        dialog = ExportImportDialog(self)
+        _center_on_parent(dialog)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        action = dialog.action()
+        fmt = dialog.format_type()
+
+        if action == "export" and fmt == "csv":
+            self._ctx_export_csv()
+        elif action == "export" and fmt == "anvilpack":
+            self._export_collection()
+        elif action == "import" and fmt == "csv":
+            self._import_csv()
+        elif action == "import" and fmt == "anvilpack":
+            self._import_collection()
+        elif action == "backup":
+            bak = dialog.backup_action()
+            if bak == "create":
+                self._create_backup()
+            else:
+                self._restore_backup()
+
+    def _import_csv(self) -> None:
+        """CSV importieren: Mods aktivieren/deaktivieren basierend auf CSV."""
+        import csv
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            tr("export_import.import_csv_title"),
+            str(Path.home()),
+            tr("dialog.csv_filter"),
+        )
+        if not path:
+            return
+
+        if not self._current_profile_path:
+            return
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                reader = csv.reader(f, delimiter=";")
+                header = next(reader, None)
+                if not header:
+                    return
+
+                # CSV-Spalten: Name, Category, Version, Priority, Active
+                csv_mods: dict[str, bool] = {}
+                for row in reader:
+                    if len(row) < 5:
+                        continue
+                    mod_name = row[0].strip()
+                    active = row[4].strip().lower() in ("yes", "1", "true", "ja")
+                    csv_mods[mod_name] = active
+
+            # Auf aktuelle Modliste anwenden
+            changed = 0
+            for entry in self._current_mod_entries:
+                if entry.is_separator:
+                    continue
+                display = entry.display_name or entry.name
+                if display in csv_mods:
+                    new_state = csv_mods[display]
+                    if entry.enabled != new_state:
+                        entry.enabled = new_state
+                        changed += 1
+
+            if changed > 0:
+                active_mods = {e.name for e in self._current_mod_entries if e.enabled}
+                write_active_mods(self._current_profile_path, active_mods)
+                self._reload_mod_list()
+                self._do_redeploy()
+
+            self.statusBar().showMessage(
+                tr("export_import.import_csv_status", count=changed), 5000,
+            )
+        except OSError as exc:
+            QMessageBox.warning(
+                self,
+                tr("error.import_failed_title"),
+                str(exc),
+            )
 
     def _ctx_export_csv(self) -> None:
         """Export the mod list as CSV file."""

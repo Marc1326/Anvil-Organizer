@@ -441,7 +441,8 @@
     "start_failed_title": "Запуск не удался",
     "start_failed_message": "Не удалось запустить:\n{path}",
     "rename_failed_title": "Переименование не удалось",
-    "export_failed_title": "Экспорт не удался"
+    "export_failed_title": "Экспорт не удался",
+    "import_failed_title": "Импорт не удался"
   },
   "game_panel": {
     "install": "Установить",
@@ -911,5 +912,26 @@
     "open_nexus": "Nexus",
     "apply_categories": "Primenit naznacheniya kategoriy",
     "game_mismatch": "Eta kollektsiya dlya {expected}, no tekushchaya instantsiya — {current}. Import nevozmozhен."
+  },
+  "export_import": {
+    "title": "Eksport / Import spiska modov",
+    "action_label": "Deystvie",
+    "export_radio": "Eksportirovat",
+    "import_radio": "Importirovat",
+    "format_label": "Format",
+    "csv_radio": "Fayl CSV",
+    "csv_desc": "Prostaya tablitsa s nazvaniyami modov, kategoriyey, versiyey, prioritetom i statusom. Dlya obmena ili sravneniya spiskov modov.",
+    "anvilpack_radio": "Kollektsiya Anvilpack",
+    "anvilpack_desc": "Polnaya nastrojka modov vklyuchaya poryadok, razdeliteli i kategorii. Dlya vosstanovleniya ili obmena s drugimi polzovatelyami Anvil.",
+    "next_button": "Dalee",
+    "menu_entry": "Eksport / Import spiska modov...",
+    "import_csv_title": "Importirovat spisok modov CSV",
+    "import_csv_status": "{count} modov bylo obnovleno",
+    "backup_radio": "Rezervnaya kopiya",
+    "backup_action_label": "Deystvie rezervnoy kopii",
+    "backup_create": "Sozdat rezervnuyu kopiyu",
+    "backup_create_desc": "Sozdayet polnuyu rezervnuyu kopiyu vsekh modov, profiley i nastroyek tekushchey instantsii.",
+    "backup_restore": "Vosstanovit rezervnuyu kopiyu",
+    "backup_restore_desc": "Vosstanavlivayet ranee sozdannuyu rezervnuyu kopiyu. Sushchestvuyushchie dannyye budut perezapisany."
   }
 }

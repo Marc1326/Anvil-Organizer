@@ -441,7 +441,8 @@
     "start_failed_title": "Arranque falhou",
     "start_failed_message": "Não foi possível iniciar:\n{path}",
     "rename_failed_title": "Renomeação falhou",
-    "export_failed_title": "Exportação falhou"
+    "export_failed_title": "Exportação falhou",
+    "import_failed_title": "Importação falhou"
   },
   "game_panel": {
     "install": "Instalar",
@@ -911,5 +912,26 @@
     "open_nexus": "Nexus",
     "apply_categories": "Aplicar atribuicoes de categorias",
     "game_mismatch": "Esta colecao e para {expected}, mas a instancia atual e {current}. Importacao nao possivel."
+  },
+  "export_import": {
+    "title": "Exportar / Importar lista de mods",
+    "action_label": "Acao",
+    "export_radio": "Exportar",
+    "import_radio": "Importar",
+    "format_label": "Formato",
+    "csv_radio": "Ficheiro CSV",
+    "csv_desc": "Tabela simples com nomes de mods, categoria, versao, prioridade e estado. Para partilhar ou comparar listas de mods.",
+    "anvilpack_radio": "Colecao Anvilpack",
+    "anvilpack_desc": "Configuracao completa de mods incluindo ordem, separadores e categorias. Para restaurar ou partilhar com outros utilizadores do Anvil.",
+    "next_button": "Seguinte",
+    "menu_entry": "Exportar / Importar lista de mods...",
+    "import_csv_title": "Importar lista de mods CSV",
+    "import_csv_status": "{count} mods foram atualizados",
+    "backup_radio": "Copia de seguranca",
+    "backup_action_label": "Acao de copia de seguranca",
+    "backup_create": "Criar copia de seguranca",
+    "backup_create_desc": "Cria uma copia de seguranca completa de todos os mods, perfis e configuracoes da instancia atual.",
+    "backup_restore": "Restaurar copia de seguranca",
+    "backup_restore_desc": "Restaura uma copia de seguranca criada anteriormente. Os dados existentes serao substituidos."
   }
 }
