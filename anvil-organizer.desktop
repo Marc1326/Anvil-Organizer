@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Anvil Organizer
+GenericName=Mod Manager
+Comment=Native Linux Mod Manager inspired by Mod Organizer 2
+Comment[de]=Nativer Linux Mod Manager inspiriert von Mod Organizer 2
+Exec=anvil-organizer %u
+Icon=anvil-organizer
+Terminal=false
+Categories=Game;Utility;
+Keywords=mod;modding;gaming;steam;proton;wine;nexus;
+StartupWMClass=anvil-organizer
+MimeType=x-scheme-handler/nxm;

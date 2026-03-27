@@ -1,0 +1,56 @@
+# Maintainer: Marc <marc1326@users.noreply.github.com>
+
+pkgname=anvil-organizer-git
+pkgver=r0.0000000
+pkgrel=1
+pkgdesc="Native Linux Mod Manager inspired by Mod Organizer 2 (git version)"
+arch=('x86_64')
+url="https://github.com/Marc1326/Anvil-Organizer"
+license=('GPL-3.0-or-later')
+depends=(
+    'python>=3.11'
+    'python-pyside6'
+    'python-lz4'
+    'qt6-base'
+    'hicolor-icon-theme'
+)
+makedepends=(
+    'git'
+    'python-build'
+    'python-installer'
+    'python-setuptools'
+    'python-wheel'
+)
+provides=('anvil-organizer')
+conflicts=('anvil-organizer')
+source=("${pkgname}::git+https://github.com/Marc1326/Anvil-Organizer.git")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd "$pkgname"
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+    cd "$pkgname"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "$pkgname"
+    python -m installer --destdir="$pkgdir" dist/*.whl
+
+    # Desktop entry
+    install -Dm644 anvil-organizer.desktop \
+        "$pkgdir/usr/share/applications/anvil-organizer.desktop"
+
+    # Icons
+    install -Dm644 anvil/resources/logo.png \
+        "$pkgdir/usr/share/icons/hicolor/256x256/apps/anvil-organizer.png"
+    install -Dm644 anvil/resources/logo.svg \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/anvil-organizer.svg"
+
+    # License
+    install -Dm644 LICENSE \
+        "$pkgdir/usr/share/licenses/${pkgname}/LICENSE"
+}
