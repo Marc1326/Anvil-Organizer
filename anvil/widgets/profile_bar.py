@@ -90,8 +90,9 @@ ADD_BUTTON_STYLE = """
         color: #888888;
         border: 1px solid #3D3D3D;
         border-radius: 6px;
-        font-size: 18px;
-        font-weight: bold;
+        font-size: 22px;
+        font-weight: 300;
+        font-family: "Noto Sans", "Arial", sans-serif;
     }
     #profileAddButton:hover {
         background: #006868;
@@ -250,10 +251,14 @@ class ProfileBar(QWidget):
         layout.addWidget(self._tab_container, 1)
 
         # ── Add Profile Button ────────────────────────────────────────
-        self._btn_add = QPushButton("+")
+        self._btn_add = QPushButton()
         self._btn_add.setObjectName("profileAddButton")
         self._btn_add.setFixedSize(30, 30)
         self._btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
+        _plus_path = os.path.join(ICON_DIR, "plus.png")
+        if os.path.exists(_plus_path):
+            self._btn_add.setIcon(QIcon(_plus_path))
+            self._btn_add.setIconSize(QSize(20, 20))
         self._btn_add.setStyleSheet(ADD_BUTTON_STYLE)
         self._btn_add.setToolTip(tr("tooltip.new_profile"))
         self._btn_add.clicked.connect(self._start_inline_create)
