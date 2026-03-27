@@ -1761,7 +1761,7 @@ class MainWindow(QMainWindow):
                         add_mod_to_modlist(self._current_profile_path, mod_path.name, enabled=False)
                 installed.append(mod_path.name)
                 # Mark as installed in .meta (MO2: markInstalled)
-                downloads_dir = self._current_instance_path / ".downloads"
+                downloads_dir = self._current_downloads_path or (self._current_instance_path / ".downloads")
                 if archive.parent == downloads_dir:
                     self._write_install_meta(archive, mod_path.name)
                     # Auto-hide: removed=true in Meta wenn Setting aktiv
@@ -1844,7 +1844,7 @@ class MainWindow(QMainWindow):
         """Find the .meta file that references mod_name and set installed=false."""
         if not self._current_instance_path:
             return
-        downloads_path = self._current_instance_path / ".downloads"
+        downloads_path = self._current_downloads_path or (self._current_instance_path / ".downloads")
         if not downloads_path.is_dir():
             return
         for meta_file in downloads_path.glob("*.meta"):
@@ -1867,7 +1867,7 @@ class MainWindow(QMainWindow):
         """Update installationFile in the .meta file when a mod is renamed."""
         if not self._current_instance_path:
             return
-        downloads_path = self._current_instance_path / ".downloads"
+        downloads_path = self._current_downloads_path or (self._current_instance_path / ".downloads")
         if not downloads_path.is_dir():
             return
         for meta_file in downloads_path.glob("*.meta"):
@@ -2464,7 +2464,7 @@ class MainWindow(QMainWindow):
         import subprocess
         if not self._current_instance_path:
             return
-        path = self._current_instance_path / ".downloads"
+        path = self._current_downloads_path or (self._current_instance_path / ".downloads")
         if path.is_dir():
             subprocess.Popen(["xdg-open", str(path)])
 
@@ -3806,11 +3806,12 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(tr("status.renamed", old=old_name, new=new_name), 5000)
 
     def _ctx_reinstall_mod(self, row: int) -> None:
-        """Reinstall a mod from its archive in .downloads/."""
+        """Reinstall a mod from its archive in the configured downloads folder."""
         entry = self._entry_for_row(row)
         if not entry:
             return
-        downloads_path = self._current_instance_path / ".downloads"
+        downloads_path = self._current_downloads_path or (self._current_instance_path / ".downloads")
+        print(f"DEBUG reinstall: _current_downloads_path={self._current_downloads_path}, downloads_path={downloads_path}", flush=True)
 
         if not downloads_path.is_dir():
             QMessageBox.warning(
@@ -3819,19 +3820,41 @@ class MainWindow(QMainWindow):
             )
             return
 
-        # Find matching archive by mod name
+        # Find matching archive by mod name or installationFile from meta.ini
         archive = None
         mod_lower = entry.name.lower()
-        for f in downloads_path.iterdir():
-            if f.is_file() and f.suffix.lower() in ('.zip', '.rar', '.7z'):
-                if mod_lower in f.stem.lower():
-                    archive = f
-                    break
+
+        # 1. Try exact match from meta.ini installationFile
+        from anvil.core.mod_metadata import read_meta_ini
+        mod_dir = self._current_instance_path / ".mods" / entry.name
+        meta = read_meta_ini(mod_dir)
+        inst_file = meta.get("installationFile", "")
+        if inst_file:
+            candidate = downloads_path / inst_file
+            if candidate.is_file():
+                archive = candidate
+
+        # 2. Fuzzy match: all mod name words must appear in archive name
+        if not archive:
+            mod_words = [w for w in mod_lower.replace("-", " ").replace("_", " ").split() if len(w) > 1]
+            best_score = 0
+            for f in downloads_path.iterdir():
+                if f.is_file() and f.suffix.lower() in ('.zip', '.rar', '.7z'):
+                    stem = f.stem.lower()
+                    # Exact substring match (original behavior)
+                    if mod_lower in stem:
+                        archive = f
+                        break
+                    # Word match: count how many mod words appear in filename
+                    matches = sum(1 for w in mod_words if w in stem)
+                    if matches > best_score and matches >= len(mod_words) * 0.6:
+                        best_score = matches
+                        archive = f
 
         if not archive:
             QMessageBox.information(
                 self, tr("dialog.reinstall_title"),
-                tr("dialog.no_matching_archive", name=entry.name),
+                tr("dialog.no_matching_archive", name=entry.name, path=str(downloads_path)),
             )
             return
 

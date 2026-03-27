@@ -241,9 +241,14 @@ def parse_fomod(config_path: Path) -> FomodConfig | None:
     """
     try:
         raw = config_path.read_bytes()
-        if raw.startswith(b"\xef\xbb\xbf"):
-            raw = raw[3:]
-        text = raw.decode("utf-8")
+        if raw.startswith(b"\xff\xfe"):
+            text = raw.decode("utf-16-le")
+        elif raw.startswith(b"\xfe\xff"):
+            text = raw.decode("utf-16-be")
+        elif raw.startswith(b"\xef\xbb\xbf"):
+            text = raw[3:].decode("utf-8")
+        else:
+            text = raw.decode("utf-8")
     except UnicodeDecodeError:
         try:
             text = raw.decode("windows-1252")

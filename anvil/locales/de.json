@@ -154,7 +154,7 @@
     "uninstall_data_override_title": "Data-Override deinstallieren",
     "uninstall_data_override_message": "Data-Override \"{name}\" wirklich deinstallieren?\n\nAlle zugehörigen Dateien werden aus Data/ gelöscht.",
     "reinstall_title": "Neu installieren",
-    "no_matching_archive": "Kein passendes Archiv für \"{name}\" in .downloads/ gefunden.",
+    "no_matching_archive": "Kein passendes Archiv für \"{name}\" in {path} gefunden.",
     "uninstall_framework_title": "Framework deinstallieren",
     "uninstall_framework_message": "Framework \"{name}\" wirklich deinstallieren?\n\nDie zugehörigen Dateien werden aus dem Spielverzeichnis gelöscht.",
     "uninstall_framework_warning": "ACHTUNG: \"{name}\" ist ein kritisches Framework!\n\nAndere Mods hängen davon ab und können ohne dieses Framework abstürzen.\n\nBei Problemen kannst du es jederzeit über Rechtsklick → Reinstall neu installieren.\n\nTrotzdem deinstallieren?",
