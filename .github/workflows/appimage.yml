@@ -1,0 +1,65 @@
+name: Build AppImage
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  appimage:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller anvil-organizer.spec --noconfirm
+
+      - name: Create AppDir
+        run: |
+          mkdir -p AppDir/usr/bin
+          # AppRun
+          cat > AppDir/AppRun << 'APPRUN'
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          exec "${HERE}/usr/bin/anvil-organizer" "$@"
+          APPRUN
+          chmod +x AppDir/AppRun
+          # Desktop + Icon
+          cp anvil-organizer.desktop AppDir/
+          cp anvil/resources/logo.png AppDir/anvil-organizer.png
+          # Binary
+          cp -a dist/anvil-organizer/* AppDir/usr/bin/
+
+      - name: Download appimagetool
+        run: |
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+
+      - name: Build AppImage
+        run: |
+          VERSION=$(python -c "from anvil.version import APP_VERSION; print(APP_VERSION)")
+          ARCH=x86_64 ./appimagetool AppDir "Anvil_Organizer-${VERSION}-x86_64.AppImage"
+
+      - name: Upload AppImage as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anvil-organizer-appimage
+          path: Anvil_Organizer-*-x86_64.AppImage
+
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} Anvil_Organizer-*-x86_64.AppImage

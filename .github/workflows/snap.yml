@@ -1,0 +1,31 @@
+name: Build & Publish Snap
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  snap:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy snapcraft.yaml to root
+        run: cp packaging/snap/snapcraft.yaml .
+
+      - uses: snapcore/action-build@v1
+        id: build
+
+      - uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_TOKEN }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: edge
+
+      - name: Upload snap as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anvil-organizer-snap
+          path: ${{ steps.build.outputs.snap }}
