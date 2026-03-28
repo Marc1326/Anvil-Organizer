@@ -3081,7 +3081,6 @@ class MainWindow(QMainWindow):
     def _export_collection(self) -> None:
         """Export the current mod setup as a .anvilpack collection."""
         from anvil.core.collection_io import build_manifest, export_collection
-        from anvil.dialogs.collection_export_dialog import CollectionExportDialog
 
         if not self._current_instance_path or not self._current_profile_path:
             return
@@ -3098,44 +3097,8 @@ class MainWindow(QMainWindow):
                 or game_short
             )
 
-        # Count mods and separators
-        mod_count = 0
-        sep_count = 0
-        for entry in self._current_mod_entries:
-            if entry.is_separator:
-                sep_count += 1
-            else:
-                mod_count += 1
-
-        # Show export dialog
-        dialog = CollectionExportDialog(
-            self,
-            game_name=game_name,
-            mod_count=mod_count,
-            separator_count=sep_count,
-        )
-        _center_on_parent(dialog)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-
-        coll_name = dialog.collection_name()
-        coll_desc = dialog.collection_description()
-        coll_author = dialog.collection_author()
-
-        # Build manifest
-        manifest = build_manifest(
-            instance_path=self._current_instance_path,
-            profile_path=self._current_profile_path,
-            game_name=game_name,
-            game_short_name=game_short,
-            game_nexus_name=game_nexus,
-            collection_name=coll_name,
-            collection_description=coll_desc,
-            collection_author=coll_author,
-        )
-
-        # Choose save location
-        suggested = str(Path.home() / f"{coll_name}.anvilpack")
+        # Choose save location — nativer Dialog
+        suggested = str(Path.home() / f"{game_name}.anvilpack")
         path, _ = QFileDialog.getSaveFileName(
             self,
             tr("collection.save_dialog_title"),
@@ -3148,6 +3111,19 @@ class MainWindow(QMainWindow):
         # Ensure extension
         if not path.endswith(".anvilpack"):
             path += ".anvilpack"
+
+        # Dateiname als Collection-Name
+        coll_name = Path(path).stem
+
+        # Build manifest
+        manifest = build_manifest(
+            instance_path=self._current_instance_path,
+            profile_path=self._current_profile_path,
+            game_name=game_name,
+            game_short_name=game_short,
+            game_nexus_name=game_nexus,
+            collection_name=coll_name,
+        )
 
         try:
             cats_path = self._current_instance_path / "categories.json"

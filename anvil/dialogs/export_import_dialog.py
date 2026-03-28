@@ -114,7 +114,12 @@ class _OptionCard(QFrame):
         self.setStyleSheet(_CARD_SELECTED if selected else _CARD_NORMAL)
 
     def mousePressEvent(self, event):
-        self.parent()._card_clicked(self)
+        # Dialog finden (kann mehrere Parent-Ebenen hoch sein)
+        w = self.parent()
+        while w and not isinstance(w, QDialog):
+            w = w.parent()
+        if w and hasattr(w, "_card_clicked"):
+            w._card_clicked(self)
         super().mousePressEvent(event)
 
 
