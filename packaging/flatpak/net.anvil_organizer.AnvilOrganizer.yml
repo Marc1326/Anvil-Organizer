@@ -66,6 +66,7 @@ modules:
     buildsystem: simple
     build-commands:
       - pip3 install --no-build-isolation --no-deps --prefix=/app .
+      - sed -i 's/^Icon=anvil-organizer$/Icon=net.anvil_organizer.AnvilOrganizer/' anvil-organizer.desktop
       - install -Dm644 anvil-organizer.desktop
           /app/share/applications/net.anvil_organizer.AnvilOrganizer.desktop
       - install -Dm644 anvil/resources/logo.png
