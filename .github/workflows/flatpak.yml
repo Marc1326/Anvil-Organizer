@@ -9,7 +9,7 @@ jobs:
   flatpak:
     runs-on: ubuntu-24.04
     container:
-      image: bilelmoussaoui/flatpak-github-actions:kde-6.8
+      image: bilelmoussaoui/flatpak-github-actions:kde-6.7
       options: --privileged
 
     steps:
