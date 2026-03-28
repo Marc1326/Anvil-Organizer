@@ -49,7 +49,7 @@ install -Dm644 anvil/resources/logo.svg \
 %doc README.md
 %{_bindir}/anvil-organizer
 %{python3_sitelib}/anvil/
-%{python3_sitelib}/anvil_organizer-*.egg-info/
+%{python3_sitelib}/anvil_organizer-*.dist-info/
 %{_datadir}/applications/anvil-organizer.desktop
 %{_datadir}/icons/hicolor/256x256/apps/anvil-organizer.png
 %{_datadir}/icons/hicolor/scalable/apps/anvil-organizer.svg
