@@ -5,6 +5,9 @@ on:
     types: [published]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   snap:
     runs-on: ubuntu-24.04
@@ -17,15 +20,22 @@ jobs:
       - uses: snapcore/action-build@v1
         id: build
 
-      - uses: snapcore/action-publish@v1
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_TOKEN }}
-        with:
-          snap: ${{ steps.build.outputs.snap }}
-          release: edge
-
       - name: Upload snap as artifact
         uses: actions/upload-artifact@v4
         with:
           name: anvil-organizer-snap
           path: ${{ steps.build.outputs.snap }}
+
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} ${{ steps.build.outputs.snap }}
+
+      - name: Publish to Snap Store
+        if: secrets.SNAP_STORE_TOKEN != ''
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_TOKEN }}
+        run: |
+          snapcraft upload --release=edge ${{ steps.build.outputs.snap }}

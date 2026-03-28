@@ -34,10 +34,37 @@ modules:
         url: https://files.pythonhosted.org/packages/source/l/lz4/lz4-4.3.3.tar.gz
         sha256: 01fe674ef2889dbb9899d8a67361e0c4a2c833af5aeb37dd505727cf5d2a131e
 
+  - name: python-shiboken6
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app shiboken6-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/cp311/s/shiboken6/shiboken6-6.8.3-cp311-abi3-manylinux_2_28_x86_64.whl
+        sha256: SKIP
+
+  - name: python-pyside6-essentials
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app PySide6_Essentials-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/cp311/P/PySide6_Essentials/PySide6_Essentials-6.8.3-cp311-abi3-manylinux_2_28_x86_64.whl
+        sha256: SKIP
+
+  - name: python-pyside6
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app PySide6-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/cp311/P/PySide6/PySide6-6.8.3-cp311-abi3-manylinux_2_28_x86_64.whl
+        sha256: SKIP
+
   - name: anvil-organizer
     buildsystem: simple
     build-commands:
-      - pip3 install --no-build-isolation --prefix=/app .
+      - pip3 install --no-build-isolation --no-deps --prefix=/app .
       - install -Dm644 anvil-organizer.desktop
           /app/share/applications/com.github.Marc1326.AnvilOrganizer.desktop
       - install -Dm644 anvil/resources/logo.png
