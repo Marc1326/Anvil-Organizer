@@ -1,5 +1,5 @@
 Name:           anvil-organizer
-Version:        1.2.1
+Version:        1.2.2
 Release:        1%{?dist}
 Summary:        Native Linux Mod Manager inspired by Mod Organizer 2
 
@@ -29,10 +29,10 @@ profile management, Nexus Mods integration, and plugin load ordering.
 %autosetup -n Anvil-Organizer-%{version}
 
 %build
-%py3_build
+# Nothing to build — pure Python package
 
 %install
-%py3_install
+pip3 install --no-build-isolation --no-deps --root=%{buildroot} --prefix=/usr .
 
 # Desktop entry
 install -Dm644 anvil-organizer.desktop \
@@ -55,9 +55,14 @@ install -Dm644 anvil/resources/logo.svg \
 %{_datadir}/icons/hicolor/scalable/apps/anvil-organizer.svg
 
 %changelog
-* Fri Mar 28 2026 Marc <marc1326@users.noreply.github.com> - 1.2.1-1
+* Sat Mar 28 2026 Marc <marc1326@users.noreply.github.com> - 1.2.2-1
+- Flatpak and packaging improvements
+- LOOT integration
+- Deploy filter
+
+* Sat Mar 28 2026 Marc <marc1326@users.noreply.github.com> - 1.2.1-1
 - Collection Export: direct native file dialog
 - Fix: Card click in Export/Import dialog
 
-* Thu Mar 27 2026 Marc <marc1326@users.noreply.github.com> - 1.2.0-1
+* Fri Mar 27 2026 Marc <marc1326@users.noreply.github.com> - 1.2.0-1
 - Initial release
