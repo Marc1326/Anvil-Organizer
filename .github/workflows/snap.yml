@@ -34,8 +34,12 @@ jobs:
           gh release upload ${{ github.event.release.tag_name }} ${{ steps.build.outputs.snap }}
 
       - name: Publish to Snap Store
-        if: secrets.SNAP_STORE_TOKEN != ''
+        continue-on-error: true
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_TOKEN }}
         run: |
-          snapcraft upload --release=edge ${{ steps.build.outputs.snap }}
+          if [ -n "$SNAPCRAFT_STORE_CREDENTIALS" ]; then
+            snapcraft upload --release=edge ${{ steps.build.outputs.snap }}
+          else
+            echo "SNAP_STORE_TOKEN not set, skipping publish"
+          fi
