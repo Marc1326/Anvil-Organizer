@@ -3,7 +3,53 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Anvil Organizer</title>
+<title>Anvil Mod Manager — Native Linux Modding Tool | Open Source</title>
+<meta name="description" content="Anvil Organizer is the first native Linux mod manager. Inspired by MO2, built with Python & Qt6. Supports 35+ games including Cyberpunk 2077, Elden Ring, Skyrim, Fallout 4. Symlink-based deploy, NexusMods integration, open source.">
+<meta name="keywords" content="Linux Mod Manager, Native Linux Modding Tool, MO2 Alternative Linux, Steam Deck Modding, Open Source Mod Manager, Vortex Alternative Linux, Cyberpunk 2077 Mods Linux, Elden Ring Mods Linux, Skyrim Mods Linux, Proton Modding, PySide6 Qt6">
+<meta name="author" content="Nathuk">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://anvil-organizer.net">
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Anvil Organizer — Native Linux Mod Manager">
+<meta property="og:description" content="The first native Linux mod manager. 35+ games, symlink deploy, NexusMods integration. Inspired by MO2, reimagined for Linux.">
+<meta property="og:url" content="https://anvil-organizer.net">
+<meta property="og:site_name" content="Anvil Organizer">
+<meta property="og:image" content="https://anvil-organizer.net/site/img/social-preview.png">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Anvil Organizer — Native Linux Mod Manager">
+<meta name="twitter:description" content="The first native Linux mod manager. 35+ games, symlink deploy, open source.">
+<meta name="twitter:image" content="https://anvil-organizer.net/site/img/social-preview.png">
+<!-- Schema.org Software Application -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Anvil Organizer",
+  "description": "Native Linux mod manager inspired by MO2. Supports 35+ games with symlink-based deploy.",
+  "url": "https://anvil-organizer.net",
+  "downloadUrl": "https://github.com/Marc1326/Anvil-Organizer/releases/latest",
+  "softwareVersion": "1.2.2",
+  "operatingSystem": "Linux",
+  "applicationCategory": "GameApplication",
+  "license": "https://opensource.org/licenses/GPL-3.0",
+  "author": {
+    "@type": "Person",
+    "name": "Nathuk",
+    "url": "https://github.com/Marc1326"
+  },
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "EUR"
+  },
+  "screenshot": "https://anvil-organizer.net/site/img/starfield.png",
+  "softwareRequirements": "Linux x86_64, Python 3.13+, PySide6",
+  "fileSize": "88MB",
+  "releaseNotes": "https://github.com/Marc1326/Anvil-Organizer/releases"
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -131,7 +177,7 @@ footer { padding:56px 40px 28px; max-width:1100px; margin:0 auto; }
 <section class="hero">
   <div class="hero-glow"></div>
   <div class="hero-fade"></div>
-  <div class="hero-badge"><span class="dot"></span> v1.0.9 — Open Source</div>
+  <div class="hero-badge"><span class="dot"></span> v1.2.2 — Open Source</div>
   <svg class="hero-logo"><use href="#anvil"/></svg>
   <h1>Anvil Organizer</h1>
   <p class="hero-sub" data-i18n="hero_sub">Der erste native Linux Mod Manager. Gebaut mit Python & Qt6 für CachyOS, Arch und jede Linux-Distribution.</p>
@@ -193,8 +239,13 @@ footer { padding:56px 40px 28px; max-width:1100px; margin:0 auto; }
     <h2 data-i18n="dl_title">Jetzt herunterladen</h2>
     <p data-i18n="dl_desc">Anvil Organizer ist kostenlos und Open Source.</p>
     <div class="dl-opts">
-      <a href="https://github.com/Marc1326/Anvil-Organizer/releases/latest" class="dl-opt"><div class="info"><span class="name" data-i18n="dl_appimage">AppImage (empfohlen)</span><span class="meta" data-i18n="dl_appimage_meta">~88 MB · Universell · Keine Installation nötig</span></div><span class="icon">↓</span></a>
-      <a href="https://github.com/Marc1326/Anvil-Organizer" class="dl-opt"><div class="info"><span class="name" data-i18n="dl_source">Quellcode (git clone)</span><span class="meta">python main.py · Python 3.13+, PySide6</span></div><span class="icon">→</span></a>
+      <a href="https://github.com/Marc1326/Anvil-Organizer/releases/latest" class="dl-opt"><div class="info"><span class="name" data-i18n="dl_appimage">AppImage (empfohlen)</span><span class="meta" data-i18n="dl_appimage_meta">Universell · Keine Installation nötig</span></div><span class="icon">↓</span></a>
+      <a href="https://flathub.org/apps/net.anvil_organizer.AnvilOrganizer" class="dl-opt"><div class="info"><span class="name">Flatpak</span><span class="meta">Flathub</span></div><span class="icon">→</span></a>
+      <a href="https://snapcraft.io/anvil-organizer" class="dl-opt"><div class="info"><span class="name">Snap</span><span class="meta">Snapcraft</span></div><span class="icon">→</span></a>
+      <a href="https://github.com/Marc1326/Anvil-Organizer/releases/latest" class="dl-opt"><div class="info"><span class="name" data-i18n="dl_deb">DEB Package</span><span class="meta">Ubuntu, Debian, Linux Mint, Pop!_OS</span></div><span class="icon">↓</span></a>
+      <a href="https://github.com/Marc1326/Anvil-Organizer/releases/latest" class="dl-opt"><div class="info"><span class="name" data-i18n="dl_rpm">RPM Package</span><span class="meta">Fedora, openSUSE</span></div><span class="icon">↓</span></a>
+      <a href="https://aur.archlinux.org/packages/anvil-organizer" class="dl-opt"><div class="info"><span class="name">AUR</span><span class="meta">Arch Linux, CachyOS, EndeavourOS, Manjaro</span></div><span class="icon">→</span></a>
+      <a href="https://github.com/Marc1326/Anvil-Organizer" class="dl-opt"><div class="info"><span class="name" data-i18n="dl_source">Quellcode</span><span class="meta">GitHub</span></div><span class="icon">→</span></a>
     </div>
     <div class="dl-links"><a href="https://www.nexusmods.com/site/mods/1141">NexusMods</a><a href="https://github.com/Marc1326/Anvil-Organizer/releases" data-i18n="dl_releases">Alle Releases</a><a href="https://github.com/Marc1326/Anvil-Organizer/issues" data-i18n="dl_bugs">Bug melden</a></div>
   </div>
