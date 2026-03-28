@@ -47,4 +47,4 @@ modules:
     sources:
       - type: git
         url: https://github.com/Marc1326/Anvil-Organizer.git
-        tag: v1.2.1
+        branch: main
