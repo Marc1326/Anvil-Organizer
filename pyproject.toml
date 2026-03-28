@@ -43,5 +43,21 @@ anvil-organizer = "anvil.__main__:main"
 [project.gui-scripts]
 anvil-organizer = "anvil.__main__:main"
 
+[tool.setuptools.package-data]
+anvil = [
+    "styles/*.qss",
+    "styles/icons/**/*.svg",
+    "styles/icons/**/*.png",
+    "styles/icons/**/*.zip",
+    "styles/Paper/**/*.svg",
+    "resources/*.png",
+    "resources/*.svg",
+    "assets/icons/**/*.png",
+    "locales/*.json",
+    "data/shims/**/*.dll",
+    "data/shims/**/*.c",
+    "data/shims/**/*.def",
+]
+
 [tool.setuptools.packages.find]
 include = ["anvil*"]
