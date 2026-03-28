@@ -1,0 +1,53 @@
+name: Build .rpm Package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rpm:
+    runs-on: ubuntu-24.04
+    container:
+      image: fedora:41
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          dnf install -y rpm-build python3-devel python3-setuptools python3-wheel python3-pip gh
+
+      - name: Prepare source tarball
+        run: |
+          VERSION=$(python3 -c "from anvil.version import APP_VERSION; print(APP_VERSION)")
+          mkdir -p ~/rpmbuild/{SOURCES,SPECS}
+          tar czf ~/rpmbuild/SOURCES/anvil-organizer-${VERSION}.tar.gz \
+            --transform "s,^,Anvil-Organizer-${VERSION}/," \
+            --exclude='.git' --exclude='__pycache__' --exclude='.venv' \
+            --exclude='dist' --exclude='build' --exclude='release' .
+          cp packaging/rpm/anvil-organizer.spec ~/rpmbuild/SPECS/
+
+      - name: Build .rpm package
+        run: rpmbuild -bb ~/rpmbuild/SPECS/anvil-organizer.spec
+
+      - name: Collect .rpm
+        run: |
+          mkdir -p dist
+          cp ~/rpmbuild/RPMS/noarch/*.rpm dist/
+
+      - name: Upload .rpm as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anvil-organizer-rpm
+          path: dist/*.rpm
+
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} dist/*.rpm

@@ -1,0 +1,12 @@
+anvil-organizer (1.2.1-1) unstable; urgency=medium
+
+  * Collection Export: direct native file dialog instead of custom window
+  * Fix: Card click in Export/Import dialog
+
+ -- Marc <marc1326@users.noreply.github.com>  Fri, 28 Mar 2026 08:00:00 +0200
+
+anvil-organizer (1.2.0-1) unstable; urgency=medium
+
+  * Initial release
+
+ -- Marc <marc1326@users.noreply.github.com>  Thu, 27 Mar 2026 12:00:00 +0200

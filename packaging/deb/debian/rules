@@ -1,0 +1,17 @@
+#!/usr/bin/make -f
+
+export PYBUILD_NAME=anvil-organizer
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_install:
+	dh_auto_install
+	# Desktop entry
+	install -Dm644 anvil-organizer.desktop \
+		debian/anvil-organizer/usr/share/applications/anvil-organizer.desktop
+	# Icons
+	install -Dm644 anvil/resources/logo.png \
+		debian/anvil-organizer/usr/share/icons/hicolor/256x256/apps/anvil-organizer.png
+	install -Dm644 anvil/resources/logo.svg \
+		debian/anvil-organizer/usr/share/icons/hicolor/scalable/apps/anvil-organizer.svg

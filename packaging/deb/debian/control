@@ -1,0 +1,26 @@
+Source: anvil-organizer
+Section: games
+Priority: optional
+Maintainer: Marc <marc1326@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-all,
+               python3-setuptools,
+               python3-wheel
+Standards-Version: 4.6.2
+Homepage: https://github.com/Marc1326/Anvil-Organizer
+Rules-Requires-Root: no
+
+Package: anvil-organizer
+Architecture: all
+Depends: ${python3:Depends},
+         ${misc:Depends},
+         python3-pyside6,
+         python3-lz4
+Description: Native Linux Mod Manager inspired by Mod Organizer 2
+ Anvil Organizer is a native Linux mod manager for games like Skyrim,
+ Fallout 4, Cyberpunk 2077, Baldur's Gate 3, Starfield, and more.
+ .
+ Features include virtual file system deployment, profile management,
+ Nexus Mods integration, drag-and-drop load ordering, and plugin
+ conflict detection.
