@@ -8,7 +8,7 @@ Build-Depends: debhelper-compat (= 13),
                python3-setuptools,
                python3-wheel
 Standards-Version: 4.6.2
-Homepage: https://github.com/Marc1326/Anvil-Organizer
+Homepage: https://anvil-organizer.net
 Rules-Requires-Root: no
 
 Package: anvil-organizer
