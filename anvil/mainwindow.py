@@ -1384,12 +1384,20 @@ class MainWindow(QMainWindow):
         """Handle archives dropped onto the mod list."""
         if not self._current_instance_path:
             return
+        if self._bg3_installer is not None:
+            self._on_bg3_archives_dropped(paths)
+            self._game_panel.refresh_downloads()
+            return
         self._install_archives([Path(p) for p in paths])
         self._game_panel.refresh_downloads()
 
     def _on_archives_dropped_at(self, paths: list, target_row: int) -> None:
         """Handle archives dropped onto the mod list at a specific position."""
         if not self._current_instance_path:
+            return
+        if self._bg3_installer is not None:
+            self._on_bg3_archives_dropped(paths)
+            self._game_panel.refresh_downloads()
             return
         self._install_archives([Path(p) for p in paths], insert_at=target_row)
         self._game_panel.refresh_downloads()
