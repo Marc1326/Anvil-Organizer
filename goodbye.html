@@ -52,9 +52,7 @@ nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:14px 40px; di
 .sec-label.green { color:var(--green-bright); }
 .sec-title { font-size:clamp(28px,3.5vw,42px); font-weight:700; letter-spacing:-.03em; line-height:1.1; margin-bottom:14px; }
 .sec-desc { font-size:16px; color:var(--on-surface-dim); max-width:600px; line-height:1.7; margin-bottom:40px; }
-.tool-row { display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center; margin-bottom:100px; }
-.tool-row.reverse { direction:rtl; }
-.tool-row.reverse > * { direction:ltr; }
+.tool-row { display:flex; flex-direction:column; gap:32px; margin-bottom:100px; max-width:800px; margin-left:auto; margin-right:auto; }
 .tool-text { }
 .tool-text h2 { font-size:28px; font-weight:700; margin-bottom:12px; letter-spacing:-.02em; }
 .tool-text h2 .gw { color:var(--purple-bright); }
@@ -89,7 +87,7 @@ footer { padding:56px 40px 28px; max-width:1100px; margin:0 auto; }
 .ft-col a { display:block; color:var(--on-surface-dim); text-decoration:none; font-size:13px; margin-bottom:8px; transition:color .2s; }
 .ft-col a:hover { color:var(--teal-glow); }
 .ft-bottom { display:flex; justify-content:space-between; align-items:center; padding-top:28px; border-top:1px solid var(--outline-ghost); font-size:11px; color:var(--on-surface-muted); }
-@media(max-width:768px) { nav{padding:12px 20px} .nav-links{display:none} .hero{padding:120px 20px 60px} .tool-row,.tool-row.reverse{grid-template-columns:1fr} .flow-steps{flex-direction:column} .flow-arrow{transform:rotate(90deg);justify-content:center} .tools-section,.flow-section,.games-section{padding:60px 20px} .ft-top{flex-direction:column} }
+@media(max-width:768px) { nav{padding:12px 20px} .nav-links{display:none} .hero{padding:120px 20px 60px} .flow-steps{flex-direction:column} .flow-arrow{transform:rotate(90deg);justify-content:center} .tools-section,.flow-section,.games-section{padding:60px 20px} .ft-top{flex-direction:column} }
 </style>
 </head>
 <body>
@@ -142,7 +140,7 @@ footer { padding:56px 40px 28px; max-width:1100px; margin:0 auto; }
   </div>
 
   <!-- HelloLinux (Importer) -->
-  <div class="tool-row reverse">
+  <div class="tool-row">
     <div class="tool-text">
       <div class="platform linux">Linux</div>
       <h2><span class="hl">HelloLinux</span> — Importer</h2>
