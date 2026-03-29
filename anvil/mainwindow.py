@@ -1396,7 +1396,7 @@ class MainWindow(QMainWindow):
         if not self._current_instance_path:
             return
         if self._bg3_installer is not None:
-            self._on_bg3_archives_dropped(paths)
+            self._on_bg3_archives_dropped(paths, insert_at=target_row)
             self._game_panel.refresh_downloads()
             return
         self._install_archives([Path(p) for p in paths], insert_at=target_row)
@@ -4528,17 +4528,31 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(tr("status.load_order_failed"), 5000)
             self._bg3_reload_mod_list()
 
-    def _on_bg3_archives_dropped(self, paths: list) -> None:
+    def _on_bg3_archives_dropped(self, paths: list, insert_at: int | None = None) -> None:
         """Install BG3 mods from dropped archives/paks."""
         if self._bg3_installer is None:
             return
+
+        # Capture reference entry for positioning before state changes
+        ref_uuid = None
+        ref_active = False
+        if insert_at is not None and self._current_mod_entries:
+            entries = self._current_mod_entries
+            idx = insert_at
+            while idx < len(entries) and getattr(entries[idx], "is_separator", False):
+                idx += 1
+            if idx < len(entries):
+                ref_uuid = entries[idx].name  # UUID for BG3 entries
+                ref_active = entries[idx].enabled
+
         installed = []
         for path_str in paths:
             result = self._bg3_installer.install_mod(Path(path_str))
             if result:
                 mod_type = result.get("type", "pak")
                 name = result.get("name", Path(path_str).name)
-                installed.append((name, mod_type))
+                uuid = result.get("uuid", "")
+                installed.append((name, mod_type, uuid))
                 # Mark download as installed in .meta file
                 try:
                     meta_path = Path(str(path_str) + ".meta")
@@ -4557,10 +4571,17 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(
                     tr("status.install_failed", name=Path(path_str).name), 5000,
                 )
+
+        # Position newly installed mods at drop target
+        if ref_uuid and installed:
+            for _name, mod_type, uuid in installed:
+                if uuid and mod_type == "pak":
+                    self._bg3_installer.insert_mod_at(uuid, ref_uuid, activate=ref_active)
+
         if installed:
             self._bg3_reload_mod_list()
-            names = ", ".join(n for n, _ in installed)
-            types = set(t for _, t in installed)
+            names = ", ".join(n for n, _, _ in installed)
+            types = set(t for _, t, _ in installed)
             if types == {"pak"}:
                 self.statusBar().showMessage(tr("status.installed_inactive", names=names), 5000)
             else:

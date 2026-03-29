@@ -120,6 +120,71 @@ class BG3ModInstaller:
         self._write_modsettings(mod_order, mods)
         return True
 
+    def insert_mod_at(self, uuid: str, before_uuid: str, activate: bool = True) -> bool:
+        """Position a newly installed mod before a reference mod.
+
+        If activate is True, add to ModOrder before before_uuid.
+        If activate is False, reposition in the inactive section of the mods list.
+        """
+        data = self._read_state()
+        mod_order = data["mod_order"]
+        mods = data["mods"]
+
+        if activate:
+            # Ensure mod is in Mods node
+            if not any(m["uuid"].lower() == uuid.lower() for m in mods):
+                meta = self._find_pak_metadata(uuid)
+                if meta is None:
+                    return False
+                mods.append({
+                    "uuid": meta["uuid"],
+                    "name": meta.get("name", ""),
+                    "folder": meta.get("folder", ""),
+                    "md5": "",
+                    "version64": meta.get("version", "0") or "0",
+                    "publish_handle": "0",
+                })
+
+            # Remove from mod_order if already there
+            mod_order = [u for u in mod_order if u.lower() != uuid.lower()]
+
+            # Find position of before_uuid in mod_order
+            pos = len(mod_order)
+            for i, u in enumerate(mod_order):
+                if u.lower() == before_uuid.lower():
+                    pos = i
+                    break
+
+            mod_order.insert(pos, uuid)
+            self._write_state(mod_order, mods)
+            self._write_modsettings(mod_order, mods)
+        else:
+            # Reposition in mods list (inactive section ordering)
+            entry = None
+            remaining = []
+            for m in mods:
+                if m["uuid"].lower() == uuid.lower() and entry is None:
+                    entry = m
+                else:
+                    remaining.append(m)
+
+            if entry is None:
+                return False
+
+            new_mods = []
+            inserted = False
+            for m in remaining:
+                if m["uuid"].lower() == before_uuid.lower() and not inserted:
+                    new_mods.append(entry)
+                    inserted = True
+                new_mods.append(m)
+            if not inserted:
+                new_mods.append(entry)
+
+            self._write_state(mod_order, new_mods)
+
+        return True
+
     def deactivate_mod(self, uuid: str) -> bool:
         """Move a mod from active to inactive (remove from ModOrder).
 
