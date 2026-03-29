@@ -39,6 +39,10 @@ MO2 dominates on Windows — Anvil fills the gap on Linux.
 - **7 languages** — DE, EN, FR, ES, IT, PT, RU
 - **Dark theme** — multiple styles included
 
+## Migrating from Windows?
+
+Use **[GoodbyeWindows](https://github.com/Marc1326/GoodbyeWindows)** to transfer your MO2 mod setup from Windows to Anvil Organizer on Linux — including load order, Nexus IDs, profiles, and mod files.
+
 ## Supported Games (35)
 
 ### Fully Supported (8)
@@ -249,3 +253,4 @@ If Anvil Organizer is useful to you, consider supporting its development:
 
 - Inspired by [Mod Organizer 2](https://github.com/ModOrganizer2/modorganizer)
 - Built with [PySide6](https://doc.qt.io/qtforpython-6/) (Qt for Python)
+- Migration from Windows: [GoodbyeWindows](https://github.com/Marc1326/GoodbyeWindows)
