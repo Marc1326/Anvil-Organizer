@@ -87,6 +87,14 @@ footer { padding:56px 40px 28px; max-width:1100px; margin:0 auto; }
 .ft-col a { display:block; color:var(--on-surface-dim); text-decoration:none; font-size:13px; margin-bottom:8px; transition:color .2s; }
 .ft-col a:hover { color:var(--teal-glow); }
 .ft-bottom { display:flex; justify-content:space-between; align-items:center; padding-top:28px; border-top:1px solid var(--outline-ghost); font-size:11px; color:var(--on-surface-muted); }
+.lang-switch { position:relative; }
+.lang-btn { background:var(--surface-high); border:1px solid var(--outline-ghost); border-radius:var(--radius-sm); color:var(--on-surface-dim); font-family:inherit; font-size:12px; font-weight:500; padding:6px 12px; cursor:pointer; transition:all .2s; display:flex; align-items:center; gap:5px; }
+.lang-btn:hover { background:var(--surface-highest); color:var(--on-surface); }
+.lang-menu { display:none; position:absolute; top:calc(100% + 6px); right:0; background:var(--surface-high); border:1px solid var(--outline-ghost); border-radius:var(--radius-sm); min-width:120px; padding:4px; z-index:200; backdrop-filter:blur(20px); box-shadow:0 12px 32px rgba(0,0,0,.4); }
+.lang-menu.open { display:block; }
+.lang-menu button { display:block; width:100%; text-align:left; padding:7px 12px; background:none; border:none; color:var(--on-surface-dim); font-family:inherit; font-size:12px; cursor:pointer; border-radius:4px; transition:background .15s; }
+.lang-menu button:hover { background:var(--teal-ghost-strong); color:var(--on-surface); }
+.lang-menu button.active { color:var(--teal-glow); }
 @media(max-width:768px) { nav{padding:12px 20px} .nav-links{display:none} .hero{padding:120px 20px 60px} .flow-steps{flex-direction:column} .flow-arrow{transform:rotate(90deg);justify-content:center} .tools-section,.flow-section,.games-section{padding:60px 20px} .ft-top{flex-direction:column} }
 </style>
 </head>
@@ -100,21 +108,33 @@ footer { padding:56px 40px 28px; max-width:1100px; margin:0 auto; }
     <li><a href="https://github.com/Marc1326/GoodbyeWindows">GitHub</a></li>
     <li><a href="https://github.com/Marc1326/Anvil-Organizer/wiki">Wiki</a></li>
   </ul>
+  <div class="lang-switch">
+    <button class="lang-btn" onclick="document.querySelector('.lang-menu').classList.toggle('open')">🌐 <span id="lang-current">EN</span></button>
+    <div class="lang-menu">
+      <button onclick="setLang('de')">🇩🇪 Deutsch</button>
+      <button onclick="setLang('en')" class="active">🇬🇧 English</button>
+      <button onclick="setLang('es')">🇪🇸 Español</button>
+      <button onclick="setLang('fr')">🇫🇷 Français</button>
+      <button onclick="setLang('it')">🇮🇹 Italiano</button>
+      <button onclick="setLang('pt')">🇧🇷 Português</button>
+      <button onclick="setLang('ru')">🇷🇺 Русский</button>
+    </div>
+  </div>
 </nav>
 
 <section class="hero">
   <div class="hero-glow"></div>
   <div class="hero-fade"></div>
   <h1><span class="gw">GoodbyeWindows</span> <span class="amp">&</span> <span class="hl">HelloLinux</span></h1>
-  <p class="hero-sub">Move your entire mod setup from Windows to Linux. No re-downloading, no starting over. Your mods, your load order, your profiles — everything comes with you.</p>
+  <p class="hero-sub" data-i18n="hero_sub">Move your entire mod setup from Windows to Linux. No re-downloading, no starting over. Your mods, your load order, your profiles — everything comes with you.</p>
   <div class="hero-actions">
     <a href="https://github.com/Marc1326/GoodbyeWindows/releases/latest" class="btn-primary">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-      Download
+      <span data-i18n="btn_download">Download</span>
     </a>
     <a href="https://github.com/Marc1326/GoodbyeWindows" class="btn-ghost">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-      Source Code
+      <span data-i18n="btn_source">Source Code</span>
     </a>
   </div>
 </section>
@@ -125,13 +145,13 @@ footer { padding:56px 40px 28px; max-width:1100px; margin:0 auto; }
     <div class="tool-text">
       <div class="platform win">Windows</div>
       <h2><span class="gw">GoodbyeWindows</span> — Exporter</h2>
-      <p>Run this tool on your Windows PC. It scans for MO2 instances automatically — Registry, AppData, common install paths. Select what you want to export and choose how to transfer.</p>
+      <p data-i18n="gw_desc">Run this tool on your Windows PC. It scans for MO2 instances automatically — Registry, AppData, common install paths. Select what you want to export and choose how to transfer.</p>
       <div class="tool-features">
-        <div class="tool-feat"><span class="check">✓</span> Auto-detects MO2 instances</div>
-        <div class="tool-feat"><span class="check">✓</span> Export to USB, external drive, or network</div>
-        <div class="tool-feat"><span class="check">✓</span> LAN transfer with PIN authentication</div>
-        <div class="tool-feat"><span class="check">✓</span> Metadata only or full export with mod files</div>
-        <div class="tool-feat"><span class="check">✓</span> Preserves load order, profiles & Nexus IDs</div>
+        <div class="tool-feat"><span class="check">✓</span> <span data-i18n="gw_f1">Auto-detects MO2 instances</span></div>
+        <div class="tool-feat"><span class="check">✓</span> <span data-i18n="gw_f2">Export to USB, external drive, or network</span></div>
+        <div class="tool-feat"><span class="check">✓</span> <span data-i18n="gw_f3">LAN transfer with PIN authentication</span></div>
+        <div class="tool-feat"><span class="check">✓</span> <span data-i18n="gw_f4">Metadata only or full export with mod files</span></div>
+        <div class="tool-feat"><span class="check">✓</span> <span data-i18n="gw_f5">Preserves load order, profiles & Nexus IDs</span></div>
       </div>
     </div>
     <div class="tool-img">
@@ -144,13 +164,13 @@ footer { padding:56px 40px 28px; max-width:1100px; margin:0 auto; }
     <div class="tool-text">
       <div class="platform linux">Linux</div>
       <h2><span class="hl">HelloLinux</span> — Importer</h2>
-      <p>Run this on your Linux PC. Import from a USB drive, scan your Windows partition (dual-boot), or receive mods directly over your local network. Everything gets converted to Anvil Organizer format.</p>
+      <p data-i18n="hl_desc">Run this on your Linux PC. Import from a USB drive, scan your Windows partition (dual-boot), or receive mods directly over your local network. Everything gets converted to Anvil Organizer format.</p>
       <div class="tool-features">
-        <div class="tool-feat"><span class="check">✓</span> Import from USB, NTFS partition, or network</div>
-        <div class="tool-feat"><span class="check">✓</span> NTFS partition scanning for dual-boot setups</div>
-        <div class="tool-feat"><span class="check">✓</span> Creates complete Anvil instance automatically</div>
-        <div class="tool-feat"><span class="check">✓</span> Symlink or copy — your choice</div>
-        <div class="tool-feat"><span class="check">✓</span> Vortex import planned</div>
+        <div class="tool-feat"><span class="check">✓</span> <span data-i18n="hl_f1">Import from USB, NTFS partition, or network</span></div>
+        <div class="tool-feat"><span class="check">✓</span> <span data-i18n="hl_f2">NTFS partition scanning for dual-boot setups</span></div>
+        <div class="tool-feat"><span class="check">✓</span> <span data-i18n="hl_f3">Creates complete Anvil instance automatically</span></div>
+        <div class="tool-feat"><span class="check">✓</span> <span data-i18n="hl_f4">Symlink or copy — your choice</span></div>
+        <div class="tool-feat"><span class="check">✓</span> <span data-i18n="hl_f5">Vortex import planned</span></div>
       </div>
     </div>
     <div class="tool-img">
@@ -161,33 +181,33 @@ footer { padding:56px 40px 28px; max-width:1100px; margin:0 auto; }
 
 <!-- How it works -->
 <section class="flow-section">
-  <div class="sec-label" style="color:var(--teal-bright)">HOW IT WORKS</div>
-  <h2 class="sec-title">Three steps. That's it.</h2>
+  <div class="sec-label" style="color:var(--teal-bright)" data-i18n="how_label">HOW IT WORKS</div>
+  <h2 class="sec-title" data-i18n="how_title">Three steps. That's it.</h2>
   <div class="flow-steps">
     <div class="flow-step">
       <div class="num purple">1</div>
-      <h3>Export on Windows</h3>
-      <p>Run GoodbyeWindows. It finds your MO2 setup and exports everything — mods, load order, profiles, Nexus IDs.</p>
+      <h3 data-i18n="step1_title">Export on Windows</h3>
+      <p data-i18n="step1_desc">Run GoodbyeWindows. It finds your MO2 setup and exports everything — mods, load order, profiles, Nexus IDs.</p>
     </div>
     <div class="flow-arrow">→</div>
     <div class="flow-step">
       <div class="num neutral">2</div>
-      <h3>Transfer</h3>
-      <p>USB drive, external disk, or direct LAN transfer with PIN. Your choice.</p>
+      <h3 data-i18n="step2_title">Transfer</h3>
+      <p data-i18n="step2_desc">USB drive, external disk, or direct LAN transfer with PIN. Your choice.</p>
     </div>
     <div class="flow-arrow">→</div>
     <div class="flow-step">
       <div class="num green">3</div>
-      <h3>Import on Linux</h3>
-      <p>Run HelloLinux. Select source, preview your mods, import into Anvil Organizer. Done.</p>
+      <h3 data-i18n="step3_title">Import on Linux</h3>
+      <p data-i18n="step3_desc">Run HelloLinux. Select source, preview your mods, import into Anvil Organizer. Done.</p>
     </div>
   </div>
 </section>
 
 <!-- Supported Games -->
 <section class="games-section">
-  <div class="sec-label" style="color:var(--teal-bright)">SUPPORTED GAMES</div>
-  <p class="sec-desc">Migration tested and supported for 19+ games. More coming.</p>
+  <div class="sec-label" style="color:var(--teal-bright)" data-i18n="games_label">SUPPORTED GAMES</div>
+  <p class="sec-desc" data-i18n="games_desc">Migration tested and supported for 19+ games. More coming.</p>
   <div class="g-grid">
     <div class="g-chip">Skyrim SE</div>
     <div class="g-chip">Skyrim</div>
@@ -220,5 +240,20 @@ footer { padding:56px 40px 28px; max-width:1100px; margin:0 auto; }
   </div>
   <div class="ft-bottom"><span>© 2026 Nathuk. GPL-3.0 License.</span></div>
 </footer>
+<script>
+const T={
+de:{hero_sub:"Bringe dein komplettes Mod-Setup von Windows nach Linux. Kein erneutes Herunterladen, kein Neuanfang. Deine Mods, deine Ladereihenfolge, deine Profile — alles kommt mit.",btn_download:"Herunterladen",btn_source:"Quellcode",gw_desc:"Starte dieses Tool auf deinem Windows-PC. Es findet MO2-Instanzen automatisch — Registry, AppData, gängige Installationspfade. Wähle was du exportieren willst und wie du übertragen möchtest.",gw_f1:"Erkennt MO2-Instanzen automatisch",gw_f2:"Export auf USB, externe Festplatte oder Netzwerk",gw_f3:"LAN-Übertragung mit PIN-Authentifizierung",gw_f4:"Nur Metadaten oder vollständiger Export mit Mod-Dateien",gw_f5:"Behält Ladereihenfolge, Profile & Nexus-IDs",hl_desc:"Starte dies auf deinem Linux-PC. Importiere von USB, scanne deine Windows-Partition (Dual-Boot) oder empfange Mods direkt über dein lokales Netzwerk. Alles wird ins Anvil Organizer-Format konvertiert.",hl_f1:"Import von USB, NTFS-Partition oder Netzwerk",hl_f2:"NTFS-Partitions-Scan für Dual-Boot-Setups",hl_f3:"Erstellt automatisch eine komplette Anvil-Instanz",hl_f4:"Symlink oder Kopie — deine Wahl",hl_f5:"Vortex-Import geplant",how_label:"SO FUNKTIONIERT ES",how_title:"Drei Schritte. Das war's.",step1_title:"Export auf Windows",step1_desc:"Starte GoodbyeWindows. Es findet dein MO2-Setup und exportiert alles — Mods, Ladereihenfolge, Profile, Nexus-IDs.",step2_title:"Übertragung",step2_desc:"USB-Stick, externe Festplatte oder direkte LAN-Übertragung mit PIN. Deine Wahl.",step3_title:"Import auf Linux",step3_desc:"Starte HelloLinux. Quelle wählen, Mods ansehen, in Anvil Organizer importieren. Fertig.",games_label:"UNTERSTÜTZTE SPIELE",games_desc:"Migration für 19+ Spiele getestet und unterstützt. Weitere folgen."},
+en:{hero_sub:"Move your entire mod setup from Windows to Linux. No re-downloading, no starting over. Your mods, your load order, your profiles — everything comes with you.",btn_download:"Download",btn_source:"Source Code",gw_desc:"Run this tool on your Windows PC. It scans for MO2 instances automatically — Registry, AppData, common install paths. Select what you want to export and choose how to transfer.",gw_f1:"Auto-detects MO2 instances",gw_f2:"Export to USB, external drive, or network",gw_f3:"LAN transfer with PIN authentication",gw_f4:"Metadata only or full export with mod files",gw_f5:"Preserves load order, profiles & Nexus IDs",hl_desc:"Run this on your Linux PC. Import from a USB drive, scan your Windows partition (dual-boot), or receive mods directly over your local network. Everything gets converted to Anvil Organizer format.",hl_f1:"Import from USB, NTFS partition, or network",hl_f2:"NTFS partition scanning for dual-boot setups",hl_f3:"Creates complete Anvil instance automatically",hl_f4:"Symlink or copy — your choice",hl_f5:"Vortex import planned",how_label:"HOW IT WORKS",how_title:"Three steps. That's it.",step1_title:"Export on Windows",step1_desc:"Run GoodbyeWindows. It finds your MO2 setup and exports everything — mods, load order, profiles, Nexus IDs.",step2_title:"Transfer",step2_desc:"USB drive, external disk, or direct LAN transfer with PIN. Your choice.",step3_title:"Import on Linux",step3_desc:"Run HelloLinux. Select source, preview your mods, import into Anvil Organizer. Done.",games_label:"SUPPORTED GAMES",games_desc:"Migration tested and supported for 19+ games. More coming."},
+es:{hero_sub:"Lleva toda tu configuración de mods de Windows a Linux. Sin volver a descargar, sin empezar de cero. Tus mods, tu orden de carga, tus perfiles — todo viene contigo.",btn_download:"Descargar",btn_source:"Código fuente",gw_desc:"Ejecuta esta herramienta en tu PC con Windows. Busca instancias de MO2 automáticamente — Registro, AppData, rutas comunes. Selecciona qué exportar y cómo transferir.",gw_f1:"Detecta instancias de MO2 automáticamente",gw_f2:"Exportar a USB, disco externo o red",gw_f3:"Transferencia LAN con autenticación PIN",gw_f4:"Solo metadatos o exportación completa con archivos",gw_f5:"Preserva orden de carga, perfiles e IDs de Nexus",hl_desc:"Ejecútalo en tu PC Linux. Importa desde USB, escanea tu partición Windows (dual-boot) o recibe mods directamente por red local. Todo se convierte al formato Anvil Organizer.",hl_f1:"Importar desde USB, partición NTFS o red",hl_f2:"Escaneo de particiones NTFS para dual-boot",hl_f3:"Crea instancia completa de Anvil automáticamente",hl_f4:"Symlink o copia — tú eliges",hl_f5:"Importación de Vortex planificada",how_label:"CÓMO FUNCIONA",how_title:"Tres pasos. Eso es todo.",step1_title:"Exportar en Windows",step1_desc:"Ejecuta GoodbyeWindows. Encuentra tu configuración MO2 y exporta todo.",step2_title:"Transferir",step2_desc:"USB, disco externo o transferencia LAN directa con PIN.",step3_title:"Importar en Linux",step3_desc:"Ejecuta HelloLinux. Selecciona fuente, vista previa de mods, importar a Anvil. Listo.",games_label:"JUEGOS SOPORTADOS",games_desc:"Migración probada para 19+ juegos. Más próximamente."},
+fr:{hero_sub:"Transférez toute votre configuration de mods de Windows vers Linux. Pas de re-téléchargement, pas de recommencement. Vos mods, votre ordre de chargement, vos profils — tout vous accompagne.",btn_download:"Télécharger",btn_source:"Code source",gw_desc:"Lancez cet outil sur votre PC Windows. Il recherche les instances MO2 automatiquement — Registre, AppData, chemins courants. Sélectionnez ce que vous voulez exporter et comment transférer.",gw_f1:"Détecte automatiquement les instances MO2",gw_f2:"Export vers USB, disque externe ou réseau",gw_f3:"Transfert LAN avec authentification PIN",gw_f4:"Métadonnées seules ou export complet avec fichiers",gw_f5:"Préserve l'ordre de chargement, profils et IDs Nexus",hl_desc:"Lancez-le sur votre PC Linux. Importez depuis USB, scannez votre partition Windows (dual-boot) ou recevez les mods directement via votre réseau local. Tout est converti au format Anvil Organizer.",hl_f1:"Import depuis USB, partition NTFS ou réseau",hl_f2:"Scan de partitions NTFS pour dual-boot",hl_f3:"Crée automatiquement une instance Anvil complète",hl_f4:"Symlink ou copie — votre choix",hl_f5:"Import Vortex prévu",how_label:"COMMENT ÇA MARCHE",how_title:"Trois étapes. C'est tout.",step1_title:"Exporter sur Windows",step1_desc:"Lancez GoodbyeWindows. Il trouve votre configuration MO2 et exporte tout.",step2_title:"Transférer",step2_desc:"Clé USB, disque externe ou transfert LAN direct avec PIN.",step3_title:"Importer sur Linux",step3_desc:"Lancez HelloLinux. Sélectionnez la source, prévisualisez vos mods, importez dans Anvil. Terminé.",games_label:"JEUX SUPPORTÉS",games_desc:"Migration testée pour 19+ jeux. D'autres à venir."},
+it:{hero_sub:"Porta tutta la tua configurazione mod da Windows a Linux. Nessun ri-download, nessun ricominciare. I tuoi mod, il tuo ordine di caricamento, i tuoi profili — tutto viene con te.",btn_download:"Scarica",btn_source:"Codice sorgente",gw_desc:"Esegui questo strumento sul tuo PC Windows. Cerca le istanze MO2 automaticamente — Registry, AppData, percorsi comuni. Seleziona cosa esportare e come trasferire.",gw_f1:"Rileva automaticamente le istanze MO2",gw_f2:"Esporta su USB, disco esterno o rete",gw_f3:"Trasferimento LAN con autenticazione PIN",gw_f4:"Solo metadati o esportazione completa con file",gw_f5:"Preserva ordine di caricamento, profili e ID Nexus",hl_desc:"Eseguilo sul tuo PC Linux. Importa da USB, scansiona la partizione Windows (dual-boot) o ricevi i mod direttamente tramite rete locale. Tutto viene convertito nel formato Anvil Organizer.",hl_f1:"Importa da USB, partizione NTFS o rete",hl_f2:"Scansione partizioni NTFS per dual-boot",hl_f3:"Crea automaticamente un'istanza Anvil completa",hl_f4:"Symlink o copia — a tua scelta",hl_f5:"Importazione Vortex pianificata",how_label:"COME FUNZIONA",how_title:"Tre passaggi. Tutto qui.",step1_title:"Esporta su Windows",step1_desc:"Esegui GoodbyeWindows. Trova la tua configurazione MO2 ed esporta tutto.",step2_title:"Trasferisci",step2_desc:"Chiavetta USB, disco esterno o trasferimento LAN diretto con PIN.",step3_title:"Importa su Linux",step3_desc:"Esegui HelloLinux. Seleziona la fonte, anteprima dei mod, importa in Anvil. Fatto.",games_label:"GIOCHI SUPPORTATI",games_desc:"Migrazione testata per 19+ giochi. Altri in arrivo."},
+pt:{hero_sub:"Leve toda a sua configuração de mods do Windows para Linux. Sem re-download, sem recomeçar. Seus mods, sua ordem de carregamento, seus perfis — tudo vem com você.",btn_download:"Baixar",btn_source:"Código fonte",gw_desc:"Execute esta ferramenta no seu PC Windows. Ela busca instâncias do MO2 automaticamente — Registro, AppData, caminhos comuns. Selecione o que exportar e como transferir.",gw_f1:"Detecta instâncias do MO2 automaticamente",gw_f2:"Exportar para USB, disco externo ou rede",gw_f3:"Transferência LAN com autenticação PIN",gw_f4:"Apenas metadados ou exportação completa com arquivos",gw_f5:"Preserva ordem de carregamento, perfis e IDs Nexus",hl_desc:"Execute no seu PC Linux. Importe de USB, escaneie sua partição Windows (dual-boot) ou receba mods diretamente pela rede local. Tudo é convertido para o formato Anvil Organizer.",hl_f1:"Importar de USB, partição NTFS ou rede",hl_f2:"Escaneamento de partições NTFS para dual-boot",hl_f3:"Cria instância Anvil completa automaticamente",hl_f4:"Symlink ou cópia — sua escolha",hl_f5:"Importação Vortex planejada",how_label:"COMO FUNCIONA",how_title:"Três passos. Só isso.",step1_title:"Exportar no Windows",step1_desc:"Execute GoodbyeWindows. Ele encontra sua configuração MO2 e exporta tudo.",step2_title:"Transferir",step2_desc:"USB, disco externo ou transferência LAN direta com PIN.",step3_title:"Importar no Linux",step3_desc:"Execute HelloLinux. Selecione a fonte, visualize seus mods, importe para Anvil. Pronto.",games_label:"JOGOS SUPORTADOS",games_desc:"Migração testada para 19+ jogos. Mais em breve."},
+ru:{hero_sub:"Перенесите всю настройку модов из Windows в Linux. Без повторной загрузки, без начала с нуля. Ваши моды, порядок загрузки, профили — всё переносится.",btn_download:"Скачать",btn_source:"Исходный код",gw_desc:"Запустите этот инструмент на вашем Windows-ПК. Он находит экземпляры MO2 автоматически — реестр, AppData, стандартные пути. Выберите что экспортировать и как передать.",gw_f1:"Автообнаружение экземпляров MO2",gw_f2:"Экспорт на USB, внешний диск или сеть",gw_f3:"LAN-передача с PIN-аутентификацией",gw_f4:"Только метаданные или полный экспорт с файлами",gw_f5:"Сохраняет порядок загрузки, профили и ID Nexus",hl_desc:"Запустите на вашем Linux-ПК. Импортируйте с USB, сканируйте раздел Windows (dual-boot) или получайте моды по локальной сети. Всё конвертируется в формат Anvil Organizer.",hl_f1:"Импорт с USB, раздела NTFS или сети",hl_f2:"Сканирование разделов NTFS для dual-boot",hl_f3:"Автоматически создаёт полный экземпляр Anvil",hl_f4:"Symlink или копия — ваш выбор",hl_f5:"Импорт Vortex запланирован",how_label:"КАК ЭТО РАБОТАЕТ",how_title:"Три шага. И всё.",step1_title:"Экспорт на Windows",step1_desc:"Запустите GoodbyeWindows. Он найдёт вашу настройку MO2 и экспортирует всё.",step2_title:"Передача",step2_desc:"USB, внешний диск или прямая LAN-передача с PIN.",step3_title:"Импорт на Linux",step3_desc:"Запустите HelloLinux. Выберите источник, просмотрите моды, импортируйте в Anvil. Готово.",games_label:"ПОДДЕРЖИВАЕМЫЕ ИГРЫ",games_desc:"Миграция протестирована для 19+ игр. Больше в пути."}
+};
+const langNames={de:'DE',en:'EN',es:'ES',fr:'FR',it:'IT',pt:'PT',ru:'RU'};
+function setLang(l){if(!T[l])return;document.querySelectorAll('[data-i18n]').forEach(e=>{const k=e.dataset.i18n;if(T[l][k])e.textContent=T[l][k]});document.getElementById('lang-current').textContent=langNames[l];document.querySelector('.lang-menu').classList.remove('open');document.querySelectorAll('.lang-menu button').forEach(b=>b.classList.remove('active'));document.querySelector('.lang-menu button[onclick*="'+l+'"]').classList.add('active');document.documentElement.lang=l;try{localStorage.setItem('gbw-lang',l)}catch(e){}}
+document.addEventListener('click',e=>{if(!e.target.closest('.lang-switch'))document.querySelector('.lang-menu').classList.remove('open')});
+try{const s=localStorage.getItem('gbw-lang');if(s&&T[s])setLang(s)}catch(e){const b=(navigator.language||'en').slice(0,2).toLowerCase();if(T[b])setLang(b)}
+</script>
 </body>
 </html>
