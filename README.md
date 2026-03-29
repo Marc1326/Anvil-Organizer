@@ -39,14 +39,6 @@ MO2 dominates on Windows — Anvil fills the gap on Linux.
 - **7 languages** — DE, EN, FR, ES, IT, PT, RU
 - **Dark theme** — multiple styles included
 
-## Migrating from Windows?
-
-Use **[GoodbyeWindows](https://github.com/Marc1326/GoodbyeWindows)** to transfer your MO2 mod setup from Windows to Anvil Organizer on Linux — including load order, Nexus IDs, profiles, and mod files.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/Marc1326/GoodbyeWindows/main/docs/screenshots/hellolinux-welcome.png" width="500" alt="HelloLinux Importer">
-</p>
-
 ## Supported Games (35)
 
 ### Fully Supported (8)
@@ -124,6 +116,16 @@ Works with **Steam** and **Heroic Games Launcher** (GOG/Epic via Proton/Wine).
     <td><img src="screenshots/settings.png" alt="Settings" width="400"></td>
   </tr>
 </table>
+
+---
+
+## Migrating from Windows?
+
+Use **[GoodbyeWindows](https://github.com/Marc1326/GoodbyeWindows)** to transfer your MO2 mod setup from Windows to Anvil Organizer on Linux — including load order, Nexus IDs, profiles, and mod files.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Marc1326/GoodbyeWindows/main/docs/screenshots/hellolinux-welcome.png" width="500" alt="HelloLinux Importer">
+</p>
 
 ---
 
