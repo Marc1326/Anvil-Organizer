@@ -387,6 +387,7 @@ class _DropTreeView(QTreeView):
         self._collapsed_separators: set[str] = set()
         self._collapsible_asc: bool = True
         self._collapsible_dsc: bool = True
+        self._extra_extensions: set[str] = set()
 
         # Install custom scrollbar for separator markings
         self._sep_scrollbar = SeparatorMarkingScrollBar(self)
@@ -535,10 +536,11 @@ class _DropTreeView(QTreeView):
     def dragEnterEvent(self, event):
         super().dragEnterEvent(event)
         if event.mimeData().hasUrls():
+            accepted = SUPPORTED_EXTENSIONS | self._extra_extensions
             for url in event.mimeData().urls():
                 if url.isLocalFile():
                     path = url.toLocalFile()
-                    if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                    if any(path.lower().endswith(ext) for ext in accepted):
                         event.acceptProposedAction()
                         return
 
@@ -616,11 +618,12 @@ class _DropTreeView(QTreeView):
         self._stop_auto_scroll()
         self._stop_expand_timer()
         if event.mimeData().hasUrls():
+            accepted = SUPPORTED_EXTENSIONS | self._extra_extensions
             paths = []
             for url in event.mimeData().urls():
                 if url.isLocalFile():
                     path = url.toLocalFile()
-                    if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                    if any(path.lower().endswith(ext) for ext in accepted):
                         paths.append(path)
             if paths:
                 event.acceptProposedAction()
@@ -1042,6 +1045,10 @@ class ModListView(QWidget):
         return sorted(rows)
 
     # ── Scrollbar separator markings ─────────────────────────────────
+
+    def set_extra_drop_extensions(self, extensions: set[str]) -> None:
+        """Add extra accepted file extensions for drag-and-drop (e.g. {'.pak'} for BG3)."""
+        self._tree._extra_extensions = extensions
 
     def set_scrollbar_marking_enabled(self, enabled: bool) -> None:
         """Enable or disable separator color markings on the scrollbar."""

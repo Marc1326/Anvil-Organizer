@@ -959,5 +959,8 @@
     "backup_create_desc": "Creates a complete backup of all mods, profiles and settings of the current instance.",
     "backup_restore": "Restore Backup",
     "backup_restore_desc": "Restores a previously created backup. Existing data will be overwritten."
+  },
+  "bg3": {
+    "mod_already_installed": "The mod \"{name}\" is already in the mod list.\n\nReplace?"
   }
 }

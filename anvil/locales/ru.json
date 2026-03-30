@@ -959,5 +959,8 @@
     "backup_create_desc": "Sozdayet polnuyu rezervnuyu kopiyu vsekh modov, profiley i nastroyek tekushchey instantsii.",
     "backup_restore": "Vosstanovit rezervnuyu kopiyu",
     "backup_restore_desc": "Vosstanavlivayet ranee sozdannuyu rezervnuyu kopiyu. Sushchestvuyushchie dannyye budut perezapisany."
+  },
+  "bg3": {
+    "mod_already_installed": "Mod \"{name}\" uzhe v spiske modov.\n\nZamenit?"
   }
 }

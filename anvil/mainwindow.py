@@ -927,6 +927,7 @@ class MainWindow(QMainWindow):
             self._current_instance_path = None
             self._current_downloads_path = None
             self._bg3_installer = None
+            self._mod_list_view.set_extra_drop_extensions(set())
             self._toolbar.deploy_sep.setVisible(False)
             self._toolbar.deploy_action.setVisible(False)
             self._mod_list_stack.setCurrentWidget(self._mod_list_view)
@@ -993,6 +994,7 @@ class MainWindow(QMainWindow):
         self._toolbar.deploy_action.setVisible(False)
         self._mod_list_stack.setCurrentWidget(self._mod_list_view)
         self._bg3_installer = None
+        self._mod_list_view.set_extra_drop_extensions(set())
 
         # Load categories for this instance
         self._category_manager.load(instance_path)
@@ -4723,6 +4725,8 @@ class MainWindow(QMainWindow):
         """
         # Use normal mod list view — NOT the BG3-specific one
         self._mod_list_stack.setCurrentWidget(self._mod_list_view)
+        # BG3 uses .pak files — tell the drop handler to accept them
+        self._mod_list_view.set_extra_drop_extensions({".pak"})
         # BG3: Auto-Deploy — kein Deploy-Button noetig
         self._toolbar.deploy_sep.setVisible(False)
         self._toolbar.deploy_action.setVisible(False)
@@ -4935,7 +4939,6 @@ class MainWindow(QMainWindow):
 
         # Capture reference entry for positioning before state changes
         ref_uuid = None
-        ref_active = False
         if insert_at is not None and self._current_mod_entries:
             entries = self._current_mod_entries
             idx = insert_at
@@ -4943,14 +4946,32 @@ class MainWindow(QMainWindow):
                 idx += 1
             if idx < len(entries):
                 ref_uuid = entries[idx].name  # UUID for BG3 entries
-                ref_active = entries[idx].enabled
 
         installed = []
         for path_str in paths:
-            result = self._bg3_installer.install_mod(Path(path_str))
+            archive_path = Path(path_str)
+
+            # Check for duplicate (same UUID already installed)
+            existing = self._bg3_installer.check_pak_duplicate(archive_path)
+            if existing:
+                reply = QMessageBox.question(
+                    self,
+                    tr("dialog.mod_exists"),
+                    tr("bg3.mod_already_installed", name=existing["name"]),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if reply != QMessageBox.StandardButton.Yes:
+                    continue
+                # Remove old version before reinstalling
+                self._bg3_installer.uninstall_mod(
+                    existing["uuid"], existing.get("pak_file", ""),
+                )
+
+            result = self._bg3_installer.install_mod(archive_path)
             if result:
                 mod_type = result.get("type", "pak")
-                name = result.get("name", Path(path_str).name)
+                name = result.get("name", archive_path.name)
                 uuid = result.get("uuid", "")
                 installed.append((name, mod_type, uuid))
                 # Mark download as installed in .meta file
@@ -4969,14 +4990,14 @@ class MainWindow(QMainWindow):
                     print(f"[BG3-META] Failed to write .meta: {exc}", flush=True)
             else:
                 self.statusBar().showMessage(
-                    tr("status.install_failed", name=Path(path_str).name), 5000,
+                    tr("status.install_failed", name=archive_path.name), 5000,
                 )
 
-        # Position newly installed mods at drop target
+        # Position newly installed mods at drop target (always inactive)
         if ref_uuid and installed:
             for _name, mod_type, uuid in installed:
                 if uuid and mod_type == "pak":
-                    self._bg3_installer.insert_mod_at(uuid, ref_uuid, activate=ref_active)
+                    self._bg3_installer.insert_mod_at(uuid, ref_uuid, activate=False)
 
         if installed:
             self._bg3_reload_mod_list()

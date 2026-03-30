@@ -55,6 +55,41 @@ class BG3ModInstaller:
 
     # ── Public API ─────────────────────────────────────────────────────
 
+    def check_pak_duplicate(self, archive_path: Path) -> dict | None:
+        """Check if a .pak (or archive containing .pak) has a UUID already installed.
+
+        Returns dict with 'name', 'uuid', 'pak_file' of the existing mod, or None.
+        """
+        if archive_path.suffix.lower() == ".pak":
+            meta = self._lspk.read_pak_metadata(archive_path)
+            if meta and meta.get("uuid"):
+                return self._find_existing_by_uuid(meta["uuid"])
+            return None
+
+        # Archive — extract, scan paks, clean up
+        extracted = self._extract_archive(archive_path)
+        if extracted is None:
+            return None
+        try:
+            for pak in Path(extracted).rglob("*.pak"):
+                meta = self._lspk.read_pak_metadata(pak)
+                if meta and meta.get("uuid"):
+                    existing = self._find_existing_by_uuid(meta["uuid"])
+                    if existing:
+                        return existing
+        finally:
+            shutil.rmtree(extracted, ignore_errors=True)
+        return None
+
+    def _find_existing_by_uuid(self, uuid: str) -> dict | None:
+        """Return existing mod info if UUID is already in state, else None."""
+        data = self._read_state()
+        for m in data["mods"]:
+            if m["uuid"].lower() == uuid.lower():
+                return {"name": m.get("name", ""), "uuid": m["uuid"],
+                        "pak_file": m.get("pak_file", "")}
+        return None
+
     def install_mod(self, archive_path: Path) -> dict | None:
         """Install a mod from an archive (ZIP/RAR/7z) or a single .pak.
 

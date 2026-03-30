@@ -959,5 +959,8 @@
     "backup_create_desc": "Erstellt eine vollstaendige Sicherung aller Mods, Profile und Einstellungen der aktuellen Instanz.",
     "backup_restore": "Sicherung wiederherstellen",
     "backup_restore_desc": "Stellt eine zuvor erstellte Sicherung wieder her. Vorhandene Daten werden ueberschrieben."
+  },
+  "bg3": {
+    "mod_already_installed": "Die Mod \"{name}\" ist bereits in der Mod-Liste vorhanden.\n\nErsetzen?"
   }
 }
