@@ -1,5 +1,5 @@
 Name:           anvil-organizer
-Version:        1.2.4
+Version:        1.2.5
 Release:        1%{?dist}
 Summary:        Native Linux Mod Manager inspired by Mod Organizer 2
 
@@ -55,7 +55,7 @@ install -Dm644 anvil/resources/logo.svg \
 %{_datadir}/icons/hicolor/scalable/apps/anvil-organizer.svg
 
 %changelog
-* Sun Mar 30 2026 Marc <marc1326@users.noreply.github.com> - 1.2.4-1
+* Sun Mar 30 2026 Marc <marc1326@users.noreply.github.com> - 1.2.5-1
 - Framework Nexus query with header button and context menu
 - Batch Nexus query improvements with toast notifications
 - BG3 drag-and-drop fix — mods now route through BG3 installer
