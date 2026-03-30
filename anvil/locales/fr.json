@@ -435,8 +435,6 @@
     "rate_limit_wait": "Limite de débit atteinte — attente de 60 secondes..."
   },
   "fw": {
-    "nexus_query_btn": "Vérifier Nexus",
-    "nexus_query_btn_tooltip": "Interroger les frameworks installés sur NexusMods",
     "query_starting": "Démarrage de la requête Nexus pour {total} frameworks...",
     "query_progress": "Requête frameworks : {current} / {total}...",
     "query_result": "{count} sur {total} frameworks mis à jour.",

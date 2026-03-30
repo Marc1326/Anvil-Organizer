@@ -145,11 +145,51 @@ Use **[GoodbyeWindows](https://github.com/Marc1326/GoodbyeWindows)** to transfer
 No installation needed — download, make executable, run:
 
 ```bash
-chmod +x Anvil_Organizer-1.1.0-x86_64.AppImage
-./Anvil_Organizer-1.1.0-x86_64.AppImage
+chmod +x Anvil_Organizer-1.2.2-x86_64.AppImage
+./Anvil_Organizer-1.2.2-x86_64.AppImage
 ```
 
 Download from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest).
+
+### Flatpak
+
+```bash
+flatpak install net.anvil_organizer.AnvilOrganizer
+```
+
+### Snap
+
+```bash
+snap install anvil-organizer
+```
+
+### AUR (Arch Linux, CachyOS, EndeavourOS, Manjaro)
+
+```bash
+paru -S anvil-organizer
+```
+
+Or the latest git version:
+
+```bash
+paru -S anvil-organizer-git
+```
+
+### DEB (Ubuntu, Debian, Linux Mint, Pop!_OS)
+
+Download `anvil-organizer_1.2.2_amd64.deb` from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest), then:
+
+```bash
+sudo dpkg -i anvil-organizer_1.2.2_amd64.deb
+```
+
+### RPM (Fedora, openSUSE)
+
+Download `anvil-organizer-1.2.2-1.fc41.noarch.rpm` from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest), then:
+
+```bash
+sudo dnf install anvil-organizer-1.2.2-1.fc41.noarch.rpm
+```
 
 ### From Source
 

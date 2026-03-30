@@ -435,8 +435,6 @@
     "rate_limit_wait": "Limite di velocità raggiunto — attesa di 60 secondi..."
   },
   "fw": {
-    "nexus_query_btn": "Verifica Nexus",
-    "nexus_query_btn_tooltip": "Interroga i framework installati su NexusMods",
     "query_starting": "Avvio query Nexus per {total} framework...",
     "query_progress": "Query framework: {current} / {total}...",
     "query_result": "{count} di {total} framework aggiornati.",

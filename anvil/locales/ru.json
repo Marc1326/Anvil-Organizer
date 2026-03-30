@@ -435,8 +435,6 @@
     "rate_limit_wait": "Достигнут лимит запросов — ожидание 60 секунд..."
   },
   "fw": {
-    "nexus_query_btn": "Запрос Nexus",
-    "nexus_query_btn_tooltip": "Запросить установленные фреймворки на NexusMods",
     "query_starting": "Запуск запроса Nexus для {total} фреймворков...",
     "query_progress": "Запрос фреймворков: {current} / {total}...",
     "query_result": "{count} из {total} фреймворков обновлено.",

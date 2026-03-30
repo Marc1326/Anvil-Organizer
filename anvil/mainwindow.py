@@ -328,7 +328,6 @@ class MainWindow(QMainWindow):
         )
         self._mod_list_view.fw_context_menu_requested.connect(self._on_fw_context_menu)
         self._mod_list_view.fw_archives_dropped.connect(self._on_fw_archives_dropped)
-        self._mod_list_view.fw_nexus_query_requested.connect(self._query_framework_nexus)
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
         self._game_panel.game_started.connect(self._on_game_started)

@@ -435,8 +435,6 @@
     "rate_limit_wait": "Rate-Limit erreicht — warte 60 Sekunden..."
   },
   "fw": {
-    "nexus_query_btn": "Nexus prüfen",
-    "nexus_query_btn_tooltip": "Installierte Frameworks auf NexusMods abfragen",
     "query_starting": "Starte Nexus-Abfrage für {total} Frameworks...",
     "query_progress": "Framework-Abfrage: {current} / {total}...",
     "query_result": "{count} von {total} Frameworks aktualisiert.",

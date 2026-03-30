@@ -806,7 +806,6 @@ class ModListView(QWidget):
     context_menu_requested = Signal(QPoint)  # global pos for context menu
     fw_context_menu_requested = Signal(QPoint, dict)  # global pos + fw_data for framework context menu
     fw_archives_dropped = Signal(list)  # archive paths dropped on framework tree
-    fw_nexus_query_requested = Signal()  # user clicked "Nexus prüfen" in framework header
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -883,10 +882,6 @@ class ModListView(QWidget):
             default_collapsed=True,
         )
         self._fw_label.set_count(0)
-        self._fw_nexus_btn = self._fw_label.add_action_button(
-            tr("fw.nexus_query_btn"), tr("fw.nexus_query_btn_tooltip"),
-        )
-        self._fw_nexus_btn.clicked.connect(lambda checked=False: self.fw_nexus_query_requested.emit())
         fw_layout.addWidget(self._fw_label)
         self._fw_tree.setHeaderLabels([tr("label.name"), tr("label.header_description"), tr("game_panel.header_status")])
         self._fw_tree.setRootIsDecorated(False)

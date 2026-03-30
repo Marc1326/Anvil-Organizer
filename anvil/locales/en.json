@@ -435,8 +435,6 @@
     "rate_limit_wait": "Rate limit reached — waiting 60 seconds..."
   },
   "fw": {
-    "nexus_query_btn": "Nexus Query",
-    "nexus_query_btn_tooltip": "Query installed frameworks on NexusMods",
     "query_starting": "Starting Nexus query for {total} frameworks...",
     "query_progress": "Framework query: {current} / {total}...",
     "query_result": "{count} of {total} frameworks updated.",
