@@ -129,6 +129,7 @@ class RDR2Game(BaseGame):
                 description="Ermoeglicht ASI-Plugins und Scripte",
                 detect_installed=["ScriptHookRDR2.dll"],
                 required_by=["ASI-Mods", "Script-Mods"],
+                nexus_id=56,
             ),
             FrameworkMod(
                 name="ASI Loader",

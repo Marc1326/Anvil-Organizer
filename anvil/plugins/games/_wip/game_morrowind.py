@@ -120,6 +120,7 @@ class MorrowindGame(BaseGame):
                 description="Morrowind Script Extender — erweitert die Scripting-Engine",
                 detect_installed=["MWSE.dll"],
                 required_by=["MWSE-Lua Mods"],
+                nexus_id=45468,
             ),
             FrameworkMod(
                 name="MGE XE",
@@ -128,6 +129,7 @@ class MorrowindGame(BaseGame):
                 description="Morrowind Graphics Extender XE — Grafik-Verbesserungen",
                 detect_installed=["MGEXEgui.exe"],
                 required_by=[],
+                nexus_id=41102,
             ),
             FrameworkMod(
                 name="MCP",
@@ -136,6 +138,7 @@ class MorrowindGame(BaseGame):
                 description="Morrowind Code Patch — Engine-Bugfixes",
                 detect_installed=["Morrowind Code Patch.exe"],
                 required_by=[],
+                nexus_id=19510,
             ),
         ]
 

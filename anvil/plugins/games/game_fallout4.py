@@ -190,6 +190,7 @@ class Fallout4Game(BaseGame):
                 description="Fallout 4 Script Extender — erweitert die Scripting-Engine",
                 detect_installed=["f4se_loader.exe"],
                 required_by=["F4SE-Plugins", "MCM", "Looksmenu"],
+                nexus_id=42147,
             ),
             FrameworkMod(
                 name="F4SE Proton Shim",

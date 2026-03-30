@@ -109,6 +109,7 @@ class StardewValleyGame(BaseGame):
                 description="Stardew Modding API — Mod-Loader für Stardew Valley",
                 detect_installed=["StardewModdingAPI"],
                 required_by=["Alle SMAPI-Mods"],
+                nexus_id=2400,
             ),
             FrameworkMod(
                 name="Content Patcher",
@@ -117,6 +118,7 @@ class StardewValleyGame(BaseGame):
                 description="Content Patcher — Ermöglicht Textur/Asset-Ersetzung",
                 detect_installed=["Mods/ContentPatcher/ContentPatcher.dll"],
                 required_by=["Die meisten Textur-Mods"],
+                nexus_id=1915,
             ),
             FrameworkMod(
                 name="Generic Mod Config Menu",
@@ -125,6 +127,7 @@ class StardewValleyGame(BaseGame):
                 description="Generic Mod Config Menu — In-Game Mod-Einstellungen",
                 detect_installed=["Mods/GenericModConfigMenu/GenericModConfigMenu.dll"],
                 required_by=[],
+                nexus_id=5098,
             ),
             FrameworkMod(
                 name="SpaceCore",
@@ -133,6 +136,7 @@ class StardewValleyGame(BaseGame):
                 description="SpaceCore — Erweiterte Modding-Features",
                 detect_installed=["Mods/SpaceCore/SpaceCore.dll"],
                 required_by=["JsonAssets", "SpaceChase Mods"],
+                nexus_id=1348,
             ),
         ]
 

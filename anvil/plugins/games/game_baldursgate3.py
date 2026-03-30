@@ -308,6 +308,7 @@ class BaldursGate3Game(BaseGame):
                 description="Script Extender fuer BG3 (Native Mod Support)",
                 detect_installed=["bin/DWrite.dll"],
                 required_by=["SE-Mods", "Native Mods"],
+                nexus_id=2172,
             ),
             FrameworkMod(
                 name="NativeModLoader",
@@ -316,6 +317,7 @@ class BaldursGate3Game(BaseGame):
                 description="DLL-Loader fuer Native Mods (bink2w64 hook)",
                 detect_installed=["bin/bink2w64_original.dll"],
                 required_by=["WASD", "Native Mods"],
+                nexus_id=944,
             ),
             FrameworkMod(
                 name="BG3WASD",
@@ -324,6 +326,7 @@ class BaldursGate3Game(BaseGame):
                 description="WASD-Steuerung fuer BG3 (benoetigt NativeModLoader)",
                 detect_installed=["bin/NativeMods/BG3WASD.dll"],
                 required_by=[],
+                nexus_id=781,
             ),
         ]
 

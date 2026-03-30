@@ -174,6 +174,7 @@ class Cyberpunk2077Game(BaseGame):
                 description="Scripting-Framework, In-Game-Konsole und Mod-Loader",
                 detect_installed=["bin/x64/version.dll"],
                 required_by=["CET-Mods", "Lua-Scripts"],
+                nexus_id=107,
             ),
             FrameworkMod(
                 name="RED4ext",
@@ -182,6 +183,7 @@ class Cyberpunk2077Game(BaseGame):
                 description="Native Plugin-Loader fuer REDengine 4",
                 detect_installed=["bin/x64/winmm.dll", "red4ext/RED4ext.dll"],
                 required_by=["ArchiveXL", "TweakXL", "Codeware"],
+                nexus_id=2380,
             ),
             FrameworkMod(
                 name="redscript",
@@ -190,6 +192,7 @@ class Cyberpunk2077Game(BaseGame):
                 description="Script-Compiler fuer REDscript-Mods",
                 detect_installed=["engine/tools/scc.exe"],
                 required_by=["REDscript-Mods"],
+                nexus_id=1511,
             ),
             FrameworkMod(
                 name="ArchiveXL",
@@ -198,6 +201,7 @@ class Cyberpunk2077Game(BaseGame):
                 description="Ermoeglicht Laden zusaetzlicher .archive-Dateien",
                 detect_installed=["red4ext/plugins/ArchiveXL/ArchiveXL.dll"],
                 required_by=["Custom-Items", "Custom-Appearances"],
+                nexus_id=4198,
             ),
             FrameworkMod(
                 name="TweakXL",
@@ -206,6 +210,7 @@ class Cyberpunk2077Game(BaseGame):
                 description="Ermoeglicht Laden zusaetzlicher TweakDB-Eintraege",
                 detect_installed=["red4ext/plugins/TweakXL/TweakXL.dll"],
                 required_by=["Custom-Items", "Gameplay-Tweaks"],
+                nexus_id=4197,
             ),
             FrameworkMod(
                 name="Codeware",
@@ -213,6 +218,7 @@ class Cyberpunk2077Game(BaseGame):
                 target="",
                 description="Shared Library fuer RED4ext-Plugins",
                 detect_installed=["red4ext/plugins/Codeware/Codeware.dll"],
+                nexus_id=7780,
             ),
             FrameworkMod(
                 name="RedFileSystem",
@@ -220,6 +226,7 @@ class Cyberpunk2077Game(BaseGame):
                 target="",
                 description="Dateisystem-Zugriff fuer RED4ext-Plugins",
                 detect_installed=["red4ext/plugins/RedFileSystem/RedFileSystem.dll"],
+                nexus_id=13378,
             ),
             FrameworkMod(
                 name="RedData",
@@ -227,6 +234,7 @@ class Cyberpunk2077Game(BaseGame):
                 target="",
                 description="JSON-Parsing Library fuer RED4ext-Plugins",
                 detect_installed=["red4ext/plugins/RedData/RedData.dll"],
+                nexus_id=14139,
             ),
             FrameworkMod(
                 name="Native Settings UI",
@@ -235,6 +243,7 @@ class Cyberpunk2077Game(BaseGame):
                 description="UI-Framework fuer Mod-Einstellungen (CET)",
                 detect_installed=["bin/x64/plugins/cyber_engine_tweaks/mods/nativeSettings/init.lua"],
                 required_by=["Mods mit Einstellungs-Menues"],
+                nexus_id=3518,
             ),
             FrameworkMod(
                 name="Mod Settings",
@@ -242,6 +251,7 @@ class Cyberpunk2077Game(BaseGame):
                 target="",
                 description="Einstellungs-Framework fuer RED4ext-Mods",
                 detect_installed=["red4ext/plugins/mod_settings/mod_settings.dll"],
+                nexus_id=4885,
             ),
         ]
 

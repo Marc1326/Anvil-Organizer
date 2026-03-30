@@ -130,6 +130,7 @@ class FalloutNVGame(BaseGame):
                 description="New Vegas Script Extender — erweitert die Scripting-Engine",
                 detect_installed=["nvse_loader.exe"],
                 required_by=["JIP LN NVSE", "JohnnyGuitar NVSE", "MCM"],
+                nexus_id=67883,
             ),
             FrameworkMod(
                 name="4GB Patcher",
@@ -138,6 +139,7 @@ class FalloutNVGame(BaseGame):
                 description="4GB RAM Patch für bessere Stabilität",
                 detect_installed=["FalloutNV.exe.backup"],
                 required_by=[],
+                nexus_id=62552,
             ),
         ]
 

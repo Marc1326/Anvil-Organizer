@@ -193,6 +193,7 @@ class StarfieldGame(BaseGame):
                 description="Starfield Script Extender — erweitert die Scripting-Engine",
                 detect_installed=["sfse_loader.exe"],
                 required_by=["SFSE-Plugins"],
+                nexus_id=106,
             ),
             FrameworkMod(
                 name="Address Library for SFSE",
@@ -201,6 +202,7 @@ class StarfieldGame(BaseGame):
                 description="Adressdatenbank für SFSE-Plugins — wird von allen DLL-Mods benötigt",
                 detect_installed=["Data/SFSE/Plugins/versionlib-*.bin"],
                 required_by=["SFSE-Plugins"],
+                nexus_id=3256,
             ),
         ]
 

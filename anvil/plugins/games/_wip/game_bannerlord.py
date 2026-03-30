@@ -98,6 +98,7 @@ class BannerlordGame(BaseGame):
                 description="Harmony — Runtime-Patching Framework",
                 detect_installed=["Modules/Harmony/SubModule.xml"],
                 required_by=["Die meisten Bannerlord Mods"],
+                nexus_id=2006,
             ),
             FrameworkMod(
                 name="ButterLib",
@@ -106,6 +107,7 @@ class BannerlordGame(BaseGame):
                 description="ButterLib — Gemeinsame Utility-Bibliothek",
                 detect_installed=["Modules/ButterLib/SubModule.xml"],
                 required_by=["MCM", "Viele größere Mods"],
+                nexus_id=2018,
             ),
             FrameworkMod(
                 name="UIExtenderEx",
@@ -114,6 +116,7 @@ class BannerlordGame(BaseGame):
                 description="UIExtenderEx — UI-Erweiterungen",
                 detect_installed=["Modules/UIExtenderEx/SubModule.xml"],
                 required_by=["UI-Mods"],
+                nexus_id=2102,
             ),
             FrameworkMod(
                 name="MCM",
@@ -122,6 +125,7 @@ class BannerlordGame(BaseGame):
                 description="Mod Configuration Menu — In-Game Mod-Einstellungen",
                 detect_installed=["Modules/MCMv5/SubModule.xml"],
                 required_by=[],
+                nexus_id=612,
             ),
         ]
 

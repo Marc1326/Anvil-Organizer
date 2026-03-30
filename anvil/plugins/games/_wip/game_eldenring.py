@@ -98,6 +98,7 @@ class EldenRingGame(BaseGame):
                 description="ModEngine2 — Mod-Loader für FromSoftware-Spiele",
                 detect_installed=["modengine2_launcher.exe"],
                 required_by=["Die meisten Elden Ring Mods"],
+                nexus_id=5998,
             ),
             FrameworkMod(
                 name="Seamless Co-op",
@@ -106,6 +107,7 @@ class EldenRingGame(BaseGame):
                 description="Seamless Co-op — Nahtloser Koop-Modus",
                 detect_installed=["elden_ring_seamless_coop.dll"],
                 required_by=[],
+                nexus_id=510,
             ),
         ]
 

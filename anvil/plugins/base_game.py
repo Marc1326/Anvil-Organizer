@@ -517,6 +517,7 @@ class BaseGame:
                         description=entry.get("description", ""),
                         detect_installed=entry.get("detect_installed", []),
                         required_by=entry.get("required_by", []),
+                        nexus_id=int(entry.get("nexus_id", 0)),
                     ))
             except Exception as exc:
                 print(

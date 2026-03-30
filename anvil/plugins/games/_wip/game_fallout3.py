@@ -126,6 +126,7 @@ class Fallout3Game(BaseGame):
                 description="Fallout Script Extender — erweitert die Scripting-Engine",
                 detect_installed=["fose_loader.exe"],
                 required_by=["FOSE-Plugins"],
+                nexus_id=8606,
             ),
         ]
 

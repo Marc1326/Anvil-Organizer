@@ -171,6 +171,7 @@ class SkyrimSEGame(BaseGame):
                 description="Skyrim Script Extender 64 — erweitert die Scripting-Engine",
                 detect_installed=["skse64_loader.exe"],
                 required_by=["SKSE-Plugins", "SkyUI", "MCM", "RaceMenu"],
+                nexus_id=30379,
             ),
             FrameworkMod(
                 name="Address Library for SKSE Plugins",
@@ -179,6 +180,7 @@ class SkyrimSEGame(BaseGame):
                 description="Adressen-Datenbank fuer SKSE-Plugins (versions-unabhaengig)",
                 detect_installed=["Data/SKSE/Plugins/versionlib*.bin"],
                 required_by=["Die meisten SKSE-Plugins"],
+                nexus_id=32444,
             ),
             FrameworkMod(
                 name="SSE Engine Fixes",
@@ -186,6 +188,7 @@ class SkyrimSEGame(BaseGame):
                 target="Data",
                 description="Behebt Engine-Bugs und verbessert Performance",
                 detect_installed=["Data/SKSE/Plugins/EngineFixes.dll"],
+                nexus_id=17230,
             ),
             FrameworkMod(
                 name="powerofthree's Tweaks",
@@ -193,6 +196,7 @@ class SkyrimSEGame(BaseGame):
                 target="Data",
                 description="Framework-Erweiterungen und Bug-Fixes",
                 detect_installed=["Data/SKSE/Plugins/po3_Tweaks.dll"],
+                nexus_id=51073,
             ),
             FrameworkMod(
                 name="Base Object Swapper",
@@ -201,6 +205,7 @@ class SkyrimSEGame(BaseGame):
                 description="Ermoeglicht dynamischen Austausch von Objekten",
                 detect_installed=["Data/SKSE/Plugins/BaseObjectSwapper.dll"],
                 required_by=["Object-Swap-Mods"],
+                nexus_id=60805,
             ),
             FrameworkMod(
                 name="Keyword Item Distributor",
@@ -208,6 +213,7 @@ class SkyrimSEGame(BaseGame):
                 target="Data",
                 description="Verteilt Keywords an Items zur Laufzeit",
                 detect_installed=["Data/SKSE/Plugins/KeywordItemDistributor.dll"],
+                nexus_id=55728,
             ),
             FrameworkMod(
                 name="Spell Perk Item Distributor",
@@ -216,6 +222,7 @@ class SkyrimSEGame(BaseGame):
                 description="Verteilt Spells, Perks und Items an NPCs",
                 detect_installed=["Data/SKSE/Plugins/SpellPerkItemDistributor.dll"],
                 required_by=["SPID-Patches"],
+                nexus_id=36869,
             ),
             FrameworkMod(
                 name="SKSE64 Proton Shim",

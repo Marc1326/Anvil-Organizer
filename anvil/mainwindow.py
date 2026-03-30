@@ -3763,7 +3763,14 @@ class MainWindow(QMainWindow):
             else:
                 skipped.append(entry.display_name or entry.name)
 
-        if not queue and skipped:
+        # Add installed frameworks with known nexus_id
+        fw_queue: list[tuple[str, int]] = []
+        if self._current_plugin:
+            for fw, installed in self._current_plugin.get_installed_frameworks():
+                if fw.nexus_id > 0 and installed:
+                    fw_queue.append((fw.name, fw.nexus_id))
+
+        if not queue and not fw_queue and skipped:
             QMessageBox.information(
                 self,
                 tr("batch_query.title"),
@@ -3771,36 +3778,45 @@ class MainWindow(QMainWindow):
             )
             return
 
-        if not queue:
+        if not queue and not fw_queue:
             self.statusBar().showMessage(tr("batch_query.no_mods"), 3000)
             return
 
+        total = len(queue) + len(fw_queue)
+
         # Initialize batch state
         self._batch_query_queue = queue
+        self._batch_fw_queue = fw_queue
         self._batch_query_slug = nexus_slug
-        self._batch_query_total = len(queue)
+        self._batch_query_total = total
         self._batch_query_done = 0
         self._batch_query_success = 0
         self._batch_query_errors = 0
         self._batch_query_skipped = skipped
         self._batch_query_active = True
+        self._pending_batch_fw_name = ""
 
         self.statusBar().showMessage(
-            tr("batch_query.starting", total=len(queue), skipped=len(skipped)), 5000,
+            tr("batch_query.starting", total=total, skipped=len(skipped)), 5000,
         )
-        Toast(self, tr("batch_query.starting", total=len(queue), skipped=len(skipped)), duration=5000)
+        Toast(self, tr("batch_query.starting", total=total, skipped=len(skipped)), duration=5000)
 
         # Start first request
         self._batch_query_next()
 
     def _batch_query_next(self) -> None:
         """Send the next request from the batch queue."""
-        if not self._batch_query_queue:
+        if self._batch_query_queue:
+            mod_path, nexus_id = self._batch_query_queue.pop(0)
+            self._pending_batch_query_path = mod_path
+            self._pending_batch_fw_name = ""
+        elif getattr(self, "_batch_fw_queue", None):
+            fw_name, nexus_id = self._batch_fw_queue.pop(0)
+            self._pending_batch_query_path = None
+            self._pending_batch_fw_name = fw_name
+        else:
             self._batch_query_finished()
             return
-
-        mod_path, nexus_id = self._batch_query_queue.pop(0)
-        self._pending_batch_query_path = mod_path
 
         self._nexus_api.query_mod_info(self._batch_query_slug, nexus_id)
 
@@ -3840,6 +3856,41 @@ class MainWindow(QMainWindow):
             tr("batch_query.title"),
             "\n\n".join(msg_parts),
         )
+
+    def _save_framework_cache(self, fw_name: str, data: dict) -> None:
+        """Save Nexus query result for a framework to framework_cache.json."""
+        if not self._current_instance_path:
+            return
+        import json
+        from datetime import datetime, timezone
+
+        cache_path = self._current_instance_path / "framework_cache.json"
+        cache: dict = {}
+        if cache_path.is_file():
+            try:
+                cache = json.loads(cache_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        nexus_slug = self._batch_query_slug
+        cache[fw_name] = {
+            "nexus_id": data.get("mod_id", 0),
+            "nexus_name": data.get("name", ""),
+            "nexus_version": data.get("version", ""),
+            "nexus_author": data.get("author", ""),
+            "nexus_summary": data.get("summary", ""),
+            "nexus_category": data.get("category_id", 0),
+            "nexus_url": f"https://www.nexusmods.com/{nexus_slug}/mods/{data.get('mod_id', 0)}",
+            "last_query": datetime.now(timezone.utc).isoformat(),
+        }
+
+        try:
+            cache_path.write_text(
+                json.dumps(cache, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
 
     def _on_dl_query_info(self, archive_path: str) -> None:
         """Handle 'Query Nexus Info' from Downloads tab context menu."""
@@ -4285,9 +4336,16 @@ class MainWindow(QMainWindow):
         elif tag.startswith("query_mod_info:") and isinstance(data, dict):
             # ── Batch query mode ──────────────────────────────────
             batch_path = getattr(self, "_pending_batch_query_path", None)
-            if getattr(self, "_batch_query_active", False) and batch_path:
+            batch_fw = getattr(self, "_pending_batch_fw_name", "")
+            if getattr(self, "_batch_query_active", False) and (batch_path or batch_fw):
                 self._pending_batch_query_path = None
-                if batch_path.exists():
+                self._pending_batch_fw_name = ""
+
+                if batch_fw:
+                    # Framework result → save to framework_cache.json
+                    self._save_framework_cache(batch_fw, data)
+                    self._batch_query_success += 1
+                elif batch_path and batch_path.exists():
                     from anvil.core.mod_metadata import write_meta_ini
                     from datetime import datetime, timezone
                     nexus_slug = self._batch_query_slug
@@ -4397,6 +4455,7 @@ class MainWindow(QMainWindow):
             # Batch mode: count error and continue with next
             if getattr(self, "_batch_query_active", False):
                 self._pending_batch_query_path = None
+                self._pending_batch_fw_name = ""
                 self._batch_query_done += 1
                 self._batch_query_errors += 1
                 # Rate limit hit → wait 60s before retry
