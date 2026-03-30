@@ -83,7 +83,9 @@
     "delete_profile": "Profil löschen",
     "select_color": "Farbe ändern...",
     "reset_color": "Farbe entfernen",
-    "nexus_query": "Nexus-Info abrufen",
+    "nexus_info_menu": "Nexus-Infos abrufen",
+    "nexus_query": "Mod-Info abrufen",
+    "nexus_query_all": "Für alle Mods abrufen",
     "lock_mod": "Mod sperren",
     "unlock_mod": "Mod entsperren",
     "toggle_lock": "Sperre umschalten"
@@ -419,6 +421,17 @@
     "nexus_no_id_found": "Keine Nexus-ID gefunden. Lade die Mod über Nexus herunter.",
     "nexus_no_game_slug": "Kein Nexus-Spielname konfiguriert.",
     "modindex_cleared": "Mod-Index Cache geleert. Wird beim naechsten Laden neu aufgebaut."
+  },
+  "batch_query": {
+    "title": "Alle Nexus-Infos abrufen",
+    "no_ids_found": "Keine Nexus-IDs gefunden für {count} Mods.\nVerwende Rechtsklick → 'Nexus-Info abrufen' für einzelne Mods.",
+    "no_mods": "Keine Mods in der Mod-Liste.",
+    "starting": "Starte Nexus-Abfrage für {total} Mods ({skipped} übersprungen)...",
+    "progress": "Nexus-Abfrage: {current} / {total}...",
+    "result_updated": "{count} von {total} Mods aktualisiert.",
+    "result_errors": "{count} Fehler bei der Abfrage.",
+    "result_skipped": "{count} Mods ohne Nexus-ID (per Rechtsklick → 'Nexus-Info abrufen' nachpflegen):",
+    "rate_limit_wait": "Rate-Limit erreicht — warte 60 Sekunden..."
   },
   "toast": {
     "backup_created": "{count} Mods gesichert | {name} | {size}",

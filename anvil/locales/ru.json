@@ -83,7 +83,9 @@
     "delete_profile": "Удалить профиль",
     "select_color": "Изменить цвет...",
     "reset_color": "Сбросить цвет",
-    "nexus_query": "Запросить информацию Nexus",
+    "nexus_info_menu": "Информация Nexus",
+    "nexus_query": "Информация о моде",
+    "nexus_query_all": "Для всех модов",
     "lock_mod": "Заблокировать мод",
     "unlock_mod": "Разблокировать мод",
     "toggle_lock": "Переключить блокировку"
@@ -419,6 +421,17 @@
     "nexus_no_id_found": "Nexus-ID не найден. Загрузите мод через Nexus.",
     "nexus_no_game_slug": "Название игры для Nexus не настроено.",
     "modindex_cleared": "Кэш индекса модов очищен. Будет перестроен при следующей загрузке."
+  },
+  "batch_query": {
+    "title": "Запросить информацию Nexus для всех",
+    "no_ids_found": "Не найдены ID Nexus для {count} модов.\nИспользуйте правый клик → 'Запросить информацию Nexus' для отдельных модов.",
+    "no_mods": "Нет модов в списке.",
+    "starting": "Начинаю запрос Nexus для {total} модов ({skipped} пропущено)...",
+    "progress": "Запрос Nexus: {current} / {total}...",
+    "result_updated": "{count} из {total} модов обновлено.",
+    "result_errors": "{count} ошибок при запросе.",
+    "result_skipped": "{count} модов без ID Nexus (правый клик → 'Запросить информацию Nexus'):",
+    "rate_limit_wait": "Достигнут лимит запросов — ожидание 60 секунд..."
   },
   "toast": {
     "backup_created": "{count} модов сохранено | {name} | {size}",

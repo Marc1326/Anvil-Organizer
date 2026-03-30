@@ -7,6 +7,7 @@ from pathlib import Path
 import configparser
 import json
 import os
+import re
 import shutil
 import sys
 
@@ -2206,8 +2207,12 @@ class MainWindow(QMainWindow):
         act.setEnabled(False)
         act = menu.addAction(tr("context.start_tracking"))
         act.setEnabled(False)
-        act_nexus_query = menu.addAction(tr("context.nexus_query"))
+        nexus_info_menu = menu.addMenu(tr("context.nexus_info_menu"))
+        nexus_info_menu.setEnabled(self._nexus_api.has_api_key())
+        act_nexus_query = nexus_info_menu.addAction(tr("context.nexus_query"))
         act_nexus_query.setEnabled(single and self._nexus_api.has_api_key())
+        act_nexus_query_all = nexus_info_menu.addAction(tr("context.nexus_query_all"))
+        act_nexus_query_all.setEnabled(self._nexus_api.has_api_key() and bool(self._current_mod_entries))
         # Nexus: nur aktiviert wenn Mod eine Nexus-ID hat
         act_nexus = menu.addAction(tr("context.visit_nexus"))
         has_nexus = single and _ctx_entry is not None and _ctx_entry.nexus_id > 0
@@ -2284,6 +2289,8 @@ class MainWindow(QMainWindow):
             self._ctx_visit_nexus(selected_rows[0])
         elif chosen == act_nexus_query:
             self._ctx_query_nexus_info(selected_rows[0])
+        elif chosen == act_nexus_query_all:
+            self._ctx_query_all_nexus_info()
         elif chosen == act_explorer:
             self._ctx_open_explorer(selected_rows[0])
         elif chosen == act_info:
@@ -3602,7 +3609,7 @@ class MainWindow(QMainWindow):
                         fname_lower = f.stem.lower()
                         if f.suffix.lower() == '.meta':
                             fname_lower = Path(f.stem).stem.lower()  # strip .zip from .zip.meta
-                        if mod_lower not in fname_lower:
+                        if re.sub(r'[^a-z0-9]', '', mod_lower) not in re.sub(r'[^a-z0-9]', '', fname_lower):
                             continue
                         # Try .meta file first for modID
                         meta_path = f if f.suffix.lower() == '.meta' else Path(str(f) + ".meta")
@@ -3648,6 +3655,191 @@ class MainWindow(QMainWindow):
         self._nexus_api.query_mod_info(nexus_slug, nexus_id)
         self.statusBar().showMessage(tr("status.nexus_query_loading"), 5000)
 
+    # ── Batch Query All Nexus Info ────────────────────────────────
+
+    def _ctx_query_all_nexus_info(self) -> None:
+        """Query Nexus info for ALL mods in the mod list (batch)."""
+        if not self._nexus_api.has_api_key():
+            return
+
+        nexus_slug = ""
+        if self._current_plugin:
+            nexus_slug = (
+                getattr(self._current_plugin, "GameNexusName", "")
+                or getattr(self._current_plugin, "GameShortName", "")
+            )
+        if not nexus_slug:
+            self.statusBar().showMessage(tr("status.nexus_no_game_slug"), 5000)
+            return
+
+        # Collect all non-separator mods with their resolved nexus_id
+        queue: list[tuple[Path, int]] = []  # (mod_path, nexus_id)
+        skipped: list[str] = []  # display names of mods without nexus_id
+
+        downloads_path = self._current_downloads_path
+
+        for entry in self._current_mod_entries:
+            if entry.is_separator:
+                continue
+
+            mod_path = Path(entry.install_path)
+            nexus_id = entry.nexus_id
+            inst_file = ""
+
+            # Fallback 1: meta.ini modid + read installationFile for later
+            if nexus_id <= 0:
+                from anvil.core.mod_metadata import read_meta_ini
+                meta_data = read_meta_ini(mod_path)
+                try:
+                    nexus_id = int(meta_data.get("modid", "0"))
+                except (ValueError, TypeError):
+                    nexus_id = 0
+                inst_file = meta_data.get("installationFile", "")
+
+            # Fallback 2: .meta file via installationFile
+                if inst_file and downloads_path and downloads_path.is_dir():
+                    for meta_candidate in downloads_path.rglob(inst_file + ".meta"):
+                        cp_meta = configparser.ConfigParser()
+                        cp_meta.optionxform = str
+                        try:
+                            cp_meta.read(str(meta_candidate), encoding="utf-8")
+                            mid = int(cp_meta.get("General", "modID", fallback="0"))
+                            if mid > 0:
+                                nexus_id = mid
+                                break
+                        except (configparser.Error, OSError, ValueError):
+                            pass
+
+            # Fallback 3: parse modID from installationFile filename
+            if nexus_id <= 0 and inst_file:
+                from anvil.core.nexus_filename_parser import extract_nexus_mod_id
+                parsed_id = extract_nexus_mod_id(inst_file)
+                if parsed_id and parsed_id > 0:
+                    nexus_id = parsed_id
+
+            # Fallback 4: search downloads for matching archive
+            if nexus_id <= 0 and downloads_path and downloads_path.is_dir():
+                from anvil.core.nexus_filename_parser import extract_nexus_mod_id as _parse_id
+                mod_folder = mod_path.name
+                mod_lower = mod_folder.lower()
+                search_dirs = [downloads_path]
+                if downloads_path.parent != downloads_path:
+                    search_dirs.append(downloads_path.parent)
+                for search_dir in search_dirs:
+                    if not search_dir.is_dir():
+                        continue
+                    for f in search_dir.rglob("*"):
+                        if not f.is_file():
+                            continue
+                        if f.suffix.lower() not in ('.zip', '.rar', '.7z', '.meta'):
+                            continue
+                        fname_lower = f.stem.lower()
+                        if f.suffix.lower() == '.meta':
+                            fname_lower = Path(f.stem).stem.lower()
+                        if re.sub(r'[^a-z0-9]', '', mod_lower) not in re.sub(r'[^a-z0-9]', '', fname_lower):
+                            continue
+                        meta_path = f if f.suffix.lower() == '.meta' else Path(str(f) + ".meta")
+                        if meta_path.is_file():
+                            cp_meta = configparser.ConfigParser()
+                            cp_meta.optionxform = str
+                            try:
+                                cp_meta.read(str(meta_path), encoding="utf-8")
+                                mid = int(cp_meta.get("General", "modID", fallback="0"))
+                                if mid > 0:
+                                    nexus_id = mid
+                                    break
+                            except (configparser.Error, OSError, ValueError):
+                                pass
+                        archive_name = f.name if f.suffix.lower() != '.meta' else f.stem
+                        parsed = _parse_id(archive_name)
+                        if parsed and parsed > 0:
+                            nexus_id = parsed
+                            break
+                    if nexus_id > 0:
+                        break
+
+            if nexus_id > 0:
+                queue.append((mod_path, nexus_id))
+            else:
+                skipped.append(entry.display_name or entry.name)
+
+        if not queue and skipped:
+            QMessageBox.information(
+                self,
+                tr("batch_query.title"),
+                tr("batch_query.no_ids_found", count=len(skipped)),
+            )
+            return
+
+        if not queue:
+            self.statusBar().showMessage(tr("batch_query.no_mods"), 3000)
+            return
+
+        # Initialize batch state
+        self._batch_query_queue = queue
+        self._batch_query_slug = nexus_slug
+        self._batch_query_total = len(queue)
+        self._batch_query_done = 0
+        self._batch_query_success = 0
+        self._batch_query_errors = 0
+        self._batch_query_skipped = skipped
+        self._batch_query_active = True
+
+        self.statusBar().showMessage(
+            tr("batch_query.starting", total=len(queue), skipped=len(skipped)), 5000,
+        )
+        Toast(self, tr("batch_query.starting", total=len(queue), skipped=len(skipped)), duration=5000)
+
+        # Start first request
+        self._batch_query_next()
+
+    def _batch_query_next(self) -> None:
+        """Send the next request from the batch queue."""
+        if not self._batch_query_queue:
+            self._batch_query_finished()
+            return
+
+        mod_path, nexus_id = self._batch_query_queue.pop(0)
+        self._pending_batch_query_path = mod_path
+
+        self._nexus_api.query_mod_info(self._batch_query_slug, nexus_id)
+
+        done = self._batch_query_done
+        total = self._batch_query_total
+        self.statusBar().showMessage(
+            tr("batch_query.progress", current=done + 1, total=total), 0,
+        )
+
+    def _batch_query_finished(self) -> None:
+        """Show results dialog when batch query completes."""
+        self._batch_query_active = False
+        self._reload_mod_list()
+
+        success = self._batch_query_success
+        errors = self._batch_query_errors
+        skipped = self._batch_query_skipped
+        total_attempted = self._batch_query_total
+
+        Toast(self, tr("batch_query.result_updated", count=success, total=total_attempted), duration=5000)
+
+        msg_parts = [tr("batch_query.result_updated", count=success, total=total_attempted)]
+
+        if errors > 0:
+            msg_parts.append(tr("batch_query.result_errors", count=errors))
+
+        if skipped:
+            msg_parts.append(tr("batch_query.result_skipped", count=len(skipped)))
+            # Show max 20 mod names
+            show_names = skipped[:20]
+            msg_parts.append("\n".join(f"  • {n}" for n in show_names))
+            if len(skipped) > 20:
+                msg_parts.append(f"  ... +{len(skipped) - 20}")
+
+        QMessageBox.information(
+            self,
+            tr("batch_query.title"),
+            "\n\n".join(msg_parts),
+        )
 
     def _on_dl_query_info(self, archive_path: str) -> None:
         """Handle 'Query Nexus Info' from Downloads tab context menu."""
@@ -4091,6 +4283,50 @@ class MainWindow(QMainWindow):
             self._pending_nxm_mod_version = data.get("version", "")
 
         elif tag.startswith("query_mod_info:") and isinstance(data, dict):
+            # ── Batch query mode ──────────────────────────────────
+            batch_path = getattr(self, "_pending_batch_query_path", None)
+            if getattr(self, "_batch_query_active", False) and batch_path:
+                self._pending_batch_query_path = None
+                if batch_path.exists():
+                    from anvil.core.mod_metadata import write_meta_ini
+                    from datetime import datetime, timezone
+                    nexus_slug = self._batch_query_slug
+
+                    # Endorsement status
+                    endorsed_val = "3"  # UNKNOWN
+                    endorsement = data.get("endorsement")
+                    if isinstance(endorsement, dict):
+                        endorse_status = endorsement.get("endorse_status", "")
+                        if endorse_status == "Endorsed":
+                            endorsed_val = "1"
+                        elif endorse_status == "Abstained":
+                            endorsed_val = "2"
+                        elif endorse_status == "Undecided":
+                            endorsed_val = "0"
+
+                    # SAFE fields only — NEVER touch name, version, description
+                    write_meta_ini(batch_path, {
+                        "modid": str(data.get("mod_id", 0)),
+                        "newestVersion": data.get("version", ""),
+                        "nexusName": data.get("name", ""),
+                        "nexusAuthor": data.get("author", ""),
+                        "nexusSummary": data.get("summary", ""),
+                        "nexusCategory": str(data.get("category_id", 0)),
+                        "endorsed": endorsed_val,
+                        "gameName": nexus_slug,
+                        "repository": "Nexus",
+                        "lastNexusQuery": datetime.now(timezone.utc).isoformat(),
+                        "nexusURL": f"https://www.nexusmods.com/{nexus_slug}/mods/{data.get('mod_id', 0)}",
+                    })
+                    self._batch_query_success += 1
+
+                self._batch_query_done += 1
+                # Delay next request by 1s to respect rate limits
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(1000, self._batch_query_next)
+                return
+
+            # ── Single query mode (existing) ──────────────────────
             dl_path = self._pending_dl_query_path
             mod_path = self._pending_query_path
 
@@ -4138,7 +4374,6 @@ class MainWindow(QMainWindow):
                 from datetime import datetime, timezone
                 write_meta_ini(mod_path, {
                     "modid": str(data.get("mod_id", 0)),
-                    "version": data.get("version", ""),
                     "newestVersion": data.get("version", ""),
                     "nexusName": data.get("name", ""),
                     "nexusAuthor": data.get("author", ""),
@@ -4159,6 +4394,22 @@ class MainWindow(QMainWindow):
     def _on_nexus_error(self, tag: str, message: str) -> None:
         """Handle Nexus API errors."""
         if tag.startswith("query_mod_info:"):
+            # Batch mode: count error and continue with next
+            if getattr(self, "_batch_query_active", False):
+                self._pending_batch_query_path = None
+                self._batch_query_done += 1
+                self._batch_query_errors += 1
+                # Rate limit hit → wait 60s before retry
+                if "429" in message or "Rate Limit" in message:
+                    from PySide6.QtCore import QTimer
+                    self.statusBar().showMessage(
+                        tr("batch_query.rate_limit_wait"), 0,
+                    )
+                    QTimer.singleShot(60000, self._batch_query_next)
+                else:
+                    from PySide6.QtCore import QTimer
+                    QTimer.singleShot(1000, self._batch_query_next)
+                return
             self._pending_dl_query_path = None
             self._pending_query_path = None
         self.statusBar().showMessage(tr("status.nexus_error", message=message), 5000)

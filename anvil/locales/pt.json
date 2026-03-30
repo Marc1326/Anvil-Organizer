@@ -83,7 +83,9 @@
     "delete_profile": "Eliminar perfil",
     "select_color": "Alterar cor...",
     "reset_color": "Remover cor",
-    "nexus_query": "Consultar info do Nexus",
+    "nexus_info_menu": "Info do Nexus",
+    "nexus_query": "Info do mod",
+    "nexus_query_all": "Para todos os mods",
     "lock_mod": "Bloquear mod",
     "unlock_mod": "Desbloquear mod",
     "toggle_lock": "Alternar bloqueio"
@@ -419,6 +421,17 @@
     "nexus_no_id_found": "Nenhum ID Nexus encontrado. Baixe o mod pelo Nexus.",
     "nexus_no_game_slug": "Nenhum slug de jogo Nexus configurado.",
     "modindex_cleared": "Cache do indice de mods limpo. Sera reconstruido no proximo carregamento."
+  },
+  "batch_query": {
+    "title": "Consultar info do Nexus de todos",
+    "no_ids_found": "Nenhum ID Nexus encontrado para {count} mods.\nUse clique direito → 'Consultar info do Nexus' para mods individuais.",
+    "no_mods": "Nenhum mod na lista.",
+    "starting": "Iniciando consulta Nexus para {total} mods ({skipped} ignorados)...",
+    "progress": "Consulta Nexus: {current} / {total}...",
+    "result_updated": "{count} de {total} mods atualizados.",
+    "result_errors": "{count} erros durante a consulta.",
+    "result_skipped": "{count} mods sem ID Nexus (clique direito → 'Consultar info do Nexus'):",
+    "rate_limit_wait": "Limite de taxa atingido — aguardando 60 segundos..."
   },
   "toast": {
     "backup_created": "{count} Mods guardados | {name} | {size}",

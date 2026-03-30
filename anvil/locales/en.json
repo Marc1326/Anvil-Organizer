@@ -83,7 +83,9 @@
     "delete_profile": "Delete Profile",
     "select_color": "Select Color...",
     "reset_color": "Reset Color",
-    "nexus_query": "Query Nexus Info",
+    "nexus_info_menu": "Query Nexus Info",
+    "nexus_query": "Query Mod Info",
+    "nexus_query_all": "Query All Mods",
     "lock_mod": "Lock Mod",
     "unlock_mod": "Unlock Mod",
     "toggle_lock": "Toggle Lock"
@@ -419,6 +421,17 @@
     "nexus_no_id_found": "No Nexus ID found. Download the mod via Nexus.",
     "nexus_no_game_slug": "No Nexus game slug configured.",
     "modindex_cleared": "Mod index cache cleared. Will be rebuilt on next load."
+  },
+  "batch_query": {
+    "title": "Query All Nexus Info",
+    "no_ids_found": "No Nexus IDs found for {count} mods.\nUse right-click → 'Query Nexus Info' for individual mods.",
+    "no_mods": "No mods in the mod list.",
+    "starting": "Starting Nexus query for {total} mods ({skipped} skipped)...",
+    "progress": "Nexus query: {current} / {total}...",
+    "result_updated": "{count} of {total} mods updated.",
+    "result_errors": "{count} errors during query.",
+    "result_skipped": "{count} mods without Nexus ID (use right-click → 'Query Nexus Info' to add manually):",
+    "rate_limit_wait": "Rate limit reached — waiting 60 seconds..."
   },
   "toast": {
     "backup_created": "{count} mods backed up | {name} | {size}",
