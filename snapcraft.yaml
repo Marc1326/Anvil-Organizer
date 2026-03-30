@@ -1,0 +1,55 @@
+name: anvil-organizer
+base: core24
+version: '1.2.3'
+summary: Native Linux Mod Manager inspired by Mod Organizer 2
+description: |
+  Anvil Organizer is a native Linux mod manager for games like Skyrim,
+  Fallout 4, Cyberpunk 2077, Baldur's Gate 3, Starfield, and more.
+  Inspired by Mod Organizer 2, it features virtual file system deployment,
+  profile management, Nexus Mods integration, and plugin load ordering.
+
+grade: stable
+confinement: strict
+
+platforms:
+  amd64:
+    build-on: [amd64]
+    build-for: [amd64]
+
+apps:
+  anvil-organizer:
+    command: bin/anvil-organizer
+    desktop: share/applications/anvil-organizer.desktop
+    extensions: [kde-neon-6]
+    plugs:
+      - home
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+      - opengl
+      - network
+      - network-bind
+      - removable-media
+      - mount-observe
+
+parts:
+  anvil-organizer:
+    plugin: python
+    source: .
+    python-packages:
+      - PySide6>=6.6.0
+      - lz4>=4.0.0
+    stage-packages:
+      - libgl1
+      - libxkbcommon0
+    override-build: |
+      craftctl default
+      # Desktop entry
+      install -Dm644 $CRAFT_PART_SRC/anvil-organizer.desktop \
+        $CRAFT_PART_INSTALL/share/applications/anvil-organizer.desktop
+      # Icons
+      install -Dm644 $CRAFT_PART_SRC/anvil/resources/logo.png \
+        $CRAFT_PART_INSTALL/share/icons/hicolor/256x256/apps/anvil-organizer.png
+      install -Dm644 $CRAFT_PART_SRC/anvil/resources/logo.svg \
+        $CRAFT_PART_INSTALL/share/icons/hicolor/scalable/apps/anvil-organizer.svg
