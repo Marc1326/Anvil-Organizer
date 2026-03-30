@@ -86,6 +86,7 @@
     "nexus_info_menu": "Информация Nexus",
     "nexus_query": "Информация о моде",
     "nexus_query_all": "Для всех модов",
+    "nexus_query_frameworks": "Запросить инфо Nexus",
     "lock_mod": "Заблокировать мод",
     "unlock_mod": "Разблокировать мод",
     "toggle_lock": "Переключить блокировку"
@@ -432,6 +433,16 @@
     "result_errors": "{count} ошибок при запросе.",
     "result_skipped": "{count} модов без ID Nexus (правый клик → 'Запросить информацию Nexus'):",
     "rate_limit_wait": "Достигнут лимит запросов — ожидание 60 секунд..."
+  },
+  "fw": {
+    "nexus_query_btn": "Запрос Nexus",
+    "nexus_query_btn_tooltip": "Запросить установленные фреймворки на NexusMods",
+    "query_starting": "Запуск запроса Nexus для {total} фреймворков...",
+    "query_progress": "Запрос фреймворков: {current} / {total}...",
+    "query_result": "{count} из {total} фреймворков обновлено.",
+    "query_errors": "{count} ошибок при запросе.",
+    "query_no_frameworks": "Не найдено установленных фреймворков с ID Nexus.",
+    "query_no_apikey": "Ключ API Nexus не настроен."
   },
   "toast": {
     "backup_created": "{count} модов сохранено | {name} | {size}",

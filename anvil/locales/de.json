@@ -86,6 +86,7 @@
     "nexus_info_menu": "Nexus-Infos abrufen",
     "nexus_query": "Mod-Info abrufen",
     "nexus_query_all": "Für alle Mods abrufen",
+    "nexus_query_frameworks": "Nexus-Info abrufen",
     "lock_mod": "Mod sperren",
     "unlock_mod": "Mod entsperren",
     "toggle_lock": "Sperre umschalten"
@@ -432,6 +433,16 @@
     "result_errors": "{count} Fehler bei der Abfrage.",
     "result_skipped": "{count} Mods ohne Nexus-ID (per Rechtsklick → 'Nexus-Info abrufen' nachpflegen):",
     "rate_limit_wait": "Rate-Limit erreicht — warte 60 Sekunden..."
+  },
+  "fw": {
+    "nexus_query_btn": "Nexus prüfen",
+    "nexus_query_btn_tooltip": "Installierte Frameworks auf NexusMods abfragen",
+    "query_starting": "Starte Nexus-Abfrage für {total} Frameworks...",
+    "query_progress": "Framework-Abfrage: {current} / {total}...",
+    "query_result": "{count} von {total} Frameworks aktualisiert.",
+    "query_errors": "{count} Fehler bei der Abfrage.",
+    "query_no_frameworks": "Keine installierten Frameworks mit Nexus-ID gefunden.",
+    "query_no_apikey": "Kein Nexus-API-Key konfiguriert."
   },
   "toast": {
     "backup_created": "{count} Mods gesichert | {name} | {size}",

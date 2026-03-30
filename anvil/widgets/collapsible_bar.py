@@ -4,21 +4,22 @@ from __future__ import annotations
 
 from PySide6.QtCore import QSettings, Qt, Signal
 from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 
 _COLLAPSED_HEIGHT = 28  # label-only height (matches pane minimumHeight)
 _MAX_HEIGHT = 16777215  # QWIDGETSIZE_MAX — no constraint
 
 
-class CollapsibleSectionBar(QLabel):
-    """A section label that collapses/expands an associated widget on click.
+class CollapsibleSectionBar(QWidget):
+    """A section bar that collapses/expands an associated widget on click.
 
     - Single click toggles the target widget's visibility.
     - Arrow indicator (▼ open / ▶ closed) is prepended to the text.
     - Collapse state is persisted via QSettings.
     - When a *container* (the QSplitter pane) is provided, its maximumHeight
       is constrained so the splitter reclaims space on collapse.
+    - Optional action button on the right side via add_action_button().
     """
 
     toggled = Signal(bool)  # emitted on state change; True = expanded (not collapsed)
@@ -42,6 +43,18 @@ class CollapsibleSectionBar(QLabel):
         self._max_expanded_height = max_expanded_height
         self._count: int | None = None
 
+        # Layout: [label .................. action_button]
+        hlayout = QHBoxLayout(self)
+        hlayout.setContentsMargins(0, 0, 0, 0)
+        hlayout.setSpacing(0)
+
+        self._label = QLabel()
+        self._label.setStyleSheet(style)
+        self._label.setCursor(Qt.CursorShape.PointingHandCursor)
+        hlayout.addWidget(self._label, 1)
+
+        self._action_btn: QPushButton | None = None
+
         self.setStyleSheet(style)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -52,6 +65,24 @@ class CollapsibleSectionBar(QLabel):
         self._apply_state()
 
     # ── Public API ─────────────────────────────────────────────────
+
+    def add_action_button(self, text: str, tooltip: str = "") -> QPushButton:
+        """Add a small action button on the right side of the header bar.
+
+        Returns the QPushButton so the caller can connect its clicked signal.
+        """
+        btn = QPushButton(text)
+        btn.setToolTip(tooltip)
+        btn.setCursor(Qt.CursorShape.ArrowCursor)
+        btn.setFixedHeight(22)
+        btn.setStyleSheet(
+            "QPushButton { padding: 1px 8px; font-size: 11px; "
+            "background: #2a4a5a; color: #ddd; border: 1px solid #3a6a7a; border-radius: 3px; }"
+            "QPushButton:hover { background: #3a5a6a; }"
+        )
+        self.layout().addWidget(btn)
+        self._action_btn = btn
+        return btn
 
     def set_count(self, count: int) -> None:
         """Update the count shown in parentheses."""
@@ -78,6 +109,11 @@ class CollapsibleSectionBar(QLabel):
     # ── Events ─────────────────────────────────────────────────────
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
+        # Only toggle when clicking on the label area, not the action button
+        child = self.childAt(event.position().toPoint())
+        if child is self._action_btn:
+            super().mousePressEvent(event)
+            return
         if event.button() == Qt.MouseButton.LeftButton:
             self._collapsed = not self._collapsed
             self._apply_state()
@@ -101,9 +137,9 @@ class CollapsibleSectionBar(QLabel):
     def _update_text(self) -> None:
         arrow = "▶" if self._collapsed else "▼"
         if self._count is not None:
-            self.setText(f"{arrow} {self._title} ({self._count})")
+            self._label.setText(f"{arrow} {self._title} ({self._count})")
         else:
-            self.setText(f"{arrow} {self._title}")
+            self._label.setText(f"{arrow} {self._title}")
 
     def _persist(self) -> None:
         settings = QSettings()

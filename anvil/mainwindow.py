@@ -320,6 +320,7 @@ class MainWindow(QMainWindow):
         )
         self._mod_list_view.fw_context_menu_requested.connect(self._on_fw_context_menu)
         self._mod_list_view.fw_archives_dropped.connect(self._on_fw_archives_dropped)
+        self._mod_list_view.fw_nexus_query_requested.connect(self._query_framework_nexus)
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
         self._game_panel.game_started.connect(self._on_game_started)
@@ -3763,14 +3764,7 @@ class MainWindow(QMainWindow):
             else:
                 skipped.append(entry.display_name or entry.name)
 
-        # Add installed frameworks with known nexus_id
-        fw_queue: list[tuple[str, int]] = []
-        if self._current_plugin:
-            for fw, installed in self._current_plugin.get_installed_frameworks():
-                if fw.nexus_id > 0 and installed:
-                    fw_queue.append((fw.name, fw.nexus_id))
-
-        if not queue and not fw_queue and skipped:
+        if not queue and skipped:
             QMessageBox.information(
                 self,
                 tr("batch_query.title"),
@@ -3778,15 +3772,14 @@ class MainWindow(QMainWindow):
             )
             return
 
-        if not queue and not fw_queue:
+        if not queue:
             self.statusBar().showMessage(tr("batch_query.no_mods"), 3000)
             return
 
-        total = len(queue) + len(fw_queue)
+        total = len(queue)
 
         # Initialize batch state
         self._batch_query_queue = queue
-        self._batch_fw_queue = fw_queue
         self._batch_query_slug = nexus_slug
         self._batch_query_total = total
         self._batch_query_done = 0
@@ -3794,7 +3787,6 @@ class MainWindow(QMainWindow):
         self._batch_query_errors = 0
         self._batch_query_skipped = skipped
         self._batch_query_active = True
-        self._pending_batch_fw_name = ""
 
         self.statusBar().showMessage(
             tr("batch_query.starting", total=total, skipped=len(skipped)), 5000,
@@ -3809,11 +3801,6 @@ class MainWindow(QMainWindow):
         if self._batch_query_queue:
             mod_path, nexus_id = self._batch_query_queue.pop(0)
             self._pending_batch_query_path = mod_path
-            self._pending_batch_fw_name = ""
-        elif getattr(self, "_batch_fw_queue", None):
-            fw_name, nexus_id = self._batch_fw_queue.pop(0)
-            self._pending_batch_query_path = None
-            self._pending_batch_fw_name = fw_name
         else:
             self._batch_query_finished()
             return
@@ -3857,7 +3844,7 @@ class MainWindow(QMainWindow):
             "\n\n".join(msg_parts),
         )
 
-    def _save_framework_cache(self, fw_name: str, data: dict) -> None:
+    def _save_framework_cache(self, fw_name: str, data: dict, slug: str = "") -> None:
         """Save Nexus query result for a framework to framework_cache.json."""
         if not self._current_instance_path:
             return
@@ -3872,7 +3859,7 @@ class MainWindow(QMainWindow):
             except (json.JSONDecodeError, OSError):
                 pass
 
-        nexus_slug = self._batch_query_slug
+        nexus_slug = slug or getattr(self, "_batch_query_slug", "")
         cache[fw_name] = {
             "nexus_id": data.get("mod_id", 0),
             "nexus_name": data.get("name", ""),
@@ -3891,6 +3878,84 @@ class MainWindow(QMainWindow):
             )
         except OSError:
             pass
+
+    # ── Separate framework Nexus query ──────────────────────────
+
+    def _query_framework_nexus(self) -> None:
+        """Query installed frameworks on NexusMods (separate from mod batch query)."""
+        if not self._nexus_api.has_api_key():
+            Toast(self, tr("fw.query_no_apikey"), duration=3000)
+            return
+
+        if getattr(self, "_batch_query_active", False) or getattr(self, "_fw_query_active", False):
+            return
+
+        nexus_slug = ""
+        if self._current_plugin:
+            nexus_slug = (
+                getattr(self._current_plugin, "GameNexusName", "")
+                or getattr(self._current_plugin, "GameShortName", "")
+            )
+        if not nexus_slug:
+            self.statusBar().showMessage(tr("status.nexus_no_game_slug"), 5000)
+            return
+
+        fw_queue: list[tuple[str, int]] = []
+        if self._current_plugin:
+            for fw, installed in self._current_plugin.get_installed_frameworks():
+                if fw.nexus_id > 0 and installed:
+                    fw_queue.append((fw.name, fw.nexus_id))
+
+        if not fw_queue:
+            Toast(self, tr("fw.query_no_frameworks"), duration=3000)
+            return
+
+        self._fw_query_queue = fw_queue
+        self._fw_query_slug = nexus_slug
+        self._fw_query_total = len(fw_queue)
+        self._fw_query_done = 0
+        self._fw_query_success = 0
+        self._fw_query_errors = 0
+        self._fw_query_active = True
+        self._pending_fw_query_name = ""
+
+        Toast(self, tr("fw.query_starting", total=len(fw_queue)), duration=3000)
+        self.statusBar().showMessage(
+            tr("fw.query_starting", total=len(fw_queue)), 5000,
+        )
+        self._fw_query_next()
+
+    def _fw_query_next(self) -> None:
+        """Send the next framework query request."""
+        if not self._fw_query_queue:
+            self._fw_query_finished()
+            return
+
+        fw_name, nexus_id = self._fw_query_queue.pop(0)
+        self._pending_fw_query_name = fw_name
+
+        self._nexus_api.query_mod_info(self._fw_query_slug, nexus_id)
+
+        done = self._fw_query_done
+        total = self._fw_query_total
+        self.statusBar().showMessage(
+            tr("fw.query_progress", current=done + 1, total=total), 0,
+        )
+
+    def _fw_query_finished(self) -> None:
+        """Show results when framework query completes."""
+        self._fw_query_active = False
+
+        success = self._fw_query_success
+        errors = self._fw_query_errors
+        total = self._fw_query_total
+
+        msg = tr("fw.query_result", count=success, total=total)
+        if errors > 0:
+            msg += "\n" + tr("fw.query_errors", count=errors)
+
+        Toast(self, msg, duration=5000)
+        self.statusBar().showMessage(msg, 5000)
 
     def _on_dl_query_info(self, archive_path: str) -> None:
         """Handle 'Query Nexus Info' from Downloads tab context menu."""
@@ -4334,18 +4399,23 @@ class MainWindow(QMainWindow):
             self._pending_nxm_mod_version = data.get("version", "")
 
         elif tag.startswith("query_mod_info:") and isinstance(data, dict):
+            # ── Separate framework query mode ─────────────────────
+            fw_qname = getattr(self, "_pending_fw_query_name", "")
+            if getattr(self, "_fw_query_active", False) and fw_qname:
+                self._pending_fw_query_name = ""
+                self._save_framework_cache(fw_qname, data, slug=getattr(self, "_fw_query_slug", ""))
+                self._fw_query_success += 1
+                self._fw_query_done += 1
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(1000, self._fw_query_next)
+                return
+
             # ── Batch query mode ──────────────────────────────────
             batch_path = getattr(self, "_pending_batch_query_path", None)
-            batch_fw = getattr(self, "_pending_batch_fw_name", "")
-            if getattr(self, "_batch_query_active", False) and (batch_path or batch_fw):
+            if getattr(self, "_batch_query_active", False) and batch_path:
                 self._pending_batch_query_path = None
-                self._pending_batch_fw_name = ""
 
-                if batch_fw:
-                    # Framework result → save to framework_cache.json
-                    self._save_framework_cache(batch_fw, data)
-                    self._batch_query_success += 1
-                elif batch_path and batch_path.exists():
+                if batch_path.exists():
                     from anvil.core.mod_metadata import write_meta_ini
                     from datetime import datetime, timezone
                     nexus_slug = self._batch_query_slug
@@ -4452,10 +4522,22 @@ class MainWindow(QMainWindow):
     def _on_nexus_error(self, tag: str, message: str) -> None:
         """Handle Nexus API errors."""
         if tag.startswith("query_mod_info:"):
+            # Separate framework query mode
+            if getattr(self, "_fw_query_active", False) and getattr(self, "_pending_fw_query_name", ""):
+                self._pending_fw_query_name = ""
+                self._fw_query_done += 1
+                self._fw_query_errors += 1
+                if "429" in message or "Rate Limit" in message:
+                    from PySide6.QtCore import QTimer
+                    self.statusBar().showMessage(tr("batch_query.rate_limit_wait"), 0)
+                    QTimer.singleShot(60000, self._fw_query_next)
+                else:
+                    from PySide6.QtCore import QTimer
+                    QTimer.singleShot(1000, self._fw_query_next)
+                return
             # Batch mode: count error and continue with next
             if getattr(self, "_batch_query_active", False):
                 self._pending_batch_query_path = None
-                self._pending_batch_fw_name = ""
                 self._batch_query_done += 1
                 self._batch_query_errors += 1
                 # Rate limit hit → wait 60s before retry
@@ -4985,6 +5067,12 @@ class MainWindow(QMainWindow):
         name = fw_data.get("name", "")
         installed = fw_data.get("installed", False)
 
+        act_nexus_query_fw = menu.addAction(tr("context.nexus_query_frameworks"))
+        _has_fw = bool(self._current_plugin and any(
+            fw.nexus_id > 0 and inst for fw, inst in self._current_plugin.get_installed_frameworks()
+        ))
+        act_nexus_query_fw.setEnabled(self._nexus_api.has_api_key() and _has_fw)
+        menu.addSeparator()
         act_reinstall = menu.addAction(tr("context.reinstall_framework"))
         act_uninstall = menu.addAction(tr("context.uninstall_framework"))
         act_uninstall.setEnabled(installed)
@@ -4995,7 +5083,9 @@ class MainWindow(QMainWindow):
         if not chosen:
             return
 
-        if chosen == act_reinstall:
+        if chosen == act_nexus_query_fw:
+            self._query_framework_nexus()
+        elif chosen == act_reinstall:
             self._fw_reinstall(name)
         elif chosen == act_uninstall:
             self._fw_uninstall(name)

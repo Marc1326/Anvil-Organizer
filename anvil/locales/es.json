@@ -86,6 +86,7 @@
     "nexus_info_menu": "Consultar info de Nexus",
     "nexus_query": "Info del mod",
     "nexus_query_all": "Para todos los mods",
+    "nexus_query_frameworks": "Consultar info de Nexus",
     "lock_mod": "Bloquear mod",
     "unlock_mod": "Desbloquear mod",
     "toggle_lock": "Alternar bloqueo"
@@ -432,6 +433,16 @@
     "result_errors": "{count} errores durante la consulta.",
     "result_skipped": "{count} mods sin ID de Nexus (usa clic derecho → 'Consultar info de Nexus'):",
     "rate_limit_wait": "Límite de velocidad alcanzado — esperando 60 segundos..."
+  },
+  "fw": {
+    "nexus_query_btn": "Consultar Nexus",
+    "nexus_query_btn_tooltip": "Consultar frameworks instalados en NexusMods",
+    "query_starting": "Iniciando consulta Nexus para {total} frameworks...",
+    "query_progress": "Consulta de frameworks: {current} / {total}...",
+    "query_result": "{count} de {total} frameworks actualizados.",
+    "query_errors": "{count} errores durante la consulta.",
+    "query_no_frameworks": "No se encontraron frameworks instalados con ID de Nexus.",
+    "query_no_apikey": "No hay clave API de Nexus configurada."
   },
   "toast": {
     "backup_created": "{count} Mods respaldados | {name} | {size}",

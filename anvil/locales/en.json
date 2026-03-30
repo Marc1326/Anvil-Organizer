@@ -86,6 +86,7 @@
     "nexus_info_menu": "Query Nexus Info",
     "nexus_query": "Query Mod Info",
     "nexus_query_all": "Query All Mods",
+    "nexus_query_frameworks": "Query Nexus Info",
     "lock_mod": "Lock Mod",
     "unlock_mod": "Unlock Mod",
     "toggle_lock": "Toggle Lock"
@@ -432,6 +433,16 @@
     "result_errors": "{count} errors during query.",
     "result_skipped": "{count} mods without Nexus ID (use right-click → 'Query Nexus Info' to add manually):",
     "rate_limit_wait": "Rate limit reached — waiting 60 seconds..."
+  },
+  "fw": {
+    "nexus_query_btn": "Nexus Query",
+    "nexus_query_btn_tooltip": "Query installed frameworks on NexusMods",
+    "query_starting": "Starting Nexus query for {total} frameworks...",
+    "query_progress": "Framework query: {current} / {total}...",
+    "query_result": "{count} of {total} frameworks updated.",
+    "query_errors": "{count} errors during query.",
+    "query_no_frameworks": "No installed frameworks with Nexus ID found.",
+    "query_no_apikey": "No Nexus API key configured."
   },
   "toast": {
     "backup_created": "{count} mods backed up | {name} | {size}",
