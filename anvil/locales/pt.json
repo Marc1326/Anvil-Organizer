@@ -442,7 +442,8 @@
     "query_result": "{count} de {total} frameworks atualizados.",
     "query_errors": "{count} erros durante a consulta.",
     "query_no_frameworks": "Nenhum framework instalado com ID Nexus encontrado.",
-    "query_no_apikey": "Nenhuma chave API Nexus configurada."
+    "query_no_apikey": "Nenhuma chave API Nexus configurada.",
+    "query_rate_limit_wait": "Limite de taxa atingido — aguardando 60 segundos..."
   },
   "toast": {
     "backup_created": "{count} Mods guardados | {name} | {size}",

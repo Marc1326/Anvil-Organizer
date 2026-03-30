@@ -302,6 +302,14 @@ class MainWindow(QMainWindow):
         self._current_mod_entries = []
         self._pending_query_path: Path | None = None
         self._pending_dl_query_path: str | None = None
+        self._fw_query_queue: list[tuple[str, int]] = []
+        self._fw_query_slug: str = ""
+        self._fw_query_total: int = 0
+        self._fw_query_done: int = 0
+        self._fw_query_success: int = 0
+        self._fw_query_errors: int = 0
+        self._fw_query_active: bool = False
+        self._pending_fw_query_name: str = ""
         self._current_profile_path: Path | None = None
         self._current_instance_path: Path | None = None
         self._current_downloads_path: Path | None = None
@@ -3887,7 +3895,7 @@ class MainWindow(QMainWindow):
             Toast(self, tr("fw.query_no_apikey"), duration=3000)
             return
 
-        if getattr(self, "_batch_query_active", False) or getattr(self, "_fw_query_active", False):
+        if self._batch_query_active or self._fw_query_active:
             return
 
         nexus_slug = ""
@@ -3945,6 +3953,7 @@ class MainWindow(QMainWindow):
     def _fw_query_finished(self) -> None:
         """Show results when framework query completes."""
         self._fw_query_active = False
+        self._reload_mod_list()
 
         success = self._fw_query_success
         errors = self._fw_query_errors
@@ -4400,10 +4409,10 @@ class MainWindow(QMainWindow):
 
         elif tag.startswith("query_mod_info:") and isinstance(data, dict):
             # ── Separate framework query mode ─────────────────────
-            fw_qname = getattr(self, "_pending_fw_query_name", "")
-            if getattr(self, "_fw_query_active", False) and fw_qname:
+            fw_qname = self._pending_fw_query_name
+            if self._fw_query_active and fw_qname:
                 self._pending_fw_query_name = ""
-                self._save_framework_cache(fw_qname, data, slug=getattr(self, "_fw_query_slug", ""))
+                self._save_framework_cache(fw_qname, data, slug=self._fw_query_slug)
                 self._fw_query_success += 1
                 self._fw_query_done += 1
                 from PySide6.QtCore import QTimer
@@ -4523,13 +4532,13 @@ class MainWindow(QMainWindow):
         """Handle Nexus API errors."""
         if tag.startswith("query_mod_info:"):
             # Separate framework query mode
-            if getattr(self, "_fw_query_active", False) and getattr(self, "_pending_fw_query_name", ""):
+            if self._fw_query_active and self._pending_fw_query_name:
                 self._pending_fw_query_name = ""
                 self._fw_query_done += 1
                 self._fw_query_errors += 1
                 if "429" in message or "Rate Limit" in message:
                     from PySide6.QtCore import QTimer
-                    self.statusBar().showMessage(tr("batch_query.rate_limit_wait"), 0)
+                    self.statusBar().showMessage(tr("fw.query_rate_limit_wait"), 0)
                     QTimer.singleShot(60000, self._fw_query_next)
                 else:
                     from PySide6.QtCore import QTimer

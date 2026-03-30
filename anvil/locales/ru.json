@@ -442,7 +442,8 @@
     "query_result": "{count} из {total} фреймворков обновлено.",
     "query_errors": "{count} ошибок при запросе.",
     "query_no_frameworks": "Не найдено установленных фреймворков с ID Nexus.",
-    "query_no_apikey": "Ключ API Nexus не настроен."
+    "query_no_apikey": "Ключ API Nexus не настроен.",
+    "query_rate_limit_wait": "Достигнут лимит запросов — ожидание 60 секунд..."
   },
   "toast": {
     "backup_created": "{count} модов сохранено | {name} | {size}",
