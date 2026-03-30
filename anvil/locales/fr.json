@@ -86,10 +86,7 @@
     "nexus_info_menu": "Infos Nexus",
     "nexus_query": "Info du mod",
     "nexus_query_all": "Pour tous les mods",
-    "nexus_query_frameworks": "Récupérer les infos Nexus",
-    "lock_mod": "Verrouiller le mod",
-    "unlock_mod": "Déverrouiller le mod",
-    "toggle_lock": "Basculer le verrouillage"
+    "nexus_query_frameworks": "Récupérer les infos Nexus"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -126,7 +123,6 @@
     "mod_details": "Détails du Mod : {name}",
     "quick_install": "Installation rapide",
     "info_title": "Informations : {name}",
-    "remove_locked_warning": "Attention : {count} mod(s) sont verrouillés !",
     "remove_mod_title": "Supprimer le Mod",
     "remove_mod_single": "Voulez-vous vraiment supprimer le Mod \"{name}\" ?\n\nLe dossier du Mod sera supprimé définitivement.",
     "remove_mod_multi": "Voulez-vous vraiment supprimer {count} Mods ?\n\n{list}\n\nLes dossiers des Mods seront supprimés définitivement.",
@@ -402,8 +398,6 @@
     "separators_expanded": "Tous les séparateurs développés",
     "renamed": "Renommé : {old} → {new}",
     "removed": "Supprimé : {names}",
-    "mod_locked": "Mod verrouillé : {name}",
-    "mod_unlocked": "Mod déverrouillé : {name}",
     "uninstalled": "Désinstallé : {name}",
     "uninstall_failed": "Désinstallation échouée",
     "data_override_uninstalled": "Data-Override désinstallé : {name}",
@@ -553,8 +547,7 @@
     "prop_has_category": "A une catégorie",
     "prop_no_category": "Sans catégorie",
     "prop_conflict_win": "Conflits (gagnant)",
-    "prop_conflict_lose": "Conflits (perdant)",
-    "prop_locked": "Verrouillé"
+    "prop_conflict_lose": "Conflits (perdant)"
   },
   "category": {
     "animations": "Animations",

@@ -86,10 +86,7 @@
     "nexus_info_menu": "Consultar info de Nexus",
     "nexus_query": "Info del mod",
     "nexus_query_all": "Para todos los mods",
-    "nexus_query_frameworks": "Consultar info de Nexus",
-    "lock_mod": "Bloquear mod",
-    "unlock_mod": "Desbloquear mod",
-    "toggle_lock": "Alternar bloqueo"
+    "nexus_query_frameworks": "Consultar info de Nexus"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -126,7 +123,6 @@
     "mod_details": "Detalles del Mod: {name}",
     "quick_install": "Instalación rápida",
     "info_title": "Información: {name}",
-    "remove_locked_warning": "Atención: {count} mod(s) están bloqueados!",
     "remove_mod_title": "Eliminar Mod",
     "remove_mod_single": "¿Eliminar realmente el Mod \"{name}\"?\n\nLa carpeta del Mod se eliminará permanentemente.",
     "remove_mod_multi": "¿Eliminar realmente {count} Mods?\n\n{list}\n\nLas carpetas de los Mods se eliminarán permanentemente.",
@@ -402,8 +398,6 @@
     "separators_expanded": "Todos los separadores expandidos",
     "renamed": "Renombrado: {old} → {new}",
     "removed": "Eliminado: {names}",
-    "mod_locked": "Mod bloqueado: {name}",
-    "mod_unlocked": "Mod desbloqueado: {name}",
     "uninstalled": "Desinstalado: {name}",
     "uninstall_failed": "Desinstalación fallida",
     "data_override_uninstalled": "Data-Override desinstalado: {name}",
@@ -553,8 +547,7 @@
     "prop_has_category": "Tiene categoría",
     "prop_no_category": "Sin categoría",
     "prop_conflict_win": "Conflictos (ganador)",
-    "prop_conflict_lose": "Conflictos (perdedor)",
-    "prop_locked": "Bloqueado"
+    "prop_conflict_lose": "Conflictos (perdedor)"
   },
   "category": {
     "animations": "Animaciones",

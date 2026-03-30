@@ -20,7 +20,7 @@ from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.translator import tr
 from anvil.core.persistent_header import PersistentHeader
 from anvil.widgets.collapsible_bar import CollapsibleSectionBar
-from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME, ROLE_SEP_COLOR, ROLE_IS_LOCKED
+from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME, ROLE_SEP_COLOR
 
 
 class SeparatorMarkingScrollBar(QScrollBar):
@@ -127,7 +127,6 @@ class CheckboxDelegate(QStyledItemDelegate):
     _COLOR_ON = QColor("#4CAF50")
     _COLOR_OFF = QColor("#666666")
     _COLOR_SEP = QColor("#D3D3D3")
-    _COLOR_LOCKED = QColor("#FFB300")  # Amber/Gold for locked mods
 
     def paint(self, painter: QPainter, option, index):
         # Draw background (selection, alternating rows)
@@ -137,7 +136,6 @@ class CheckboxDelegate(QStyledItemDelegate):
             style.drawPrimitive(style.PrimitiveElement.PE_PanelItemViewItem, option, painter, option.widget)
 
         is_sep = index.data(ROLE_IS_SEPARATOR)
-        is_locked = index.data(ROLE_IS_LOCKED)
 
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -174,33 +172,6 @@ class CheckboxDelegate(QStyledItemDelegate):
                     QPointF(cx, cy + size // 2 - 1),
                 ])
             painter.drawPolygon(tri)
-        elif is_locked:
-            # Locked mod: draw padlock icon in amber/gold
-            size = 16
-            x = option.rect.x() + (option.rect.width() - size) // 2
-            y = option.rect.y() + (option.rect.height() - size) // 2
-
-            color = self._COLOR_LOCKED
-
-            # Draw lock body (rounded rectangle, lower part)
-            body_x = x + 2
-            body_y = y + 7
-            body_w = 12
-            body_h = 8
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(color))
-            painter.drawRoundedRect(body_x, body_y, body_w, body_h, 2, 2)
-
-            # Draw lock shackle (arc, upper part)
-            painter.setPen(QPen(color, 2.0))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            shackle_rect = QRect(x + 4, y + 1, 8, 10)
-            painter.drawArc(shackle_rect, 0, 180 * 16)  # Upper half arc
-
-            # Draw keyhole (small dark circle on body)
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(QColor("#1e1e1e")))
-            painter.drawEllipse(x + 6, y + 9, 4, 4)
         else:
             # Normal mod: circle + check
             check = index.data(Qt.ItemDataRole.CheckStateRole)
@@ -249,11 +220,6 @@ class CheckboxDelegate(QStyledItemDelegate):
             if event.type() == event.Type.MouseButtonDblClick:
                 return True
             return False
-        # Guard: locked mods — consume click, do nothing
-        is_locked = index.data(ROLE_IS_LOCKED)
-        if is_locked:
-            return True  # Event consumed, no action
-
         # Normal mod: toggle checkbox on Release, consume DblClick
         if event.type() == event.Type.MouseButtonRelease:
             current = index.data(Qt.ItemDataRole.CheckStateRole)
@@ -342,7 +308,6 @@ class ModListProxyModel(QSortFilterProxyModel):
             from anvil.widgets.filter_panel import (
                 PROP_ENABLED, PROP_DISABLED, PROP_HAS_CATEGORY,
                 PROP_NO_CATEGORY, PROP_CONFLICT_WIN, PROP_CONFLICT_LOSE,
-                PROP_LOCKED,
             )
             match = False
             if PROP_ENABLED in self._filter_prop_ids and entry.enabled:
@@ -352,8 +317,6 @@ class ModListProxyModel(QSortFilterProxyModel):
             if PROP_HAS_CATEGORY in self._filter_prop_ids and entry.category_ids:
                 match = True
             if PROP_NO_CATEGORY in self._filter_prop_ids and not entry.category_ids:
-                match = True
-            if PROP_LOCKED in self._filter_prop_ids and getattr(entry, "is_locked", False):
                 match = True
             # Conflict filters need conflict data from model row
             if source and source_row < source.rowCount():

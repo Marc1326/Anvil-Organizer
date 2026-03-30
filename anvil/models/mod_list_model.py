@@ -37,13 +37,12 @@ ROLE_IS_SEPARATOR = Qt.ItemDataRole.UserRole + 1
 ROLE_FOLDER_NAME = Qt.ItemDataRole.UserRole + 2
 ROLE_IS_COLLAPSED = Qt.ItemDataRole.UserRole + 3  # Whether separator is collapsed (set by view)
 ROLE_SEP_COLOR = Qt.ItemDataRole.UserRole + 4     # Separator color string (hex, e.g. "#FF0000")
-ROLE_IS_LOCKED = Qt.ItemDataRole.UserRole + 5     # Whether mod is locked (always enabled)
 
 
 class ModRow:
-    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name", "color", "file_count", "is_locked")
+    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name", "color", "file_count")
 
-    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name="", color="", file_count=0, is_locked=False):
+    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name="", color="", file_count=0):
         self.enabled = enabled
         self.name = name
         self.conflicts = conflicts
@@ -57,7 +56,6 @@ class ModRow:
         self.folder_name = folder_name
         self.color = color
         self.file_count = file_count
-        self.is_locked = is_locked
 
 
 def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None) -> ModRow:
@@ -85,7 +83,6 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None) -> ModR
         folder_name=entry.name,
         color=entry.color,
         file_count=getattr(entry, "file_count", 0),
-        is_locked=getattr(entry, "is_locked", False),
     )
 
 
@@ -351,17 +348,12 @@ class ModListModel(QAbstractItemModel):
             return r.folder_name
         if role == ROLE_SEP_COLOR:
             return r.color if r.is_separator else ""
-        if role == ROLE_IS_LOCKED:
-            return r.is_locked
         return None
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
         if not index.isValid() or index.row() >= len(self._rows):
             return False
         if role == Qt.ItemDataRole.CheckStateRole and index.column() == COL_CHECK:
-            # Guard: locked mods cannot be toggled
-            if self._rows[index.row()].is_locked:
-                return False
             new_enabled = value == Qt.CheckState.Checked.value
             self._rows[index.row()].enabled = new_enabled
             self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole])
@@ -374,7 +366,7 @@ class ModListModel(QAbstractItemModel):
             return Qt.ItemFlag.ItemIsDropEnabled
         f = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled
         r = self._rows[index.row()]
-        if index.column() == COL_CHECK and not r.is_separator and not r.is_locked:
+        if index.column() == COL_CHECK and not r.is_separator:
             f |= Qt.ItemFlag.ItemIsUserCheckable
         return f
 

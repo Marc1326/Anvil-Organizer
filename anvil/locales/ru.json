@@ -86,10 +86,7 @@
     "nexus_info_menu": "Информация Nexus",
     "nexus_query": "Информация о моде",
     "nexus_query_all": "Для всех модов",
-    "nexus_query_frameworks": "Запросить инфо Nexus",
-    "lock_mod": "Заблокировать мод",
-    "unlock_mod": "Разблокировать мод",
-    "toggle_lock": "Переключить блокировку"
+    "nexus_query_frameworks": "Запросить инфо Nexus"
   },
   "toolbar": {
     "deploy": "Развернуть",
@@ -126,7 +123,6 @@
     "mod_details": "Подробности мода: {name}",
     "quick_install": "Быстрая установка",
     "info_title": "Информация: {name}",
-    "remove_locked_warning": "Внимание: {count} мод(ов) заблокированы!",
     "remove_mod_title": "Удалить мод",
     "remove_mod_single": "Действительно удалить мод \"{name}\"?\n\nПапка мода будет безвозвратно удалена.",
     "remove_mod_multi": "Действительно удалить {count} модов?\n\n{list}\n\nПапки модов будут безвозвратно удалены.",
@@ -402,8 +398,6 @@
     "separators_expanded": "Все разделители развёрнуты",
     "renamed": "Переименовано: {old} → {new}",
     "removed": "Удалено: {names}",
-    "mod_locked": "Мод заблокирован: {name}",
-    "mod_unlocked": "Мод разблокирован: {name}",
     "uninstalled": "Удалено: {name}",
     "uninstall_failed": "Удаление не удалось",
     "data_override_uninstalled": "Data-Override удалён: {name}",
@@ -553,8 +547,7 @@
     "prop_has_category": "Есть категория",
     "prop_no_category": "Без категории",
     "prop_conflict_win": "Конфликты (победитель)",
-    "prop_conflict_lose": "Конфликты (проигравший)",
-    "prop_locked": "Заблокировано"
+    "prop_conflict_lose": "Конфликты (проигравший)"
   },
   "category": {
     "animations": "Анимации",

@@ -41,7 +41,6 @@ PROP_HAS_CATEGORY = -5
 PROP_NO_CATEGORY = -6
 PROP_CONFLICT_WIN = -7
 PROP_CONFLICT_LOSE = -8
-PROP_LOCKED = -9
 
 def _get_property_chips():
     """Return property chips with translated labels."""
@@ -54,7 +53,6 @@ def _get_property_chips():
         (PROP_NO_CATEGORY, tr("filter.prop_no_category")),
         (PROP_CONFLICT_WIN, tr("filter.prop_conflict_win")),
         (PROP_CONFLICT_LOSE, tr("filter.prop_conflict_lose")),
-        (PROP_LOCKED, tr("filter.prop_locked")),
     ]
 
 
