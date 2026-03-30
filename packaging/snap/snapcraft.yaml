@@ -1,6 +1,6 @@
 name: anvil-organizer
 base: core24
-version: '1.2.0'
+version: '1.2.4'
 summary: Native Linux Mod Manager inspired by Mod Organizer 2
 description: |
   Anvil Organizer is a native Linux mod manager for games like Skyrim,

@@ -28,10 +28,9 @@ jobs:
 
       - name: Upload to Release
         if: github.event_name == 'release'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload ${{ github.event.release.tag_name }} ${{ steps.build.outputs.snap }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.build.outputs.snap }}
 
       - name: Publish to Snap Store
         continue-on-error: true
