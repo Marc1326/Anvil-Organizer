@@ -50,4 +50,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.event.release.tag_name }} dist/*.rpm
+          gh release upload ${{ github.event.release.tag_name }} dist/*.rpm --repo ${{ github.repository }}
