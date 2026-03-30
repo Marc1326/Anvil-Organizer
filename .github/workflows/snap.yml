@@ -1,8 +1,8 @@
 name: Build & Publish Snap
 
 on:
-  release:
-    types: [published]
+  push:
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -27,9 +27,10 @@ jobs:
           path: ${{ steps.build.outputs.snap }}
 
       - name: Upload to Release
-        if: github.event_name == 'release'
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          draft: true
           files: ${{ steps.build.outputs.snap }}
 
       - name: Publish to Snap Store
