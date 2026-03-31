@@ -145,8 +145,8 @@ Use **[GoodbyeWindows](https://github.com/Marc1326/GoodbyeWindows)** to transfer
 No installation needed — download, make executable, run:
 
 ```bash
-chmod +x Anvil_Organizer-1.2.2-x86_64.AppImage
-./Anvil_Organizer-1.2.2-x86_64.AppImage
+chmod +x Anvil_Organizer-1.2.8-x86_64.AppImage
+./Anvil_Organizer-1.2.8-x86_64.AppImage
 ```
 
 Download from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest).
@@ -177,18 +177,18 @@ paru -S anvil-organizer-git
 
 ### DEB (Ubuntu, Debian, Linux Mint, Pop!_OS)
 
-Download `anvil-organizer_1.2.2_amd64.deb` from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest), then:
+Download `anvil-organizer_1.2.8_amd64.deb` from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest), then:
 
 ```bash
-sudo dpkg -i anvil-organizer_1.2.2_amd64.deb
+sudo dpkg -i anvil-organizer_1.2.8_amd64.deb
 ```
 
 ### RPM (Fedora, openSUSE)
 
-Download `anvil-organizer-1.2.2-1.fc41.noarch.rpm` from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest), then:
+Download `anvil-organizer-1.2.8-1.fc41.noarch.rpm` from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest), then:
 
 ```bash
-sudo dnf install anvil-organizer-1.2.2-1.fc41.noarch.rpm
+sudo dnf install anvil-organizer-1.2.8-1.fc41.noarch.rpm
 ```
 
 ### From Source
@@ -268,6 +268,22 @@ Anvil uses a **symlink-based virtual file system** similar to MO2:
 4. **Your game directory stays clean** — no files are ever copied or modified
 
 This approach works natively on Linux without the need for a virtual filesystem driver.
+
+---
+
+## Create Game Plugin
+
+Your game is not listed? Add it yourself — **no coding required**:
+
+1. Click the **puzzle icon** in the toolbar (or **File → Game Plugin → Create**)
+2. Fill in: Game Name, Game Binary (.exe), Steam ID, and Data Path
+3. Click **Create** — done!
+
+The plugin is saved to `~/.anvil-organizer/plugins/games/` and loaded automatically on next startup.
+
+You can also edit existing plugins via **File → Game Plugin → Edit** to change paths, add frameworks, or update cover images.
+
+Full guide with examples: **[Wiki — Create Game Plugin](https://github.com/Marc1326/Anvil-Organizer/wiki/Create-Game-Plugin)**
 
 ---
 
