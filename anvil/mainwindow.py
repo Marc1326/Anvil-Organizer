@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFrame,
 )
-from PySide6.QtCore import Qt, QSettings, QTimer, QUrl, QSize
+from PySide6.QtCore import Qt, QModelIndex, QSettings, QTimer, QUrl, QSize
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
 
 from anvil.core.ui_helpers import _center_on_parent, get_text_input
@@ -2474,6 +2474,52 @@ class MainWindow(QMainWindow):
         name = name.strip()
         folder_name = f"{name}_separator"
 
+        # ── BG3-Weiche: Separator direkt ins Model + bg3_separators.json ──
+        if self._bg3_installer is not None:
+            model = self._mod_list_view.source_model()
+            # Duplikat-Prüfung gegen bestehende Separatoren im Model
+            for r in model._rows:
+                if r.is_separator and r.folder_name == folder_name:
+                    QMessageBox.warning(
+                        self, tr("dialog.create_separator_title"),
+                        tr("dialog.separator_exists", name=name),
+                    )
+                    return
+
+            sep_entry = ModEntry(
+                name=folder_name,
+                enabled=True,
+                priority=0,
+                is_separator=True,
+                display_name=name,
+            )
+            sep_row = mod_entry_to_row(sep_entry)
+            # Insert at current selection or at the top
+            tree = self._mod_list_view._tree
+            sel_indexes = tree.selectionModel().selectedRows()
+            if sel_indexes:
+                proxy_row = sel_indexes[0].row()
+                source_idx = self._mod_list_view._proxy_model.mapToSource(sel_indexes[0])
+                insert_pos = source_idx.row()
+            else:
+                insert_pos = 0
+
+            model.beginInsertRows(QModelIndex(), insert_pos, insert_pos)
+            model._rows.insert(insert_pos, sep_row)
+            model.endInsertRows()
+
+            # Update internal entries list
+            self._current_mod_entries.insert(insert_pos, sep_entry)
+            for i, e in enumerate(self._current_mod_entries):
+                e.priority = i
+            self._mod_list_view._proxy_model.set_mod_entries(self._current_mod_entries)
+
+            self._bg3_save_separators(model)
+            self._mod_list_view._tree._apply_separator_filter()
+            self.statusBar().showMessage(tr("status.separator_created", name=name), 5000)
+            return
+
+        # ── Standard path: Ordner in .mods/ + modlist.txt ──
         mods_dir = self._current_instance_path / ".mods"
         sep_path = mods_dir / folder_name
 
