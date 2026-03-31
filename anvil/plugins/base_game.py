@@ -560,6 +560,137 @@ class BaseGame:
                     return fw
         return None
 
+    # ── Heuristik: Unbekannte Frameworks erkennen ──────────────────────
+
+    # Dateitypen die auf Framework hindeuten
+    _FW_EXTENSIONS = {".dll", ".exe", ".so", ".asi"}
+    # Dateitypen die auf normale Mods hindeuten
+    _MOD_EXTENSIONS = {
+        ".esp", ".esm", ".esl", ".pak", ".archive", ".dds",
+        ".nif", ".mesh", ".gr2", ".bsa", ".ba2", ".pex",
+    }
+    # Keywords in Dateinamen die auf Framework hindeuten
+    _FW_KEYWORDS = {
+        "loader", "extender", "hook", "injector", "bridge",
+        "patcher", "proxy", "launcher", "shim",
+    }
+    # Config-Dateitypen neben DLLs
+    _CONFIG_EXTENSIONS = {".ini", ".toml", ".cfg", ".xml", ".json"}
+
+    def detect_possible_framework(
+        self, archive_contents: list[str]
+    ) -> dict | None:
+        """Score-based heuristic to detect if an archive might be a framework.
+
+        Returns a dict with score, reasons, and detected files if the score
+        reaches the threshold (60), or None.
+        """
+        lower_contents = [f.lower().replace("\\", "/") for f in archive_contents]
+        score = 0
+        reasons: list[str] = []
+        fw_files: list[str] = []
+
+        # Criterion 1: Contains .dll/.exe/.so/.asi (+30)
+        has_fw_ext = False
+        for entry in lower_contents:
+            ext = Path(entry).suffix
+            if ext in self._FW_EXTENSIONS:
+                has_fw_ext = True
+                fw_files.append(entry)
+        if has_fw_ext:
+            score += 30
+            reasons.append("executable_files")
+
+        if not has_fw_ext:
+            return None  # No point checking further without executables
+
+        # Criterion 2: Keywords in filename (+25)
+        for entry in lower_contents:
+            name_lower = Path(entry).stem.lower()
+            if any(kw in name_lower for kw in self._FW_KEYWORDS):
+                score += 25
+                reasons.append("keyword_match")
+                break
+
+        # Criterion 3: Config file next to DLL (+15)
+        dll_dirs = {str(Path(e).parent) for e in lower_contents
+                    if Path(e).suffix in self._FW_EXTENSIONS}
+        for entry in lower_contents:
+            if Path(entry).suffix in self._CONFIG_EXTENSIONS:
+                if str(Path(entry).parent) in dll_dirs:
+                    score += 15
+                    reasons.append("config_beside_dll")
+                    break
+
+        # Criterion 4: No typical mod files (+20)
+        has_mod_files = any(
+            Path(e).suffix in self._MOD_EXTENSIONS for e in lower_contents
+        )
+        if not has_mod_files:
+            score += 20
+            reasons.append("no_mod_files")
+
+        # Criterion 5: Files at root level, not in Data/ (+10)
+        all_outside_data = all(
+            not e.startswith("data/") for e in lower_contents
+            if Path(e).suffix in self._FW_EXTENSIONS
+        )
+        if all_outside_data:
+            score += 10
+            reasons.append("outside_data_dir")
+
+        if score >= 60:
+            return {
+                "score": score,
+                "reasons": reasons,
+                "detected_files": fw_files,
+            }
+        return None
+
+    def save_framework_to_json(
+        self,
+        name: str,
+        target: str,
+        detect_installed: list[str],
+        pattern: list[str] | None = None,
+    ) -> None:
+        """Save a new framework entry to the user's plugin JSON file."""
+        short = self.GameShortName.lower()
+        json_path = (
+            Path.home() / ".anvil-organizer" / "plugins" / "games"
+            / f"game_{short}.json"
+        )
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+
+        data: dict = {"frameworks": []}
+        if json_path.is_file():
+            try:
+                data = json.loads(json_path.read_text(encoding="utf-8"))
+            except Exception:
+                data = {"frameworks": []}
+
+        # Check if framework with same name already exists
+        existing = data.get("frameworks", [])
+        for entry in existing:
+            if entry.get("name", "").lower() == name.lower():
+                return  # Already exists, don't duplicate
+
+        new_entry: dict = {"name": name}
+        if target:
+            new_entry["target"] = target
+        if detect_installed:
+            new_entry["detect_installed"] = detect_installed
+        if pattern:
+            new_entry["pattern"] = pattern
+
+        existing.append(new_entry)
+        data["frameworks"] = existing
+
+        json_path.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
     def get_installed_frameworks(self) -> list[tuple[FrameworkMod, bool]]:
         """Check which framework mods are installed in the game directory.
 

@@ -888,6 +888,7 @@
     "fw_target": "Cartella Destinazione",
     "fw_nexus_id": "Nexus ID",
     "fw_detect": "Percorso di Rilevamento",
+    "fw_pattern": "Pattern",
     "fw_add": "Aggiungi",
     "fw_remove": "Rimuovi",
     "create": "Crea",
@@ -957,5 +958,24 @@
   },
   "bg3": {
     "mod_already_installed": "Il mod \"{name}\" e gia nella lista dei mod.\n\nSostituire?"
+  },
+  "fw_detect": {
+    "title": "Framework Rilevato",
+    "header": "La mod \"{name}\" potrebbe essere un framework.",
+    "reasons_title": "Motivi del Rilevamento",
+    "reason_executables": "Contiene file eseguibili (.dll, .exe, .so, .asi)",
+    "reason_keywords": "Il nome contiene parole chiave di framework",
+    "reason_config": "File di configurazione trovato accanto a DLL/EXE",
+    "reason_no_mod_files": "Nessun file mod tipico trovato",
+    "reason_outside_data": "File al di fuori della directory Data",
+    "files_title": "File Rilevati",
+    "settings_title": "Impostazioni Framework",
+    "name": "Nome",
+    "target": "Cartella Destinazione",
+    "target_hint": "es. . o bin/",
+    "detect_path": "Percorso di Rilevamento",
+    "detect_hint": "File per il rilevamento, separati da virgola",
+    "btn_cancel": "Annulla",
+    "btn_install": "Installa come Framework"
   }
 }

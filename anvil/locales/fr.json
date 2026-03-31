@@ -888,6 +888,7 @@
     "fw_target": "Dossier Cible",
     "fw_nexus_id": "Nexus ID",
     "fw_detect": "Chemin de Détection",
+    "fw_pattern": "Modèle",
     "fw_add": "Ajouter",
     "fw_remove": "Supprimer",
     "create": "Créer",
@@ -957,5 +958,24 @@
   },
   "bg3": {
     "mod_already_installed": "Le mod \"{name}\" est deja dans la liste des mods.\n\nRemplacer ?"
+  },
+  "fw_detect": {
+    "title": "Framework Detecte",
+    "header": "Le mod \"{name}\" pourrait etre un framework.",
+    "reasons_title": "Raisons de Detection",
+    "reason_executables": "Contient des fichiers executables (.dll, .exe, .so, .asi)",
+    "reason_keywords": "Le nom contient des mots-cles de framework",
+    "reason_config": "Fichier de configuration trouve a cote de DLL/EXE",
+    "reason_no_mod_files": "Aucun fichier de mod typique trouve",
+    "reason_outside_data": "Fichiers en dehors du repertoire Data",
+    "files_title": "Fichiers Detectes",
+    "settings_title": "Parametres du Framework",
+    "name": "Nom",
+    "target": "Dossier Cible",
+    "target_hint": "ex. . ou bin/",
+    "detect_path": "Chemin de Detection",
+    "detect_hint": "Fichier(s) pour la detection, separes par virgule",
+    "btn_cancel": "Annuler",
+    "btn_install": "Installer comme Framework"
   }
 }

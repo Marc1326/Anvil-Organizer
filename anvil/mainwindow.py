@@ -1391,34 +1391,50 @@ class MainWindow(QMainWindow):
         if not files:
             return
 
-        # BG3: use BG3ModInstaller
-        if self._bg3_installer is not None:
-            self._on_bg3_archives_dropped(files)
+        # Pre-filter: detect framework mods before normal/BG3 install
+        remaining = [f for f in files if not self._try_install_as_framework(Path(f))]
+        if not remaining:
+            self._game_panel.refresh_downloads()
             return
 
-        self._install_archives([Path(f) for f in files])
+        # BG3: use BG3ModInstaller
+        if self._bg3_installer is not None:
+            self._on_bg3_archives_dropped(remaining)
+            return
+
+        self._install_archives([Path(f) for f in remaining])
         self._game_panel.refresh_downloads()
 
     def _on_archives_dropped(self, paths: list) -> None:
         """Handle archives dropped onto the mod list."""
         if not self._current_instance_path:
             return
-        if self._bg3_installer is not None:
-            self._on_bg3_archives_dropped(paths)
+        # Pre-filter: detect framework mods before normal/BG3 install
+        remaining = [p for p in paths if not self._try_install_as_framework(Path(p))]
+        if not remaining:
             self._game_panel.refresh_downloads()
             return
-        self._install_archives([Path(p) for p in paths])
+        if self._bg3_installer is not None:
+            self._on_bg3_archives_dropped(remaining)
+            self._game_panel.refresh_downloads()
+            return
+        self._install_archives([Path(p) for p in remaining])
         self._game_panel.refresh_downloads()
 
     def _on_archives_dropped_at(self, paths: list, target_row: int) -> None:
         """Handle archives dropped onto the mod list at a specific position."""
         if not self._current_instance_path:
             return
-        if self._bg3_installer is not None:
-            self._on_bg3_archives_dropped(paths, insert_at=target_row)
+        # Pre-filter: detect framework mods before normal/BG3 install
+        remaining = [p for p in paths if not self._try_install_as_framework(Path(p))]
+        if not remaining:
             self._game_panel.refresh_downloads()
             return
-        self._install_archives([Path(p) for p in paths], insert_at=target_row)
+        if self._bg3_installer is not None:
+            self._on_bg3_archives_dropped(remaining, insert_at=target_row)
+            self._game_panel.refresh_downloads()
+            return
+        self._install_archives([Path(p) for p in remaining], insert_at=target_row)
         self._game_panel.refresh_downloads()
 
     def _on_start_game(self, binary_path: str, working_dir: str) -> None:
@@ -1531,6 +1547,105 @@ class MainWindow(QMainWindow):
                     flush=True,
                 )
 
+    def _try_install_as_framework(self, archive: Path) -> bool:
+        """Check if an archive is a framework mod and install it if confirmed.
+
+        Returns True if the archive was handled as a framework, False otherwise.
+        Used as a pre-filter before the BG3/normal install paths.
+        """
+        if self._current_plugin is None or not self._current_game_path:
+            return False
+
+        flatten = getattr(self._current_plugin, "GameFlattenArchive", True)
+        se_dir = getattr(self._current_plugin, "ScriptExtenderDir", "")
+        installer = ModInstaller(
+            self._current_instance_path, flatten=flatten,
+            script_extender_dir=se_dir,
+        )
+        temp_dir = installer.extract_to_temp(archive)
+        if temp_dir is None:
+            return False
+
+        file_list = [
+            str(f.relative_to(temp_dir))
+            for f in temp_dir.rglob("*") if f.is_file()
+        ]
+
+        # 1. Known framework?
+        fw = self._current_plugin.is_framework_mod(file_list)
+        if fw is not None:
+            game_path = self._current_game_path
+            already_installed = any(
+                (game_path / dp).exists() for dp in fw.detect_installed
+            )
+            if already_installed:
+                answer = QMessageBox.question(
+                    self,
+                    tr("status.framework_update_title"),
+                    tr("status.framework_update_message", name=fw.name),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes,
+                )
+                if answer != QMessageBox.StandardButton.Yes:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    return True  # handled (user declined update)
+            result = installer.install_framework(temp_dir, fw, game_path)
+            if result:
+                self.statusBar().showMessage(
+                    tr("status.framework_installed", names=result["name"]), 5000,
+                )
+                self._reload_mod_list()
+            return True
+
+        # 2. Heuristic: unknown framework?
+        detection = self._current_plugin.detect_possible_framework(file_list)
+        if detection is not None:
+            from anvil.widgets.framework_detect_dialog import FrameworkDetectDialog
+            dlg = FrameworkDetectDialog(
+                self,
+                archive_name=archive.stem,
+                score=detection["score"],
+                reasons=detection["reasons"],
+                detected_files=detection["detected_files"],
+            )
+            _center_on_parent(dlg)
+            if dlg.exec() == QDialog.DialogCode.Accepted:
+                fw_name = dlg.framework_name()
+                fw_target = dlg.framework_target()
+                fw_detect = dlg.framework_detect_installed()
+                fw_pattern = [
+                    Path(f).name for f in detection["detected_files"]
+                ]
+                from anvil.plugins.framework_mod import FrameworkMod
+                new_fw = FrameworkMod(
+                    name=fw_name,
+                    pattern=fw_pattern,
+                    target=fw_target,
+                    description="",
+                    detect_installed=fw_detect or fw_pattern,
+                )
+                result = installer.install_framework(
+                    temp_dir, new_fw, self._current_game_path,
+                )
+                if result:
+                    self._current_plugin.save_framework_to_json(
+                        fw_name, fw_target,
+                        fw_detect or fw_pattern, fw_pattern,
+                    )
+                    self.statusBar().showMessage(
+                        tr("status.framework_installed", names=fw_name), 5000,
+                    )
+                    self._reload_mod_list()
+                return True
+            else:
+                # User declined — not a framework, continue normal install
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return False
+
+        # Not a framework
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return False
+
     def _install_archives(self, archives: list[Path], insert_at: int | None = None,
                           reinstall_mod_path: Path | None = None) -> None:
         """Install one or more archives as mods.
@@ -1594,6 +1709,54 @@ class MainWindow(QMainWindow):
                             )
                         continue
                     else:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        continue
+
+            # 2b. Heuristic: detect possible unknown framework
+            if self._current_plugin is not None and self._current_game_path:
+                detection = self._current_plugin.detect_possible_framework(file_list)
+                if detection is not None:
+                    from anvil.widgets.framework_detect_dialog import FrameworkDetectDialog
+                    dlg = FrameworkDetectDialog(
+                        self,
+                        archive_name=archive.stem,
+                        score=detection["score"],
+                        reasons=detection["reasons"],
+                        detected_files=detection["detected_files"],
+                    )
+                    _center_on_parent(dlg)
+                    if dlg.exec() == QDialog.DialogCode.Accepted:
+                        fw_name = dlg.framework_name()
+                        fw_target = dlg.framework_target()
+                        fw_detect = dlg.framework_detect_installed()
+                        # Build pattern from detected files for future recognition
+                        fw_pattern = [
+                            Path(f).name for f in detection["detected_files"]
+                        ]
+                        # Create temporary FrameworkMod for installation
+                        from anvil.plugins.framework_mod import FrameworkMod
+                        new_fw = FrameworkMod(
+                            name=fw_name,
+                            pattern=fw_pattern,
+                            target=fw_target,
+                            description="",
+                            detect_installed=fw_detect or fw_pattern,
+                        )
+                        game_path = self._current_game_path
+                        result = installer.install_framework(
+                            temp_dir, new_fw, game_path
+                        )
+                        if result:
+                            frameworks_installed.append(result["name"])
+                            # Persist to plugin JSON
+                            self._current_plugin.save_framework_to_json(
+                                fw_name, fw_target,
+                                fw_detect or fw_pattern,
+                                fw_pattern,
+                            )
+                        continue
+                    else:
+                        # User declined — don't install, keep in downloads
                         shutil.rmtree(temp_dir, ignore_errors=True)
                         continue
 

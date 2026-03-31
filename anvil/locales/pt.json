@@ -888,6 +888,7 @@
     "fw_target": "Pasta Destino",
     "fw_nexus_id": "Nexus ID",
     "fw_detect": "Caminho de Detecção",
+    "fw_pattern": "Padrão",
     "fw_add": "Adicionar",
     "fw_remove": "Remover",
     "create": "Criar",
@@ -957,5 +958,24 @@
   },
   "bg3": {
     "mod_already_installed": "O mod \"{name}\" ja esta na lista de mods.\n\nSubstituir?"
+  },
+  "fw_detect": {
+    "title": "Framework Detectado",
+    "header": "O mod \"{name}\" pode ser um framework.",
+    "reasons_title": "Razoes da Deteccao",
+    "reason_executables": "Contem arquivos executaveis (.dll, .exe, .so, .asi)",
+    "reason_keywords": "O nome contem palavras-chave de framework",
+    "reason_config": "Arquivo de configuracao encontrado junto a DLL/EXE",
+    "reason_no_mod_files": "Nenhum arquivo de mod tipico encontrado",
+    "reason_outside_data": "Arquivos fora do diretorio Data",
+    "files_title": "Arquivos Detectados",
+    "settings_title": "Configuracoes do Framework",
+    "name": "Nome",
+    "target": "Pasta Destino",
+    "target_hint": "ex. . ou bin/",
+    "detect_path": "Caminho de Deteccao",
+    "detect_hint": "Arquivo(s) para deteccao, separados por virgula",
+    "btn_cancel": "Cancelar",
+    "btn_install": "Instalar como Framework"
   }
 }

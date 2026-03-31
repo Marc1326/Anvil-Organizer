@@ -150,12 +150,13 @@ class PluginCreatorDialog(QDialog):
         fw_group = QGroupBox(tr("plugin_creator.frameworks"))
         fw_layout = QVBoxLayout(fw_group)
 
-        self._fw_table = QTableWidget(0, 5)
+        self._fw_table = QTableWidget(0, 6)
         self._fw_table.setHorizontalHeaderLabels([
             tr("plugin_creator.fw_name"),
             tr("plugin_creator.fw_target"),
             tr("plugin_creator.fw_nexus_id"),
             tr("plugin_creator.fw_detect"),
+            tr("plugin_creator.fw_pattern"),
             tr("plugin_creator.fw_source"),
         ])
         header = self._fw_table.horizontalHeader()
@@ -163,7 +164,8 @@ class PluginCreatorDialog(QDialog):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         self._fw_table.setMinimumHeight(140)
         fw_layout.addWidget(self._fw_table)
 
@@ -258,6 +260,7 @@ class PluginCreatorDialog(QDialog):
                 fw.target,
                 "",
                 ", ".join(fw.detect_installed),
+                ", ".join(fw.pattern),
                 "Built-in",
             )
 
@@ -270,11 +273,13 @@ class PluginCreatorDialog(QDialog):
                     fw.target,
                     "",
                     ", ".join(fw.detect_installed),
+                    ", ".join(fw.pattern),
                     "JSON",
                 )
 
     def _add_fw_to_table(
-        self, name: str, target: str, nexus_id: str, detect: str, source: str,
+        self, name: str, target: str, nexus_id: str, detect: str,
+        pattern: str, source: str,
     ) -> None:
         """Eine Framework-Zeile zur Tabelle hinzufuegen."""
         row = self._fw_table.rowCount()
@@ -283,10 +288,11 @@ class PluginCreatorDialog(QDialog):
         self._fw_table.setItem(row, 1, QTableWidgetItem(target))
         self._fw_table.setItem(row, 2, QTableWidgetItem(nexus_id))
         self._fw_table.setItem(row, 3, QTableWidgetItem(detect))
+        self._fw_table.setItem(row, 4, QTableWidgetItem(pattern))
 
         source_item = QTableWidgetItem(source)
         source_item.setFlags(source_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        self._fw_table.setItem(row, 4, source_item)
+        self._fw_table.setItem(row, 5, source_item)
 
         # Built-in Zeilen: Name nicht editierbar
         if source == "Built-in":
@@ -323,13 +329,13 @@ class PluginCreatorDialog(QDialog):
     # ── Framework-Tabelle ────────────────────────────────────────
 
     def _add_fw_row(self) -> None:
-        self._add_fw_to_table("", "", "", "", "JSON")
+        self._add_fw_to_table("", "", "", "", "", "JSON")
 
     def _remove_fw_row(self) -> None:
         row = self._fw_table.currentRow()
         if row < 0:
             return
-        source = (self._fw_table.item(row, 4) or QTableWidgetItem("")).text()
+        source = (self._fw_table.item(row, 5) or QTableWidgetItem("")).text()
         if source == "Built-in":
             QMessageBox.information(
                 self,
@@ -517,7 +523,7 @@ class PluginCreatorDialog(QDialog):
         """Liest nur JSON-Framework-Eintraege aus der Tabelle."""
         result = []
         for row in range(self._fw_table.rowCount()):
-            source = (self._fw_table.item(row, 4) or QTableWidgetItem("")).text()
+            source = (self._fw_table.item(row, 5) or QTableWidgetItem("")).text()
             if source == "Built-in":
                 continue  # Python-Frameworks nicht in JSON speichern
 
@@ -525,6 +531,7 @@ class PluginCreatorDialog(QDialog):
             target = (self._fw_table.item(row, 1) or QTableWidgetItem("")).text().strip()
             nexus_id = (self._fw_table.item(row, 2) or QTableWidgetItem("")).text().strip()
             detect = (self._fw_table.item(row, 3) or QTableWidgetItem("")).text().strip()
+            pattern = (self._fw_table.item(row, 4) or QTableWidgetItem("")).text().strip()
 
             if not name:
                 continue
@@ -536,6 +543,8 @@ class PluginCreatorDialog(QDialog):
                 entry["nexus_id"] = int(nexus_id)
             if detect:
                 entry["detect_installed"] = [d.strip() for d in detect.split(",")]
+            if pattern:
+                entry["pattern"] = [p.strip() for p in pattern.split(",")]
 
             result.append(entry)
         return result

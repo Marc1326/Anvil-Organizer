@@ -888,6 +888,7 @@
     "fw_target": "Целевая папка",
     "fw_nexus_id": "Nexus ID",
     "fw_detect": "Путь проверки",
+    "fw_pattern": "Шаблон",
     "fw_add": "Добавить",
     "fw_remove": "Удалить",
     "create": "Создать",
@@ -957,5 +958,24 @@
   },
   "bg3": {
     "mod_already_installed": "Mod \"{name}\" uzhe v spiske modov.\n\nZamenit?"
+  },
+  "fw_detect": {
+    "title": "Obnaruzhen freymvork",
+    "header": "Mod \"{name}\" mozhet byt freymvorkom.",
+    "reasons_title": "Prichiny obnaruzheniya",
+    "reason_executables": "Soderzhit ispolnyayemyye fayly (.dll, .exe, .so, .asi)",
+    "reason_keywords": "Imya soderzhit klyuchevyye slova freymvorka",
+    "reason_config": "Konfiguratsionnyy fayl ryadom s DLL/EXE",
+    "reason_no_mod_files": "Tipichnyye fayly modov ne naydeny",
+    "reason_outside_data": "Fayly za predelami direktorii Data",
+    "files_title": "Obnaruzhennyye fayly",
+    "settings_title": "Nastroyki freymvorka",
+    "name": "Nazvaniye",
+    "target": "Tselevaya papka",
+    "target_hint": "napr. . ili bin/",
+    "detect_path": "Put proverki",
+    "detect_hint": "Fayl(y) dlya obnaruzheniya, cherez zapyatuyu",
+    "btn_cancel": "Otmena",
+    "btn_install": "Ustanovit kak freymvork"
   }
 }
