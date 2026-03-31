@@ -40,9 +40,9 @@ ROLE_SEP_COLOR = Qt.ItemDataRole.UserRole + 4     # Separator color string (hex,
 
 
 class ModRow:
-    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name", "color", "file_count")
+    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name", "color", "file_count", "child_count")
 
-    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name="", color="", file_count=0):
+    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name="", color="", file_count=0, child_count=0):
         self.enabled = enabled
         self.name = name
         self.conflicts = conflicts
@@ -56,6 +56,7 @@ class ModRow:
         self.folder_name = folder_name
         self.color = color
         self.file_count = file_count
+        self.child_count = child_count
 
 
 def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None) -> ModRow:
@@ -156,12 +157,14 @@ class ModListModel(QAbstractItemModel):
     def _get_separator_children(self, sep_row: int) -> list[int]:
         """Return list of source row indices that belong to the separator at sep_row.
 
-        Children are all non-separator rows after sep_row until the next separator
-        or end of list.
+        Uses child_count to limit the children — only the mods the user
+        explicitly placed under this separator, not everything until the
+        next separator.
         """
+        limit = self._rows[sep_row].child_count
         children = []
         for i in range(sep_row + 1, len(self._rows)):
-            if self._rows[i].is_separator:
+            if self._rows[i].is_separator or len(children) >= limit:
                 break
             children.append(i)
         return children
@@ -217,7 +220,26 @@ class ModListModel(QAbstractItemModel):
         """Replace all mods with *mods*."""
         self.beginResetModel()
         self._rows = list(mods)
+        self._recalculate_child_counts()
         self.endResetModel()
+
+    def _recalculate_child_counts(self) -> None:
+        """Calculate child_count for each separator from current row positions."""
+        last_sep_idx: int | None = None
+        for i, row in enumerate(self._rows):
+            if row.is_separator:
+                if last_sep_idx is not None:
+                    self._rows[last_sep_idx].child_count = i - last_sep_idx - 1
+                last_sep_idx = i
+        # Last separator: count remaining non-separator rows
+        if last_sep_idx is not None:
+            count = 0
+            for j in range(last_sep_idx + 1, len(self._rows)):
+                if not self._rows[j].is_separator:
+                    count += 1
+                else:
+                    break
+            self._rows[last_sep_idx].child_count = count
 
     def rowCount(self, parent=QModelIndex()):
         if parent.isValid():
@@ -404,9 +426,8 @@ class ModListModel(QAbstractItemModel):
     def dropMimeData(self, data, action, row, column, parent):
         """Beim Drop: Zeile verschieben mit beginMoveRows/endMoveRows.
 
-        Wenn ein Separator verschoben wird, werden alle Mods zwischen
-        diesem Separator und dem nächsten Separator (oder Listenende)
-        als Block mitgenommen.
+        Wenn ein Separator verschoben wird, werden Separator + child_count
+        Mods als Block mitgenommen.
         """
         if action == Qt.DropAction.IgnoreAction:
             return True
@@ -434,13 +455,65 @@ class ModListModel(QAbstractItemModel):
             source_row = source_rows[0]
             if self._rows[source_row].is_separator:
                 return self._move_separator_block(source_row, target)
-            return self._move_single_row(source_row, target)
+            # Single mod move — update child_counts of affected separators
+            source_sep = self._find_parent_separator(source_row)
+            result = self._move_single_row(source_row, target)
+            if result:
+                # Determine new position of the moved mod
+                new_pos = (target - 1) if source_row < target else target
+                target_sep = self._find_parent_separator(new_pos)
+                # Adjust child counts (skip if same separator)
+                if source_sep != target_sep:
+                    if source_sep:
+                        self._adjust_child_count(source_sep, -1)
+                    if target_sep:
+                        self._adjust_child_count(target_sep, +1)
+            return result
         else:
             # Mehrfachauswahl: Separatoren herausfiltern, nur Mods verschieben
             mod_rows = [r for r in source_rows if not self._rows[r].is_separator]
             if not mod_rows:
                 return False
-            return self._move_multiple_rows(mod_rows, target)
+            # Track source separators before move
+            source_sep_counts: dict[str, int] = {}
+            for r in mod_rows:
+                src = self._find_parent_separator(r)
+                if src:
+                    source_sep_counts[src] = source_sep_counts.get(src, 0) + 1
+            result = self._move_multiple_rows(mod_rows, target)
+            if result:
+                # Find target separator at landing position
+                adjusted = target
+                for r in sorted(mod_rows):
+                    if r < target:
+                        adjusted -= 1
+                target_sep = self._find_parent_separator(adjusted)
+                # Adjust child counts
+                for sep_folder, count in source_sep_counts.items():
+                    if sep_folder != (target_sep or ""):
+                        self._adjust_child_count(sep_folder, -count)
+                if target_sep:
+                    gain = len(mod_rows) - source_sep_counts.get(target_sep, 0)
+                    if gain > 0:
+                        self._adjust_child_count(target_sep, gain)
+            return result
+
+    def _find_parent_separator(self, row: int) -> str | None:
+        """Find the folder_name of the separator that owns this row, or None if free zone."""
+        for i in range(row - 1, -1, -1):
+            if self._rows[i].is_separator:
+                # Check if row is within this separator's child_count range
+                if row <= i + self._rows[i].child_count:
+                    return self._rows[i].folder_name
+                return None  # After separator's children = free zone
+        return None
+
+    def _adjust_child_count(self, sep_folder: str, delta: int) -> None:
+        """Adjust child_count of a separator by folder_name."""
+        for r in self._rows:
+            if r.is_separator and r.folder_name == sep_folder:
+                r.child_count = max(0, r.child_count + delta)
+                return
 
     def _move_single_row(self, source_row: int, target: int) -> bool:
         """Verschiebt eine einzelne Zeile."""
@@ -494,16 +567,12 @@ class ModListModel(QAbstractItemModel):
         return True
 
     def _move_separator_block(self, source_row: int, target: int) -> bool:
-        """Verschiebt einen Separator mit allen zugehörigen Mods als Block.
+        """Verschiebt einen Separator mit seinen child_count Mods als Block.
 
-        Der Block umfasst den Separator und alle Mods bis zum nächsten
-        Separator (oder Listenende).
+        Der Block umfasst den Separator und genau child_count Mods danach.
         """
-        # Ende des Blocks finden (nächster Separator oder Listenende)
-        end_row = source_row + 1
-        while end_row < len(self._rows) and not self._rows[end_row].is_separator:
-            end_row += 1
-
+        children = self._get_separator_children(source_row)
+        end_row = (children[-1] + 1) if children else (source_row + 1)
         block_size = end_row - source_row
 
         # Keine Verschiebung nötig wenn Block bereits an Zielposition

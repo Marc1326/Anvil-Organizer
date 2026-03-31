@@ -1012,6 +1012,7 @@ class MainWindow(QMainWindow):
         self._bg3_installer = None
         self._mod_list_view.set_extra_drop_extensions(set())
 
+
         # Load categories for this instance
         self._category_manager.load(instance_path)
         self._mod_list_view.source_model().set_category_manager(self._category_manager)
@@ -3511,7 +3512,20 @@ class MainWindow(QMainWindow):
         if not filtered:
             return
 
+        # Track source separators for child_count updates
+        source_sep_counts: dict[str, int] = {}
+        for r in filtered:
+            src = model._find_parent_separator(r)
+            if src:
+                source_sep_counts[src] = source_sep_counts.get(src, 0) + 1
+
         model._move_multiple_rows(filtered, target)
+
+        # Update child_counts: source separators lose mods, target gains them
+        for sep_folder, count in source_sep_counts.items():
+            if sep_folder != separator_folder:
+                model._adjust_child_count(sep_folder, -count)
+        model._adjust_child_count(separator_folder, len(filtered))
 
     def _apply_category_changes(
         self,
@@ -4921,21 +4935,32 @@ class MainWindow(QMainWindow):
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
 
     def _bg3_save_separators(self, model=None) -> None:
-        """Save BG3 separator positions to the current profile."""
+        """Save BG3 separator positions to the current profile.
+
+        Stores the UUID of the first mod AFTER the separator as anchor,
+        so positions survive mod additions/removals.
+        """
         if model is None:
             model = self._mod_list_view.source_model()
         if self._current_profile_path is None:
             return
         seps = []
-        for i, row in enumerate(model._rows):
+        rows = model._rows
+        for i, row in enumerate(rows):
             if row.is_separator:
                 display = row.name  # display name
                 raw_name = row.folder_name  # e.g. "My Group_separator"
+                # Find the first non-separator mod after this separator
+                before_uuid = ""
+                for j in range(i + 1, len(rows)):
+                    if not rows[j].is_separator:
+                        before_uuid = rows[j].folder_name
+                        break
                 seps.append({
                     "name": raw_name.replace("_separator", "") if raw_name.endswith("_separator") else raw_name,
                     "display_name": display,
                     "color": row.color,
-                    "position": i,
+                    "before_uuid": before_uuid,
                 })
         sep_file = self._current_profile_path / "bg3_separators.json"
         try:
@@ -4960,8 +4985,29 @@ class MainWindow(QMainWindow):
 
     def _bg3_reload_mod_list(self) -> None:
         """Reload BG3 mods into the normal ModListView via ModEntry bridge."""
+        print("bg3_sep: _bg3_reload_mod_list() CALLED", file=sys.stderr)
         if self._bg3_installer is None:
+            print("bg3_sep: ABORT — no installer", file=sys.stderr)
             return
+
+        # ── Capture live separator state from model before rebuild ──
+        model = self._mod_list_view.source_model()
+        live_seps = []
+        rows = model._rows
+        for i, row in enumerate(rows):
+            if row.is_separator:
+                before_uuid = ""
+                for j in range(i + 1, len(rows)):
+                    if not rows[j].is_separator:
+                        before_uuid = rows[j].folder_name
+                        break
+                live_seps.append({
+                    "name": row.folder_name.replace("_separator", "") if row.folder_name.endswith("_separator") else row.folder_name,
+                    "display_name": row.name,
+                    "color": getattr(row, "color", ""),
+                    "before_uuid": before_uuid,
+                })
+
         mod_list = self._bg3_installer.get_mod_list()
 
         # ── Convert BG3 mods to ModEntry objects ──
@@ -4979,29 +5025,44 @@ class MainWindow(QMainWindow):
             entries.append(entry)
             priority += 1
 
-        # ── Load separators from profile ──
-        sep_file = (self._current_profile_path / "bg3_separators.json") if self._current_profile_path else None
-        if sep_file is not None and sep_file.is_file():
-            try:
-                import json as _json
-                seps = _json.loads(sep_file.read_text(encoding="utf-8"))
-                # Insert separators at their stored positions
-                for sep in reversed(seps):
-                    sep_entry = ModEntry(
-                        name=sep.get("name", "separator") + "_separator",
-                        enabled=True,
-                        priority=0,
-                        is_separator=True,
-                        display_name=sep.get("display_name", ""),
-                        color=sep.get("color", ""),
-                    )
-                    pos = min(sep.get("position", 0), len(entries))
-                    entries.insert(pos, sep_entry)
-                # Renumber priorities
-                for i, e in enumerate(entries):
-                    e.priority = i
-            except (ValueError, OSError):
-                pass
+        # ── Reinsert separators ──
+        # Use live model data if available, fall back to file for initial load
+        seps_to_use = live_seps
+        print(f"bg3_sep: live_seps={len(live_seps)}, profile_path={self._current_profile_path}", file=sys.stderr)
+        if not seps_to_use:
+            sep_file = (self._current_profile_path / "bg3_separators.json") if self._current_profile_path else None
+            if sep_file is not None and sep_file.is_file():
+                try:
+                    seps_to_use = json.loads(sep_file.read_text(encoding="utf-8"))
+                except (ValueError, OSError):
+                    seps_to_use = []
+
+        if seps_to_use:
+            uuid_to_idx = {e.name: i for i, e in enumerate(entries)}
+            print(f"bg3_sep: {len(seps_to_use)} seps, {len(entries)} mods, source={'live' if live_seps else 'file'}", file=sys.stderr)
+            offset = 0
+            for sep in seps_to_use:
+                sep_entry = ModEntry(
+                    name=sep.get("name", "separator") + "_separator",
+                    enabled=True,
+                    priority=0,
+                    is_separator=True,
+                    display_name=sep.get("display_name", ""),
+                    color=sep.get("color", ""),
+                )
+                anchor = sep.get("before_uuid", "")
+                print(f"bg3_sep: '{sep.get('display_name')}' anchor='{anchor[:20]}' found={anchor in uuid_to_idx if anchor else 'no-anchor'}", file=sys.stderr)
+                if anchor and anchor in uuid_to_idx:
+                    pos = uuid_to_idx[anchor] + offset
+                elif "position" in sep:
+                    # Fallback for old format (absolute position)
+                    pos = min(sep["position"], len(entries) + offset)
+                else:
+                    pos = len(entries) + offset
+                entries.insert(pos, sep_entry)
+                offset += 1
+            for i, e in enumerate(entries):
+                e.priority = i
 
         # ── Add data-override mods (cosmetic: textures, meshes) to mod list ──
         for ov in mod_list.get("data_overrides", []):

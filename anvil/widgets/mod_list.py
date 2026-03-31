@@ -407,17 +407,18 @@ class _DropTreeView(QTreeView):
             return
 
         hidden: set[int] = set()
-        current_sep_collapsed = False
 
-        for row in range(source.rowCount()):
-            idx = source.index(row, 0)
+        for sep_row in range(source.rowCount()):
+            idx = source.index(sep_row, 0)
             is_sep = source.data(idx, ROLE_IS_SEPARATOR)
+            if not is_sep:
+                continue
             folder = source.data(idx, ROLE_FOLDER_NAME) or ""
-
-            if is_sep:
-                current_sep_collapsed = folder in self._collapsed_separators
-            elif current_sep_collapsed:
-                hidden.add(row)
+            if folder not in self._collapsed_separators:
+                continue
+            # Hide only child_count mods after this separator
+            for child_row in source._get_separator_children(sep_row):
+                hidden.add(child_row)
 
         proxy.set_hidden_rows(hidden)
 
@@ -616,7 +617,31 @@ class _DropTreeView(QTreeView):
                 self.archives_dropped.emit(paths)
                 return
         # Internal DnD (mod reorder)
+        # Detect if a separator is being moved — auto-collapse after drop
+        _sep_to_collapse = None
+        from anvil.models.mod_list_model import MIME_MOD_ROWS
+        if event.mimeData().hasFormat(MIME_MOD_ROWS):
+            from PySide6.QtCore import QDataStream, QIODevice, QByteArray
+            raw = event.mimeData().data(MIME_MOD_ROWS)
+            stream = QDataStream(raw, QIODevice.OpenModeFlag.ReadOnly)
+            rows = []
+            while not stream.atEnd():
+                rows.append(stream.readInt32())
+            if len(rows) == 1:
+                proxy = self.model()
+                if isinstance(proxy, ModListProxyModel):
+                    source = proxy.sourceModel()
+                    if source and 0 <= rows[0] < source.rowCount():
+                        is_sep = source.data(source.index(rows[0], 0), ROLE_IS_SEPARATOR)
+                        if is_sep:
+                            _sep_to_collapse = source.data(source.index(rows[0], 0), ROLE_FOLDER_NAME) or ""
+
         super().dropEvent(event)
+
+        # Auto-collapse the moved separator (Anforderung 4)
+        if _sep_to_collapse and _sep_to_collapse not in self._collapsed_separators:
+            self._collapsed_separators.add(_sep_to_collapse)
+            self._apply_separator_filter()
 
     # ── Setting 6: Selection-based conflict highlighting ──────────
 
