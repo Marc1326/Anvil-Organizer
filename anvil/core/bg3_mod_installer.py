@@ -191,6 +191,27 @@ class BG3ModInstaller:
                     break
 
             mod_order.insert(pos, uuid)
+
+            # Also reposition in mods list so display order matches
+            entry = None
+            rest = []
+            for m in mods:
+                if m["uuid"].lower() == uuid.lower() and entry is None:
+                    entry = m
+                else:
+                    rest.append(m)
+            if entry is not None:
+                new_mods = []
+                inserted = False
+                for m in rest:
+                    if m["uuid"].lower() == before_uuid.lower() and not inserted:
+                        new_mods.append(entry)
+                        inserted = True
+                    new_mods.append(m)
+                if not inserted:
+                    new_mods.append(entry)
+                mods = new_mods
+
             self._write_state(mod_order, mods)
             self._write_modsettings(mod_order, mods)
         else:

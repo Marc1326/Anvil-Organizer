@@ -5085,7 +5085,7 @@ class MainWindow(QMainWindow):
         if ref_uuid and installed:
             for _name, mod_type, uuid in installed:
                 if uuid and mod_type == "pak":
-                    self._bg3_installer.insert_mod_at(uuid, ref_uuid, activate=ref_active)
+                    self._bg3_installer.insert_mod_at(uuid, ref_uuid, activate=False)
 
         if installed:
             self._bg3_reload_mod_list()
