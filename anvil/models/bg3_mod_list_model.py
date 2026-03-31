@@ -256,33 +256,18 @@ class BG3ModListModel(QAbstractItemModel):
     def canDropMimeData(self, data, action, row, column, parent):
         return data.hasFormat(MIME_BG3_MOD_ROWS) or data.hasUrls()
 
-    def dropMimeData(self, data, action, row, column, parent):
-        if action == Qt.DropAction.IgnoreAction:
-            return True
-        if not self._allow_reorder or not data.hasFormat(MIME_BG3_MOD_ROWS):
-            return False
-
-        raw = bytes(data.data(MIME_BG3_MOD_ROWS))
-        uuids = [u for u in raw.decode("utf-8").split("\n") if u]
-        if not uuids:
-            return False
-
-        # Find source row by UUID
-        uuid = uuids[0]
+    def move_mod(self, uuid: str, target: int) -> bool:
+        """Move a mod by UUID to a new position. Called directly by the view."""
         source_row = None
         for i, r in enumerate(self._rows):
             if r.uuid == uuid:
                 source_row = i
                 break
         if source_row is None:
-            return False  # UUID not in this model (cross-tree handled by view)
+            return False
 
-        if row >= 0:
-            target = row
-        elif parent.isValid():
-            target = parent.row()
-        else:
-            target = self.rowCount()
+        if source_row == target or source_row == target - 1:
+            return False  # No-op: already at target
 
         p = QModelIndex()
         if source_row < target:
@@ -297,19 +282,14 @@ class BG3ModListModel(QAbstractItemModel):
             self._rows.insert(target, row_data)
         self.endMoveRows()
 
-        self._drop_in_progress = True
         self.mods_reordered.emit()
         return True
 
-    def removeRows(self, row, count, parent=QModelIndex()):
-        """No-Op nach DnD — beginMoveRows hat die Zeile bereits verschoben.
+    def dropMimeData(self, data, action, row, column, parent):
+        # Not used — internal DnD is handled by _BG3DropTreeView.dropEvent()
+        return False
 
-        MUST return False so QSortFilterProxyModel does NOT call
-        beginRemoveRows/endRemoveRows (which would hide rows from the view
-        even though the source model still contains them).
-        """
-        if self._drop_in_progress:
-            self._drop_in_progress = False
+    def removeRows(self, row, count, parent=QModelIndex()):
         return False
 
     # ── Sorting ────────────────────────────────────────────────────

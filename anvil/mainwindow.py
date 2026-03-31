@@ -1233,14 +1233,20 @@ class MainWindow(QMainWindow):
 
         # ── BG3-Weiche: Reihenfolge über Installer speichern ──
         if self._bg3_installer is not None:
+            # Only include real mod UUIDs — exclude data-override filenames
+            # and separators to prevent ghost entries in bg3_modstate.json
+            bg3_mod_uuids = {
+                m["uuid"].lower()
+                for m in (self._bg3_installer.get_mod_list().get("mods", []))
+            }
             uuid_order = [
                 r.folder_name for r in model._rows
                 if not r.is_separator and r.folder_name
+                and r.folder_name.lower() in bg3_mod_uuids
             ]
             self._bg3_installer.reorder_mods(uuid_order)
             # Save separator positions
             self._bg3_save_separators(model)
-            self._bg3_reload_mod_list()
             return
 
         # ── Standard path ──
