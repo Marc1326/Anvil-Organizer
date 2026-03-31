@@ -109,6 +109,19 @@ def _ensure_list(val) -> list:
     return list(val)
 
 
+class _CenteredClearLineEdit(QLineEdit):
+    """QLineEdit that vertically centers the built-in clear button."""
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        from PySide6.QtWidgets import QToolButton
+        for btn in self.findChildren(QToolButton):
+            g = btn.geometry()
+            centered_y = (self.height() - g.height()) // 2
+            if g.y() != centered_y:
+                btn.setGeometry(g.x(), centered_y, g.width(), g.height())
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -179,7 +192,7 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self._profile_bar)
 
         # ── Mod-Suche ──
-        self._mod_search = QLineEdit()
+        self._mod_search = _CenteredClearLineEdit()
         self._mod_search.setPlaceholderText(tr("filter.search_placeholder"))
         self._mod_search.setClearButtonEnabled(True)
         self._mod_search.textChanged.connect(self._on_filter_changed)
