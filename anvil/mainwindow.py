@@ -4771,6 +4771,19 @@ class MainWindow(QMainWindow):
             except (ValueError, OSError):
                 pass
 
+        # ── Add data-override mods (cosmetic: textures, meshes) to mod list ──
+        for ov in mod_list.get("data_overrides", []):
+            ov_name = ov.get("name", "?")
+            entry = ModEntry(
+                name=ov_name,
+                enabled=True,
+                priority=priority,
+                display_name=ov_name,
+                is_direct_install=False,
+            )
+            entries.append(entry)
+            priority += 1
+
         self._current_mod_entries = entries
 
         # ── Feed into normal model ──
@@ -4781,9 +4794,9 @@ class MainWindow(QMainWindow):
 
         # ── Update frameworks in the framework panel ──
         fw_list = mod_list.get("frameworks", [])
-        data_overrides = mod_list.get("data_overrides", [])
+        # Data overrides that install into game dir (e.g. bin/NativeMods/)
         fw_items = list(fw_list)
-        for ov in data_overrides:
+        for ov in mod_list.get("data_override_frameworks", []):
             fw_items.append({
                 "name": ov.get("name", "?"),
                 "description": f"Data Override — {len(ov.get('files', []))} Dateien",

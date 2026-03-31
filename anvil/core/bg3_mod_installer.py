@@ -478,14 +478,27 @@ class BG3ModInstaller:
         total_count = len(unified)
 
         # Data overrides and frameworks
-        data_overrides = self.get_data_overrides()
+        all_overrides = self.get_data_overrides()
         frameworks = self._get_frameworks()
+
+        # Split data overrides: files outside Data/ are framework-like
+        # (e.g. bin/NativeMods/ → installed into game directory)
+        data_overrides = []
+        data_override_frameworks = []
+        for ov in all_overrides:
+            files = ov.get("files", [])
+            is_fw = files and any(not f.startswith("Data/") for f in files)
+            if is_fw:
+                data_override_frameworks.append(ov)
+            else:
+                data_overrides.append(ov)
 
         return {
             "mods": unified,
             "active_count": active_count,
             "total_count": total_count,
             "data_overrides": data_overrides,
+            "data_override_frameworks": data_override_frameworks,
             "frameworks": frameworks,
         }
 
