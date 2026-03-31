@@ -1,5 +1,5 @@
 Name:           anvil-organizer
-Version:        1.2.7
+Version:        1.2.8
 Release:        1%{?dist}
 Summary:        Native Linux Mod Manager inspired by Mod Organizer 2
 
@@ -55,7 +55,7 @@ install -Dm644 anvil/resources/logo.svg \
 %{_datadir}/icons/hicolor/scalable/apps/anvil-organizer.svg
 
 %changelog
-* Mon Mar 31 2026 Marc <marc1326@users.noreply.github.com> - 1.2.7-1
+* Mon Mar 31 2026 Marc <marc1326@users.noreply.github.com> - 1.2.8-1
 - Automatic framework detection with score-based heuristic
 - Game Plugin menu with create/edit and toolbar button
 - BG3 DnD fixes: drop position, duplicate detection, no auto-activate
