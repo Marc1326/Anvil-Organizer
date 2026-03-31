@@ -4,8 +4,9 @@ import os
 import sys
 from pathlib import Path
 
-# KDE-Portal für native Dialoge aktivieren — MUSS vor Qt-Imports stehen
-os.environ.setdefault("QT_QPA_PLATFORMTHEME", "kde")
+# Native Datei-Dialoge über XDG Desktop Portal — MUSS vor Qt-Imports stehen
+# Funktioniert mit allen DEs: KDE/Dolphin, GNOME/Nautilus, Cinnamon/Nemo, XFCE/Thunar
+os.environ.setdefault("QT_QPA_PLATFORMTHEME", "xdgdesktopportal")
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QSettings, QTranslator, QLibraryInfo

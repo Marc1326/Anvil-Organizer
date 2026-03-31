@@ -389,8 +389,11 @@ class MainWindow(QMainWindow):
 
         fm.addSeparator()
 
-        act = fm.addAction(tr("menu.create_plugin"))
+        plugin_menu = fm.addMenu(tr("menu.plugin_menu"))
+        act = plugin_menu.addAction(tr("menu.create_plugin"))
         act.triggered.connect(self._on_create_plugin)
+        act = plugin_menu.addAction(tr("menu.edit_plugin"))
+        act.triggered.connect(self._on_edit_plugin)
 
         fm.addSeparator()
 
@@ -564,7 +567,21 @@ class MainWindow(QMainWindow):
             self.switch_instance(dlg.switched_to)
 
     def _on_create_plugin(self) -> None:
-        """Datei → Game Plugin erstellen / bearbeiten..."""
+        """Datei → Game Plugin erstellen (leerer Dialog)."""
+        from anvil.widgets.plugin_creator_dialog import PluginCreatorDialog
+        dlg = PluginCreatorDialog(
+            self,
+            plugin=None,
+            icon_manager=self._game_panel._icon_manager if self._game_panel else None,
+        )
+        if dlg.exec() == PluginCreatorDialog.DialogCode.Accepted:
+            QMessageBox.information(
+                self, "Neustart",
+                tr("plugin_creator.restart_hint"),
+            )
+
+    def _on_edit_plugin(self) -> None:
+        """Datei → Game Plugin ändern (aktuelles Plugin)."""
         from anvil.widgets.plugin_creator_dialog import PluginCreatorDialog
         dlg = PluginCreatorDialog(
             self,

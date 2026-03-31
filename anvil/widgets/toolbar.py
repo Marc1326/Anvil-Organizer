@@ -60,6 +60,13 @@ def create_toolbar(parent=None):
         if win and hasattr(win, method_name):
             getattr(win, method_name)()
 
+    plugin_btn = _add_btn("plugin.svg", tr("menu.plugin_menu"))
+    plugin_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+    plugin_menu = QMenu(bar)
+    plugin_menu.addAction(tr("menu.create_plugin"), lambda: _call_win("_on_create_plugin"))
+    plugin_menu.addAction(tr("menu.edit_plugin"), lambda: _call_win("_on_edit_plugin"))
+    plugin_btn.setMenu(plugin_menu)
+
     folder_btn = _add_btn("archives.svg", "Folders")
     folder_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
     folder_menu = QMenu(bar)
