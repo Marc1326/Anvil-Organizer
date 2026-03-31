@@ -60,8 +60,12 @@ jobs:
           name: anvil-organizer-appimage
           path: Anvil_Organizer-*-x86_64.AppImage
 
+      - name: Get version tag
+        id: version
+        run: echo "tag=v$(python -c 'from anvil.version import APP_VERSION; print(APP_VERSION)')" >> "$GITHUB_OUTPUT"
+
       - name: Upload to Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
           files: Anvil_Organizer-*-x86_64.AppImage

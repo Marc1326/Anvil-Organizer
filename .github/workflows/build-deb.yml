@@ -68,8 +68,12 @@ jobs:
           name: anvil-organizer-deb
           path: dist/*.deb
 
+      - name: Get version tag
+        id: version
+        run: echo "tag=v$(python3 -c 'from anvil.version import APP_VERSION; print(APP_VERSION)')" >> "$GITHUB_OUTPUT"
+
       - name: Upload to Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
           files: dist/*.deb
