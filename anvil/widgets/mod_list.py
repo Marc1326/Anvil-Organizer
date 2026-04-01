@@ -825,9 +825,8 @@ class ModListView(QWidget):
         self._proxy_model = ModListProxyModel(self)
         self._proxy_model.setSourceModel(self._source_model)
         self._tree.setModel(self._proxy_model)
-        self._tree.header().setSortIndicatorShown(True)
-        self._tree.header().setSectionsClickable(True)
-        self._tree.header().sortIndicatorChanged.connect(self._proxy_model.sort)
+        self._tree.header().setSortIndicatorShown(False)
+        self._tree.header().setSectionsClickable(False)
         self._model = self._proxy_model  # Für Kompatibilität
 
         # Connect model signals to update scrollbar separator markings
