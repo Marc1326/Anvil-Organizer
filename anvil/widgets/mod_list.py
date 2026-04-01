@@ -497,6 +497,52 @@ class _DropTreeView(QTreeView):
 
     # ── Drag & Drop events ────────────────────────────────────────
 
+    def startDrag(self, supportedActions):
+        """Hide selection highlight during drag, restore + reselect after drop."""
+        from PySide6.QtGui import QPalette
+        # Save dragged mod names for reselection after drop
+        self._dragged_mod_names = []
+        proxy = self.model()
+        if isinstance(proxy, ModListProxyModel):
+            source = proxy.sourceModel()
+            if source:
+                for idx in self.selectedIndexes():
+                    if idx.column() == 0:
+                        src_idx = proxy.mapToSource(idx)
+                        if src_idx.isValid():
+                            self._dragged_mod_names.append(source._rows[src_idx.row()].name)
+        # Make highlight transparent AFTER pixmap is created (QTimer fires inside drag event loop)
+        self._orig_highlight = self.palette().color(QPalette.ColorRole.Highlight)
+        QTimer.singleShot(0, self._hide_drag_highlight)
+        super().startDrag(supportedActions)  # blocks until drag ends
+        # Restore highlight color
+        pal = self.palette()
+        pal.setColor(QPalette.ColorRole.Highlight, self._orig_highlight)
+        self.setPalette(pal)
+        # Reselect moved mods at new positions
+        names = getattr(self, "_dragged_mod_names", [])
+        if names and isinstance(proxy, ModListProxyModel):
+            source = proxy.sourceModel()
+            if source:
+                from PySide6.QtCore import QItemSelectionModel
+                sel = self.selectionModel()
+                sel.clearSelection()
+                for i, row_data in enumerate(source._rows):
+                    if row_data.name in names:
+                        for col in range(source.columnCount()):
+                            proxy_idx = proxy.mapFromSource(source.index(i, col))
+                            if proxy_idx.isValid():
+                                sel.select(proxy_idx, QItemSelectionModel.SelectionFlag.Select)
+        self._dragged_mod_names = []
+
+    def _hide_drag_highlight(self):
+        """Called via QTimer.singleShot(0) inside drag event loop — after pixmap is rendered."""
+        from PySide6.QtGui import QPalette
+        pal = self.palette()
+        pal.setColor(QPalette.ColorRole.Highlight, QColor(0, 0, 0, 0))
+        self.setPalette(pal)
+        self.viewport().update()
+
     def dragEnterEvent(self, event):
         super().dragEnterEvent(event)
         if event.mimeData().hasUrls():
