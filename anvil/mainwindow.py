@@ -4974,6 +4974,7 @@ class MainWindow(QMainWindow):
                     "display_name": display,
                     "color": row.color,
                     "before_uuid": before_uuid,
+                    "child_count": row.child_count,
                 })
         sep_file = self._current_profile_path / "bg3_separators.json"
         try:
@@ -5019,6 +5020,7 @@ class MainWindow(QMainWindow):
                     "display_name": row.name,
                     "color": getattr(row, "color", ""),
                     "before_uuid": before_uuid,
+                    "child_count": row.child_count,
                 })
 
         mod_list = self._bg3_installer.get_mod_list()
@@ -5034,6 +5036,21 @@ class MainWindow(QMainWindow):
                 display_name=mod.get("name", ""),
                 version=mod.get("version64", mod.get("version", "")),
                 author=mod.get("author", ""),
+            )
+            entries.append(entry)
+            priority += 1
+
+        # ── Add data-override mods BEFORE separator reinsertion ──
+        # Data overrides must be in entries before separators are placed,
+        # so separator anchors and "end of list" positions account for them.
+        for ov in mod_list.get("data_overrides", []):
+            ov_name = ov.get("name", "?")
+            entry = ModEntry(
+                name=ov_name,
+                enabled=True,
+                priority=priority,
+                display_name=ov_name,
+                is_direct_install=False,
             )
             entries.append(entry)
             priority += 1
@@ -5077,25 +5094,33 @@ class MainWindow(QMainWindow):
             for i, e in enumerate(entries):
                 e.priority = i
 
-        # ── Add data-override mods (cosmetic: textures, meshes) to mod list ──
-        for ov in mod_list.get("data_overrides", []):
-            ov_name = ov.get("name", "?")
-            entry = ModEntry(
-                name=ov_name,
-                enabled=True,
-                priority=priority,
-                display_name=ov_name,
-                is_direct_install=False,
-            )
-            entries.append(entry)
-            priority += 1
-
         self._current_mod_entries = entries
 
         # ── Feed into normal model ──
         mod_rows = [mod_entry_to_row(e) for e in entries]
-        self._mod_list_view.source_model().set_mods(mod_rows)
+        source_model = self._mod_list_view.source_model()
+        source_model.set_mods(mod_rows)
+
+        # ── Restore saved child_counts ──
+        # set_mods() recalculates child_counts blindly (counts ALL mods
+        # between separators).  Restore the user's intended grouping.
+        if seps_to_use:
+            sep_child_counts = {}
+            for sep in seps_to_use:
+                sep_name = sep.get("name", "separator") + "_separator"
+                if "child_count" in sep:
+                    sep_child_counts[sep_name] = sep["child_count"]
+                elif not sep.get("before_uuid"):
+                    # No anchor + no saved child_count = separator at end
+                    # with no intended children (e.g. before data overrides)
+                    sep_child_counts[sep_name] = 0
+            if sep_child_counts:
+                for row in source_model._rows:
+                    if row.is_separator and row.folder_name in sep_child_counts:
+                        row.child_count = sep_child_counts[row.folder_name]
+
         self._mod_list_view._proxy_model.set_mod_entries(entries)
+        self._mod_list_view._tree._apply_separator_filter()
         self._update_active_count()
 
         # ── Update frameworks in the framework panel ──
