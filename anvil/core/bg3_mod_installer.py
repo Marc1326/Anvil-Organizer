@@ -1170,13 +1170,6 @@ class BG3ModInstaller:
             mods_lines.append(self._mod_xml(attrs))
             written_uuids.add(key)
 
-        # Inactive mods (in Mods node but not in ModOrder)
-        for mod in all_mods:
-            key = mod["uuid"].lower()
-            if key not in written_uuids:
-                mods_lines.append(self._mod_xml(mod))
-                written_uuids.add(key)
-
         # ── Assemble full XML ─────────────────────────────────────
         xml = (
             f'<?xml version="1.0" encoding="UTF-8"?>\n'

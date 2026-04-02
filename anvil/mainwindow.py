@@ -1210,11 +1210,22 @@ class MainWindow(QMainWindow):
             return
         row_data = model._rows[row]
 
-        # ── BG3-Weiche: visuellen Toggle + Entry updaten ──
+        # ── BG3-Weiche: Toggle + Installer-State updaten ──
         if self._bg3_installer is not None:
             uuid = row_data.folder_name  # folder_name = UUID bei BG3
             if not uuid or row_data.is_separator:
                 return
+            # Nur .pak-Mods: modsettings.lsx aktualisieren
+            print(f"DEBUG _on_mod_toggled: uuid={uuid[:30]}, enabled={enabled}, is_data_override={row_data.is_data_override}, is_framework={row_data.is_framework}", flush=True)
+            if not row_data.is_data_override and not row_data.is_framework:
+                if enabled:
+                    result = self._bg3_installer.activate_mod(uuid)
+                    print(f"DEBUG activate_mod({uuid[:30]}) → {result}", flush=True)
+                else:
+                    result = self._bg3_installer.deactivate_mod(uuid)
+                    print(f"DEBUG deactivate_mod({uuid[:30]}) → {result}", flush=True)
+            else:
+                print(f"DEBUG SKIPPED installer call (data_override or framework)", flush=True)
             for entry in self._current_mod_entries:
                 if entry.name == uuid:
                     entry.enabled = enabled
