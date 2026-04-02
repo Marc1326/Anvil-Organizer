@@ -4254,9 +4254,10 @@ class MainWindow(QMainWindow):
         if not entry:
             return
         old_name = entry.name
+        display = entry.display_name or old_name
 
         new_name, ok = get_text_input(
-            self, tr("dialog.rename_mod_title"), tr("dialog.rename_mod_prompt"), text=old_name,
+            self, tr("dialog.rename_mod_title"), tr("dialog.rename_mod_prompt"), text=display,
         )
         if not ok or not new_name.strip() or new_name.strip() == old_name:
             return
