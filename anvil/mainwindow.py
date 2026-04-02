@@ -1216,16 +1216,11 @@ class MainWindow(QMainWindow):
             if not uuid or row_data.is_separator:
                 return
             # Nur .pak-Mods: modsettings.lsx aktualisieren
-            print(f"DEBUG _on_mod_toggled: uuid={uuid[:30]}, enabled={enabled}, is_data_override={row_data.is_data_override}, is_framework={row_data.is_framework}", flush=True)
             if not row_data.is_data_override and not row_data.is_framework:
                 if enabled:
-                    result = self._bg3_installer.activate_mod(uuid)
-                    print(f"DEBUG activate_mod({uuid[:30]}) → {result}", flush=True)
+                    self._bg3_installer.activate_mod(uuid)
                 else:
-                    result = self._bg3_installer.deactivate_mod(uuid)
-                    print(f"DEBUG deactivate_mod({uuid[:30]}) → {result}", flush=True)
-            else:
-                print(f"DEBUG SKIPPED installer call (data_override or framework)", flush=True)
+                    self._bg3_installer.deactivate_mod(uuid)
             for entry in self._current_mod_entries:
                 if entry.name == uuid:
                     entry.enabled = enabled
