@@ -20,7 +20,7 @@ from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.translator import tr
 from anvil.core.persistent_header import PersistentHeader
 from anvil.widgets.collapsible_bar import CollapsibleSectionBar
-from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME, ROLE_SEP_COLOR
+from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME, ROLE_SEP_COLOR, ROLE_IS_DATA_OVERRIDE
 
 
 class SeparatorMarkingScrollBar(QScrollBar):

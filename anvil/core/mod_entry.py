@@ -52,6 +52,7 @@ class ModEntry:
     # Special types
     is_separator: bool = False             # True for _separator dirs
     is_direct_install: bool = False        # True for framework mods (copy, not symlink)
+    is_data_override: bool = False         # True for BG3 data-override mods (loose files in Data/)
 
     # Separator color (from meta.ini, MO2-compatible)
     color: str = ""                        # Hex color e.g. "#FF0000", empty = no custom color

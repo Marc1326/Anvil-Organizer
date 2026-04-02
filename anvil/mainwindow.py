@@ -1210,16 +1210,21 @@ class MainWindow(QMainWindow):
             return
         row_data = model._rows[row]
 
-        # ── BG3-Weiche: über Installer aktivieren/deaktivieren ──
+        # ── BG3-Weiche: visuellen Toggle + Entry updaten ──
         if self._bg3_installer is not None:
             uuid = row_data.folder_name  # folder_name = UUID bei BG3
             if not uuid or row_data.is_separator:
                 return
-            if enabled:
-                self._bg3_installer.activate_mod(uuid)
-            else:
-                self._bg3_installer.deactivate_mod(uuid)
-            self._bg3_reload_mod_list()
+            for entry in self._current_mod_entries:
+                if entry.name == uuid:
+                    entry.enabled = enabled
+                    break
+            self._update_active_count()
+            model.dataChanged.emit(
+                model.index(0, 0),
+                model.index(model.rowCount() - 1, 0),
+                [Qt.ItemDataRole.CheckStateRole],
+            )
             return
 
         # ── Standard path ──
@@ -3476,19 +3481,29 @@ class MainWindow(QMainWindow):
         """Enable or disable selected mods."""
         model = self._mod_list_view.source_model()
         for row in rows:
+            if 0 <= row < len(model._rows):
+                r = model._rows[row]
+                if r.is_separator:
+                    continue
+                r.enabled = enabled
+                # BG3: persist via installer
+                if self._bg3_installer is not None and r.folder_name:
+                    if enabled:
+                        self._bg3_installer.activate_mod(r.folder_name)
+                    else:
+                        self._bg3_installer.deactivate_mod(r.folder_name)
             entry = self._entry_for_row(row)
             if entry:
                 entry.enabled = enabled
-            if 0 <= row < len(model._rows):
-                model._rows[row].enabled = enabled
         model.dataChanged.emit(
             model.index(0, 0),
             model.index(model.rowCount() - 1, 0),
             [Qt.ItemDataRole.CheckStateRole],
         )
-        self._write_current_modlist()
+        if self._bg3_installer is None:
+            self._write_current_modlist()
+            self._schedule_redeploy()
         self._update_active_count()
-        self._schedule_redeploy()
 
     def _ctx_enable_all(self, enabled: bool) -> None:
         """Enable or disable ALL mods."""
@@ -5051,6 +5066,7 @@ class MainWindow(QMainWindow):
                 priority=priority,
                 display_name=ov_name,
                 is_direct_install=False,
+                is_data_override=True,
             )
             entries.append(entry)
             priority += 1

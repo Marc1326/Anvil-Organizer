@@ -37,12 +37,13 @@ ROLE_IS_SEPARATOR = Qt.ItemDataRole.UserRole + 1
 ROLE_FOLDER_NAME = Qt.ItemDataRole.UserRole + 2
 ROLE_IS_COLLAPSED = Qt.ItemDataRole.UserRole + 3  # Whether separator is collapsed (set by view)
 ROLE_SEP_COLOR = Qt.ItemDataRole.UserRole + 4     # Separator color string (hex, e.g. "#FF0000")
+ROLE_IS_DATA_OVERRIDE = Qt.ItemDataRole.UserRole + 5  # True for BG3 data-override mods (always active)
 
 
 class ModRow:
-    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "folder_name", "color", "file_count", "child_count")
+    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "is_data_override", "folder_name", "color", "file_count", "child_count")
 
-    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, folder_name="", color="", file_count=0, child_count=0):
+    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, is_data_override=False, folder_name="", color="", file_count=0, child_count=0):
         self.enabled = enabled
         self.name = name
         self.conflicts = conflicts
@@ -53,6 +54,7 @@ class ModRow:
         self.is_framework = is_framework
         self.is_error = is_error
         self.is_separator = is_separator
+        self.is_data_override = is_data_override
         self.folder_name = folder_name
         self.color = color
         self.file_count = file_count
@@ -81,6 +83,7 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None) -> ModR
         is_framework=entry.is_direct_install,
         is_error=False,
         is_separator=entry.is_separator,
+        is_data_override=getattr(entry, "is_data_override", False),
         folder_name=entry.name,
         color=entry.color,
         file_count=getattr(entry, "file_count", 0),
@@ -370,6 +373,8 @@ class ModListModel(QAbstractItemModel):
             return r.folder_name
         if role == ROLE_SEP_COLOR:
             return r.color if r.is_separator else ""
+        if role == ROLE_IS_DATA_OVERRIDE:
+            return r.is_data_override
         return None
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
