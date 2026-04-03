@@ -713,7 +713,7 @@ class MainWindow(QMainWindow):
         if dlg.exec() == SettingsDialog.DialogCode.Accepted:
             # Reload current instance to apply changed paths
             if self.instance_manager.current_instance():
-                self._apply_instance(self.instance_manager.current_instance())
+                self.switch_instance(self.instance_manager.current_instance())
 
     def _on_menu_help(self) -> None:
         """Hilfe → Hilfe (Strg+H)."""
@@ -889,7 +889,7 @@ class MainWindow(QMainWindow):
         # Load current instance (if any)
         current = self.instance_manager.current_instance()
         if current:
-            self._apply_instance(current)
+            self.switch_instance(current)
         else:
             self._status_bar.clear_instance()
 
@@ -921,31 +921,94 @@ class MainWindow(QMainWindow):
                         deployer = ModDeployer(instance_path, game_path)
                         deployer.purge()
 
+    def _teardown_current_instance(self) -> None:
+        """Phase 1: Alten Instance-State sichern und leeren.
+
+        Reihenfolge ist KRITISCH:
+        - Timer stoppen VOR Purge (sonst deployed Timer nach Purge nochmal)
+        - Async-Queues leeren VOR State-Nullung (Callbacks pruefen Queues)
+        - State speichern VOR Model-Clearing (sonst werden leere Daten gespeichert)
+        - Purge VOR State-Nullung (braucht _deployer und _current_plugin)
+        """
+        # ── Schritt 1: Timer stoppen ──
+        self._redeploy_timer.stop()
+
+        # ── Schritt 2: Asynchrone Operationen abbrechen ──
+        # Nexus-API Queues leeren + active-Flags auf False
+        self._fw_query_queue.clear()
+        self._fw_query_active = False
+        if hasattr(self, "_batch_query_queue"):
+            self._batch_query_queue.clear()
+        if hasattr(self, "_batch_query_active"):
+            self._batch_query_active = False
+        # REDmod-Prozess abbrechen falls aktiv
+        self._game_panel.cancel_redmod_if_running()
+
+        # ── Schritt 3: State speichern (VOR Daten-Clearing!) ──
+        # Nur wenn eine aktive Instanz existiert (nicht beim ersten Start)
+        if self._current_instance_path is not None:
+            # Mod-Reihenfolge sichern (non-BG3)
+            if self._bg3_installer is None and self._current_mod_entries:
+                self._write_current_modlist()
+            # BG3-Trenner sichern
+            if self._bg3_installer is not None:
+                self._bg3_save_separators()
+            # Collapsed Separators + Splitter + Filter-State sichern
+            self._save_ui_state()
+
+        # ── Schritt 4: Deploy purgen ──
+        # silent_purge() braucht _deployer und _current_plugin (noch nicht None!)
+        self._game_panel.silent_purge()
+
+        # ── Schritt 5: Model leeren ──
+        self._mod_list_view.clear_mods()
+
+        # Collapsed Separators leeren (KERN-FIX fuer den gemeldeten Bug)
+        self._mod_list_view._tree._collapsed_separators.clear()
+
+        # Highlighted/Conflict Rows leeren (Indices werden im neuen Game ungueltig)
+        model = self._mod_list_view.source_model()
+        model._highlighted_rows.clear()
+        model._conflict_win_rows.clear()
+        model._conflict_lose_rows.clear()
+
+        # ── Schritt 6: Filter + Suche zuruecksetzen ──
+        self._filter_panel.reset_all()
+        self._mod_search.clear()
+
+        # ── Schritt 7: State-Variablen nullen ──
+        self._current_mod_entries = []
+        self._current_profile_path = None
+        self._current_instance_path = None
+        self._current_downloads_path = None
+        self._current_plugin = None
+        self._current_game_path = None
+        self._bg3_installer = None
+        self._mod_index = None
+
     def switch_instance(self, instance_name: str) -> None:
         """Switch to a different instance and update all UI components.
 
         Called by the toolbar after the instance manager dialog closes.
+        2-phase approach: teardown old state, then apply new state.
 
         Args:
             instance_name: Name of the instance to switch to.
         """
+        self._teardown_current_instance()
         self.instance_manager.set_current_instance(instance_name)
         self._apply_instance(instance_name)
 
     def _apply_instance(self, instance_name: str) -> None:
         """Load instance data and update all widgets.
 
-        Purges any previous deployment before switching, then
-        auto-deploys after the new instance is fully loaded.
+        Phase 2 of instance switching: builds new state.
+        Expects _teardown_current_instance() to have been called first
+        (via switch_instance) so the model/state is already clean.
 
         Args:
             instance_name: Name of the instance to apply.
         """
-        # Cancel any pending debounced redeploy
-        self._redeploy_timer.stop()
-        # Purge old deployment before switching
-        self._game_panel.silent_purge()
-
         data = self.instance_manager.load_instance(instance_name)
         if not data:
             self.setWindowTitle(f"Anvil Organizer v{APP_VERSION}")
@@ -3998,6 +4061,11 @@ class MainWindow(QMainWindow):
 
     def _batch_query_next(self) -> None:
         """Send the next request from the batch queue."""
+        # Guard: Teardown setzt _batch_query_active auf False.
+        # Ohne diesen Guard wuerde Queue-Clearing → _batch_query_finished() →
+        # _reload_mod_list() einen ungewollten Reload ausloesen.
+        if not getattr(self, "_batch_query_active", False):
+            return
         if self._batch_query_queue:
             mod_path, nexus_id = self._batch_query_queue.pop(0)
             self._pending_batch_query_path = mod_path
@@ -4127,6 +4195,11 @@ class MainWindow(QMainWindow):
 
     def _fw_query_next(self) -> None:
         """Send the next framework query request."""
+        # Guard: Teardown setzt _fw_query_active auf False und leert die Queue.
+        # Ohne diesen Guard wuerde Queue-Clearing → _fw_query_finished() →
+        # _reload_mod_list() einen ungewollten Reload ausloesen.
+        if not self._fw_query_active:
+            return
         if not self._fw_query_queue:
             self._fw_query_finished()
             return

@@ -1340,6 +1340,19 @@ class GamePanel(QWidget):
             except OSError:
                 pass
 
+    def cancel_redmod_if_running(self) -> None:
+        """Cancel any running REDmod deploy process.
+
+        Safe to call even if no REDmod deploy is running.
+        Called by MainWindow._teardown_current_instance() during game switch.
+        """
+        self._redmod_cancel_requested = True
+        if self._redmod_process is not None:
+            try:
+                self._redmod_process.kill()
+            except (OSError, ProcessLookupError):
+                pass
+
     # ── REDmod Overlay ────────────────────────────────────────────────
 
     def _show_redmod_overlay(self) -> None:
