@@ -95,12 +95,14 @@ class ModDeployer:
         needs_ba2_packing: bool = False,
         copy_deploy_paths: list[str] | None = None,
         mod_index: ModIndex | None = None,
+        redmod_path: str = "",
     ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
         self._data_path = data_path
         self._nest_under_mod_name = nest_under_mod_name
         self._lml_path = lml_path
+        self._redmod_path = redmod_path
         self._multi_folder_routes = multi_folder_routes or {}
         self._mods_path = instance_path / ".mods"
         self._profiles_dir = instance_path / ".profiles"
@@ -220,6 +222,111 @@ class ModDeployer:
                     })
                 except OSError as exc:
                     result.errors.append(f"lml symlink {mod_name}: {exc}")
+                continue  # Keine Einzel-Dateien symlinken
+
+            # REDmod-Erkennung (Pattern A + C):
+            # Mods mit info.json werden als Ordner-Symlinks nach
+            # game_root/<redmod_path>/<name>/ deployed.
+            # Pattern B (mods/<name>/info.json) wird vom normalen
+            # Einzel-Symlink-Code behandelt (mods/ Prefix ist im Mod).
+            redmod_handled = False
+            if self._redmod_path:
+                # Pattern A: info.json direkt im Mod-Root
+                # → gesamter Mod ist ein REDmod-Ordner
+                if (mod_dir / "info.json").is_file():
+                    redmod_target = (
+                        self._game_path / self._redmod_path / mod_name
+                    )
+                    redmod_target.parent.mkdir(parents=True, exist_ok=True)
+
+                    if redmod_target.is_symlink():
+                        redmod_target.unlink()
+                    elif redmod_target.exists():
+                        result.skipped_real_files.append(
+                            str(redmod_target.relative_to(self._game_path))
+                        )
+                        redmod_handled = True
+                        continue
+
+                    try:
+                        redmod_target.symlink_to(mod_dir)
+                        result.links_created += 1
+                        symlinks.append({
+                            "link": str(
+                                Path(self._redmod_path) / mod_name
+                            ),
+                            "target": str(mod_dir),
+                            "mod": mod_name,
+                            "type": "dir_symlink",
+                        })
+                        print(
+                            f"[DEPLOY] REDmod Pattern A: "
+                            f"{mod_name} -> {redmod_target}",
+                            flush=True,
+                        )
+                    except OSError as exc:
+                        result.errors.append(
+                            f"redmod symlink {mod_name}: {exc}"
+                        )
+                    redmod_handled = True
+
+                # Pattern C: Subfolder mit info.json, OHNE mods/ Prefix
+                # Der Subfolder wird als Ordner-Symlink deployed.
+                # Gesamter Mod wird danach übersprungen (continue).
+                if not redmod_handled and not (mod_dir / "mods").is_dir():
+                    for child in mod_dir.iterdir():
+                        if (
+                            child.is_dir()
+                            and child.name.lower() not in _SKIP_DIRS
+                            and (child / "info.json").is_file()
+                        ):
+                            redmod_target = (
+                                self._game_path
+                                / self._redmod_path
+                                / child.name
+                            )
+                            redmod_target.parent.mkdir(
+                                parents=True, exist_ok=True
+                            )
+
+                            if redmod_target.is_symlink():
+                                redmod_target.unlink()
+                            elif redmod_target.exists():
+                                result.skipped_real_files.append(
+                                    str(
+                                        redmod_target.relative_to(
+                                            self._game_path
+                                        )
+                                    )
+                                )
+                                continue
+
+                            try:
+                                redmod_target.symlink_to(child)
+                                result.links_created += 1
+                                symlinks.append({
+                                    "link": str(
+                                        Path(self._redmod_path)
+                                        / child.name
+                                    ),
+                                    "target": str(child),
+                                    "mod": mod_name,
+                                    "type": "dir_symlink",
+                                })
+                                print(
+                                    f"[DEPLOY] REDmod Pattern C: "
+                                    f"{mod_name}/{child.name} "
+                                    f"-> {redmod_target}",
+                                    flush=True,
+                                )
+                            except OSError as exc:
+                                result.errors.append(
+                                    f"redmod symlink "
+                                    f"{mod_name}/{child.name}: {exc}"
+                                )
+                            redmod_handled = True
+
+            if redmod_handled:
                 continue  # Keine Einzel-Dateien symlinken
 
             # Walk all files in this mod (use cache when available)

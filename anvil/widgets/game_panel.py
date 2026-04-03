@@ -99,6 +99,8 @@ class GamePanel(QWidget):
     game_stopped = Signal()           # emitted when the game process ends
 
     dl_query_info_requested = Signal(str)  # archive_path
+    _redmod_finished = Signal(int, str, str, str, bool)  # (exit_code, stdout, stderr, binary, is_steam)
+    _redmod_manual_finished = Signal(int, str, str)       # (exit_code, stdout, stderr)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -350,6 +352,13 @@ class GamePanel(QWidget):
         self._current_profile_name: str = "Default"
         self._deployer: ModDeployer | None = None
         self._mod_index = None  # ModIndex, set from mainwindow
+        # REDmod deploy state
+        self._redmod_process = None
+        self._redmod_cancel_requested = False
+        self._redmod_overlay = None
+        self._redmod_launch_plugin = None  # captured at deploy start
+        self._redmod_finished.connect(self._on_redmod_finished)
+        self._redmod_manual_finished.connect(self._on_manual_redmod_finished)
         # Map row index → archive Path for installation
         self._dl_archives: list[Path] = []
         # Hidden downloads toggle (MO2: showHidden)
@@ -426,8 +435,9 @@ class GamePanel(QWidget):
         multi_routes = getattr(game_plugin, "GameMultiFolderRoutes", {}) if game_plugin else {}
         ba2_packing = getattr(game_plugin, "NeedsBa2Packing", False) if game_plugin else False
         copy_paths = getattr(game_plugin, "GameCopyDeployPaths", []) if game_plugin else []
+        redmod_path = getattr(game_plugin, "GameRedmodPath", "") if game_plugin else ""
         if self._instance_path and game_path:
-            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index)
+            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index, redmod_path=redmod_path)
 
         # Update label
         self._game_label.setText(game_name or tr("game_panel.no_game_selected"))
@@ -533,16 +543,33 @@ class GamePanel(QWidget):
                 action.triggered.connect(lambda checked, i=idx: self._on_exe_selected(i))
                 self._executables.append({"name": name, "binary": binary})
 
-            # Disabled-Platzhalter: "skip REDmod deploy", "Manually deploy REDmod"
-            has_redmod = any(
-                "redmod" in e.get("binary", "").lower() or "prelauncher" in e.get("binary", "").lower()
-                for e in game_plugin.executables()
-            )
-            if game_name and has_redmod:
-                skip_action = self._exe_menu.addAction(cover_icon, tr("game_panel.skip_redmod", name=game_name))
-                skip_action.setEnabled(False)
-                deploy_action = self._exe_menu.addAction(tr("game_panel.deploy_redmod"))
-                deploy_action.setEnabled(False)
+            # REDmod menu entries (active when NeedsRedmodDeploy is set)
+            needs_redmod = getattr(game_plugin, "NeedsRedmodDeploy", False)
+            if game_name and needs_redmod:
+                self._exe_menu.addSeparator()
+
+                # "skip REDmod deploy" — checkable toggle
+                skip_action = self._exe_menu.addAction(
+                    cover_icon,
+                    tr("game_panel.skip_redmod", name=game_name),
+                )
+                skip_action.setCheckable(True)
+                settings = QSettings("AnvilOrganizer", "Anvil")
+                instance_key = str(self._instance_path) if self._instance_path else ""
+                skip_action.setChecked(
+                    settings.value(f"redmod_skip/{instance_key}", False, type=bool)
+                )
+                skip_action.toggled.connect(
+                    lambda checked: self._on_skip_redmod_toggled(checked)
+                )
+
+                # "Manually deploy REDmod" — triggers deploy without game launch
+                deploy_action = self._exe_menu.addAction(
+                    tr("game_panel.deploy_redmod"),
+                )
+                deploy_action.triggered.connect(
+                    lambda checked=False: self._on_manual_redmod_deploy()
+                )
 
             # Explore Virtual Folder
             self._exe_menu.addSeparator()
@@ -1007,7 +1034,11 @@ class GamePanel(QWidget):
         self._start_btn.setToolTip(tr("game_panel.start_with_name", name=name))
 
     def _on_start_clicked(self) -> None:
-        """Start the currently selected executable (deploy already happened)."""
+        """Start the currently selected executable (deploy already happened).
+
+        If the game needs REDmod deployment and the user has not skipped it,
+        runs ``redMod.exe deploy`` first, then launches the game on success.
+        """
         idx = self._selected_exe_index
         if idx < 0 or idx >= len(self._executables):
             return
@@ -1026,16 +1057,25 @@ class GamePanel(QWidget):
             and plugin.detectedStore() == "steam"
         )
 
+        # Check if REDmod deploy is needed before launching
+        needs_redmod = self._needs_redmod_deploy(plugin)
+        print(f"[START] _needs_redmod_deploy={needs_redmod}, binary={binary}", flush=True)
+        if needs_redmod:
+            self._run_redmod_deploy_then_launch(plugin, binary, is_steam)
+            return
+
+        self._do_launch(plugin, binary, is_steam)
+
+    def _do_launch(self, plugin, binary: str, is_steam: bool) -> None:
+        """Actually launch the game binary (Steam, Proton, or direct)."""
         if is_steam:
             force_proton = getattr(plugin, "GameLaunchViaProton", False)
             is_main_binary = (
                 hasattr(plugin, "GameBinary") and binary == plugin.GameBinary
             )
             if is_main_binary and not force_proton:
-                # Main game binary -> launch via steam -applaunch
                 self._launch_via_steam(plugin)
             else:
-                # Non-primary executable or GameLaunchViaProton flag -> launch via proton run
                 self._launch_via_proton(plugin, binary)
             return
 
@@ -1059,6 +1099,474 @@ class GamePanel(QWidget):
         working_dir = str(binary_path.parent)
         self.start_requested.emit(str(binary_path), working_dir)
         self.game_started.emit(self._game_label.text(), -1)
+
+    # ── REDmod Deploy ─────────────────────────────────────────────────
+
+    def _needs_redmod_deploy(self, plugin) -> bool:
+        """Check if REDmod deployment is needed before game launch.
+
+        Returns True only when ALL of these conditions are met:
+        - The plugin has NeedsRedmodDeploy == True
+        - The user has not checked "skip REDmod deploy"
+        - At least one active mod has a REDmod component (info.json)
+        - redMod.exe exists in the game directory
+        - Proton is available (Steam game)
+        """
+        if plugin is None:
+            return False
+        if not getattr(plugin, "NeedsRedmodDeploy", False):
+            return False
+
+        # Check "skip REDmod deploy" setting
+        settings = QSettings("AnvilOrganizer", "Anvil")
+        instance_key = str(self._instance_path) if self._instance_path else ""
+        if settings.value(f"redmod_skip/{instance_key}", False, type=bool):
+            return False
+
+        game_path = self._current_game_path
+        if game_path is None:
+            return False
+
+        # Check if redMod.exe exists
+        redmod_binary = getattr(plugin, "_REDMOD_BINARY", "")
+        if not redmod_binary or not (game_path / redmod_binary).exists():
+            print(
+                "[REDmod] redMod.exe not found — skipping deploy",
+                flush=True,
+            )
+            return False
+
+        # Check Proton availability
+        if not hasattr(plugin, "findProtonRun") or plugin.findProtonRun() is None:
+            print(
+                "[REDmod] Proton not available — skipping deploy",
+                flush=True,
+            )
+            return False
+
+        # Check if any active mod has a REDmod component
+        if self._instance_path is None:
+            return False
+        mods_path = self._instance_path / ".mods"
+        if not mods_path.is_dir():
+            return False
+
+        from anvil.core.mod_list_io import read_global_modlist, read_active_mods
+        profiles_dir = self._instance_path / ".profiles"
+        global_order = read_global_modlist(profiles_dir)
+        active_mods = read_active_mods(profiles_dir / self._current_profile_name)
+
+        for mod_name in global_order:
+            if mod_name not in active_mods:
+                continue
+            mod_dir = mods_path / mod_name
+            if not mod_dir.is_dir():
+                continue
+            # Pattern A: info.json in root
+            if (mod_dir / "info.json").is_file():
+                return True
+            # Pattern B: mods/<name>/info.json
+            mods_sub = mod_dir / "mods"
+            if mods_sub.is_dir():
+                for child in mods_sub.iterdir():
+                    if child.is_dir() and (child / "info.json").is_file():
+                        return True
+            # Pattern C: <subfolder>/info.json (not under mods/)
+            for child in mod_dir.iterdir():
+                if (
+                    child.is_dir()
+                    and child.name != "mods"
+                    and child.name != "fomod"
+                    and (child / "info.json").is_file()
+                ):
+                    return True
+
+        return False
+
+    def _run_redmod_deploy_then_launch(
+        self, plugin, binary: str, is_steam: bool
+    ) -> None:
+        """Run redMod.exe deploy in a worker thread, then launch the game."""
+        import threading
+
+        game_path = self._current_game_path
+        if game_path is None:
+            return
+
+        redmod_binary = getattr(plugin, "_REDMOD_BINARY", "")
+        proton_result = self._build_proton_env(plugin)
+        if proton_result is None:
+            print("[REDmod] Proton env build failed", flush=True)
+            self._do_launch(plugin, binary, is_steam)
+            return
+
+        env, proton_script, compat_data, _steam_root = proton_result
+
+        # Use wine64 directly instead of proton run (proton run hangs for CLI tools)
+        wine64 = Path(proton_script).parent / "files" / "bin" / "wine64"
+        if not wine64.exists():
+            print("[REDmod] wine64 not found, falling back to proton run", flush=True)
+            wine64 = None
+        wineprefix = compat_data / "pfx"
+
+        # Capture plugin reference before async work (instance switch safety)
+        self._redmod_launch_plugin = plugin
+
+        # Show overlay
+        self._show_redmod_overlay()
+        self._start_btn.setEnabled(False)
+        self._redmod_cancel_requested = False
+
+        # Convert Linux path to Windows Z: path for -root argument
+        wine_root = "Z:" + str(game_path).replace("/", "\\")
+
+        def _worker() -> None:
+            """Run redMod.exe deploy in background thread."""
+            # Shim: temporarily hide scripts/ dirs (Wine compat workaround)
+            hidden_scripts = self._shim_redmod_scripts(game_path)
+            try:
+                if wine64:
+                    cmd = [str(wine64), str(game_path / redmod_binary), "deploy", "-root", wine_root]
+                    run_env = env.copy()
+                    run_env["WINEPREFIX"] = str(wineprefix)
+                    run_env["WINEDLLOVERRIDES"] = "mscoree=;mshtml="
+                else:
+                    cmd = [str(proton_script), "run", str(game_path / redmod_binary), "deploy", "-root", wine_root]
+                    run_env = env
+                print(f"[REDmod] CMD: {' '.join(cmd)}", flush=True)
+                proc = subprocess.Popen(
+                    cmd,
+                    cwd=str(game_path),
+                    env=run_env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                self._redmod_process = proc
+
+                try:
+                    stdout, stderr = proc.communicate(timeout=300)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    stdout, stderr = proc.communicate()
+
+                if self._redmod_cancel_requested:
+                    exit_code = -1
+                    stdout_text = ""
+                    stderr_text = "Cancelled by user"
+                else:
+                    exit_code = proc.returncode
+                    stdout_text = stdout.decode("utf-8", errors="replace") if stdout else ""
+                    stderr_text = stderr.decode("utf-8", errors="replace") if stderr else ""
+
+            except OSError as exc:
+                exit_code = -1
+                stdout_text = ""
+                stderr_text = str(exc)
+            finally:
+                self._restore_redmod_scripts(hidden_scripts)
+
+            # Signal emitted → delivered to main thread via Qt event loop
+            self._redmod_finished.emit(
+                exit_code, stdout_text, stderr_text, binary, is_steam
+            )
+
+        self._redmod_process = None
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+
+    def _on_redmod_finished(
+        self,
+        exit_code: int,
+        stdout_text: str,
+        stderr_text: str,
+        binary: str,
+        is_steam: bool,
+    ) -> None:
+        """Handle REDmod deploy completion (called on main thread)."""
+        self._hide_redmod_overlay()
+        self._start_btn.setEnabled(True)
+        self._redmod_process = None
+
+        plugin = self._redmod_launch_plugin or self._current_plugin
+        self._redmod_launch_plugin = None
+
+        if self._redmod_cancel_requested:
+            print("[REDmod] Deploy cancelled by user", flush=True)
+            return
+
+        # Log everything for debugging
+        print(f"[REDmod] exit_code={exit_code}", flush=True)
+        if stdout_text:
+            for line in stdout_text.strip().splitlines()[:30]:
+                print(f"[REDmod] stdout: {line}", flush=True)
+        if stderr_text:
+            for line in stderr_text.strip().splitlines()[:10]:
+                print(f"[REDmod] stderr: {line}", flush=True)
+
+        # Proton often returns non-zero exit codes even on success.
+        # Check stdout for redMod.exe success indicator instead.
+        deploy_ok = exit_code == 0 or "succeeded" in stdout_text.lower()
+
+        if deploy_ok:
+            print("[REDmod] Deploy successful", flush=True)
+            self._do_launch(plugin, binary, is_steam)
+        else:
+            print("[REDmod] Deploy FAILED", flush=True)
+
+            # Show error dialog with "Launch anyway?" option
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setWindowTitle(tr("game_panel.redmod_deploy_failed_title"))
+            msg.setText(tr("game_panel.redmod_deploy_failed_text"))
+            msg.setDetailedText(stderr_text or stdout_text or f"Exit code: {exit_code}")
+            launch_btn = msg.addButton(
+                tr("game_panel.redmod_launch_anyway"),
+                QMessageBox.ButtonRole.AcceptRole,
+            )
+            msg.addButton(
+                tr("game_panel.redmod_cancel"),
+                QMessageBox.ButtonRole.RejectRole,
+            )
+            msg.exec()
+            if msg.clickedButton() == launch_btn:
+                self._do_launch(plugin, binary, is_steam)
+
+    def _on_redmod_cancel(self) -> None:
+        """Cancel the running REDmod deploy process."""
+        self._redmod_cancel_requested = True
+        if self._redmod_process is not None:
+            try:
+                self._redmod_process.kill()
+            except OSError:
+                pass
+
+    # ── REDmod Overlay ────────────────────────────────────────────────
+
+    def _show_redmod_overlay(self) -> None:
+        """Show a pulsing progress overlay while REDmod compiles."""
+        from PySide6.QtWidgets import QProgressBar
+
+        overlay = QWidget(self)
+        overlay.setObjectName("redmodOverlay")
+        overlay_layout = QVBoxLayout(overlay)
+        overlay_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        title = QLabel(tr("game_panel.redmod_overlay_title"))
+        title.setObjectName("redmodOverlayTitle")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        font = title.font()
+        font.setPointSize(14)
+        font.setBold(True)
+        title.setFont(font)
+
+        bar = QProgressBar()
+        bar.setObjectName("redmodProgressBar")
+        bar.setRange(0, 0)  # pulsing / busy mode
+        bar.setFixedWidth(300)
+        bar.setFixedHeight(24)
+
+        status = QLabel(tr("game_panel.redmod_overlay_status"))
+        status.setObjectName("redmodOverlayStatus")
+        status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        cancel_btn = QPushButton(tr("game_panel.redmod_overlay_cancel"))
+        cancel_btn.setObjectName("redmodCancelButton")
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(lambda checked=False: self._on_redmod_cancel())
+
+        overlay_layout.addWidget(title)
+        overlay_layout.addWidget(bar, 0, Qt.AlignmentFlag.AlignHCenter)
+        overlay_layout.addWidget(status)
+        overlay_layout.addWidget(cancel_btn, 0, Qt.AlignmentFlag.AlignRight)
+
+        overlay.setGeometry(self.rect())
+        overlay.show()
+        overlay.raise_()
+        self._redmod_overlay = overlay
+
+    def resizeEvent(self, event) -> None:
+        """Keep the REDmod overlay covering the full panel on resize."""
+        super().resizeEvent(event)
+        if self._redmod_overlay is not None:
+            self._redmod_overlay.setGeometry(self.rect())
+
+    def _hide_redmod_overlay(self) -> None:
+        """Remove the REDmod overlay widget."""
+        overlay = getattr(self, "_redmod_overlay", None)
+        if overlay is not None:
+            overlay.hide()
+            overlay.deleteLater()
+            self._redmod_overlay = None
+
+    # ── REDmod Script Shim (Wine compat) ────────────────────────────
+
+    def _shim_redmod_scripts(self, game_path: Path) -> list[tuple[Path, Path]]:
+        """Temporarily hide scripts/ dirs in REDmod mods.
+
+        Wine's redMod.exe script compiler fails on certain opcodes that
+        work fine on native Windows.  Hiding the scripts/ folders lets
+        redMod.exe compile tweaks, archives and sounds successfully.
+        The scripts are loaded at runtime by the Redscript framework
+        inside Proton, which handles them correctly.
+
+        Returns a list of (backup_path, original_path) tuples for restore.
+        """
+        hidden: list[tuple[Path, Path]] = []
+        mods_dir = game_path / "mods"
+        if not mods_dir.is_dir():
+            return hidden
+        for mod_dir in mods_dir.iterdir():
+            if not mod_dir.is_dir():
+                continue
+            scripts_dir = mod_dir / "scripts"
+            if scripts_dir.is_dir():
+                bak = mod_dir / "_scripts_bak"
+                try:
+                    scripts_dir.rename(bak)
+                    hidden.append((bak, scripts_dir))
+                    print(f"[REDmod] Shim: hid scripts/ in {mod_dir.name}", flush=True)
+                except OSError as exc:
+                    print(f"[REDmod] Shim: failed to hide scripts/ in {mod_dir.name}: {exc}", flush=True)
+        return hidden
+
+    def _restore_redmod_scripts(self, hidden: list[tuple[Path, Path]]) -> None:
+        """Restore scripts/ dirs after REDmod deploy."""
+        for bak, original in hidden:
+            try:
+                bak.rename(original)
+            except OSError as exc:
+                print(f"[REDmod] Shim: failed to restore {original}: {exc}", flush=True)
+        if hidden:
+            print(f"[REDmod] Shim: restored {len(hidden)} scripts/ dir(s)", flush=True)
+
+    def _on_skip_redmod_toggled(self, checked: bool) -> None:
+        """Save the 'skip REDmod deploy' preference per instance."""
+        settings = QSettings("AnvilOrganizer", "Anvil")
+        instance_key = str(self._instance_path) if self._instance_path else ""
+        settings.setValue(f"redmod_skip/{instance_key}", checked)
+
+    def _on_manual_redmod_deploy(self) -> None:
+        """Manually run redMod.exe deploy without starting the game afterwards."""
+        import threading
+
+        plugin = self._current_plugin
+        game_path = self._current_game_path
+        if plugin is None or game_path is None:
+            return
+
+        redmod_binary = getattr(plugin, "_REDMOD_BINARY", "")
+        if not redmod_binary or not (game_path / redmod_binary).exists():
+            QMessageBox.warning(
+                self,
+                tr("game_panel.redmod_deploy_failed_title"),
+                tr("game_panel.redmod_exe_not_found"),
+            )
+            return
+
+        proton_result = self._build_proton_env(plugin)
+        if proton_result is None:
+            QMessageBox.warning(
+                self,
+                tr("game_panel.redmod_deploy_failed_title"),
+                tr("game_panel.proton_not_found"),
+            )
+            return
+
+        env, proton_script, compat_data, _steam_root = proton_result
+
+        # Use wine64 directly instead of proton run (proton run hangs for CLI tools)
+        wine64 = Path(proton_script).parent / "files" / "bin" / "wine64"
+        if not wine64.exists():
+            print("[REDmod] wine64 not found, falling back to proton run", flush=True)
+            wine64 = None
+        wineprefix = compat_data / "pfx"
+
+        # Convert Linux path to Windows Z: path for -root argument
+        wine_root = "Z:" + str(game_path).replace("/", "\\")
+
+        self._show_redmod_overlay()
+        self._start_btn.setEnabled(False)
+        self._redmod_cancel_requested = False
+
+        def _worker() -> None:
+            # Shim: temporarily hide scripts/ dirs (Wine compat workaround)
+            hidden_scripts = self._shim_redmod_scripts(game_path)
+            try:
+                if wine64:
+                    cmd = [str(wine64), str(game_path / redmod_binary), "deploy", "-root", wine_root]
+                    run_env = env.copy()
+                    run_env["WINEPREFIX"] = str(wineprefix)
+                    run_env["WINEDLLOVERRIDES"] = "mscoree=;mshtml="
+                else:
+                    cmd = [str(proton_script), "run", str(game_path / redmod_binary), "deploy", "-root", wine_root]
+                    run_env = env
+                print(f"[REDmod] CMD: {' '.join(cmd)}", flush=True)
+                proc = subprocess.Popen(
+                    cmd,
+                    cwd=str(game_path),
+                    env=run_env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                self._redmod_process = proc
+
+                try:
+                    stdout, stderr = proc.communicate(timeout=300)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    stdout, stderr = proc.communicate()
+
+                if self._redmod_cancel_requested:
+                    exit_code = -1
+                    stdout_text = ""
+                    stderr_text = "Cancelled by user"
+                else:
+                    exit_code = proc.returncode
+                    stdout_text = stdout.decode("utf-8", errors="replace") if stdout else ""
+                    stderr_text = stderr.decode("utf-8", errors="replace") if stderr else ""
+            except OSError as exc:
+                exit_code = -1
+                stdout_text = ""
+                stderr_text = str(exc)
+            finally:
+                self._restore_redmod_scripts(hidden_scripts)
+
+            self._redmod_manual_finished.emit(
+                exit_code, stdout_text, stderr_text
+            )
+
+        self._redmod_process = None
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+
+    def _on_manual_redmod_finished(
+        self, exit_code: int, stdout_text: str, stderr_text: str
+    ) -> None:
+        """Handle manual REDmod deploy completion (no game launch)."""
+        self._hide_redmod_overlay()
+        self._start_btn.setEnabled(True)
+        self._redmod_process = None
+
+        if self._redmod_cancel_requested:
+            return
+
+        deploy_ok = exit_code == 0 or "succeeded" in stdout_text.lower()
+
+        if deploy_ok:
+            print("[REDmod] Manual deploy successful", flush=True)
+            QMessageBox.information(
+                self,
+                tr("game_panel.redmod_deploy_success_title"),
+                tr("game_panel.redmod_deploy_success_text"),
+            )
+        else:
+            print(f"[REDmod] Manual deploy failed (exit_code={exit_code})", flush=True)
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setWindowTitle(tr("game_panel.redmod_deploy_failed_title"))
+            msg.setText(tr("game_panel.redmod_deploy_failed_text"))
+            msg.setDetailedText(stderr_text or stdout_text or f"Exit code: {exit_code}")
+            msg.exec()
 
     def _launch_via_steam(self, plugin) -> None:
         """Launch the main game binary via steam -applaunch."""
@@ -1099,6 +1607,43 @@ class GamePanel(QWidget):
                 tr("game_panel.steam_not_found"),
             )
 
+    def _build_proton_env(self, plugin) -> tuple[dict[str, str], Path, Path, Path] | None:
+        """Build the Proton environment for running .exe files.
+
+        Returns:
+            Tuple of (env_dict, proton_script, compat_data, steam_root)
+            or None if Proton is not available.
+        """
+        proton_info = plugin.findProtonRun()
+        if proton_info is None:
+            return None
+
+        proton_script, compat_data, steam_root = proton_info
+
+        env = os.environ.copy()
+        env["STEAM_COMPAT_DATA_PATH"] = str(compat_data)
+        env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_root)
+
+        steam_id = plugin.GameSteamId
+        if isinstance(steam_id, list):
+            steam_id = steam_id[0]
+        env["SteamAppId"] = str(steam_id)
+        env["SteamGameId"] = str(steam_id)
+
+        # Proton shim env overrides (e.g. WINEDLLOVERRIDES for F4SE)
+        if hasattr(plugin, "get_proton_env_overrides"):
+            for key, val in plugin.get_proton_env_overrides().items():
+                if key == "WINEDLLOVERRIDES":
+                    existing = env.get(key, "")
+                    env[key] = f"{existing};{val}" if existing else val
+                else:
+                    env[key] = val
+
+        # UMU_ID aktiviert den korrekten SLR-Pfad
+        env["UMU_ID"] = f"umu-{steam_id}"
+
+        return env, proton_script, compat_data, steam_root
+
     def _launch_via_proton(self, plugin, binary: str) -> None:
         """Launch a non-primary executable via Proton for Steam games.
 
@@ -1123,42 +1668,16 @@ class GamePanel(QWidget):
             )
             return
 
-        # Find the Proton runner for this game
-        proton_info = plugin.findProtonRun()
-        if proton_info is None:
+        proton_result = self._build_proton_env(plugin)
+        if proton_result is None:
             QMessageBox.warning(
                 self, tr("game_panel.start"),
                 tr("game_panel.proton_not_found"),
             )
             return
 
-        proton_script, compat_data, steam_root = proton_info
-
-        # Build environment for proton run
-        env = os.environ.copy()
-        env["STEAM_COMPAT_DATA_PATH"] = str(compat_data)
-        env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_root)
-
-        # Set SteamAppId so Proton knows which game context to use
-        steam_id = plugin.GameSteamId
-        if isinstance(steam_id, list):
-            steam_id = steam_id[0]
-        env["SteamAppId"] = str(steam_id)
-        env["SteamGameId"] = str(steam_id)
-
-        # Proton shim env overrides (e.g. WINEDLLOVERRIDES for F4SE)
-        if hasattr(plugin, "get_proton_env_overrides"):
-            for key, val in plugin.get_proton_env_overrides().items():
-                if key == "WINEDLLOVERRIDES":
-                    existing = env.get(key, "")
-                    env[key] = f"{existing};{val}" if existing else val
-                else:
-                    env[key] = val
-
+        env, proton_script, _compat_data, _steam_root = proton_result
         working_dir = str(binary_path.parent)
-
-        # UMU_ID aktiviert den korrekten SLR-Pfad (wine64 <exe> statt wine64 steam.exe)
-        env["UMU_ID"] = f"umu-{steam_id}"
 
         try:
             proc = subprocess.Popen(
@@ -1335,8 +1854,9 @@ class GamePanel(QWidget):
         multi_routes = getattr(self._current_plugin, "GameMultiFolderRoutes", {}) if self._current_plugin else {}
         ba2_packing = getattr(self._current_plugin, "NeedsBa2Packing", False) if self._current_plugin else False
         copy_paths = getattr(self._current_plugin, "GameCopyDeployPaths", []) if self._current_plugin else []
+        redmod_path = getattr(self._current_plugin, "GameRedmodPath", "") if self._current_plugin else ""
         if self._current_game_path and instance_path:
-            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index)
+            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index, redmod_path=redmod_path)
         else:
             self._deployer = None
 

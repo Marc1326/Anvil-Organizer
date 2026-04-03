@@ -1508,6 +1508,7 @@ class MainWindow(QMainWindow):
     def _unlock_ui(self) -> None:
         """Re-enable the UI after a game has stopped or user clicks Unlock."""
         self._game_running = False
+        self._game_panel.silent_purge()
         self._lock_overlay.setVisible(False)
         self._splitter.setEnabled(True)
         self._log_container.setEnabled(True)

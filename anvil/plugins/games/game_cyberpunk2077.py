@@ -97,9 +97,14 @@ class Cyberpunk2077Game(BaseGame):
         "/CD Projekt Red/Cyberpunk 2077"
     )
 
-    # ── REDmod (Pfade für spätere Implementierung) ─────────────────────
+    # ── REDmod ─────────────────────────────────────────────────────────
 
-    # TODO: REDmod deployment
+    GameRedmodPath: str = "mods"
+    """REDmod mods are deployed as directory symlinks into game_root/mods/."""
+
+    NeedsRedmodDeploy: bool = True
+    """Enable automatic ``redMod.exe deploy`` before game launch."""
+
     _REDMOD_BINARY = "tools/redmod/bin/redMod.exe"
 
     # ── Überschriebene Methoden ────────────────────────────────────────

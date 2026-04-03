@@ -108,6 +108,14 @@ class BaseGame:
     """If set, mods containing install.xml are deployed as directory
     symlinks into this path (e.g. 'lml' for RDR2).  Empty = disabled."""
 
+    GameRedmodPath: str = ""
+    """If set, mods containing info.json (REDmod) are deployed as directory
+    symlinks into this path (e.g. 'mods' for Cyberpunk 2077).  Empty = disabled."""
+
+    NeedsRedmodDeploy: bool = False
+    """If True, ``redMod.exe deploy`` is run before game launch to compile
+    REDmod mods.  Only relevant for Cyberpunk 2077."""
+
     ProtonShimFiles: list[str] = []
     """DLL filenames shipped in anvil/data/shims/<GameShortName>/ that are
     copied into the game root during deploy and removed during purge.
