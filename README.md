@@ -145,8 +145,8 @@ Use **[GoodbyeWindows](https://github.com/Marc1326/GoodbyeWindows)** to transfer
 No installation needed — download, make executable, run:
 
 ```bash
-chmod +x Anvil_Organizer-1.2.8-x86_64.AppImage
-./Anvil_Organizer-1.2.8-x86_64.AppImage
+chmod +x Anvil_Organizer-1.3.3-x86_64.AppImage
+./Anvil_Organizer-1.3.3-x86_64.AppImage
 ```
 
 Download from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest).
