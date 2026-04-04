@@ -484,22 +484,34 @@ class SettingsDialog(QDialog):
         opt_grp = QGroupBox(tr("settings.options"))
         opt_layout = QHBoxLayout(opt_grp)
         opt_left = QVBoxLayout()
-        for key, checked in (
-            ("settings.nexus_endorsement", True),
-            ("settings.nexus_tracking", True),
-            ("settings.nexus_category_mapping", True),
-            ("settings.nexus_hide_api_counter", False),
-        ):
-            cb = QCheckBox(tr(key))
-            cb.setChecked(checked)
-            _disabled(cb)
-            opt_left.addWidget(cb)
+        # Endorsement — Coming soon
+        cb = QCheckBox(tr("settings.nexus_endorsement"))
+        cb.setChecked(True)
+        _disabled(cb)
+        opt_left.addWidget(cb)
+
+        # Tracking — aktiv
+        self._cb_nexus_tracking = QCheckBox(tr("settings.nexus_tracking"))
+        self._cb_nexus_tracking.setChecked(
+            self._settings().value("Nexus/tracking_enabled", True, type=bool))
+        opt_left.addWidget(self._cb_nexus_tracking)
+
+        # Category Mapping — Coming soon
+        cb = QCheckBox(tr("settings.nexus_category_mapping"))
+        cb.setChecked(True)
+        _disabled(cb)
+        opt_left.addWidget(cb)
+
+        # API Counter ausblenden — aktiv
+        self._cb_nexus_hide_api = QCheckBox(tr("settings.nexus_hide_api_counter"))
+        self._cb_nexus_hide_api.setChecked(
+            self._settings().value("Nexus/hide_api_counter", False, type=bool))
+        opt_left.addWidget(self._cb_nexus_hide_api)
         opt_layout.addLayout(opt_left)
         opt_right = QVBoxLayout()
-        btn_link = QPushButton(tr("settings.nexus_link_nxm"))
-        btn_link.clicked.connect(self._nx_register_nxm_handler)
-        _disabled(btn_link)
-        opt_right.addWidget(btn_link)
+        self._btn_nxm_link = QPushButton(tr("settings.nexus_link_nxm"))
+        self._btn_nxm_link.clicked.connect(self._nx_register_nxm_handler)
+        opt_right.addWidget(self._btn_nxm_link)
         opt_right.addWidget(_disabled(QPushButton(tr("settings.nexus_clear_cache"))))
         opt_right.addStretch()
         opt_layout.addLayout(opt_right)
@@ -538,7 +550,7 @@ class SettingsDialog(QDialog):
         self._nexus_api.request_error.connect(self._nx_on_error)
         self._nexus_api.rate_limit_updated.connect(self._nx_on_rate_limit)
         self._sso_login: NexusSSOLogin | None = None
-        saved_key = settings.value("nexus/api_key", "")
+        saved_key = self.load_api_key()
         if saved_key:
             self._nexus_api.set_api_key(saved_key)
             self._nx_log_add("API-Schlüssel überprüfen...")
@@ -979,6 +991,9 @@ class SettingsDialog(QDialog):
         settings.setValue("ModList/symbol_flags", self._cb_sym_flags.isChecked())
         settings.setValue("ModList/symbol_content", self._cb_sym_content.isChecked())
         settings.setValue("ModList/symbol_version", self._cb_sym_version.isChecked())
+        # Tab Nexus — Optionen
+        settings.setValue("Nexus/tracking_enabled", self._cb_nexus_tracking.isChecked())
+        settings.setValue("Nexus/hide_api_counter", self._cb_nexus_hide_api.isChecked())
         # Tab-Index merken
         settings.setValue("SettingsDialog/tab_index", self._tabs.currentIndex())
         settings.sync()  # Sicherstellen dass Änderungen geschrieben werden

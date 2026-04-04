@@ -417,7 +417,8 @@
     "nexus_query_invalid_id": "ID Mod non valido.",
     "nexus_no_id_found": "Nessun ID Nexus trovato. Scarica la mod tramite Nexus.",
     "nexus_no_game_slug": "Nessuno slug di gioco Nexus configurato.",
-    "modindex_cleared": "Cache dell'indice mod svuotata. Verrà ricostruita al prossimo caricamento."
+    "modindex_cleared": "Cache dell'indice mod svuotata. Verrà ricostruita al prossimo caricamento.",
+    "update_available_mod": "Aggiornamento disponibile: {name} ({current} → {newest})"
   },
   "batch_query": {
     "title": "Richiedi info Nexus per tutti",

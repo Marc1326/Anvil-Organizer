@@ -713,6 +713,9 @@ class MainWindow(QMainWindow):
         )
         _center_on_parent(dlg)
         if dlg.exec() == SettingsDialog.DialogCode.Accepted:
+            # Apply API counter visibility immediately
+            hidden = self._settings().value("Nexus/hide_api_counter", False, type=bool)
+            self._status_bar.set_api_counter_visible(not hidden)
             # Reload current instance to apply changed paths
             if self.instance_manager.current_instance():
                 self.switch_instance(self.instance_manager.current_instance())
@@ -943,6 +946,8 @@ class MainWindow(QMainWindow):
             self._batch_query_queue.clear()
         if hasattr(self, "_batch_query_active"):
             self._batch_query_active = False
+        if hasattr(self, "_update_check_queue"):
+            self._update_check_queue.clear()
         # REDmod-Prozess abbrechen falls aktiv
         self._game_panel.cancel_redmod_if_running()
 
@@ -2156,24 +2161,51 @@ class MainWindow(QMainWindow):
         # Reload mod list (reuses _reload_mod_list which handles framework filtering)
         self._reload_mod_list()
 
-        # Setting 3: Update-Check stub after installation
-        if installed and self._settings().value(
-            "ModList/check_updates_after_install", True, type=bool
+        # Setting 3: Update-Check after installation
+        s = self._settings()
+        if (
+            installed
+            and s.value("ModList/check_updates_after_install", True, type=bool)
+            and s.value("Nexus/tracking_enabled", True, type=bool)
+            and self._nexus_api.has_api_key()
+            and self._current_plugin
         ):
-            for mod_folder_name in installed:
-                # Find the matching ModEntry to check for nexus_id
-                for entry in self._current_mod_entries:
-                    if entry.name == mod_folder_name and entry.nexus_id > 0:
-                        display = entry.display_name or entry.name
-                        msg = f"Update-Check: {display} — Nexus-ID: {entry.nexus_id}"
-                        print(f"DEBUG {msg}", flush=True)
-                        self._log_panel.add_log("info", msg)
-                        break
+            nexus_slug = (
+                getattr(self._current_plugin, "GameNexusName", "")
+                or getattr(self._current_plugin, "GameShortName", "")
+            )
+            if nexus_slug:
+                queue = []
+                for mod_folder_name in installed:
+                    for entry in self._current_mod_entries:
+                        if entry.name == mod_folder_name and entry.nexus_id > 0:
+                            queue.append((
+                                entry.display_name or entry.name,
+                                entry.nexus_id,
+                                entry.version,
+                                entry.install_path,
+                            ))
+                            break
+                if queue:
+                    self._update_check_queue = queue
+                    self._update_check_slug = nexus_slug
+                    self._update_check_next()
 
         if installed:
             names = ", ".join(installed)
             self.statusBar().showMessage(tr("status.installed", names=names), 5000)
             self._schedule_redeploy()
+
+    def _update_check_next(self) -> None:
+        """Send the next update-check request from the queue."""
+        queue = getattr(self, "_update_check_queue", [])
+        if not queue:
+            return
+        name, nexus_id, version, mod_path = queue.pop(0)
+        self._pending_update_check = (name, nexus_id, version, mod_path)
+        slug = getattr(self, "_update_check_slug", "")
+        if slug:
+            self._nexus_api.update_check_mod(slug, nexus_id)
 
     def _write_install_meta(self, archive: Path, mod_name: str) -> None:
         """Write installed=true and installationFile=mod_name to the archive's .meta file."""
@@ -4752,6 +4784,29 @@ class MainWindow(QMainWindow):
             self._pending_nxm_mod_name = data.get("name", "")
             self._pending_nxm_mod_version = data.get("version", "")
 
+        elif tag.startswith("update_check:") and isinstance(data, dict):
+            # ── Post-install update check ─────────────────────────
+            pending = getattr(self, "_pending_update_check", None)
+            if pending:
+                name, nexus_id, installed_version, mod_path = pending
+                self._pending_update_check = None
+                newest_version = data.get("version", "")
+                if mod_path and mod_path.exists() and newest_version:
+                    from anvil.core.mod_metadata import write_meta_ini
+                    write_meta_ini(mod_path, {"newestVersion": newest_version})
+                    if installed_version and installed_version != newest_version:
+                        msg = tr(
+                            "status.update_available_mod",
+                            name=name,
+                            current=installed_version,
+                            newest=newest_version,
+                        )
+                        self._log_panel.add_log("info", msg)
+                        self.statusBar().showMessage(msg, 8000)
+            # Schedule next check with 1s delay
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(1000, self._update_check_next)
+
         elif tag.startswith("query_mod_info:") and isinstance(data, dict):
             # ── Separate framework query mode ─────────────────────
             fw_qname = self._pending_fw_query_name
@@ -4875,6 +4930,11 @@ class MainWindow(QMainWindow):
 
     def _on_nexus_error(self, tag: str, message: str) -> None:
         """Handle Nexus API errors."""
+        if tag.startswith("update_check:"):
+            self._pending_update_check = None
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(1000, self._update_check_next)
+            return
         if tag.startswith("query_mod_info:"):
             # Separate framework query mode
             if self._fw_query_active and self._pending_fw_query_name:
@@ -4911,6 +4971,8 @@ class MainWindow(QMainWindow):
 
     def _update_api_status(self, daily: int, hourly: int) -> None:
         """Update status bar API rate limit display."""
+        hidden = self._settings().value("Nexus/hide_api_counter", False, type=bool)
+        self._status_bar.set_api_counter_visible(not hidden)
         self._status_bar.update_api_status(
             daily_remaining=daily,
             hourly_remaining=hourly,

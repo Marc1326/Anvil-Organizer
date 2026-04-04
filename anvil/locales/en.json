@@ -417,7 +417,8 @@
     "nexus_query_invalid_id": "Invalid Mod ID entered.",
     "nexus_no_id_found": "No Nexus ID found. Download the mod via Nexus.",
     "nexus_no_game_slug": "No Nexus game slug configured.",
-    "modindex_cleared": "Mod index cache cleared. Will be rebuilt on next load."
+    "modindex_cleared": "Mod index cache cleared. Will be rebuilt on next load.",
+    "update_available_mod": "Update available: {name} ({current} → {newest})"
   },
   "batch_query": {
     "title": "Query All Nexus Info",

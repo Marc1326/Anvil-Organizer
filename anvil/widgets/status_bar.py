@@ -61,3 +61,7 @@ class StatusBarWidget(QStatusBar):
         self._api_label.setText(text)
 
         self._api_label.setStyleSheet("QLabel { padding: 2px 6px; }")
+
+    def set_api_counter_visible(self, visible: bool) -> None:
+        """Show or hide the API rate limit label."""
+        self._api_label.setVisible(visible)

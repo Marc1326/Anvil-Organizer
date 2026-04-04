@@ -124,6 +124,13 @@ class NexusAPI(QObject):
         self._get(f"/games/{game}/mods/{mod_id}.json",
                   tag=f"query_mod_info:{game}:{mod_id}")
 
+    def update_check_mod(self, game: str, mod_id: int) -> None:
+        """Fetch mod metadata for post-install update check.
+        Uses 'update_check:' tag prefix to distinguish from other queries.
+        """
+        self._get(f"/games/{game}/mods/{mod_id}.json",
+                  tag=f"update_check:{game}:{mod_id}")
+
     def get_mod_files(self, game: str, mod_id: int) -> None:
         """Fetch file list for a mod.  GET /games/{game}/mods/{mod_id}/files.json"""
         self._get(
