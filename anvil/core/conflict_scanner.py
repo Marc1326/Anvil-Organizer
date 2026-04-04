@@ -71,6 +71,7 @@ class ConflictScanner:
         mods: list[dict],
         game_plugin=None,
         mod_index: ModIndex | None = None,
+        pak_file_lists: dict[str, list[dict]] | None = None,
     ) -> dict:
         """Scan *mods* for file conflicts.
 
@@ -106,7 +107,26 @@ class ConflictScanner:
         for mod in mods:
             mod_name = mod["name"]
 
-            # Try cached file list first
+            # Try pak file lists first (BG3 .pak archives)
+            if pak_file_lists is not None and mod_name in pak_file_lists:
+                for finfo in pak_file_lists[mod_name]:
+                    rel = finfo["rel"]
+                    fname = rel.rsplit("/", 1)[-1] if "/" in rel else rel
+                    if fname in self._INTERNAL_FILES:
+                        continue
+                    dot_pos = fname.rfind(".")
+                    ext = fname[dot_pos:].lower() if dot_pos >= 0 else ""
+                    if ext in self._IGNORED_EXTENSIONS:
+                        continue
+                    owners = file_owners.setdefault(rel, [])
+                    owners.append(mod_name)
+                continue
+
+            # pak mode active but mod not in file lists → skip entirely
+            if pak_file_lists is not None:
+                continue
+
+            # Try cached file list next
             if mod_index is not None:
                 cached_files = mod_index.get_file_list(mod_name)
                 if cached_files:

@@ -72,6 +72,7 @@ from anvil.core.nexus_api import NexusAPI
 from anvil.core.nxm_handler import parse_nxm_url, check_cli_for_nxm
 from anvil.core.conflict_scanner import ConflictScanner
 from anvil.core.modindex import ModIndex
+from anvil.core.lspk_parser import LSPKReader
 from anvil.models.mod_list_model import mod_entry_to_row, COL_COUNT
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 from anvil.widgets.category_dialog import CategoryDialog
@@ -1290,10 +1291,13 @@ class MainWindow(QMainWindow):
                     entry.enabled = enabled
                     break
             self._update_active_count()
+            # Recompute conflicts (enabled state changed → conflicts may differ)
+            conflict_data = self._compute_conflict_data()
+            for mod_row in model._rows:
+                mod_row.conflicts = conflict_data.get(mod_row.folder_name, "")
             model.dataChanged.emit(
                 model.index(0, 0),
-                model.index(model.rowCount() - 1, 0),
-                [Qt.ItemDataRole.CheckStateRole],
+                model.index(model.rowCount() - 1, model.columnCount() - 1),
             )
             return
 
@@ -1336,6 +1340,24 @@ class MainWindow(QMainWindow):
             self._bg3_installer.reorder_mods(uuid_order)
             # Save separator positions
             self._bg3_save_separators(model)
+            # Rebuild _current_mod_entries in new order (needed for correct
+            # conflict winners — ConflictScanner uses list order as priority)
+            new_entries = []
+            for row_data in model._rows:
+                for entry in self._current_mod_entries:
+                    if entry.name == row_data.folder_name and entry not in new_entries:
+                        entry.priority = len(new_entries)
+                        new_entries.append(entry)
+                        break
+            self._current_mod_entries = new_entries
+            # Recompute conflicts (priority changed → winner may differ)
+            conflict_data = self._compute_conflict_data()
+            for row_data in model._rows:
+                row_data.conflicts = conflict_data.get(row_data.folder_name, "")
+            model.dataChanged.emit(
+                model.index(0, 0),
+                model.index(model.rowCount() - 1, model.columnCount() - 1),
+            )
             return
 
         # ── Standard path ──
@@ -1408,6 +1430,34 @@ class MainWindow(QMainWindow):
             self._filter_panel.active_category_ids(),
         )
 
+    def _build_bg3_file_lists(self) -> dict[str, list[dict]]:
+        """Read file lists from all BG3 .pak files.
+
+        Returns:
+            Dict: UUID -> [{"rel": "path", "size": N}, ...]
+            Paths are lowercase-normalized (BG3 runs under Proton/Windows).
+        """
+        result: dict[str, list[dict]] = {}
+        if self._bg3_installer is None or self._bg3_installer._mods_path is None:
+            return result
+        mods_path = self._bg3_installer._mods_path
+        if not mods_path.is_dir():
+            return result
+
+        reader = LSPKReader()
+        for pak in mods_path.glob("*.pak"):
+            metadata, file_list = reader.read_pak_full(pak)
+            if metadata is None or not metadata.get("uuid"):
+                continue
+            uuid = metadata["uuid"].lower()
+            # Normalize to lowercase for case-insensitive comparison
+            normalized = [
+                {"rel": f["rel"].lower(), "size": f["size"]}
+                for f in file_list
+            ]
+            result[uuid] = normalized
+        return result
+
     def _compute_conflict_data(self) -> dict:
         """Run ConflictScanner and return per-mod conflict info.
 
@@ -1415,17 +1465,36 @@ class MainWindow(QMainWindow):
         ``{"type": "win"|"lose"|"both", "wins": N, "losses": N,
            "win_mods": N, "lose_mods": N}``
         """
-        if not self._current_instance_path or not self._current_mod_entries:
+        if not self._current_mod_entries:
             return {}
-        all_mods = [
-            {"name": e.name, "path": str(self._current_instance_path / ".mods" / e.name)}
-            for e in self._current_mod_entries if e.enabled
-        ]
-        if not all_mods:
-            return {}
-        result = ConflictScanner().scan_conflicts(
-            all_mods, self._current_plugin, mod_index=self._mod_index,
-        )
+
+        # BG3: use pak_file_lists instead of filesystem scan
+        if self._bg3_installer is not None:
+            pak_file_lists = self._build_bg3_file_lists()
+            all_mods = [
+                {"name": e.name, "path": ""}
+                for e in self._current_mod_entries
+                if e.enabled and not e.is_separator and not e.is_data_override
+            ]
+            if not all_mods:
+                return {}
+            result = ConflictScanner().scan_conflicts(
+                all_mods, self._current_plugin, pak_file_lists=pak_file_lists,
+            )
+        else:
+            # Regular games: filesystem-based scan
+            if not self._current_instance_path:
+                return {}
+            all_mods = [
+                {"name": e.name, "path": str(self._current_instance_path / ".mods" / e.name)}
+                for e in self._current_mod_entries if e.enabled
+            ]
+            if not all_mods:
+                return {}
+            result = ConflictScanner().scan_conflicts(
+                all_mods, self._current_plugin, mod_index=self._mod_index,
+            )
+
         # Build per-mod conflict counts
         per_mod: dict[str, dict] = {}
         for conflict in result["conflicts"]:
@@ -5005,6 +5074,10 @@ class MainWindow(QMainWindow):
         # BG3: Auto-Deploy — kein Deploy-Button noetig
         self._toolbar.deploy_sep.setVisible(False)
         self._toolbar.deploy_action.setVisible(False)
+        # Enable conflict highlighting on mod click
+        s = self._settings()
+        self._mod_list_view._tree._conflict_highlight_on_select = s.value(
+            "ModList/conflict_highlight_on_select", True, type=bool)
 
         # Instance path
         instance_path = self._current_instance_path
@@ -5221,7 +5294,8 @@ class MainWindow(QMainWindow):
         self._current_mod_entries = entries
 
         # ── Feed into normal model ──
-        mod_rows = [mod_entry_to_row(e) for e in entries]
+        conflict_data = self._compute_conflict_data()
+        mod_rows = [mod_entry_to_row(e, conflict_data) for e in entries]
         source_model = self._mod_list_view.source_model()
         source_model.set_mods(mod_rows)
 

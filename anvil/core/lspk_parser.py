@@ -84,60 +84,75 @@ class LSPKReader:
             print(f"lspk_parser: failed to read {pak_path.name}: {exc}", file=sys.stderr)
             return None
 
+    def _read_entries(self, f) -> list[dict] | None:
+        """Read and parse all file entries from an open LSPK V18 file.
+
+        Args:
+            f: Open file handle, positioned at the start of the .pak.
+
+        Returns:
+            List of entry dicts (name, offset, compression, size_on_disk,
+            uncompressed_size) — or None on any format error.
+        """
+        # ── Magic ─────────────────────────────────────────
+        magic = f.read(4)
+        if magic != LSPK_MAGIC:
+            return None
+
+        # ── Header (36 bytes) ─────────────────────────────
+        header_data = f.read(_HEADER_SIZE)
+        if len(header_data) < _HEADER_SIZE:
+            return None
+
+        version, file_list_offset, file_list_size, flags, priority, md5, num_parts = \
+            struct.unpack(_HEADER_FMT, header_data)
+
+        if version != LSPK_VERSION:
+            return None
+
+        # ── File list (LZ4-compressed) ────────────────────
+        f.seek(file_list_offset)
+        num_files = struct.unpack("<I", f.read(4))[0]
+        compressed_size = struct.unpack("<I", f.read(4))[0]
+        compressed_data = f.read(compressed_size)
+
+        if len(compressed_data) < compressed_size:
+            return None
+
+        expected_size = _ENTRY_SIZE * num_files
+        decompressed = lz4.block.decompress(compressed_data, uncompressed_size=expected_size)
+
+        # ── Parse file entries ────────────────────────────
+        entries = []
+        for i in range(num_files):
+            offset = i * _ENTRY_SIZE
+            chunk = decompressed[offset:offset + _ENTRY_SIZE]
+            if len(chunk) < _ENTRY_SIZE:
+                break
+
+            name_raw, off_low, off_high, arch_part, entry_flags, size_on_disk, uncompressed_size = \
+                struct.unpack(_ENTRY_FMT, chunk)
+
+            # Null-terminated name
+            name = name_raw.split(b"\x00", 1)[0].decode("utf-8", errors="replace")
+            file_offset = off_low | (off_high << 32)
+            compression = entry_flags & 0x0F
+
+            entries.append({
+                "name": name,
+                "offset": file_offset,
+                "compression": compression,
+                "size_on_disk": size_on_disk,
+                "uncompressed_size": uncompressed_size,
+            })
+
+        return entries
+
     def _read(self, pak_path: Path) -> dict | None:
         with open(pak_path, "rb") as f:
-            # ── Magic ─────────────────────────────────────────
-            magic = f.read(4)
-            if magic != LSPK_MAGIC:
+            entries = self._read_entries(f)
+            if entries is None:
                 return None
-
-            # ── Header (36 bytes) ─────────────────────────────
-            header_data = f.read(_HEADER_SIZE)
-            if len(header_data) < _HEADER_SIZE:
-                return None
-
-            version, file_list_offset, file_list_size, flags, priority, md5, num_parts = \
-                struct.unpack(_HEADER_FMT, header_data)
-
-            if version != LSPK_VERSION:
-                print(f"lspk_parser: unsupported version {version} in {pak_path.name}", file=sys.stderr)
-                return None
-
-            # ── File list (LZ4-compressed) ────────────────────
-            f.seek(file_list_offset)
-            num_files = struct.unpack("<I", f.read(4))[0]
-            compressed_size = struct.unpack("<I", f.read(4))[0]
-            compressed_data = f.read(compressed_size)
-
-            if len(compressed_data) < compressed_size:
-                return None
-
-            expected_size = _ENTRY_SIZE * num_files
-            decompressed = lz4.block.decompress(compressed_data, uncompressed_size=expected_size)
-
-            # ── Parse file entries ────────────────────────────
-            entries = []
-            for i in range(num_files):
-                offset = i * _ENTRY_SIZE
-                chunk = decompressed[offset:offset + _ENTRY_SIZE]
-                if len(chunk) < _ENTRY_SIZE:
-                    break
-
-                name_raw, off_low, off_high, arch_part, entry_flags, size_on_disk, uncompressed_size = \
-                    struct.unpack(_ENTRY_FMT, chunk)
-
-                # Null-terminated name
-                name = name_raw.split(b"\x00", 1)[0].decode("utf-8", errors="replace")
-                file_offset = off_low | (off_high << 32)
-                compression = entry_flags & 0x0F
-
-                entries.append({
-                    "name": name,
-                    "offset": file_offset,
-                    "compression": compression,
-                    "size_on_disk": size_on_disk,
-                    "uncompressed_size": uncompressed_size,
-                })
 
             # ── Find target file ──────────────────────────────
             info_json = None
@@ -162,6 +177,54 @@ class LSPKReader:
             if target is info_json and info_json is not None:
                 return self._parse_info_json(raw)
             return self._parse_meta_lsx(raw)
+
+    def read_pak_full(self, pak_path: Path) -> tuple[dict | None, list[dict]]:
+        """Read metadata AND full file list in a single pass.
+
+        Returns:
+            (metadata_dict, file_list)
+            metadata_dict: like read_pak_metadata() — or None on error
+            file_list: [{"rel": "path/file.ext", "size": N}, ...] — or []
+        """
+        if not _HAS_LZ4:
+            return None, []
+
+        try:
+            with open(pak_path, "rb") as f:
+                entries = self._read_entries(f)
+                if entries is None:
+                    return None, []
+
+                # Build full file list
+                file_list = [
+                    {"rel": e["name"], "size": e["uncompressed_size"]}
+                    for e in entries
+                ]
+
+                # Find metadata (info.json or meta.lsx)
+                info_json = None
+                meta_lsx = None
+                for entry in entries:
+                    lower = entry["name"].lower()
+                    if lower.endswith("info.json"):
+                        info_json = entry
+                    elif lower.endswith("meta.lsx"):
+                        meta_lsx = entry
+
+                target = info_json or meta_lsx
+                metadata = None
+                if target is not None:
+                    raw = self._extract_file(f, target)
+                    if raw is not None:
+                        if target is info_json:
+                            metadata = self._parse_info_json(raw)
+                        else:
+                            metadata = self._parse_meta_lsx(raw)
+
+                return metadata, file_list
+        except Exception as exc:
+            print(f"lspk_parser: read_pak_full failed for {pak_path.name}: {exc}", file=sys.stderr)
+            return None, []
 
     def _extract_file(self, f, entry: dict) -> bytes | None:
         """Read and decompress a single file entry."""

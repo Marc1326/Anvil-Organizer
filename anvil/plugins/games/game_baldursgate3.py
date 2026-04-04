@@ -343,6 +343,7 @@ class BaldursGate3Game(BaseGame):
         return [
             "**/info.json",    # mod metadata, each mod has own
             "**/readme*.txt",  # readme files
+            "**/meta.lsx",     # mod metadata in every .pak
         ]
 
     def executables(self) -> list[dict[str, str]]:
