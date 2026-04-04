@@ -3556,12 +3556,13 @@ class MainWindow(QMainWindow):
                 if r.is_separator:
                     continue
                 r.enabled = enabled
-                # BG3: persist via installer
+                # BG3: persist via installer (skip frameworks + data-overrides)
                 if self._bg3_installer is not None and r.folder_name:
-                    if enabled:
-                        self._bg3_installer.activate_mod(r.folder_name)
-                    else:
-                        self._bg3_installer.deactivate_mod(r.folder_name)
+                    if not r.is_data_override and not r.is_framework:
+                        if enabled:
+                            self._bg3_installer.activate_mod(r.folder_name)
+                        else:
+                            self._bg3_installer.deactivate_mod(r.folder_name)
             entry = self._entry_for_row(row)
             if entry:
                 entry.enabled = enabled

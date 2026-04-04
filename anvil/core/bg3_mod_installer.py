@@ -116,7 +116,11 @@ class BG3ModInstaller:
             shutil.rmtree(extracted, ignore_errors=True)
 
     def activate_mod(self, uuid: str) -> bool:
-        """Move a mod from inactive to active (add to ModOrder)."""
+        """Move a mod from inactive to active (add to ModOrder).
+
+        Also restores the .pak file from Mods/.disabled/ back to Mods/
+        so BG3 actually loads it.
+        """
         if self._state_file_path() is None and self._modsettings_path is None:
             return False
 
@@ -147,6 +151,9 @@ class BG3ModInstaller:
         # Already active?
         if any(u.lower() == uuid.lower() for u in mod_order):
             return True
+
+        # Restore .pak from .disabled/ back to Mods/
+        self._restore_pak(uuid, mods)
 
         # Add to end of ModOrder
         mod_order.append(uuid)
@@ -245,6 +252,7 @@ class BG3ModInstaller:
         """Move a mod from active to inactive (remove from ModOrder).
 
         The mod entry stays in the Mods node so it is not lost.
+        The .pak file is moved to Mods/.disabled/ so BG3 cannot load it.
         """
         if self._state_file_path() is None and self._modsettings_path is None:
             return False
@@ -263,10 +271,75 @@ class BG3ModInstaller:
             # Was not active
             return True
 
+        # Move .pak to .disabled/ so BG3 cannot load it
+        self._disable_pak(uuid, mods)
+
         self._write_state(new_order, mods)
         # Auto-deploy: immediately write modsettings.lsx
         self._write_modsettings(new_order, mods)
         return True
+
+    # ── .pak file management for activate/deactivate ─────────────────
+
+    def _disable_pak(self, uuid: str, mods: list[dict]) -> None:
+        """Move .pak file from Mods/ to Mods/.disabled/."""
+        if not self._mods_path:
+            return
+        pak_name = self._pak_name_for_uuid(uuid, mods)
+        if not pak_name:
+            return
+        src = self._mods_path / pak_name
+        if not src.exists():
+            return
+        disabled_dir = self._mods_path / ".disabled"
+        disabled_dir.mkdir(parents=True, exist_ok=True)
+        dst = disabled_dir / pak_name
+        try:
+            shutil.move(str(src), str(dst))
+            print(f"bg3_installer: disabled — moved {pak_name} to .disabled/",
+                  file=sys.stderr)
+        except OSError as e:
+            print(f"bg3_installer: failed to move {pak_name} to .disabled/: {e}",
+                  file=sys.stderr)
+
+    def _restore_pak(self, uuid: str, mods: list[dict]) -> None:
+        """Restore .pak file from Mods/.disabled/ back to Mods/."""
+        if not self._mods_path:
+            return
+        pak_name = self._pak_name_for_uuid(uuid, mods)
+        if not pak_name:
+            return
+        disabled_dir = self._mods_path / ".disabled"
+        src = disabled_dir / pak_name
+        if not src.exists():
+            return
+        dst = self._mods_path / pak_name
+        if dst.exists():
+            # Already in Mods/ — nothing to restore
+            return
+        try:
+            shutil.move(str(src), str(dst))
+            print(f"bg3_installer: restored — moved {pak_name} from .disabled/",
+                  file=sys.stderr)
+        except OSError as e:
+            print(f"bg3_installer: failed to restore {pak_name}: {e}",
+                  file=sys.stderr)
+
+    def _pak_name_for_uuid(self, uuid: str, mods: list[dict]) -> str | None:
+        """Find the .pak filename for a given UUID from state or by scanning."""
+        # First: check state data
+        for m in mods:
+            if m["uuid"].lower() == uuid.lower() and m.get("pak_file"):
+                return m["pak_file"]
+        # Fallback: scan Mods/ folder
+        if self._mods_path and self._mods_path.is_dir():
+            for pak in self._mods_path.glob("*.pak"):
+                meta = self._lspk.read_pak_metadata(pak)
+                if meta and meta.get("uuid", "").lower() == uuid.lower():
+                    return pak.name
+        return None
+
+    # ── Reorder ────────────────────────────────────────────────────────
 
     def reorder_mods(self, uuid_order: list[str]) -> bool:
         """Set the load order of active mods.
@@ -1043,20 +1116,9 @@ class BG3ModInstaller:
                 if not m.get("pak_file"):
                     m["pak_file"] = uuid_to_pak.get(m["uuid"].lower(), "")
 
-        # Fix: ensure ALL mods in state are also in mod_order
-        # (fixes the 21-missing-UUIDs bug from previous versions)
-        for m in mods:
-            m_uuid = m["uuid"].lower()
-            if m_uuid in _HIDDEN_UUIDS or is_base_game_mod(m["uuid"]):
-                continue
-            if m_uuid not in mod_order_uuids:
-                mod_order.append(m["uuid"])
-                mod_order_uuids.add(m_uuid)
-                print(
-                    f"bg3_installer: migration — added missing UUID to mod_order: "
-                    f"{m.get('name', '?')} ({m['uuid']})",
-                    file=sys.stderr,
-                )
+        # NOTE: Previously this block forced ALL mods into mod_order,
+        # re-activating deactivated mods on every migration. Removed —
+        # inactive mods must stay inactive to prevent savegame corruption.
 
         # Write the new state file
         self._write_state(mod_order, mods)
