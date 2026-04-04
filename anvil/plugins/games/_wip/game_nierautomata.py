@@ -1,4 +1,4 @@
-"""NieR:Automata game plugin for Anvil Organizer — auto-generated from MO2.
+"""NieR:Automata game plugin for Anvil Organizer.
 
 NieR:Automata Mods werden direkt ins Spielverzeichnis platziert.
 FAR (Fix Automata Resolution) und andere Tools ersetzen Dateien

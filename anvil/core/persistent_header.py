@@ -3,7 +3,7 @@
 Hooks into ``sectionResized`` so every user resize is saved automatically.
 Avoids Qt's ``saveState()``/``restoreState()`` which store the *current*
 width of a stretched last column instead of the user-chosen width
-(see MO2 issue #1563, Qt bug QTBUG-52436).
+(see Qt bug QTBUG-52436).
 
 Writes are debounced (300 ms) so dragging a column border produces at most
 one disk write instead of hundreds.

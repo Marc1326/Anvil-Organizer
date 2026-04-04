@@ -1,4 +1,4 @@
-"""Dragon Age 2 game plugin for Anvil Organizer — auto-generated from MO2.
+"""Dragon Age 2 game plugin for Anvil Organizer.
 
 Dragon Age 2 platziert Mods im Documents-Verzeichnis unter
 BioWare/Dragon Age 2/packages/core/override. Savegames liegen in
@@ -41,10 +41,7 @@ class DragonAge2Game(BaseGame):
 
     GameSaveExtension = "das"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Dragon-Age-II"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (Proton-Prefix) --------------------------------------
 

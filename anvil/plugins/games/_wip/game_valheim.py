@@ -1,4 +1,4 @@
-"""Valheim game plugin for Anvil Organizer — auto-generated from MO2.
+"""Valheim game plugin for Anvil Organizer.
 
 Valheim nutzt BepInEx als Mod-Loader. Mods werden ins Spielverzeichnis
 installiert, BepInEx-Plugins nach BepInEx/plugins/.
@@ -44,10 +44,7 @@ class ValheimGame(BaseGame):
     GameNexusId = 3667
     GameNexusName = "valheim"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Valheim"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (Proton-Prefix) --------------------------------------
 

@@ -1,4 +1,4 @@
-"""Toolbar — MO2-Kopie: Paper Dark SVG-Icons, Separatoren, rechte Status-Icons."""
+"""Toolbar — Paper Dark SVG-Icons, Separatoren, rechte Status-Icons."""
 
 import os
 import subprocess
@@ -39,7 +39,7 @@ def create_toolbar(parent=None):
         bar.addWidget(btn)
         return btn
 
-    # Links: MO2-Reihenfolge mit Separatoren (Paper Dark SVGs)
+    # Links: Buttons mit Separatoren (Paper Dark SVGs)
     instances_btn = _add_btn("instances.svg", "Instances/Game")
     def _open_instance_manager():
         win = bar.window()

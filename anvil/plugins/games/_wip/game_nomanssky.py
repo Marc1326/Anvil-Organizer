@@ -1,4 +1,4 @@
-"""No Man's Sky game plugin for Anvil Organizer — auto-generated from MO2.
+"""No Man's Sky game plugin for Anvil Organizer.
 
 No Man's Sky Mods werden als .pak-Dateien ins GAMEDATA/PCBANKS/MODS
 Verzeichnis installiert.
@@ -41,7 +41,4 @@ class NoMansSkyGame(BaseGame):
     GameNexusId = 1634
     GameNexusName = "nomanssky"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-No-Man's-Sky"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"

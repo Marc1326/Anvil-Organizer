@@ -1,8 +1,8 @@
 """Intelligent conflict detection for mod files.
 
-MO2 detects conflicts purely by filename — two mods having a file called
-"readme.txt" counts as a conflict even if they live at different relative
-paths and would never overwrite each other.
+Traditional mod managers detect conflicts purely by filename — two mods having
+a file called "readme.txt" counts as a conflict even if they live at different
+relative paths and would never overwrite each other.
 
 ConflictScanner improves on this by comparing *relative paths* instead of
 bare filenames.  A conflict only exists when two or more mods contain a

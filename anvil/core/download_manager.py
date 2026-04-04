@@ -2,7 +2,7 @@
 
 Uses urllib.request + QThread for HTTP downloads with progress tracking.
 No QtNetwork dependency — no extra system packages needed.
-Creates MO2-compatible .meta files alongside downloaded archives.
+Creates .meta files alongside downloaded archives (compatible with common format).
 """
 
 from __future__ import annotations
@@ -292,7 +292,7 @@ class DownloadManager(QObject):
         task.status = "finished"
         self._active.discard(task.download_id)
 
-        # Write .meta file (MO2 compatible)
+        # Write .meta file
         self._write_meta(task)
 
         self.download_finished.emit(task.download_id, str(task.save_path))
@@ -311,7 +311,7 @@ class DownloadManager(QObject):
         self._check_all_finished()
 
     def _write_meta(self, task: DownloadTask) -> None:
-        """Write a MO2-compatible .meta file next to the downloaded archive."""
+        """Write a .meta file next to the downloaded archive."""
         meta_path = Path(str(task.save_path) + ".meta")
         cp = configparser.ConfigParser()
         cp["General"] = {

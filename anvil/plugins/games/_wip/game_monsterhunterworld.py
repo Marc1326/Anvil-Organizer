@@ -1,4 +1,4 @@
-"""Monster Hunter: World game plugin for Anvil Organizer — auto-generated from MO2.
+"""Monster Hunter: World game plugin for Anvil Organizer.
 
 Monster Hunter: World Mods werden direkt ins Spielverzeichnis platziert.
 Stracker's Loader und andere Tools modifizieren die Engine.
@@ -42,7 +42,4 @@ class MonsterHunterWorldGame(BaseGame):
     GameNexusId = 2531
     GameNexusName = "monsterhunterworld"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Monster-Hunter:-World"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"

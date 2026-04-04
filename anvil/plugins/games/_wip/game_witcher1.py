@@ -1,4 +1,4 @@
-"""The Witcher: Enhanced Edition game plugin for Anvil Organizer — auto-generated from MO2.
+"""The Witcher: Enhanced Edition game plugin for Anvil Organizer.
 
 The Witcher verwendet ein Data-Verzeichnis fuer Mods. Savegames sind
 im Documents-Ordner unter The Witcher/saves.
@@ -44,10 +44,7 @@ class Witcher1Game(BaseGame):
     GameNexusId = 150
     GameNexusName = "witcher"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-The-Witcher"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (Proton-Prefix) --------------------------------------
 

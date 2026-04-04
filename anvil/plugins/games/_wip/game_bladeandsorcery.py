@@ -1,4 +1,4 @@
-"""Blade & Sorcery game plugin for Anvil Organizer — auto-generated from MO2.
+"""Blade & Sorcery game plugin for Anvil Organizer.
 
 Blade & Sorcery platziert Mods im StreamingAssets/Mods Verzeichnis.
 Savegames liegen im Documents-Ordner.
@@ -40,10 +40,7 @@ class BladeAndSorceryGame(BaseGame):
 
     GameSaveExtension = "chr"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Blade-&-Sorcery"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (Proton-Prefix) --------------------------------------
 

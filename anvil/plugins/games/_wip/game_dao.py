@@ -1,4 +1,4 @@
-"""Dragon Age: Origins game plugin for Anvil Organizer — auto-generated from MO2.
+"""Dragon Age: Origins game plugin for Anvil Organizer.
 
 Dragon Age: Origins platziert Mods im Documents-Verzeichnis unter
 BioWare/Dragon Age/packages/core/override. Savegames liegen in
@@ -42,10 +42,7 @@ class DragonAgeOriginsGame(BaseGame):
 
     GameSaveExtension = "das"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Dragon-Age:-Origins"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (Proton-Prefix) --------------------------------------
 

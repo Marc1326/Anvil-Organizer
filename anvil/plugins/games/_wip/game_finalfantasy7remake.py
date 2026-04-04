@@ -1,4 +1,4 @@
-"""Final Fantasy VII Remake game plugin for Anvil Organizer — auto-generated from MO2.
+"""Final Fantasy VII Remake game plugin for Anvil Organizer.
 
 Final Fantasy VII Remake nutzt Unreal Engine 4 und platziert Mods als
 .pak-Dateien im End/Content/Paks/~mods Verzeichnis.

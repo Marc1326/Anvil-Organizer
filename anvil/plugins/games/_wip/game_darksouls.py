@@ -1,4 +1,4 @@
-"""Dark Souls game plugin for Anvil Organizer — auto-generated from MO2.
+"""Dark Souls game plugin for Anvil Organizer.
 
 Dark Souls: Prepare to Die Edition verwendet eine einfache Mod-Struktur.
 Mods werden im DATA-Verzeichnis platziert. DSfix und andere Tools
@@ -44,10 +44,7 @@ class DarkSoulsGame(BaseGame):
     GameNexusId = 162
     GameNexusName = "darksouls"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Dark-Souls"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (Proton-Prefix) --------------------------------------
 

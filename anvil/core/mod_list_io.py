@@ -1,4 +1,4 @@
-"""Read and write MO2-compatible modlist.txt files.
+"""Read and write modlist.txt files (compatible with common meta.ini format).
 
 Each profile folder (e.g. ``.profiles/Default/``) contains a
 ``modlist.txt`` that defines mod load order and enabled/disabled state.

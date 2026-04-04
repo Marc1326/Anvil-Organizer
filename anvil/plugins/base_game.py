@@ -4,8 +4,8 @@ Every game plugin inherits from BaseGame and sets class-level attributes
 to describe the game. The store-detection logic in detectGame() works
 automatically as long as the plugin provides at least one store ID.
 
-Inspired by MO2's BasicGame but adapted for Linux (no Windows registry,
-Proton prefix support, .exe-agnostic binary lookup).
+Adapted for Linux (no Windows registry, Proton prefix support,
+.exe-agnostic binary lookup).
 """
 
 from __future__ import annotations

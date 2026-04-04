@@ -1,6 +1,6 @@
-"""Nexus Mods SSO login via WebSocket (MO2-compatible protocol).
+"""Nexus Mods SSO login via WebSocket.
 
-Flow (identical to MO2's NexusSSOLogin):
+Flow (Nexus SSO protocol v2):
 1. Connect WebSocket to wss://sso.nexusmods.com
 2. Send {"id": "<uuid>", "token": null, "protocol": 2}
 3. Receive {"success": true, "data": {"connection_token": "..."}}
@@ -35,7 +35,7 @@ APPLICATION_SLUG = "nathuk-anvilorganizer"
 
 
 class _SSOState:
-    """SSO connection states (mirrors MO2's NexusSSOLogin::States)."""
+    """SSO connection states."""
     CONNECTING = 0       # Connecting to WebSocket
     WAITING_TOKEN = 1    # Waiting for connection_token
     WAITING_BROWSER = 2  # Waiting for user to authorize in browser
@@ -179,7 +179,7 @@ class _WebSocketWorker(QThread):
 
 
 class NexusSSOLogin(QObject):
-    """SSO login manager (mirrors MO2's NexusSSOLogin interface).
+    """SSO login manager for Nexus Mods.
 
     Signals:
         key_changed(api_key): API key received from Nexus.
@@ -235,7 +235,7 @@ class NexusSSOLogin(QObject):
 
     @staticmethod
     def state_to_string(state: int, detail: str = "") -> str:
-        """Convert state to user-readable German string (like MO2)."""
+        """Convert state to user-readable German string."""
         if state == _SSOState.ERROR and detail:
             return f"Fehler: {detail}"
         return STATE_MESSAGES.get(state, "Unbekannter Status.")

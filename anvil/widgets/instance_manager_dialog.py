@@ -1,4 +1,4 @@
-"""Instanz Manager Dialog — MO2-Stil mit QSplitter."""
+"""Instanz Manager Dialog mit QSplitter."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ QPushButton#createBtn:hover { background: #008585; }
 
 
 class InstanceManagerDialog(QDialog):
-    """Dialog for managing game instances (MO2-style)."""
+    """Dialog zur Verwaltung von Game-Instanzen."""
 
     switched_to: str | None = None
 

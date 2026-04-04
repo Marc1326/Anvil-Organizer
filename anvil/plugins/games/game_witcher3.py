@@ -1,7 +1,6 @@
 """The Witcher 3: Wild Hunt game plugin for Anvil Organizer.
 
-Based on the MO2 basic_games plugin by Holt59, adapted for
-Linux with Proton prefix support.
+Adapted for Linux with Proton prefix support.
 
 Features implemented:
   - Store detection (Steam, GOG — multiple editions each)
@@ -37,7 +36,7 @@ class Witcher3Game(BaseGame):
     Author = "Anvil Organizer Team"
     Version = "1.0.0"
 
-    # -- Spiel-Attribute (aus MO2 game_witcher3.py) -------------------------
+    # -- Spiel-Attribute ----------------------------------------------------
 
     GameName = "The Witcher 3: Wild Hunt"
     GameShortName = "witcher3"
@@ -65,13 +64,10 @@ class Witcher3Game(BaseGame):
     GameNexusId = 952
     GameNexusName = "witcher3"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-The-Witcher-3"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (innerhalb Proton-Prefix) ----------------------------
-    # MO2: %DOCUMENTS%/The Witcher 3
+    # Windows: Documents/The Witcher 3
 
     _WIN_DOCUMENTS = (
         "drive_c/users/steamuser/Documents/The Witcher 3"
@@ -200,7 +196,7 @@ class Witcher3Game(BaseGame):
     def iniFiles(self) -> list[str]:
         """Return config files managed by The Witcher 3.
 
-        From MO2: user.settings and input.settings.
+        user.settings and input.settings.
         Located in the Documents/The Witcher 3 directory.
         """
         return ["user.settings", "input.settings"]

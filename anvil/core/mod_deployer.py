@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 # Files inside mod folders that are metadata, not game content.
 _SKIP_FILES = {"meta.ini", "codes.txt", "fomod_choices.json"}
 
-# Directories inside mod folders that are installer metadata (like MO2).
+# Directories inside mod folders that are installer metadata.
 _SKIP_DIRS = {"fomod"}
 
 # Extensions skipped ONLY in the mod root directory (not in subdirectories).
@@ -368,7 +368,7 @@ class ModDeployer:
                 except ValueError:
                     continue
 
-                # Strip "root/" prefix (MO2 RootBuilder pattern)
+                # Strip "root/" prefix (RootBuilder pattern)
                 if rel.parts and rel.parts[0].lower() == "root":
                     rel = Path(*rel.parts[1:]) if len(rel.parts) > 1 else rel
 

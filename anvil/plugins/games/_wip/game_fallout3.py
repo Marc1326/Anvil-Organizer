@@ -1,6 +1,6 @@
 """Fallout 3 game plugin for Anvil Organizer.
 
-Based on the MO2 game_fallout3 plugin, adapted for Linux with Proton support.
+Adapted for Linux with Proton support.
 
 Features:
   - Store detection (Steam, GOG)

@@ -1,6 +1,6 @@
 """Morrowind game plugin for Anvil Organizer.
 
-Based on the MO2 game_morrowind plugin, adapted for Linux with Proton support.
+Adapted for Linux with Proton support.
 
 Morrowind uses an older Gamebryo engine version. Unlike newer Bethesda games,
 it does NOT use plugins.txt — load order is defined in Morrowind.ini under

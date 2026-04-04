@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -312,7 +313,7 @@ class SettingsDialog(QDialog):
         self._cb_collapse_per_profile.setChecked(
             settings.value("ModList/collapse_per_profile", False, type=bool))
         ml_layout.addWidget(self._cb_collapse_per_profile)
-        # Signal-Verbindungen fuer Gruppen-Deaktivierung (MO2-Verhalten)
+        # Signal-Verbindungen fuer Gruppen-Deaktivierung
         self._cb_collapsible_asc.toggled.connect(self._update_separator_group)
         self._cb_collapsible_dsc.toggled.connect(self._update_separator_group)
         self._update_separator_group()  # Initialer Zustand
@@ -449,7 +450,7 @@ class SettingsDialog(QDialog):
         konto_layout.addLayout(stats)
         nx_content_layout.addWidget(konto_grp)
 
-        # ── Nexus-Verbindung (MO2 layout: log + 3 buttons) ────────
+        # ── Nexus-Verbindung (Log + 3 Buttons) ───────────────────
         verb_grp = QGroupBox(tr("settings.nexus_connection"))
         verb_layout = QHBoxLayout(verb_grp)
 
@@ -773,7 +774,7 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(self._tabs)
 
-        # Letzten Tab-Index wiederherstellen (MO2-Pattern)
+        # Letzten Tab-Index wiederherstellen
         saved_tab = settings.value("SettingsDialog/tab_index", 0, type=int)
         self._tabs.setCurrentIndex(saved_tab)
 
@@ -847,7 +848,7 @@ class SettingsDialog(QDialog):
     def _update_separator_group(self) -> None:
         """Enable/disable separator sub-widgets based on Asc/Dsc checkboxes.
 
-        MO2-Verhalten: Wenn weder Asc noch Dsc aktiviert sind, werden die
+        Wenn weder Asc noch Dsc aktiviert sind, werden die
         Konflikte- und Symbol-Checkboxen innerhalb der Separator-Gruppe
         deaktiviert, da sie ohne einklappbare Separatoren keinen Sinn haben.
         """
@@ -864,6 +865,66 @@ class SettingsDialog(QDialog):
     def _settings() -> QSettings:
         path = str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf")
         return QSettings(path, QSettings.Format.IniFormat)
+
+    # ── Secure API key storage via system keychain ───────────────────
+
+    _KEYRING_SERVICE = "AnvilOrganizer"
+    _KEYRING_USER = "nexus_api_key"
+
+    @staticmethod
+    def save_api_key(api_key: str) -> None:
+        """Store the Nexus API key in the system keychain."""
+        try:
+            import keyring
+            keyring.set_password(
+                SettingsDialog._KEYRING_SERVICE,
+                SettingsDialog._KEYRING_USER,
+                api_key,
+            )
+        except Exception as e:
+            print(f"keyring: failed to store API key: {e}", file=sys.stderr)
+            # Fallback: QSettings (better than losing the key entirely)
+            SettingsDialog._settings().setValue("nexus/api_key", api_key)
+
+    @staticmethod
+    def load_api_key() -> str:
+        """Load the Nexus API key from system keychain (with migration)."""
+        # Try keyring first
+        try:
+            import keyring
+            key = keyring.get_password(
+                SettingsDialog._KEYRING_SERVICE,
+                SettingsDialog._KEYRING_USER,
+            )
+            if key:
+                return key
+        except Exception as e:
+            print(f"keyring: failed to load API key: {e}", file=sys.stderr)
+
+        # Migrate from old QSettings storage
+        settings = SettingsDialog._settings()
+        old_key = settings.value("nexus/api_key", "")
+        if old_key:
+            SettingsDialog.save_api_key(old_key)
+            settings.remove("nexus/api_key")
+            print("keyring: migrated API key from config to system keychain",
+                  file=sys.stderr)
+            return old_key
+        return ""
+
+    @staticmethod
+    def delete_api_key() -> None:
+        """Remove the Nexus API key from system keychain."""
+        try:
+            import keyring
+            keyring.delete_password(
+                SettingsDialog._KEYRING_SERVICE,
+                SettingsDialog._KEYRING_USER,
+            )
+        except Exception:
+            pass
+        # Also clean up old QSettings entry if present
+        SettingsDialog._settings().remove("nexus/api_key")
 
     def _on_theme_changed(self, theme_name: str):
         """Apply selected theme live as preview."""
@@ -982,7 +1043,7 @@ class SettingsDialog(QDialog):
     # ── Nexus-Tab helpers ─────────────────────────────────────────────
 
     def _nx_log_add(self, text: str) -> None:
-        """Add a line to the Nexus connection log (MO2 style)."""
+        """Zeile zum Nexus-Verbindungs-Log hinzufuegen."""
         for line in text.split("\n"):
             if line.strip():
                 self._nx_log.addItem(line.strip())
@@ -1020,7 +1081,7 @@ class SettingsDialog(QDialog):
         self._btn_disconnect.setToolTip("")
 
     def _nx_connect_sso(self) -> None:
-        """Start the SSO login flow via browser (MO2 style)."""
+        """SSO-Login via Browser starten."""
         # Cancel existing SSO if active
         if self._sso_login and self._sso_login.is_active():
             self._sso_login.cancel()
@@ -1053,8 +1114,7 @@ class SettingsDialog(QDialog):
         """Handle API key received from SSO."""
         self._nx_log_add(tr("settings.nexus_key_received"))
         self._nexus_api.set_api_key(api_key)
-        settings = self._settings()
-        settings.setValue("nexus/api_key", api_key)
+        self.save_api_key(api_key)
         self._nx_log_add(tr("settings.nexus_key_validating"))
         self._nexus_api.validate_key()
         self._nx_update_button_states()
@@ -1070,8 +1130,7 @@ class SettingsDialog(QDialog):
             self._nx_log.clear()
             self._nx_log_add(tr("settings.nexus_key_manual"))
             self._nexus_api.set_api_key(key.strip())
-            settings = self._settings()
-            settings.setValue("nexus/api_key", key.strip())
+            self.save_api_key(key.strip())
             self._nx_log_add(tr("settings.nexus_key_validating"))
             self._nx_status_label.setStyleSheet("")
             self._nexus_api.validate_key()
@@ -1084,8 +1143,7 @@ class SettingsDialog(QDialog):
             self._sso_login.cancel()
             self._btn_connect.setText(tr("button.connect_nexus"))
 
-        settings = self._settings()
-        settings.remove("nexus/api_key")
+        self.delete_api_key()
         self._nexus_api.set_api_key("")
         self._nx_uid.clear()
         self._nx_name.clear()

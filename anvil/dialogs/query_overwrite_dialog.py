@@ -1,4 +1,4 @@
-"""Overwrite-Dialog — MO2-Style: Zusammenführen / Ersetzen / Umbenennen / Abbrechen."""
+"""Overwrite-Dialog — Zusammenführen / Ersetzen / Umbenennen / Abbrechen."""
 
 from enum import Enum
 
@@ -44,7 +44,7 @@ class OverwriteAction(Enum):
 
 
 class QueryOverwriteDialog(QDialog):
-    """MO2-style dialog shown when a mod with the same name already exists."""
+    """Dialog wenn ein Mod mit gleichem Namen bereits existiert."""
 
     def __init__(self, mod_name: str, parent=None):
         super().__init__(parent)
@@ -57,7 +57,7 @@ class QueryOverwriteDialog(QDialog):
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Content frame (like MO2 upper area)
+        # Content frame
         frame = QFrame()
         frame.setObjectName("contentFrame")
         frame_layout = QVBoxLayout(frame)

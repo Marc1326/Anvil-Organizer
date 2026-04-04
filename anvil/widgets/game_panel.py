@@ -1,4 +1,4 @@
-"""Game-Panel — MO2-Kopie: großes Game-Icon, Tabs, Downloads mit Neu laden."""
+"""Game-Panel — grosses Game-Icon, Tabs, Downloads mit Neu laden."""
 
 from __future__ import annotations
 
@@ -361,7 +361,7 @@ class GamePanel(QWidget):
         self._redmod_manual_finished.connect(self._on_manual_redmod_finished)
         # Map row index → archive Path for installation
         self._dl_archives: list[Path] = []
-        # Hidden downloads toggle (MO2: showHidden)
+        # Hidden downloads toggle
         self._show_hidden: bool = False
         # Collapsed folder separators in downloads tab
         self._dl_collapsed: set[str] = set()
@@ -2007,7 +2007,7 @@ class GamePanel(QWidget):
             item_size.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self._dl_table.setItem(row_idx, 1, item_size)
 
-            # Status (MO2-Muster)
+            # Status bestimmen (installiert / nicht installiert)
             if meta_installed:
                 is_installed = True
             elif meta_install_file:
@@ -2281,7 +2281,7 @@ class GamePanel(QWidget):
                     pass
             self.refresh_downloads()
 
-    # ── Hide/Un-Hide (MO2 style) ─────────────────────────────────
+    # ── Hide/Un-Hide ─────────────────────────────────────────────
 
     def _on_dl_filter_changed(self, text: str) -> None:
         """Filter-Änderung → _apply_dl_collapse() steuert alle Visibility-Ebenen."""
@@ -2314,7 +2314,7 @@ class GamePanel(QWidget):
             return
         meta_path = Path(path + ".meta")
         cp = configparser.ConfigParser()
-        cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
+        cp.optionxform = str  # CamelCase-Keys beibehalten
         if meta_path.is_file():
             try:
                 cp.read(str(meta_path), encoding="utf-8")
@@ -2342,7 +2342,7 @@ class GamePanel(QWidget):
         self.refresh_downloads()
 
     def _on_dl_context_menu(self, pos) -> None:
-        """Right-click context menu on downloads table (MO2 style)."""
+        """Rechtsklick-Kontextmenue fuer die Download-Tabelle."""
         # Collect all selected archive paths (Separator-Zeilen filtern)
         selected_rows = sorted({idx.row() for idx in self._dl_table.selectedIndexes()})
         selected_rows = [r for r in selected_rows if not self._is_separator_row(r)]

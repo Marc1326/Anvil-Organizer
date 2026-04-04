@@ -1,4 +1,4 @@
-"""Darkest Dungeon game plugin for Anvil Organizer — auto-generated from MO2.
+"""Darkest Dungeon game plugin for Anvil Organizer.
 
 Darkest Dungeon Mods werden direkt ins Spielverzeichnis platziert.
 Das Spiel hat separate Binaries fuer Steam und Standalone.
@@ -42,10 +42,7 @@ class DarkestDungeonGame(BaseGame):
     GameNexusId = 804
     GameNexusName = "darkestdungeon"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Darkest-Dungeon"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (Proton-Prefix) --------------------------------------
 

@@ -1,4 +1,4 @@
-"""Divinity: Original Sin Enhanced Edition game plugin for Anvil Organizer — auto-generated from MO2.
+"""Divinity: Original Sin Enhanced Edition game plugin for Anvil Organizer.
 
 Divinity: Original Sin EE nutzt ein Data-Verzeichnis fuer Mods (.pak-Dateien).
 Savegames liegen im Documents-Ordner unter Larian Studios.
@@ -45,10 +45,7 @@ class DivinityOriginalSinEEGame(BaseGame):
     GameNexusId = 1995
     GameNexusName = "divinityoriginalsinenhancededition"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Divinity:-Original-Sin"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (Proton-Prefix) --------------------------------------
 

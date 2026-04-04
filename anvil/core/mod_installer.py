@@ -40,7 +40,7 @@ class ModInstaller:
 
     # ── Public API ─────────────────────────────────────────────────────
 
-    # MO2-style regex for Nexus filenames (ported from nexusinterface.cpp:332)
+    # Regex for Nexus filenames
     # Group 1: mod name, Group 2: optional version, Group 3: Nexus mod ID
     _NEXUS_RE = re.compile(
         r'^([a-zA-Z0-9_\'".\-() ]*?)'       # mod name
@@ -63,7 +63,7 @@ class ModInstaller:
     def suggest_name(archive_path: Path) -> str:
         """Derive a clean mod name from a Nexus-style archive filename.
 
-        Ported from MO2's ``NexusInterface::interpretNexusFileName()``.
+        Parses Nexus-style archive filenames to extract a clean mod name.
         """
         filename = archive_path.name
         m = ModInstaller._NEXUS_RE.match(filename)
@@ -78,8 +78,8 @@ class ModInstaller:
     def suggest_names(self, archive_path: Path) -> tuple[str, list[str]]:
         """Collect name variants for the Quick-Install combo box.
 
-        Mirrors MO2's ``GuessedValue<QString>`` — collects multiple guesses
-        at different quality levels, returns the best + all variants.
+        Collects multiple name guesses at different quality levels,
+        returns the best + all variants.
 
         Returns:
             ``(best_name, [variant, ...])`` — *best_name* is pre-selected,

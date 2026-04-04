@@ -2,9 +2,9 @@
 
 Each instance has its own categories.json.  Categories are flat (no hierarchy)
 and referenced by integer ID.  Mods store their category IDs as a
-comma-separated list in meta.ini (primary category first, like MO2).
+comma-separated list in meta.ini (primary category first).
 
-Default categories are inspired by MO2 / Nexus Mods.
+Default categories based on common Nexus Mods taxonomy.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Any
 from anvil.core.translator import tr
 
 
-# MO2-inspired default categories (sorted alphabetically).
+# Default categories (sorted alphabetically).
 _DEFAULT_CATEGORIES: list[dict[str, Any]] = [
     {"id": 1,  "name": "Animations"},
     {"id": 2,  "name": "Armor & Clothing"},

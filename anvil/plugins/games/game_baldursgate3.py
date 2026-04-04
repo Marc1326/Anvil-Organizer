@@ -1,7 +1,6 @@
 """Baldur's Gate 3 game plugin for Anvil Organizer.
 
-Based on the MO2 basic_games plugin by daescha, adapted for
-Linux with Proton prefix support.
+Adapted for Linux with Proton prefix support.
 
 Features implemented:
   - Store detection (Steam, GOG)
@@ -64,10 +63,7 @@ class BaldursGate3Game(BaseGame):
     GameNexusId = 3474
     GameNexusName = "baldursgate3"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Baldur's-Gate-3"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # ── Windows-Pfade (innerhalb Proton-Prefix) ────────────────────────
 

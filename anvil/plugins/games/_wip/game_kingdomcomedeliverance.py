@@ -1,4 +1,4 @@
-"""Kingdom Come: Deliverance game plugin for Anvil Organizer — auto-generated from MO2.
+"""Kingdom Come: Deliverance game plugin for Anvil Organizer.
 
 Kingdom Come: Deliverance unterstuetzt Mods ueber ein eigenes mods-Verzeichnis.
 Config-Dateien (.cfg) werden im Spielverzeichnis verwaltet.
@@ -46,10 +46,7 @@ class KingdomComeDeliveranceGame(BaseGame):
     GameNexusId = 2298
     GameNexusName = "kingdomcomedeliverance"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Kingdom-Come:-Deliverance"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (Proton-Prefix) --------------------------------------
 

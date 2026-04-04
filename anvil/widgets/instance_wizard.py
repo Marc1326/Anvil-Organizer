@@ -1,4 +1,4 @@
-"""Neuer-Instanz-Wizard — QDialog mit QStackedWidget (8 Seiten, MO2-Stil)."""
+"""Neuer-Instanz-Wizard — QDialog mit QStackedWidget (8 Seiten)."""
 
 from __future__ import annotations
 

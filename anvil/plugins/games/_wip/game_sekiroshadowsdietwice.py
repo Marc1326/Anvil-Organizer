@@ -1,4 +1,4 @@
-"""Sekiro: Shadows Die Twice game plugin for Anvil Organizer — auto-generated from MO2.
+"""Sekiro: Shadows Die Twice game plugin for Anvil Organizer.
 
 Sekiro nutzt FromSoftware's Engine. Mods werden im mods-Verzeichnis
 platziert. Savegames verwenden das .sl2 Format.

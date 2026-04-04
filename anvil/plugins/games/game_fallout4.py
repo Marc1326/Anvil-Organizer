@@ -1,7 +1,6 @@
 """Fallout 4 game plugin for Anvil Organizer.
 
-Based on the MO2 game_fallout4 plugin (C++), adapted for
-Linux with Proton prefix support.
+Adapted for Linux with Proton prefix support.
 
 Features implemented:
   - Store detection (Steam, GOG)
@@ -39,7 +38,7 @@ class Fallout4Game(BaseGame):
     Author = "Anvil Organizer Team"
     Version = "1.0.0"
 
-    # -- Spiel-Attribute (aus MO2 gamefallout4.cpp) -------------------------
+    # -- Spiel-Attribute ----------------------------------------------------
 
     GameName = "Fallout 4"
     GameShortName = "Fallout4"
@@ -58,16 +57,13 @@ class Fallout4Game(BaseGame):
     GameNexusId = 1151
     GameNexusName = "fallout4"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Fallout-4"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     ProtonShimFiles: list[str] = ["X3DAudio1_7.dll"]
 
     ScriptExtenderDir = "F4SE"
 
-    # -- Primary & DLC Plugins (aus MO2) ------------------------------------
+    # -- Primary & DLC Plugins -----------------------------------------------
 
     PRIMARY_PLUGINS = [
         "Fallout4.esm",
@@ -99,7 +95,7 @@ class Fallout4Game(BaseGame):
     ]
 
     # -- Windows-Pfade (innerhalb Proton-Prefix) ----------------------------
-    # MO2: determineMyGamesPath("Fallout4") -> Documents/My Games/Fallout4
+    # Windows: Documents/My Games/Fallout4
 
     _WIN_DOCUMENTS = (
         "drive_c/users/steamuser/Documents/My Games/Fallout4"
@@ -246,7 +242,6 @@ class Fallout4Game(BaseGame):
         """Return executable definitions for Fallout 4.
 
         Includes: Fallout 4, F4SE (if installed), Launcher, Creation Kit.
-        Matches MO2's executable list.
         """
         result: list[dict[str, str]] = [
             {"name": "Fallout 4", "binary": self.GameBinary},
@@ -267,7 +262,7 @@ class Fallout4Game(BaseGame):
     def iniFiles(self) -> list[str]:
         """Return config files managed by Fallout 4.
 
-        From MO2: Fallout4.ini, Fallout4Prefs.ini, Fallout4Custom.ini.
+        Fallout4.ini, Fallout4Prefs.ini, Fallout4Custom.ini.
         Located in the My Games/Fallout4 directory.
         """
         return ["Fallout4.ini", "Fallout4Prefs.ini", "Fallout4Custom.ini"]

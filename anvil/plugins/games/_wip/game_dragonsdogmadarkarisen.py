@@ -1,4 +1,4 @@
-"""Dragon's Dogma: Dark Arisen game plugin for Anvil Organizer — auto-generated from MO2.
+"""Dragon's Dogma: Dark Arisen game plugin for Anvil Organizer.
 
 Dragon's Dogma: Dark Arisen nutzt ein nativePC-Verzeichnis fuer Mods.
 Das Spiel verwendet Capcoms MT Framework Engine.
@@ -40,7 +40,4 @@ class DragonsDogmaDarkArisenGame(BaseGame):
 
     GameNexusName = "dragonsdogma"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Dragon's-Dogma:-Dark-Arisen"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"

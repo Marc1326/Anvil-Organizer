@@ -1,7 +1,6 @@
 """Cyberpunk 2077 game plugin for Anvil Organizer.
 
-Based on the MO2 basic_games plugin by 6788 and Zash, adapted for
-Linux with Proton prefix support.
+Adapted for Linux with Proton prefix support.
 
 Features implemented:
   - Store detection (Steam, GOG, Epic)
@@ -81,10 +80,7 @@ class Cyberpunk2077Game(BaseGame):
     GameNexusId = 3333
     GameNexusName = "cyberpunk2077"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Cyberpunk-2077"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # ── Windows-Pfade (innerhalb Proton-Prefix) ────────────────────────
 

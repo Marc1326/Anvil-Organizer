@@ -1,6 +1,6 @@
 """FOMOD installer wizard dialog.
 
-MO2-style step-by-step installer that lets the user choose options
+Step-by-step installer that lets the user choose options
 defined in a FOMOD ModuleConfig.xml.
 """
 

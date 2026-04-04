@@ -1,7 +1,6 @@
 """Skyrim Special Edition game plugin for Anvil Organizer.
 
-Based on the MO2 game_skyrimSE plugin (C++), adapted for
-Linux with Proton prefix support.
+Adapted for Linux with Proton prefix support.
 
 Features implemented:
   - Store detection (Steam, GOG — SE + Anniversary Upgrade)
@@ -40,7 +39,7 @@ class SkyrimSEGame(BaseGame):
     Author = "Anvil Organizer Team"
     Version = "1.0.0"
 
-    # -- Spiel-Attribute (aus MO2 gameskyrimse.cpp) -------------------------
+    # -- Spiel-Attribute ----------------------------------------------------
 
     GameName = "Skyrim Special Edition"
     GameShortName = "SkyrimSE"
@@ -60,10 +59,7 @@ class SkyrimSEGame(BaseGame):
     GameNexusId = 1704
     GameNexusName = "skyrimspecialedition"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Skyrim-Special-Edition"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     ProtonShimFiles: list[str] = ["winhttp.dll"]
 
@@ -79,7 +75,7 @@ class SkyrimSEGame(BaseGame):
         "Spell Perk Item Distributor",
     ]
 
-    # -- Primary & DLC Plugins (aus MO2) ------------------------------------
+    # -- Primary & DLC Plugins -----------------------------------------------
 
     PRIMARY_PLUGINS = [
         "Skyrim.esm",
@@ -105,8 +101,7 @@ class SkyrimSEGame(BaseGame):
     ]
 
     # -- Windows-Pfade (innerhalb Proton-Prefix) ----------------------------
-    # MO2: determineMyGamesPath("Skyrim Special Edition")
-    #       -> Documents/My Games/Skyrim Special Edition
+    # Windows: Documents/My Games/Skyrim Special Edition
 
     _WIN_DOCUMENTS = (
         "drive_c/users/steamuser/Documents/My Games/Skyrim Special Edition"
@@ -281,7 +276,6 @@ class SkyrimSEGame(BaseGame):
         """Return executable definitions for Skyrim Special Edition.
 
         Includes: Skyrim SE, SKSE64 (if installed), Launcher, Creation Kit.
-        Matches MO2's executable list.
         """
         result: list[dict[str, str]] = [
             {"name": "Skyrim Special Edition", "binary": self.GameBinary},
@@ -301,7 +295,7 @@ class SkyrimSEGame(BaseGame):
     def iniFiles(self) -> list[str]:
         """Return config files managed by Skyrim Special Edition.
 
-        From MO2: Skyrim.ini, SkyrimPrefs.ini, SkyrimCustom.ini.
+        Skyrim.ini, SkyrimPrefs.ini, SkyrimCustom.ini.
         Located in the My Games/Skyrim Special Edition directory.
         """
         return ["Skyrim.ini", "SkyrimPrefs.ini", "SkyrimCustom.ini"]

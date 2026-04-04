@@ -3,7 +3,7 @@
 Parses the FOMOD XML format used by Nexus Mods installers.
 Supports steps, groups, plugins, files, flags, and conditions.
 
-Reference: MO2 installerFomod plugin.
+Reference: FOMOD specification (NexusMods installer format).
 """
 
 from __future__ import annotations

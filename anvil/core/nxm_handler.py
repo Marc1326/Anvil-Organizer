@@ -97,7 +97,7 @@ def register_nxm_handler() -> bool:
     content = f"""[Desktop Entry]
 Type=Application
 Name=Anvil Organizer
-Comment=Mod Organizer for Linux
+Comment=Anvil Organizer
 Exec=python3 {main_script} %u
 Icon=anvil-organizer
 Terminal=false

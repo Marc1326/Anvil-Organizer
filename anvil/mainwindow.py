@@ -154,7 +154,7 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # MO2: Profil-Leiste NUR über der linken Seite, nicht über die ganze Breite
+        # Profil-Leiste NUR ueber der linken Seite, nicht ueber die ganze Breite
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter = self._splitter
         left_pane = QWidget()
@@ -301,7 +301,8 @@ class MainWindow(QMainWindow):
 
         # ── Nexus API ────────────────────────────────────────────────
         self._nexus_api = NexusAPI(self)
-        saved_key = self._settings().value("nexus/api_key", "")
+        from anvil.widgets.settings_dialog import SettingsDialog
+        saved_key = SettingsDialog.load_api_key()
         if saved_key:
             self._nexus_api.set_api_key(saved_key)
             self._status_bar.update_api_status(logged_in=True)
@@ -373,10 +374,10 @@ class MainWindow(QMainWindow):
         self._update_checker.update_progress.connect(self._on_update_progress)
         QTimer.singleShot(3000, self._update_checker.check)
 
-    # ── Menu bar (MO2-Struktur) ─────────────────────────────────────
+    # ── Menu bar ───────────────────────────────────────────────────
 
     def _build_menu_bar(self) -> None:
-        """Build the full MO2-style menu bar."""
+        """Build the full menu bar."""
         menubar = self.menuBar()
 
         # ════════════════════════════════════════════════════════════════
@@ -561,7 +562,7 @@ class MainWindow(QMainWindow):
         act = hm.addAction(tr("menu.about_qt"))
         act.triggered.connect(self._on_about_qt)
 
-    # ── MO2 icon size constants ─────────────────────────────────────
+    # ── Icon size constants ─────────────────────────────────────────
 
     _ICON_SIZES = [QSize(24, 24), QSize(32, 32), QSize(42, 36)]
 
@@ -667,7 +668,7 @@ class MainWindow(QMainWindow):
         self._toolbar.setToolButtonStyle(style)
 
     def _update_toolbar_menu(self) -> None:
-        """Sync checkmarks with actual widget state (MO2 pattern)."""
+        """Sync checkmarks with actual widget state."""
         self._act_menubar.setChecked(self.menuBar().isVisible())
         self._act_toolbar.setChecked(self._toolbar.isVisible())
         self._act_statusbar.setChecked(self._status_bar.isVisible())
@@ -1745,8 +1746,8 @@ class MainWindow(QMainWindow):
                           reinstall_mod_path: Path | None = None) -> None:
         """Install one or more archives as mods.
 
-        MO2-Pattern (testOverwrite):
-        - Name berechnen, prüfen ob .mods/{name} existiert
+        Duplikat-Pruefung:
+        - Name berechnen, pruefen ob .mods/{name} existiert
         - NEIN → direkt installieren, kein Dialog
         - JA  → QuickInstallDialog → QueryOverwriteDialog falls nötig
 
@@ -1935,7 +1936,7 @@ class MainWindow(QMainWindow):
             mod_name = best
             dest = installer.mods_path / mod_name
 
-            # Nur bei Duplikat: Dialog zeigen (MO2 testOverwrite-Pattern)
+            # Nur bei Duplikat: Dialog zeigen
             if dest.exists():
                 while True:
                     dlg = QuickInstallDialog(variants, mod_name, self)
@@ -2045,7 +2046,7 @@ class MainWindow(QMainWindow):
                     else:
                         add_mod_to_modlist(self._current_profile_path, mod_path.name, enabled=False)
                 installed.append(mod_path.name)
-                # Mark as installed in .meta (MO2: markInstalled)
+                # Mark as installed in .meta
                 downloads_dir = self._current_downloads_path or (self._current_instance_path / ".downloads")
                 if archive.parent == downloads_dir:
                     self._write_install_meta(archive, mod_path.name)
@@ -2054,7 +2055,7 @@ class MainWindow(QMainWindow):
                     if s.value("Interface/hide_downloads_after_install", False, type=bool):
                         meta_path = Path(str(archive) + ".meta")
                         cp = configparser.ConfigParser()
-                        cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
+                        cp.optionxform = str  # CamelCase-Keys beibehalten
                         if meta_path.is_file():
                             try:
                                 cp.read(str(meta_path), encoding="utf-8")
@@ -2109,7 +2110,7 @@ class MainWindow(QMainWindow):
         """Write installed=true and installationFile=mod_name to the archive's .meta file."""
         meta_path = Path(str(archive) + ".meta")
         cp = configparser.ConfigParser()
-        cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
+        cp.optionxform = str  # CamelCase-Keys beibehalten
         if meta_path.is_file():
             try:
                 cp.read(str(meta_path), encoding="utf-8")
@@ -2134,7 +2135,7 @@ class MainWindow(QMainWindow):
             return
         for meta_file in downloads_path.glob("*.meta"):
             cp = configparser.ConfigParser()
-            cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
+            cp.optionxform = str  # CamelCase-Keys beibehalten
             try:
                 cp.read(str(meta_file), encoding="utf-8")
             except Exception:
@@ -2157,7 +2158,7 @@ class MainWindow(QMainWindow):
             return
         for meta_file in downloads_path.glob("*.meta"):
             cp = configparser.ConfigParser()
-            cp.optionxform = str  # CamelCase-Keys beibehalten (MO2-Kompatibilitaet)
+            cp.optionxform = str  # CamelCase-Keys beibehalten
             try:
                 cp.read(str(meta_file), encoding="utf-8")
             except Exception:
@@ -2224,7 +2225,7 @@ class MainWindow(QMainWindow):
     # ── Mod list context menu ──────────────────────────────────────
 
     def _on_mod_context_menu(self, global_pos) -> None:
-        """Build and show the mod list context menu (MO2 structure)."""
+        """Build and show the mod list context menu."""
         if not self._current_instance_path:
             return
 
@@ -3652,7 +3653,7 @@ class MainWindow(QMainWindow):
         if new_primary not in new_ids:
             new_primary = new_ids[0] if new_ids else 0
 
-        # Build category string (primary first, like MO2)
+        # Build category string (primary first)
         old_ids = set(entry.category_ids)
         old_primary = entry.primary_category
         if set(new_ids) == old_ids and new_primary == old_primary:
@@ -4815,7 +4816,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(tr("status.nexus_error", message=message), 5000)
 
     def _update_api_status(self, daily: int, hourly: int) -> None:
-        """Update status bar API rate limit display (MO2 style)."""
+        """Update status bar API rate limit display."""
         self._status_bar.update_api_status(
             daily_remaining=daily,
             hourly_remaining=hourly,

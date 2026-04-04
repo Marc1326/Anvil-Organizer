@@ -1,4 +1,4 @@
-"""Subnautica game plugin for Anvil Organizer — auto-generated from MO2.
+"""Subnautica game plugin for Anvil Organizer.
 
 Subnautica nutzt BepInEx als Mod-Loader. Mods werden entweder als
 BepInEx-Plugins oder als QMods installiert.
@@ -42,10 +42,7 @@ class SubnauticaGame(BaseGame):
 
     GameNexusName = "subnautica"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Subnautica"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (Proton-Prefix) --------------------------------------
 

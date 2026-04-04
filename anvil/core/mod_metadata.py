@@ -1,4 +1,4 @@
-"""Read and write MO2-compatible meta.ini files for individual mods.
+"""Read and write meta.ini files for individual mods.
 
 Each mod folder under ``.mods/<name>/`` may contain a ``meta.ini``
 with metadata such as display name, version, author, etc.
@@ -62,7 +62,7 @@ def read_meta_ini(mod_path: Path) -> dict[str, str]:
     for section in cp.sections():
         for key, value in cp.items(section):
             # Flatten: prefix with section name for [installed], keep
-            # [General] keys as-is to match MO2 conventions.
+            # [General] keys as-is to match common meta.ini conventions.
             if section == "General":
                 data[key] = value
             else:

@@ -1,4 +1,4 @@
-"""The Witcher 2: Assassins of Kings game plugin for Anvil Organizer — auto-generated from MO2.
+"""The Witcher 2: Assassins of Kings game plugin for Anvil Organizer.
 
 The Witcher 2 nutzt das CookedPC-Verzeichnis fuer Mods. Config-Dateien
 liegen im Documents-Ordner unter witcher 2/Config.
@@ -45,10 +45,7 @@ class Witcher2Game(BaseGame):
 
     GameNexusName = "witcher2"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-The-Witcher-2"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     # -- Windows-Pfade (Proton-Prefix) --------------------------------------
 

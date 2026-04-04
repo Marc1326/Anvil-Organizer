@@ -1,4 +1,4 @@
-"""Control game plugin for Anvil Organizer — auto-generated from MO2.
+"""Control game plugin for Anvil Organizer.
 
 Control von Remedy Entertainment. Mods werden direkt ins
 Spielverzeichnis platziert. Das Spiel hat DX11 und DX12 Versionen.

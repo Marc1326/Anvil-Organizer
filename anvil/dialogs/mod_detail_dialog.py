@@ -383,7 +383,7 @@ def _format_file_size(size_bytes: int) -> str:
 
 
 def _build_images_tab(mod_path: str):
-    """Tab wie MO2: Splitter; links Thumbnail-Liste + Filter, rechts Preview + Info."""
+    """Bilder-Tab: Splitter; links Thumbnail-Liste + Filter, rechts Preview + Info."""
     page = QWidget()
     page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     layout = QVBoxLayout(page)
@@ -519,7 +519,7 @@ def _build_images_tab(mod_path: str):
 
 
 def _build_textfiles_tab(mod_path: str):
-    """Tab wie MO2: Splitter; links Label + Liste + Filter, rechts Toolbar + Editor."""
+    """Textdateien-Tab: Splitter; links Label + Liste + Filter, rechts Toolbar + Editor."""
     page = QWidget()
     page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     layout = QVBoxLayout(page)
@@ -1071,10 +1071,9 @@ class TranslatedFileSystemModel(QFileSystemModel):
 
 
 def _build_filetree_tab(mod_path: str):
-    """Verzeichnisbaum-Tab wie MO2: QFileSystemModel + QTreeView.
+    """Verzeichnisbaum-Tab: QFileSystemModel + QTreeView.
 
-    Shows the mod's directory structure with Name, Size, Type, Date columns.
-    Based on MO2's modinfodialogfiletree.cpp implementation.
+    Zeigt die Verzeichnisstruktur des Mods mit Name, Größe, Typ, Datum.
     """
     page = QWidget()
     page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -1082,7 +1081,7 @@ def _build_filetree_tab(mod_path: str):
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(6)
 
-    # "Mod im Explorer öffnen" Button (wie MO2: openInExplorer)
+    # "Mod im Explorer öffnen" Button
     btn_row = QHBoxLayout()
     btn_explore = QPushButton(tr("button.open_in_explorer"))
     btn_explore.clicked.connect(
@@ -1097,21 +1096,21 @@ def _build_filetree_tab(mod_path: str):
         layout.addStretch()
         return page
 
-    # QFileSystemModel (wie MO2: m_fs = new QFileSystemModel)
+    # QFileSystemModel für Verzeichnisstruktur
     fs_model = TranslatedFileSystemModel()
     fs_model.setRootPath(mod_path)
-    fs_model.setReadOnly(True)  # MO2 uses false, we start read-only
+    fs_model.setReadOnly(True)
 
-    # QTreeView (wie MO2: ui->filetree)
+    # QTreeView für Dateibaum
     tree = QTreeView()
     tree.setObjectName("filetreeView")
     tree.setModel(fs_model)
     tree.setRootIndex(fs_model.index(mod_path))
 
-    # Spalten-Breite (MO2: setColumnWidth(0, 300))
+    # Spalten-Breite
     tree.setColumnWidth(0, 300)  # Name
 
-    # MO2-Einstellungen aus modinfodialog.ui
+    # TreeView-Einstellungen
     tree.setSortingEnabled(True)
     tree.setAlternatingRowColors(True)
     tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -1130,7 +1129,7 @@ def _build_filetree_tab(mod_path: str):
 
     layout.addWidget(tree, 1)
 
-    # TODO: Kontextmenü (Open, Rename, Delete, Hide/Unhide) wie MO2
+    # TODO: Kontextmenü (Open, Rename, Delete, Hide/Unhide)
     # TODO: Drag & Drop InternalMove
     # TODO: Header-State Persistenz
 
@@ -1138,10 +1137,10 @@ def _build_filetree_tab(mod_path: str):
 
 
 def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
-    """Konflikte-Tab wie MO2: Gewinnt/Verliert-Bereiche mit ConflictScanner.
+    """Konflikte-Tab: Gewinnt/Verliert-Bereiche mit ConflictScanner.
 
-    Based on MO2's modinfodialogconflicts.cpp — two QTreeWidgets
-    (Overwrite / Overwritten) with file path and competing mod name.
+    Zwei QTreeWidgets (Überschreibt / Wird überschrieben) mit Dateipfad
+    und konkurrierendem Mod-Namen.
     """
     page = QWidget()
     page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -1555,7 +1554,7 @@ class ModDetailDialog(QDialog):
         # Tab 3: Optionale ESPs
         self.tab_widget.addTab(_build_optional_esps_tab(mod_path), tr("mod_detail.tab_optional_esps"))
 
-        # Tab 4: Konflikte (wie MO2: ConflictsTab)
+        # Tab 4: Konflikte
         self.tab_widget.addTab(
             _build_conflicts_tab(mod_name, all_mods, game_plugin), tr("mod_detail.tab_conflicts"),
         )
@@ -1570,7 +1569,7 @@ class ModDetailDialog(QDialog):
         # Tab 6: Nexus Info
         self.tab_widget.addTab(_build_nexus_tab(mod_path), tr("mod_detail.tab_nexus"))
 
-        # Tab 7: Verzeichnisbaum (wie MO2: FileTreeTab)
+        # Tab 7: Verzeichnisbaum
         self.tab_widget.addTab(_build_filetree_tab(mod_path), tr("mod_detail.tab_filetree"))
 
         tab_bar = self.tab_widget.tabBar()

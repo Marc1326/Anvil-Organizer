@@ -1,4 +1,4 @@
-"""Extract Nexus Mod-ID from archive filenames (MO2-compatible regex)."""
+"""Extract Nexus Mod-ID from archive filenames."""
 
 import re
 

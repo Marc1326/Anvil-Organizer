@@ -1,4 +1,4 @@
-"""Statusbar — MO2-Kopie: Instanz-Info links, Benachrichtigungen + API rechts."""
+"""Statusbar — Instanz-Info links, Benachrichtigungen + API rechts."""
 
 from __future__ import annotations
 
@@ -45,9 +45,9 @@ class StatusBarWidget(QStatusBar):
         queued: int = 0,
         logged_in: bool = True,
     ) -> None:
-        """Update the API rate limit display (MO2 style with color coding).
+        """Update the API rate limit display with color coding.
 
-        Color scheme (from MO2 statusbar.cpp):
+        Color scheme:
         - Green: remaining > 500
         - Yellow: 200..500
         - Red: < 200

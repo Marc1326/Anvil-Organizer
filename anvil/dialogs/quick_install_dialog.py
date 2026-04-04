@@ -1,7 +1,4 @@
-"""Schnellinstallation-Dialog — MO2-Style mit editierbarer ComboBox.
-
-Ported from MO2's ``simpleinstalldialog.cpp/ui`` (installer_quick plugin).
-"""
+"""Schnellinstallation-Dialog mit editierbarer ComboBox."""
 
 from PySide6.QtWidgets import (
     QDialog,
@@ -61,10 +58,10 @@ QPushButton:disabled {{ color: #666666; border-color: #2A2A2A; }}
 
 
 class QuickInstallDialog(QDialog):
-    """MO2-style Quick Install dialog with editable QComboBox for mod name.
+    """Quick-Install-Dialog mit editierbarer ComboBox für den Mod-Namen.
 
-    The combo box is populated with name variants (like MO2's
-    ``GuessedValue::variants()``).  The best guess is pre-selected.
+    Die ComboBox wird mit Namensvarianten befüllt. Der beste Vorschlag
+    ist vorausgewählt.
     """
 
     def __init__(
@@ -91,7 +88,7 @@ class QuickInstallDialog(QDialog):
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Name row (like MO2: Label "Name" + editable ComboBox)
+        # Name-Zeile: Label "Name" + editierbare ComboBox
         name_row = QHBoxLayout()
         name_row.setContentsMargins(7, 7, 7, 7)
         name_row.setSpacing(6)
@@ -105,7 +102,7 @@ class QuickInstallDialog(QDialog):
         )
         self._name_combo.setMinimumContentsLength(30)
 
-        # Populate with variants (like MO2 iterating GuessedValue::variants())
+        # Varianten einfügen
         for v in variants:
             self._name_combo.addItem(v)
 
@@ -119,7 +116,7 @@ class QuickInstallDialog(QDialog):
         elif variants:
             self._name_combo.setCurrentIndex(0)
 
-        # Case-sensitive completer (like MO2)
+        # Groß-/Kleinschreibung-sensitiver Completer
         completer = self._name_combo.completer()
         if completer:
             completer.setCaseSensitivity(Qt.CaseSensitivity.CaseSensitive)
@@ -127,7 +124,7 @@ class QuickInstallDialog(QDialog):
         name_row.addWidget(self._name_combo, 1)
         layout.addLayout(name_row)
 
-        # Buttons (like MO2: Manual | spacer | OK | Cancel)
+        # Buttons: Manual | Spacer | OK | Cancel
         btn_row = QHBoxLayout()
         btn_row.setContentsMargins(7, 7, 7, 7)
         btn_row.setSpacing(6)

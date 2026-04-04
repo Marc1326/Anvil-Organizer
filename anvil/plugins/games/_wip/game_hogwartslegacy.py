@@ -1,6 +1,6 @@
 """Game plugin for Hogwarts Legacy — Anvil Organizer.
 
-Unreal Engine 4 game. Mods go into the ~mods folder inside Paks.
+Unreal Engine 5 game. Mods go into the ~mods folder inside Paks.
 Supports Steam and GOG.
 """
 

@@ -54,7 +54,7 @@ class ModEntry:
     is_direct_install: bool = False        # True for framework mods (copy, not symlink)
     is_data_override: bool = False         # True for BG3 data-override mods (loose files in Data/)
 
-    # Separator color (from meta.ini, MO2-compatible)
+    # Separator color (from meta.ini, compatible with common meta.ini format)
     color: str = ""                        # Hex color e.g. "#FF0000", empty = no custom color
 
     # Computed from filesystem
@@ -115,7 +115,7 @@ def _build_entry(
     if is_sep and not display:
         display = name[:-len("_separator")]
 
-    # Parse comma-separated category IDs (primary first, like MO2)
+    # Parse comma-separated category IDs (primary first)
     raw_cat = meta.get("category", "")
     cat_ids: list[int] = []
     if raw_cat:
@@ -130,7 +130,7 @@ def _build_entry(
                     pass
     primary_cat = cat_ids[0] if cat_ids else 0
 
-    # Read separator color from meta.ini (MO2-compatible: "color" key)
+    # Read separator color from meta.ini (compatible with common meta.ini format)
     sep_color = ""
     if is_sep:
         raw_color = meta.get("color", "")

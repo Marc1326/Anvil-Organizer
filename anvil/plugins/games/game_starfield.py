@@ -1,7 +1,6 @@
 """Starfield game plugin for Anvil Organizer.
 
-Based on the MO2 game_starfield plugin (C++), adapted for
-Linux with Proton prefix support.
+Adapted for Linux with Proton prefix support.
 
 Features implemented:
   - Store detection (Steam only — no GOG/Epic release)
@@ -40,7 +39,7 @@ class StarfieldGame(BaseGame):
     Author = "Anvil Organizer Team"
     Version = "1.0.0"
 
-    # -- Spiel-Attribute (aus MO2 gamestarfield.cpp) ------------------------
+    # -- Spiel-Attribute ----------------------------------------------------
 
     GameName = "Starfield"
     GameShortName = "Starfield"
@@ -62,16 +61,13 @@ class StarfieldGame(BaseGame):
     GameNexusId = 4187
     GameNexusName = "starfield"
 
-    GameSupportURL = (
-        "https://github.com/ModOrganizer2/modorganizer-basic_games/wiki/"
-        "Game:-Starfield"
-    )
+    GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     ProtonShimFiles: list[str] = []  # sfse_loader.exe handles injection directly (ProtonDB approach)
 
     ScriptExtenderDir = "SFSE"
 
-    # -- Primary & DLC Plugins (aus MO2) ------------------------------------
+    # -- Primary & DLC Plugins -----------------------------------------------
 
     PRIMARY_PLUGINS = [
         "Starfield.esm",
@@ -92,7 +88,7 @@ class StarfieldGame(BaseGame):
     ]
 
     # -- Windows-Pfade (innerhalb Proton-Prefix) ----------------------------
-    # MO2: determineMyGamesPath("Starfield") -> Documents/My Games/Starfield
+    # Windows: Documents/My Games/Starfield
 
     _WIN_DOCUMENTS = (
         "drive_c/users/steamuser/Documents/My Games/Starfield"
@@ -159,7 +155,6 @@ class StarfieldGame(BaseGame):
     def data_path(self) -> Path | None:
         """Return the Data directory inside Documents (for loose file mods).
 
-        MO2: documentsDirectory().absoluteFilePath("Data")
         This is where Starfield looks for loose mod files.
         """
         docs = self.gameDocumentsDirectory()
@@ -251,7 +246,6 @@ class StarfieldGame(BaseGame):
         """Return executable definitions for Starfield.
 
         Includes: Starfield, SFSE (if installed), Creation Kit (if installed).
-        Matches MO2's executable list.
         """
         result: list[dict[str, str]] = [
             {"name": "Starfield", "binary": self.GameBinary},
@@ -273,7 +267,7 @@ class StarfieldGame(BaseGame):
     def iniFiles(self) -> list[str]:
         """Return config files managed by Starfield.
 
-        From MO2: StarfieldPrefs.ini and StarfieldCustom.ini.
+        StarfieldPrefs.ini and StarfieldCustom.ini.
         Located in the My Games/Starfield directory.
         """
         return ["StarfieldPrefs.ini", "StarfieldCustom.ini"]
