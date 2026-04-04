@@ -599,7 +599,8 @@ class BG3ModInstaller:
     def uninstall_mod(self, uuid: str, pak_filename: str) -> bool:
         """Uninstall a mod completely.
 
-        Removes from ModOrder, removes from Mods node, deletes .pak file.
+        Removes from ModOrder, removes from Mods node, deletes .pak file
+        from Mods/, Mods/.disabled/, and symlink targets.
         """
         if self._state_file_path() is None and self._modsettings_path is None:
             return False
@@ -612,6 +613,10 @@ class BG3ModInstaller:
         mod_order = data["mod_order"]
         mods = data["mods"]
 
+        # Resolve pak filename from state if not provided
+        if not pak_filename:
+            pak_filename = self._pak_name_for_uuid(uuid, mods) or ""
+
         # Remove from ModOrder
         new_order = [u for u in mod_order if u.lower() != uuid.lower()]
 
@@ -620,12 +625,23 @@ class BG3ModInstaller:
 
         self._write_state(new_order, new_mods)
 
-        # Delete .pak file
+        # Delete .pak file from all possible locations
         if self._mods_path and pak_filename:
-            pak_path = self._mods_path / pak_filename
-            if pak_path.is_file():
-                pak_path.unlink()
-                print(f"bg3_installer: deleted {pak_path}")
+            for search_dir in [self._mods_path, self._mods_path / ".disabled"]:
+                pak_path = search_dir / pak_filename
+                if not pak_path.exists():
+                    continue
+                # If symlink, also delete the target file
+                if pak_path.is_symlink():
+                    target = pak_path.resolve()
+                    pak_path.unlink()
+                    print(f"bg3_installer: deleted symlink {pak_path}")
+                    if target.is_file():
+                        target.unlink()
+                        print(f"bg3_installer: deleted target {target}")
+                elif pak_path.is_file():
+                    pak_path.unlink()
+                    print(f"bg3_installer: deleted {pak_path}")
 
         return True
 

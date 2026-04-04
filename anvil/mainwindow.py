@@ -4435,13 +4435,38 @@ class MainWindow(QMainWindow):
 
     def _ctx_remove_mods(self, rows: list[int]) -> None:
         """Remove selected mods (folder + modlist.txt entry)."""
-        names = []
+        entries = []
         for row in rows:
             entry = self._entry_for_row(row)
             if entry:
-                names.append(entry.name)
-        if not names:
+                entries.append(entry)
+        if not entries:
             return
+
+        # BG3 mode: entry.name is UUID, use bg3_installer.uninstall_mod()
+        if self._bg3_installer is not None:
+            display_names = [e.display_name or e.name for e in entries]
+            if len(display_names) == 1:
+                msg = tr("dialog.uninstall_mod_message", name=display_names[0])
+            else:
+                names_list = "\n".join(f"  • {n}" for n in display_names)
+                msg = tr("dialog.remove_mod_multi", count=len(display_names), list=names_list)
+
+            reply = QMessageBox.question(
+                self, tr("dialog.uninstall_mod_title"), msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+            for entry in entries:
+                self._bg3_installer.uninstall_mod(entry.name, "")
+            self._bg3_reload_mod_list()
+            self.statusBar().showMessage(
+                tr("status.uninstalled", name=", ".join(display_names)), 5000)
+            return
+
+        names = [e.name for e in entries]
 
         if len(names) == 1:
             msg = tr("dialog.remove_mod_single", name=names[0])
