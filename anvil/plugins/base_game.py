@@ -148,6 +148,10 @@ class BaseGame:
     """Primary/DLC plugin files (.esm) that are always active.
     Only relevant for Bethesda Creation Engine games."""
 
+    LootGameName: str = ""
+    """LOOT --game parameter value (e.g. 'Skyrim Special Edition', 'Fallout4').
+    Empty string means LOOT is not available for this game."""
+
     # ── BA2-Packing (Bethesda-Spiele unter Proton) ─────────────────────
 
     NeedsBa2Packing: bool = False

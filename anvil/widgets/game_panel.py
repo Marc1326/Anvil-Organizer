@@ -351,6 +351,7 @@ class GamePanel(QWidget):
         self._instance_path: Path | None = None
         self._current_profile_name: str = "Default"
         self._deployer: ModDeployer | None = None
+        self._separator_deploy_paths: dict[str, str] = {}
         self._mod_index = None  # ModIndex, set from mainwindow
         # REDmod deploy state
         self._redmod_process = None
@@ -437,7 +438,7 @@ class GamePanel(QWidget):
         copy_paths = getattr(game_plugin, "GameCopyDeployPaths", []) if game_plugin else []
         redmod_path = getattr(game_plugin, "GameRedmodPath", "") if game_plugin else ""
         if self._instance_path and game_path:
-            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index, redmod_path=redmod_path)
+            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index, redmod_path=redmod_path, separator_deploy_paths=self._separator_deploy_paths)
 
         # Update label
         self._game_label.setText(game_name or tr("game_panel.no_game_selected"))
@@ -625,6 +626,20 @@ class GamePanel(QWidget):
         if mods_path and mods_path.is_dir():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(mods_path)))
 
+    # ── Separator deploy paths ────────────────────────────────────────
+
+    def set_separator_deploy_paths(self, paths: dict[str, str]) -> None:
+        """Set custom deploy paths per separator.
+
+        Args:
+            paths: Mapping of separator folder names to deploy paths.
+                   Empty paths are ignored (fallback to game path).
+        """
+        self._separator_deploy_paths = {k: v for k, v in paths.items() if v}
+        # Update deployer if already initialized
+        if self._deployer is not None:
+            self._deployer._separator_deploy_paths = self._separator_deploy_paths
+
     # ── Silent deploy / purge (called from MainWindow) ──────────────
 
     def silent_deploy(self) -> None:
@@ -693,6 +708,14 @@ class GamePanel(QWidget):
             result_path = writer.write()
             if result_path is None:
                 print("[GamePanel] plugins.txt write failed or skipped", flush=True)
+
+            # Optional: LOOT auto-sort on deploy
+            from PySide6.QtCore import QSettings
+            if QSettings().value("LOOT/auto_sort_on_deploy", False, type=bool):
+                loot_name = getattr(self._current_plugin, "LootGameName", "")
+                if loot_name:
+                    self._auto_loot_sort(writer)
+
             self._refresh_plugins_tab()
 
         # Deploy Proton shim DLLs (e.g. F4SE version.dll)
@@ -979,6 +1002,14 @@ class GamePanel(QWidget):
             )
         except (OSError, json.JSONDecodeError) as exc:
             print(f"[BA2] Failed to update manifest: {exc}", flush=True)
+
+    def _auto_loot_sort(self, writer: PluginsTxtWriter) -> None:
+        """Auto-sort via LOOT on deploy — disabled.
+
+        LOOT is a GUI application and does not support silent CLI sorting.
+        Users should sort via the LOOT toolbar button instead.
+        """
+        pass
 
     def _refresh_plugins_tab(self) -> None:
         """Populate the plugins tree with scanned plugin files."""
@@ -1636,6 +1667,8 @@ class GamePanel(QWidget):
         env = os.environ.copy()
         env["STEAM_COMPAT_DATA_PATH"] = str(compat_data)
         env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_root)
+        if self._current_game_path:
+            env["STEAM_COMPAT_INSTALL_PATH"] = str(self._current_game_path)
 
         steam_id = plugin.GameSteamId
         if isinstance(steam_id, list):
@@ -1709,6 +1742,56 @@ class GamePanel(QWidget):
                 self, tr("game_panel.start"),
                 tr("game_panel.proton_launch_failed", error=str(exc)),
             )
+
+    def run_with_proton(
+        self, exe_path: str, args: list[str] | None = None,
+        working_dir: str | None = None,
+    ) -> subprocess.Popen | None:
+        """Launch an arbitrary Windows .exe via the current game's Proton."""
+        plugin = self._current_plugin
+        if plugin is None:
+            QMessageBox.warning(
+                self, tr("proton_tools.title"),
+                tr("proton_tools.no_game"),
+            )
+            return None
+
+        exe = Path(exe_path)
+        if not exe.is_file():
+            QMessageBox.warning(
+                self, tr("proton_tools.title"),
+                tr("proton_tools.exe_not_found", path=str(exe)),
+            )
+            return None
+
+        proton_result = self._build_proton_env(plugin)
+        if proton_result is None:
+            QMessageBox.warning(
+                self, tr("proton_tools.title"),
+                tr("proton_tools.proton_not_found"),
+            )
+            return None
+
+        env, proton_script, _compat_data, _steam_root = proton_result
+        env["WINEPREFIX"] = str(_compat_data / "pfx")
+
+        cwd = working_dir or str(exe.parent)
+
+        try:
+            cmd = [str(proton_script), "run", str(exe)]
+            if args:
+                cmd.extend(args)
+            proc = subprocess.Popen(
+                cmd, cwd=cwd, env=env,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            return proc
+        except OSError as exc:
+            QMessageBox.warning(
+                self, tr("proton_tools.title"),
+                tr("proton_tools.launch_failed", error=str(exc)),
+            )
+            return None
 
     def _start_process_watcher(
         self, binary_name: str, proc=None, app_id: str | None = None
@@ -1869,7 +1952,7 @@ class GamePanel(QWidget):
         copy_paths = getattr(self._current_plugin, "GameCopyDeployPaths", []) if self._current_plugin else []
         redmod_path = getattr(self._current_plugin, "GameRedmodPath", "") if self._current_plugin else ""
         if self._current_game_path and instance_path:
-            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index, redmod_path=redmod_path)
+            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index, redmod_path=redmod_path, separator_deploy_paths=self._separator_deploy_paths)
         else:
             self._deployer = None
 

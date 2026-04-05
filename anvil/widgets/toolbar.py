@@ -109,6 +109,8 @@ def create_toolbar(parent=None):
     tools_menu.addAction(tr("menu.profiles"), lambda: _call_win("_on_menu_profiles"))
     tools_menu.addAction(tr("menu.executables"), lambda: _call_win("_on_menu_executables"))
     tools_menu.addSeparator()
+    tools_menu.addAction(tr("menu.reshade_wizard"), lambda: _call_win("_on_reshade_wizard"))
+    tools_menu.addSeparator()
     tools_menu.addAction(tr("menu.settings"), lambda: _call_win("_on_menu_settings"))
     tools_btn.setMenu(tools_menu)
 
@@ -120,6 +122,26 @@ def create_toolbar(parent=None):
             win._on_menu_settings()
 
     settings_btn.clicked.connect(_on_settings)
+
+    # Proton Tools — externes Tool im Proton-Prefix starten (nur Steam)
+    proton_btn = QToolButton(bar)
+    proton_btn.setIcon(_icon("proton.svg"))
+    proton_btn.setToolTip("Proton Tools")
+    proton_btn.setText("Proton Tools")
+    proton_action = bar.addWidget(proton_btn)
+    proton_action.setVisible(False)
+
+    def _on_proton_clicked(checked=False):
+        win = bar.window()
+        if win and hasattr(win, "_rebuild_proton_menu"):
+            menu = QMenu(proton_btn)
+            win._rebuild_proton_menu(menu)
+            menu.exec(proton_btn.mapToGlobal(proton_btn.rect().bottomLeft()))
+
+    proton_btn.clicked.connect(_on_proton_clicked)
+
+    bar.proton_btn = proton_btn
+    bar.proton_action = proton_action
 
     deploy_sep = bar.addSeparator()
     deploy_sep.setVisible(False)
@@ -141,6 +163,48 @@ def create_toolbar(parent=None):
     bar.deploy_btn = deploy_btn      # For styling
     bar.deploy_action = deploy_action  # For visibility
     bar.deploy_sep = deploy_sep        # Separator tied to deploy
+
+    # Script Merger Button (Witcher 3-spezifisch, standardmäßig unsichtbar)
+    merger_sep = bar.addSeparator()
+    merger_sep.setVisible(False)
+
+    merger_btn = QToolButton(bar)
+    merger_btn.setIcon(_icon("tools.svg"))
+    merger_btn.setToolTip(tr("toolbar.script_merger"))
+    merger_btn.setText(tr("toolbar.script_merger"))
+    merger_action = bar.addWidget(merger_btn)
+    merger_action.setVisible(False)
+
+    def _on_script_merger():
+        win = bar.window()
+        if win and hasattr(win, "_on_script_merger_clicked"):
+            win._on_script_merger_clicked()
+
+    merger_btn.clicked.connect(_on_script_merger)
+    bar.merger_btn = merger_btn
+    bar.merger_action = merger_action
+    bar.merger_sep = merger_sep
+
+    # LOOT-Button (Bethesda-spezifisch, standardmäßig unsichtbar)
+    loot_sep = bar.addSeparator()
+    loot_sep.setVisible(False)
+
+    loot_btn = QToolButton(bar)
+    loot_btn.setIcon(_icon("sort.svg"))
+    loot_btn.setToolTip(tr("toolbar.loot_sort"))
+    loot_btn.setText(tr("toolbar.loot_sort"))
+    loot_action = bar.addWidget(loot_btn)
+    loot_action.setVisible(False)
+
+    def _on_loot():
+        win = bar.window()
+        if win and hasattr(win, "_on_loot_sort_clicked"):
+            win._on_loot_sort_clicked()
+
+    loot_btn.clicked.connect(_on_loot)
+    bar.loot_btn = loot_btn
+    bar.loot_action = loot_action
+    bar.loot_sep = loot_sep
 
     # Spacer: rechte Icons bündig rechts
     spacer = QWidget()

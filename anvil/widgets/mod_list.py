@@ -20,7 +20,7 @@ from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.translator import tr
 from anvil.core.persistent_header import PersistentHeader
 from anvil.widgets.collapsible_bar import CollapsibleSectionBar
-from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME, ROLE_SEP_COLOR, ROLE_IS_DATA_OVERRIDE
+from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME, ROLE_SEP_COLOR, ROLE_IS_DATA_OVERRIDE, ROLE_GROUP_NAME, ROLE_IS_GROUP_HEAD
 
 
 class SeparatorMarkingScrollBar(QScrollBar):
@@ -231,6 +231,124 @@ class CheckboxDelegate(QStyledItemDelegate):
         return False
 
 
+class GroupNameDelegate(QStyledItemDelegate):
+    """Custom delegate for COL_NAME that draws group indentation and color bar.
+
+    - Group-head: single indent + collapse triangle + group name suffix
+    - Group member: double indent + vertical color bar on the left
+    - Normal mod: no change
+    """
+
+    _INDENT_GROUP_HEAD = 20   # px indent for group head
+    _INDENT_GROUP_MEMBER = 32  # px indent for group members
+    _BAR_WIDTH = 3             # px width of color bar
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._group_manager = None  # Set by ModListView
+
+    def set_group_manager(self, manager) -> None:
+        self._group_manager = manager
+
+    def paint(self, painter: QPainter, option, index):
+        group_name = index.data(ROLE_GROUP_NAME) or ""
+        is_head = index.data(ROLE_IS_GROUP_HEAD)
+        is_sep = index.data(ROLE_IS_SEPARATOR)
+
+        if is_sep or not group_name:
+            # Normal separator or non-grouped mod — default painting
+            super().paint(painter, option, index)
+            return
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Draw background (selection, alternating rows)
+        self.initStyleOption(option, index)
+        style = option.widget.style() if option.widget else None
+        if style:
+            style.drawPrimitive(style.PrimitiveElement.PE_PanelItemViewItem, option, painter, option.widget)
+
+        # Get group color
+        color_str = ""
+        if self._group_manager:
+            color_str = self._group_manager.get_group_color(group_name)
+        group_color = QColor(color_str) if color_str else QColor("#4FC3F7")
+        if not group_color.isValid():
+            group_color = QColor("#4FC3F7")
+
+        rect = option.rect
+
+        if is_head:
+            # Draw color bar on left
+            bar_rect = QRect(rect.x() + 2, rect.y() + 2, self._BAR_WIDTH, rect.height() - 4)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(group_color))
+            painter.drawRect(bar_rect)
+
+            # Draw collapse/expand triangle
+            collapsed = False
+            if self._group_manager:
+                collapsed = self._group_manager.is_collapsed(group_name)
+
+            tri_x = rect.x() + 10
+            tri_cy = rect.y() + rect.height() // 2
+            tri_size = 8
+
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(QColor("#D3D3D3")))
+
+            from PySide6.QtGui import QPolygonF
+            from PySide6.QtCore import QPointF
+            if collapsed:
+                tri = QPolygonF([
+                    QPointF(tri_x, tri_cy - tri_size // 2),
+                    QPointF(tri_x, tri_cy + tri_size // 2),
+                    QPointF(tri_x + tri_size // 2, tri_cy),
+                ])
+            else:
+                tri = QPolygonF([
+                    QPointF(tri_x - tri_size // 4, tri_cy - 2),
+                    QPointF(tri_x + tri_size // 2 + tri_size // 4, tri_cy - 2),
+                    QPointF(tri_x + tri_size // 4, tri_cy + tri_size // 2 - 1),
+                ])
+            painter.drawPolygon(tri)
+
+            # Draw text with indent
+            text_rect = QRect(rect.x() + self._INDENT_GROUP_HEAD, rect.y(), rect.width() - self._INDENT_GROUP_HEAD, rect.height())
+            display_text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+
+            # If collapsed, append member count
+            if collapsed and self._group_manager:
+                members = self._group_manager.get_members(group_name)
+                count = len(members)
+                count_text = tr("tooltip.group_collapsed", count=count)
+                display_text = f"{display_text}  [{count_text}]"
+
+            text_color = option.palette.highlightedText().color() if option.state & option.widget.style().StateFlag.State_Selected else option.palette.text().color()
+            painter.setPen(QPen(text_color))
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, display_text)
+        else:
+            # Group member: draw color bar + indented text
+            bar_rect = QRect(rect.x() + 2, rect.y(), self._BAR_WIDTH, rect.height())
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(group_color))
+            painter.drawRect(bar_rect)
+
+            # Draw text with double indent
+            text_rect = QRect(rect.x() + self._INDENT_GROUP_MEMBER, rect.y(), rect.width() - self._INDENT_GROUP_MEMBER, rect.height())
+            display_text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+            text_color = option.palette.highlightedText().color() if option.state & option.widget.style().StateFlag.State_Selected else option.palette.text().color()
+            painter.setPen(QPen(text_color))
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, display_text)
+
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        hint = super().sizeHint(option, index)
+        return QSize(hint.width(), max(hint.height(), 28))
+
+
 class ModListProxyModel(QSortFilterProxyModel):
     """Proxy-Model für Mod-Liste. Qt leitet DnD automatisch ans Source-Model weiter.
     Supports hiding mods under collapsed separators and chip-based filtering."""
@@ -245,6 +363,11 @@ class ModListProxyModel(QSortFilterProxyModel):
         self._filter_nexus_cat_ids: set[int] = set()
         self._mod_entries: list = []  # Reference to MainWindow._current_mod_entries
         self._category_manager = None
+        self._group_manager = None  # Set by MainWindow for group-head visibility
+
+    def set_group_manager(self, manager):
+        """Set GroupManager reference for group-head filter logic."""
+        self._group_manager = manager
 
     def set_hidden_rows(self, rows: set[int]):
         """Set which source rows should be hidden (collapsed under a separator)."""
@@ -284,12 +407,31 @@ class ModListProxyModel(QSortFilterProxyModel):
         # Separators always visible (they structure the list)
         source = self.sourceModel()
         if source:
-            from anvil.models.mod_list_model import ROLE_IS_SEPARATOR
+            from anvil.models.mod_list_model import ROLE_IS_SEPARATOR, ROLE_IS_GROUP_HEAD, ROLE_GROUP_NAME
             idx = source.index(source_row, 0)
             if source.data(idx, ROLE_IS_SEPARATOR):
                 return True
 
+            # Group-head: visible if ANY member passes the filter
+            if source.data(idx, ROLE_IS_GROUP_HEAD) and self._group_manager:
+                group_name = source.data(idx, ROLE_GROUP_NAME) or ""
+                if group_name:
+                    members = self._group_manager.get_members(group_name)
+                    for member_folder in members:
+                        for sr in range(source.rowCount()):
+                            sr_idx = source.index(sr, 0)
+                            if source.data(sr_idx, ROLE_FOLDER_NAME) == member_folder:
+                                if sr != source_row and self._entry_matches_filter(sr):
+                                    return True
+                                break
+
         # Get corresponding ModEntry (visible_entries index = source_row)
+        return self._entry_matches_filter(source_row)
+
+    def _entry_matches_filter(self, source_row: int) -> bool:
+        """Check if the entry at source_row matches current filters."""
+        source = self.sourceModel()
+
         if source_row >= len(self._mod_entries):
             return True
         entry = self._mod_entries[source_row]
@@ -393,8 +535,11 @@ class _DropTreeView(QTreeView):
         # ── Conflict highlighting for selected mod ──
         self._conflict_highlight_on_select: bool = False
 
+        # ── Group manager reference ──
+        self._group_manager = None
+
     def _apply_separator_filter(self):
-        """Recalculate which rows to hide based on collapsed separators."""
+        """Recalculate which rows to hide based on collapsed separators and groups."""
         proxy = self.model()
         if not isinstance(proxy, ModListProxyModel):
             return
@@ -420,26 +565,33 @@ class _DropTreeView(QTreeView):
             return
 
         hidden: set[int] = set()
+        current_sep_collapsed = False
 
-        for sep_row in range(source.rowCount()):
-            idx = source.index(sep_row, 0)
+        for row in range(source.rowCount()):
+            idx = source.index(row, 0)
             is_sep = source.data(idx, ROLE_IS_SEPARATOR)
-            if not is_sep:
+            if is_sep:
+                folder = source.data(idx, ROLE_FOLDER_NAME) or ""
+                current_sep_collapsed = folder in self._collapsed_separators
                 continue
-            folder = source.data(idx, ROLE_FOLDER_NAME) or ""
-            if folder not in self._collapsed_separators:
-                continue
-            # Hide only child_count mods after this separator
-            for child_row in source._get_separator_children(sep_row):
-                hidden.add(child_row)
+            if current_sep_collapsed:
+                hidden.add(row)
+            else:
+                # Group collapse: hide non-head members of collapsed groups
+                if self._group_manager:
+                    group_name = source.data(idx, ROLE_GROUP_NAME) or ""
+                    is_head = source.data(idx, ROLE_IS_GROUP_HEAD)
+                    if group_name and not is_head and self._group_manager.is_collapsed(group_name):
+                        hidden.add(row)
 
         proxy.set_hidden_rows(hidden)
 
     # ── Separator click on any column ────────────────────────────
 
     def mousePressEvent(self, event):
-        """Klick auf Separator merken — Toggle erst in mouseReleaseEvent (damit DnD starten kann)."""
+        """Klick auf Separator/Group-Head merken — Toggle erst in mouseReleaseEvent (damit DnD starten kann)."""
         self._pending_separator_toggle = None
+        self._pending_group_toggle = None
         if event.button() == Qt.MouseButton.LeftButton:
             idx = self.indexAt(event.pos())
             if idx.isValid():
@@ -452,10 +604,17 @@ class _DropTreeView(QTreeView):
                         if is_sep and idx.column() != COL_CHECK:
                             folder = source.data(source.index(source_idx.row(), 0), ROLE_FOLDER_NAME) or ""
                             self._pending_separator_toggle = folder
+                        elif not is_sep and idx.column() == COL_NAME:
+                            # Check if this is a group head click
+                            is_head = source.data(source.index(source_idx.row(), 0), ROLE_IS_GROUP_HEAD)
+                            if is_head:
+                                group_name = source.data(source.index(source_idx.row(), 0), ROLE_GROUP_NAME) or ""
+                                if group_name:
+                                    self._pending_group_toggle = group_name
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
-        """Toggle Separator nur wenn KEIN Drag stattfand."""
+        """Toggle Separator/Group nur wenn KEIN Drag stattfand."""
         if self._pending_separator_toggle is not None:
             folder = self._pending_separator_toggle
             self._pending_separator_toggle = None
@@ -465,6 +624,13 @@ class _DropTreeView(QTreeView):
                 else:
                     self._collapsed_separators.add(folder)
                 self._apply_separator_filter()
+        if self._pending_group_toggle is not None:
+            group_name = self._pending_group_toggle
+            self._pending_group_toggle = None
+            if self.state() != QAbstractItemView.State.DraggingState:
+                if self._group_manager:
+                    self._group_manager.toggle_collapsed(group_name)
+                    self._apply_separator_filter()
         super().mouseReleaseEvent(event)
 
     # ── Setting 4: Auto-Expand timer logic ──────────────────────
@@ -897,6 +1063,9 @@ class ModListView(QWidget):
         # Custom delegate for checkbox column
         self._check_delegate = CheckboxDelegate(self._tree)
         self._tree.setItemDelegateForColumn(COL_CHECK, self._check_delegate)
+        # Custom delegate for name column (group indentation + color bar)
+        self._name_delegate = GroupNameDelegate(self._tree)
+        self._tree.setItemDelegateForColumn(COL_NAME, self._name_delegate)
         # Column widths — all Interactive (resizable by mouse)
         header = self._tree.header()
         header.setStretchLastSection(False)
@@ -978,6 +1147,12 @@ class ModListView(QWidget):
     def source_model(self) -> ModListModel:
         """Return the underlying ModListModel."""
         return self._source_model
+
+    def set_group_manager(self, manager) -> None:
+        """Set GroupManager reference for group display and filtering."""
+        self._tree._group_manager = manager
+        self._name_delegate.set_group_manager(manager)
+        self._proxy_model.set_group_manager(manager)
 
     def clear_mods(self) -> None:
         """Remove all mods from the list."""

@@ -57,6 +57,12 @@ class ModEntry:
     # Separator color (from meta.ini, compatible with common meta.ini format)
     color: str = ""                        # Hex color e.g. "#FF0000", empty = no custom color
 
+    # Custom deploy path (from meta.ini, only for separators)
+    deploy_path: str = ""                  # Absolute path or empty = use global game path
+
+    # Group membership (set by GroupManager, NOT from meta.ini)
+    group: str = ""                        # Group name this mod belongs to
+
     # Nexus metadata
     nexus_category: int = 0                # Nexus category ID from meta.ini
 
@@ -135,10 +141,14 @@ def _build_entry(
 
     # Read separator color from meta.ini (compatible with common meta.ini format)
     sep_color = ""
+    sep_deploy_path = ""
     if is_sep:
         raw_color = meta.get("color", "")
         if raw_color:
             sep_color = raw_color
+        raw_deploy = meta.get("deploy_path", "")
+        if raw_deploy:
+            sep_deploy_path = raw_deploy
 
     # Parse Nexus category ID
     nexus_cat = 0
@@ -165,6 +175,7 @@ def _build_entry(
         install_date=meta.get("installDate", ""),
         is_separator=is_sep,
         color=sep_color,
+        deploy_path=sep_deploy_path,
         nexus_category=nexus_cat,
         file_count=file_count,
         total_size=total_size,

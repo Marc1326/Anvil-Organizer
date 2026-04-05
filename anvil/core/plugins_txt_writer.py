@@ -157,6 +157,64 @@ class PluginsTxtWriter:
             print(f"{_TAG} Error writing {txt_path}: {exc}")
             return None
 
+    def write_sorted(self, sorted_plugins: list[str]) -> Path | None:
+        """Write plugins.txt using LOOT-sorted order.
+
+        PRIMARY_PLUGINS are always placed first (in their original order),
+        regardless of LOOT's sorting.  Remaining plugins follow in the
+        order provided by ``sorted_plugins``.
+
+        Returns the written path, or None on failure.
+        """
+        txt_path = self._game_plugin.plugins_txt_path()
+        if txt_path is None:
+            print(f"{_TAG} No plugins_txt_path — skipping write_sorted")
+            return None
+
+        if not sorted_plugins:
+            print(f"{_TAG} Empty sorted list — skipping write_sorted")
+            return None
+
+        # Build final order: primary first, then LOOT-sorted remainder
+        primary_lower = {p.lower() for p in self._primary}
+        result: list[str] = []
+
+        # 1. Primary plugins in their canonical order (only if present in sorted list)
+        sorted_lower_map = {p.lower(): p for p in sorted_plugins}
+        for p in self._primary:
+            actual = sorted_lower_map.get(p.lower())
+            if actual:
+                result.append(actual)
+
+        # 2. Remaining in LOOT order
+        for p in sorted_plugins:
+            if p.lower() not in primary_lower:
+                result.append(p)
+
+        if not result:
+            print(f"{_TAG} No plugins after filtering — skipping write_sorted")
+            return None
+
+        # Ensure parent directory exists
+        import os
+        os.makedirs(txt_path.parent, exist_ok=True)
+
+        # Remove case-variants before writing
+        self._remove_case_variants(txt_path)
+
+        # Build content
+        lines = [_HEADER]
+        for plugin in result:
+            lines.append(f"*{plugin}\r\n")
+
+        try:
+            txt_path.write_text("".join(lines), encoding="utf-8")
+            print(f"{_TAG} Wrote {len(result)} plugins (LOOT-sorted) to {txt_path}")
+            return txt_path
+        except OSError as exc:
+            print(f"{_TAG} Error writing {txt_path}: {exc}")
+            return None
+
     def remove(self) -> bool:
         """Delete plugins.txt.  Returns True if removed or already absent."""
         txt_path = self._game_plugin.plugins_txt_path()

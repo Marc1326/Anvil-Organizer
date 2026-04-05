@@ -96,6 +96,7 @@ class ModDeployer:
         copy_deploy_paths: list[str] | None = None,
         mod_index: ModIndex | None = None,
         redmod_path: str = "",
+        separator_deploy_paths: dict[str, str] | None = None,
     ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
@@ -112,6 +113,7 @@ class ModDeployer:
         self._needs_ba2_packing = needs_ba2_packing
         self._copy_deploy_paths = [p.replace("\\", "/") for p in (copy_deploy_paths or [])]
         self._mod_index = mod_index
+        self._separator_deploy_paths = separator_deploy_paths or {}
 
     def is_direct_install(self, mod_name: str) -> bool:
         """Return True if *mod_name* matches a direct-install pattern.
@@ -174,6 +176,17 @@ class ModDeployer:
                         seen.add(name)
                         print(f"[DEPLOY] +framework: {name}", flush=True)
 
+        # Build mod → separator mapping using FULL global order
+        # (not just enabled mods — inactive separators must be recognized)
+        mod_to_separator: dict[str, str] = {}
+        if self._separator_deploy_paths:
+            current_sep = ""
+            for name in global_order:
+                if name.endswith("_separator"):
+                    current_sep = name
+                else:
+                    mod_to_separator[name] = current_sep
+
         enabled_mods.reverse()
         print(f"[DEPLOY] Enabled mods: {len(enabled_mods)}", flush=True)
         print(f"[DEPLOY] Data path: {self._data_path or '(root)'}", flush=True)
@@ -194,7 +207,7 @@ class ModDeployer:
             if not mod_dir.is_dir():
                 continue
 
-            # Skip separators
+            # Skip separators (they are organizational, not deployable)
             if mod_name.endswith("_separator"):
                 continue
 
@@ -399,7 +412,12 @@ class ModDeployer:
                             else:
                                 rel = data_prefix / rel
 
-                target = self._game_path / rel
+                # Determine deploy base: custom separator path or global game path
+                mod_separator = mod_to_separator.get(mod_name, "")
+                sep_path = self._separator_deploy_paths.get(mod_separator, "")
+                deploy_base = Path(sep_path) if sep_path else self._game_path
+
+                target = deploy_base / rel
 
                 # Safety: never overwrite a real (non-symlink) game file
                 # Exception: direct-install (framework) mods MUST overwrite
@@ -415,17 +433,19 @@ class ModDeployer:
                 if not parent.exists():
                     try:
                         parent.mkdir(parents=True, exist_ok=True)
-                        # Track created directories (relative)
+                        # Track created directories (relative to deploy_base)
                         try:
-                            rel_parent = parent.relative_to(self._game_path)
+                            rel_parent = parent.relative_to(deploy_base)
                             # Track each level of newly created dirs
+                            # Use deploy_base:rel_dir format for custom paths
                             parts = rel_parent.parts
                             for i in range(len(parts)):
-                                d = self._game_path / Path(*parts[: i + 1])
-                                if str(d.relative_to(self._game_path)) not in created_dirs:
-                                    created_dirs.add(
-                                        str(d.relative_to(self._game_path))
-                                    )
+                                d = deploy_base / Path(*parts[: i + 1])
+                                dir_key = str(d.relative_to(deploy_base))
+                                if sep_path:
+                                    dir_key = f"{deploy_base}:{dir_key}"
+                                if dir_key not in created_dirs:
+                                    created_dirs.add(dir_key)
                         except ValueError:
                             pass
                     except OSError as exc:
@@ -474,12 +494,15 @@ class ModDeployer:
                                 )
                                 shutil.copy2(target, src_file)
                                 # Bereits aktuell im Game-Dir → kein erneutes Kopieren nötig
-                                symlinks.append({
+                                entry_data = {
                                     "link": str(rel),
                                     "target": str(src_file),
                                     "mod": mod_name,
                                     "type": deploy_type,
-                                })
+                                }
+                                if sep_path:
+                                    entry_data["deploy_base"] = sep_path
+                                symlinks.append(entry_data)
                                 result.files_copied += 1
                                 continue
                         except OSError:
@@ -489,12 +512,15 @@ class ModDeployer:
                     try:
                         shutil.copy2(src_file, target)
                         result.files_copied += 1
-                        symlinks.append({
+                        entry_data = {
                             "link": str(rel),
                             "target": str(src_file),
                             "mod": mod_name,
                             "type": deploy_type,
-                        })
+                        }
+                        if sep_path:
+                            entry_data["deploy_base"] = sep_path
+                        symlinks.append(entry_data)
                     except OSError as exc:
                         result.errors.append(
                             f"copy {rel}: {exc}"
@@ -503,12 +529,15 @@ class ModDeployer:
                     try:
                         target.symlink_to(src_file)
                         result.links_created += 1
-                        symlinks.append({
+                        entry_data = {
                             "link": str(rel),
                             "target": str(src_file),
                             "mod": mod_name,
                             "type": "symlink",
-                        })
+                        }
+                        if sep_path:
+                            entry_data["deploy_base"] = sep_path
+                        symlinks.append(entry_data)
                     except OSError as exc:
                         result.errors.append(
                             f"symlink {rel} -> {src_file}: {exc}"
@@ -573,7 +602,10 @@ class ModDeployer:
         # Remove symlinks (but NOT copied files from direct-install mods)
         for entry in manifest.get("symlinks", []):
             link_rel = entry.get("link", "")
-            link_path = game_path / link_rel
+            # Use per-entry deploy_base if present (custom separator path)
+            entry_deploy_base = entry.get("deploy_base", "")
+            base_path = Path(entry_deploy_base) if entry_deploy_base else game_path
+            link_path = base_path / link_rel
             deploy_type = entry.get("type", "symlink")
 
             # Direct-install copies are intentionally left in place
@@ -628,8 +660,16 @@ class ModDeployer:
         # double-cleanup and race conditions with manifest updates.
 
         # Clean up created directories (deepest first)
+        # Format: "rel/path" for game_path or "/abs/path:rel/path" for custom deploy
         for dir_rel in manifest.get("created_dirs", []):
-            dir_path = game_path / dir_rel
+            if ":" in dir_rel and dir_rel[0] == "/":
+                # Custom deploy path format: /abs/base:rel/dir
+                colon_idx = dir_rel.index(":", 1)  # Skip first char (/)
+                custom_base = Path(dir_rel[:colon_idx])
+                rel_part = dir_rel[colon_idx + 1:]
+                dir_path = custom_base / rel_part
+            else:
+                dir_path = game_path / dir_rel
 
             if not dir_path.is_dir():
                 continue

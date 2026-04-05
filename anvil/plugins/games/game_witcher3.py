@@ -148,6 +148,18 @@ class Witcher3Game(BaseGame):
             )
         return None
 
+    def vanilla_scripts_dir(self) -> Path | None:
+        """Return the vanilla scripts directory (content/content0/scripts).
+
+        Used by the native Script Merger to compare mod scripts against
+        the original game files for 3-way diff.
+        """
+        if self._game_path is not None:
+            path = self._game_path / "content" / "content0" / "scripts"
+            if path.is_dir():
+                return path
+        return None
+
     def has_script_merger(self) -> bool:
         """Check if Witcher Script Merger is available.
 

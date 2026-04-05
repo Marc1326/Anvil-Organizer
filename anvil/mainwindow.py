@@ -73,7 +73,8 @@ from anvil.core.nxm_handler import parse_nxm_url, check_cli_for_nxm
 from anvil.core.conflict_scanner import ConflictScanner
 from anvil.core.modindex import ModIndex
 from anvil.core.lspk_parser import LSPKReader
-from anvil.models.mod_list_model import mod_entry_to_row, COL_COUNT
+from anvil.models.mod_list_model import mod_entry_to_row, COL_COUNT, ROLE_GROUP_NAME, ROLE_IS_GROUP_HEAD
+from anvil.core.mod_groups import GroupManager
 from anvil.widgets.instance_wizard import CreateInstanceWizard
 from anvil.widgets.category_dialog import CategoryDialog
 from anvil.widgets.log_panel import LogPanel
@@ -301,6 +302,10 @@ class MainWindow(QMainWindow):
         self._category_manager = CategoryManager()
         self._filter_panel.set_category_manager(self._category_manager)
 
+        # ── Group manager ──────────────────────────────────────────────
+        self._group_manager = GroupManager()
+        self._mod_list_view.set_group_manager(self._group_manager)
+
         # ── Nexus API ────────────────────────────────────────────────
         self._nexus_api = NexusAPI(self)
         from anvil.widgets.settings_dialog import SettingsDialog
@@ -527,6 +532,9 @@ class MainWindow(QMainWindow):
         act.setShortcut(QKeySequence("Ctrl+I"))
         act.setEnabled(False)
 
+        self._act_reshade = tm.addAction(tr("menu.reshade_wizard"))
+        self._act_reshade.triggered.connect(self._on_reshade_wizard)
+
         tm.addSeparator()
 
         act = tm.addAction(tr("menu.settings"))
@@ -725,6 +733,60 @@ class MainWindow(QMainWindow):
             # Reload current instance to apply changed paths
             if self.instance_manager.current_instance():
                 self.switch_instance(self.instance_manager.current_instance())
+
+    def _on_reshade_wizard(self) -> None:
+        """Werkzeuge → ReShade Wizard."""
+        from anvil.dialogs.reshade_wizard import ReshadeWizard
+
+        game_path = self._current_game_path
+        if game_path is None:
+            return
+
+        plugin = self._current_plugin
+        game_binary = getattr(plugin, "GameBinary", "") if plugin else ""
+        instance_name = self.instance_manager.current_instance() or ""
+
+        dlg = ReshadeWizard(game_path, game_binary, instance_name, self)
+        _center_on_parent(dlg)
+        dlg.exec()
+
+    # ── Proton Tools ─────────────────────────────────────────────────
+    def _rebuild_proton_menu(self, menu) -> None:
+        from anvil.widgets.proton_tools_dialog import load_proton_tools
+        menu.clear()
+        tools = []
+        if self._current_instance_path:
+            tools = load_proton_tools(self._current_instance_path)
+        for i, tool in enumerate(tools):
+            name = tool.get("name", "?")
+            act = menu.addAction(name)
+            act.triggered.connect(
+                lambda checked=False, idx=i: self._run_proton_tool(idx)
+            )
+        if tools:
+            menu.addSeparator()
+        manage_act = menu.addAction(tr("proton_tools.manage"))
+        manage_act.triggered.connect(lambda checked=False: self._on_proton_manage())
+
+    def _run_proton_tool(self, idx: int) -> None:
+        from anvil.widgets.proton_tools_dialog import load_proton_tools
+        if not self._current_instance_path:
+            return
+        tools = load_proton_tools(self._current_instance_path)
+        if idx < 0 or idx >= len(tools):
+            return
+        tool = tools[idx]
+        exe_path = tool.get("exe_path", "")
+        if not exe_path:
+            return
+        args = tool.get("args", [])
+        wdir = tool.get("working_dir", "")
+        self._game_panel.run_with_proton(exe_path, args, wdir or None)
+
+    def _on_proton_manage(self) -> None:
+        from anvil.widgets.proton_tools_dialog import ProtonToolsDialog
+        dlg = ProtonToolsDialog(self, instance_path=self._current_instance_path)
+        dlg.exec()
 
     def _on_menu_help(self) -> None:
         """Hilfe → Hilfe (Strg+H)."""
@@ -1035,9 +1097,15 @@ class MainWindow(QMainWindow):
             self._mod_list_view.set_extra_drop_extensions(set())
             self._toolbar.deploy_sep.setVisible(False)
             self._toolbar.deploy_action.setVisible(False)
+            self._toolbar.proton_action.setVisible(False)
+            self._toolbar.merger_sep.setVisible(False)
+            self._toolbar.merger_action.setVisible(False)
+            self._toolbar.loot_sep.setVisible(False)
+            self._toolbar.loot_action.setVisible(False)
             self._mod_list_stack.setCurrentWidget(self._mod_list_view)
             self._update_active_count()
             self._status_bar.clear_instance()
+            self._act_reshade.setEnabled(False)
             return
 
         game_name = data.get("game_name", instance_name)
@@ -1062,6 +1130,9 @@ class MainWindow(QMainWindow):
         # different path than what detectGame() found via store detection)
         if plugin is not None and game_path is not None:
             plugin.setGamePath(game_path, store=store if store else None)
+
+        # ReShade menu item: enable when game path is available
+        self._act_reshade.setEnabled(game_path is not None)
 
         # 1. Title
         self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v{APP_VERSION}")
@@ -1097,10 +1168,32 @@ class MainWindow(QMainWindow):
         # Hide BG3 deploy button, switch to standard mod list
         self._toolbar.deploy_sep.setVisible(False)
         self._toolbar.deploy_action.setVisible(False)
+        _BETHESDA_GAMES = {
+            "SkyrimSE", "Fallout4", "Fallout3", "FalloutNV",
+            "Starfield", "Morrowind", "OblivionRemastered",
+        }
+        self._toolbar.proton_action.setVisible(
+            store == "steam" and short_name in _BETHESDA_GAMES
+        )
+
+        # Witcher 3: Script Merger Button einblenden
+        is_witcher3 = short_name == "witcher3"
+        self._toolbar.merger_sep.setVisible(is_witcher3)
+        self._toolbar.merger_action.setVisible(is_witcher3)
+
+        # LOOT button visibility (Bethesda games only)
+        has_loot = (
+            plugin is not None
+            and getattr(plugin, "LootGameName", "") != ""
+            and hasattr(plugin, "has_plugins_txt")
+            and plugin.has_plugins_txt()
+        )
+        self._toolbar.loot_sep.setVisible(has_loot)
+        self._toolbar.loot_action.setVisible(has_loot)
+
         self._mod_list_stack.setCurrentWidget(self._mod_list_view)
         self._bg3_installer = None
         self._mod_list_view.set_extra_drop_extensions(set())
-
 
         # Load categories for this instance
         self._category_manager.load(instance_path)
@@ -1148,6 +1241,14 @@ class MainWindow(QMainWindow):
         self._profile_bar.set_profiles(profile_folders, active=profile_name)
         self._current_profile_path = instance_path / ".profiles" / profile_name
 
+        # Load groups for this profile
+        self._group_manager.load(self._current_profile_path)
+        # Cleanup orphaned group members
+        mods_dir = instance_path / ".mods"
+        if mods_dir.is_dir():
+            existing_folders = {d.name for d in mods_dir.iterdir() if d.is_dir()}
+            self._group_manager.cleanup_orphans(existing_folders)
+
         # Rebuild mod file index (only re-scans changed mods)
         self._mod_index = ModIndex(instance_path)
         self._mod_index.rebuild()
@@ -1169,7 +1270,7 @@ class MainWindow(QMainWindow):
         conflict_data = self._compute_conflict_data()
         # Filter out framework (direct-install) mods from the main list
         visible_entries = [e for e in self._current_mod_entries if not e.is_direct_install]
-        mod_rows = [mod_entry_to_row(e, conflict_data) for e in visible_entries]
+        mod_rows = [mod_entry_to_row(e, conflict_data, self._group_manager) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         # Provide visible entries to proxy for filter logic
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
@@ -1187,6 +1288,7 @@ class MainWindow(QMainWindow):
         _dlog(f"[APPLY-INSTANCE] Game path: {game_path}")
         self._game_panel.set_mod_index(self._mod_index)
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
+        self._sync_separator_deploy_paths()
         self._game_panel.silent_deploy()
 
         # Framework detection (nach Deploy, damit Shims vorhanden sind)
@@ -1262,6 +1364,14 @@ class MainWindow(QMainWindow):
                 if entry.name == folder:
                     return entry
         return None
+
+    def _sync_separator_deploy_paths(self) -> None:
+        """Extract custom deploy paths from separator ModEntries and sync to GamePanel."""
+        paths: dict[str, str] = {}
+        for entry in self._current_mod_entries:
+            if entry.is_separator and entry.deploy_path:
+                paths[entry.name] = entry.deploy_path
+        self._game_panel.set_separator_deploy_paths(paths)
 
     # ── Mod list persistence ─────────────────────────────────────────
 
@@ -1403,8 +1513,86 @@ class MainWindow(QMainWindow):
             model.index(0, 0),
             model.index(model.rowCount() - 1, model.columnCount() - 1),
         )
+        # Check group consistency after DnD
+        self._check_group_consistency_after_reorder(model)
         self._mod_list_view._tree._apply_separator_filter()
         self._schedule_redeploy()
+
+    def _check_group_consistency_after_reorder(self, model) -> None:
+        """After DnD, check if any group members were moved out of their group.
+
+        If a single member is no longer contiguous with its group, remove it.
+        If a member crossed a separator boundary, remove it from the group.
+        """
+        changed = False
+        for gname in list(self._group_manager.all_groups().keys()):
+            members = self._group_manager.get_members(gname)
+            if not members:
+                continue
+
+            # Find rows for each member
+            member_rows: dict[str, int] = {}
+            for i, r in enumerate(model._rows):
+                if r.folder_name in members:
+                    member_rows[r.folder_name] = i
+
+            # Find separator for each member
+            member_seps: dict[str, str] = {}
+            for folder_name, row_idx in member_rows.items():
+                sep = ""
+                for j in range(row_idx, -1, -1):
+                    if j < len(model._rows) and model._rows[j].is_separator:
+                        sep = model._rows[j].folder_name
+                        break
+                member_seps[folder_name] = sep
+
+            # All members must be in the same separator
+            seps = set(member_seps.values())
+            if len(seps) > 1:
+                from collections import Counter
+                sep_counts = Counter(member_seps.values())
+                main_sep = sep_counts.most_common(1)[0][0]
+                for folder_name, sep in member_seps.items():
+                    if sep != main_sep:
+                        self._group_manager.remove_member(folder_name)
+                        changed = True
+
+            # Check contiguity
+            rows_list = sorted(member_rows.values())
+            if len(rows_list) >= 2:
+                expected_span = rows_list[-1] - rows_list[0] + 1
+                if expected_span != len(rows_list):
+                    blocks: list[list[int]] = []
+                    current_block = [rows_list[0]]
+                    for ri in range(1, len(rows_list)):
+                        if rows_list[ri] == current_block[-1] + 1:
+                            current_block.append(rows_list[ri])
+                        else:
+                            blocks.append(current_block)
+                            current_block = [rows_list[ri]]
+                    blocks.append(current_block)
+
+                    largest = max(blocks, key=len)
+                    largest_set = set(largest)
+
+                    row_to_folder = {v: k for k, v in member_rows.items()}
+                    for row_idx in rows_list:
+                        if row_idx not in largest_set:
+                            folder = row_to_folder.get(row_idx, "")
+                            if folder:
+                                self._group_manager.remove_member(folder)
+                                changed = True
+
+        if changed:
+            conflict_data = self._compute_conflict_data()
+            for i, r in enumerate(model._rows):
+                gname = self._group_manager.get_group_for_mod(r.folder_name)
+                r.group_name = gname
+                r.is_group_head = bool(gname and self._group_manager.is_group_head(r.folder_name))
+            model.dataChanged.emit(
+                model.index(0, 0),
+                model.index(model.rowCount() - 1, model.columnCount() - 1),
+            )
 
     def _update_active_count(self) -> None:
         """Update the active mod counter in the profile bar."""
@@ -1432,6 +1620,7 @@ class MainWindow(QMainWindow):
         print("[PURGE] Auto-redeploy: purging current deployment", flush=True)
         self._game_panel.silent_purge()
         print("[DEPLOY] Auto-redeploy: deploying mods (fast, no BA2)", flush=True)
+        self._sync_separator_deploy_paths()
         self._game_panel.silent_deploy_fast()
         self.statusBar().showMessage(tr("status.deployed"), 3000)
 
@@ -1626,6 +1815,7 @@ class MainWindow(QMainWindow):
             print("[PURGE] Pre-launch purge", flush=True)
             self._game_panel.silent_purge()
             print("[DEPLOY] Pre-launch full deploy (with BA2)", flush=True)
+            self._sync_separator_deploy_paths()
             self._game_panel.silent_deploy()
         from PySide6.QtCore import QProcess
         success, pid = QProcess.startDetached(binary_path, [], working_dir)
@@ -2558,6 +2748,56 @@ class MainWindow(QMainWindow):
 
         menu.addSeparator()
 
+        # ── Gruppen ───────────────────────────────────────────────
+        act_create_group = None
+        act_dissolve_group = None
+        act_rename_group = None
+        act_add_to_group = None
+        act_remove_from_group = None
+        act_group_color = None
+        _selected_group_name = ""
+
+        # Check if any selected row is a separator
+        model = self._mod_list_view.source_model()
+        has_separator_in_selection = any(
+            0 <= r < len(model._rows) and model._rows[r].is_separator
+            for r in selected_rows
+        )
+
+        if has_selection and not has_separator_in_selection:
+            if len(selected_rows) >= 2:
+                act_create_group = menu.addAction(tr("context.create_group"))
+
+            if single:
+                row = selected_rows[0]
+                if 0 <= row < len(model._rows):
+                    row_data = model._rows[row]
+                    if row_data.group_name:
+                        _selected_group_name = row_data.group_name
+                        if row_data.is_group_head:
+                            act_dissolve_group = menu.addAction(tr("context.dissolve_group"))
+                            act_rename_group = menu.addAction(tr("context.rename_group"))
+                            act_group_color = menu.addAction(tr("context.group_color"))
+                        else:
+                            act_remove_from_group = menu.addAction(tr("context.remove_from_group"))
+                    else:
+                        group_names = self._group_manager.group_names()
+                        if group_names:
+                            add_group_menu = menu.addMenu(tr("context.add_to_group"))
+                            for gn in group_names:
+                                act_g = add_group_menu.addAction(gn)
+                                act_g.setData(gn)
+                            act_add_to_group = add_group_menu
+            elif len(selected_rows) >= 2:
+                has_grouped = any(
+                    0 <= r < len(model._rows) and model._rows[r].group_name
+                    for r in selected_rows
+                )
+                if has_grouped:
+                    act_remove_from_group = menu.addAction(tr("context.remove_from_group"))
+
+        menu.addSeparator()
+
         # ── Senden / Mod-Aktionen ────────────────────────────────
         send_to_menu = menu.addMenu(tr("context.send_to"))
         send_to_menu.setEnabled(False)
@@ -2609,6 +2849,8 @@ class MainWindow(QMainWindow):
         # ── Separator-Farbe ──────────────────────────────────────
         act_select_color = None
         act_reset_color = None
+        act_set_deploy_path = None
+        act_reset_deploy_path = None
         _sep_entry = None
         if single and _ctx_entry:
             _sep_entry = _ctx_entry
@@ -2617,6 +2859,10 @@ class MainWindow(QMainWindow):
                 act_select_color = menu.addAction(tr("context.select_color"))
                 if _sep_entry.color:
                     act_reset_color = menu.addAction(tr("context.reset_color"))
+                menu.addSeparator()
+                act_set_deploy_path = menu.addAction(tr("context.set_deploy_path"))
+                if _sep_entry.deploy_path:
+                    act_reset_deploy_path = menu.addAction(tr("context.reset_deploy_path"))
 
         # ── Execute ───────────────────────────────────────────────
         chosen = menu.exec(global_pos)
@@ -2683,6 +2929,23 @@ class MainWindow(QMainWindow):
             self._ctx_select_separator_color(selected_rows[0])
         elif chosen is not None and chosen == act_reset_color and act_reset_color:
             self._ctx_reset_separator_color(selected_rows[0])
+        elif chosen is not None and chosen == act_set_deploy_path and act_set_deploy_path:
+            self._ctx_set_deploy_path(selected_rows[0])
+        elif chosen is not None and chosen == act_reset_deploy_path and act_reset_deploy_path:
+            self._ctx_reset_deploy_path(selected_rows[0])
+        elif act_create_group is not None and chosen == act_create_group:
+            self._ctx_create_group(selected_rows)
+        elif act_dissolve_group is not None and chosen == act_dissolve_group:
+            self._ctx_dissolve_group(_selected_group_name)
+        elif act_rename_group is not None and chosen == act_rename_group:
+            self._ctx_rename_group(_selected_group_name)
+        elif act_group_color is not None and chosen == act_group_color:
+            self._ctx_group_color(_selected_group_name)
+        elif act_remove_from_group is not None and chosen == act_remove_from_group:
+            self._ctx_remove_from_group(selected_rows)
+        elif act_add_to_group is not None and isinstance(act_add_to_group, QMenu):
+            if chosen and chosen.data() is not None and chosen.parent() == act_add_to_group:
+                self._ctx_add_to_group(selected_rows[0], chosen.data())
 
     # ── Context menu actions ───────────────────────────────────────
 
@@ -2832,6 +3095,235 @@ class MainWindow(QMainWindow):
             )
         # Repaint scrollbar
         self._mod_list_view._tree.verticalScrollBar().update()
+
+    # ── Deploy path context menu actions ─────────────────────────────
+
+    def _ctx_set_deploy_path(self, source_row: int) -> None:
+        """Open QFileDialog for separator and save chosen deploy path."""
+        if source_row >= len(self._current_mod_entries):
+            return
+        entry = self._entry_for_row(source_row)
+        if entry is None or not entry.is_separator:
+            return
+
+        chosen_path = QFileDialog.getExistingDirectory(
+            self,
+            tr("dialog.deploy_path_title"),
+            entry.deploy_path or str(Path.home()),
+        )
+        if not chosen_path:
+            return  # User cancelled
+
+        # Persist to meta.ini
+        from anvil.core.mod_metadata import write_meta_ini
+        write_meta_ini(entry.install_path, {"deploy_path": chosen_path})
+
+        # Update in-memory data
+        entry.deploy_path = chosen_path
+
+        # Update ModRow tooltip in model
+        model = self._mod_list_view.source_model()
+        rows = model._rows
+        if source_row < len(rows):
+            rows[source_row].deploy_path = chosen_path
+            model.dataChanged.emit(
+                model.index(source_row, 0),
+                model.index(source_row, COL_COUNT - 1),
+                [Qt.ItemDataRole.ToolTipRole],
+            )
+
+        # Log
+        sep_name = entry.display_name or entry.name
+        self._log_panel.add_log(
+            "info",
+            tr("dialog.deploy_path_set", name=sep_name, path=chosen_path),
+        )
+
+    def _ctx_reset_deploy_path(self, source_row: int) -> None:
+        """Remove custom deploy path from separator."""
+        if source_row >= len(self._current_mod_entries):
+            return
+        entry = self._entry_for_row(source_row)
+        if entry is None or not entry.is_separator:
+            return
+
+        # Persist empty deploy_path to meta.ini
+        from anvil.core.mod_metadata import write_meta_ini
+        write_meta_ini(entry.install_path, {"deploy_path": ""})
+
+        # Update in-memory data
+        entry.deploy_path = ""
+
+        # Update ModRow tooltip in model
+        model = self._mod_list_view.source_model()
+        rows = model._rows
+        if source_row < len(rows):
+            rows[source_row].deploy_path = ""
+            model.dataChanged.emit(
+                model.index(source_row, 0),
+                model.index(source_row, COL_COUNT - 1),
+                [Qt.ItemDataRole.ToolTipRole],
+            )
+
+        # Log
+        sep_name = entry.display_name or entry.name
+        self._log_panel.add_log(
+            "info",
+            tr("dialog.deploy_path_reset", name=sep_name),
+        )
+
+    # ── Group context menu actions ──────────────────────────────────
+
+    def _get_separator_for_row(self, source_row: int) -> str:
+        """Find the separator folder_name that contains the given row."""
+        model = self._mod_list_view.source_model()
+        for i in range(source_row, -1, -1):
+            if i < len(model._rows) and model._rows[i].is_separator:
+                return model._rows[i].folder_name
+        return ""
+
+    def _ctx_create_group(self, source_rows: list[int]) -> None:
+        """Create a new group from selected mods."""
+        if len(source_rows) < 2:
+            return
+
+        model = self._mod_list_view.source_model()
+
+        # Validate: all mods must be in the same separator
+        sep_names = set()
+        folder_names = []
+        for row in source_rows:
+            if row >= len(model._rows):
+                return
+            if model._rows[row].is_separator:
+                return
+            sep = self._get_separator_for_row(row)
+            sep_names.add(sep)
+            folder_names.append(model._rows[row].folder_name)
+
+        if len(sep_names) > 1:
+            QMessageBox.warning(
+                self, tr("dialog.create_group_title"),
+                tr("dialog.group_cross_separator"),
+            )
+            return
+
+        name, ok = get_text_input(
+            self, tr("dialog.create_group_title"), tr("dialog.create_group_prompt"),
+        )
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+
+        if self._group_manager.group_exists(name):
+            QMessageBox.warning(
+                self, tr("dialog.create_group_title"),
+                tr("dialog.group_name_exists"),
+            )
+            return
+
+        self._group_manager.create_group(name, folder_names)
+        self._reload_mod_list()
+        self.statusBar().showMessage(tr("context.create_group").replace("...", f": {name}"), 5000)
+
+    def _ctx_dissolve_group(self, group_name: str) -> None:
+        """Dissolve a group, keeping mods in place."""
+        if not group_name:
+            return
+
+        reply = QMessageBox.question(
+            self, tr("context.dissolve_group"),
+            tr("dialog.dissolve_confirm", name=group_name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        self._group_manager.dissolve_group(group_name)
+        self._reload_mod_list()
+
+    def _ctx_rename_group(self, group_name: str) -> None:
+        """Rename a group."""
+        if not group_name:
+            return
+
+        new_name, ok = get_text_input(
+            self, tr("dialog.rename_group_title"), tr("dialog.rename_group_prompt"),
+            text=group_name,
+        )
+        if not ok or not new_name.strip():
+            return
+        new_name = new_name.strip()
+
+        if new_name == group_name:
+            return
+
+        if self._group_manager.group_exists(new_name):
+            QMessageBox.warning(
+                self, tr("dialog.rename_group_title"),
+                tr("dialog.group_name_exists"),
+            )
+            return
+
+        self._group_manager.rename_group(group_name, new_name)
+        self._reload_mod_list()
+
+    def _ctx_group_color(self, group_name: str) -> None:
+        """Change group color."""
+        if not group_name:
+            return
+
+        from PySide6.QtWidgets import QColorDialog
+
+        current = QColor(self._group_manager.get_group_color(group_name))
+        color = QColorDialog.getColor(current, self, tr("context.group_color"))
+        if color.isValid():
+            self._group_manager.set_color(group_name, color.name())
+            self._reload_mod_list()
+
+    def _ctx_add_to_group(self, source_row: int, group_name: str) -> None:
+        """Add a mod to an existing group."""
+        model = self._mod_list_view.source_model()
+        if source_row >= len(model._rows):
+            return
+        folder_name = model._rows[source_row].folder_name
+
+        current_group = self._group_manager.get_group_for_mod(folder_name)
+        if current_group == group_name:
+            QMessageBox.information(
+                self, tr("context.add_to_group"),
+                tr("dialog.group_already_member", mod=folder_name, group=group_name),
+            )
+            return
+
+        # Validate same separator as group head
+        members = self._group_manager.get_members(group_name)
+        if members:
+            head_folder = members[0]
+            mod_sep = self._get_separator_for_row(source_row)
+            head_sep = ""
+            for i, r in enumerate(model._rows):
+                if r.folder_name == head_folder:
+                    head_sep = self._get_separator_for_row(i)
+                    break
+            if head_sep != mod_sep:
+                QMessageBox.warning(
+                    self, tr("context.add_to_group"),
+                    tr("dialog.group_cross_separator"),
+                )
+                return
+
+        self._group_manager.add_member(group_name, folder_name)
+        self._reload_mod_list()
+
+    def _ctx_remove_from_group(self, source_rows: list[int]) -> None:
+        """Remove mods from their groups."""
+        model = self._mod_list_view.source_model()
+        for row in source_rows:
+            if row < len(model._rows):
+                folder_name = model._rows[row].folder_name
+                self._group_manager.remove_member(folder_name)
+        self._reload_mod_list()
 
     def _open_mods_folder(self) -> None:
         """Open the mods folder in file manager."""
@@ -3176,6 +3668,14 @@ class MainWindow(QMainWindow):
         # 2. Update profile path
         self._current_profile_path = new_profile_path
 
+        # 2b. Load groups for new profile
+        self._group_manager.load(self._current_profile_path)
+        if self._current_instance_path:
+            mods_dir = self._current_instance_path / ".mods"
+            if mods_dir.is_dir():
+                existing_folders = {d.name for d in mods_dir.iterdir() if d.is_dir()}
+                self._group_manager.cleanup_orphans(existing_folders)
+
         # 3. Save selected profile to instance data
         current_instance = self.instance_manager.current_instance()
         if current_instance:
@@ -3210,6 +3710,7 @@ class MainWindow(QMainWindow):
         self._redeploy_timer.stop()
         self._game_panel.silent_purge()
         self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
+        self._sync_separator_deploy_paths()
         self._game_panel.silent_deploy()
 
     def _apply_active_state(self, active_mods: set[str]) -> None:
@@ -4745,6 +5246,8 @@ class MainWindow(QMainWindow):
 
         profiles_dir = self._current_instance_path / ".profiles"
         for name in names:
+            # Remove from group before deleting
+            self._group_manager.remove_member(name)
             mod_path = self._current_instance_path / ".mods" / name
             if mod_path.is_dir():
                 shutil.rmtree(mod_path)
@@ -4850,9 +5353,15 @@ class MainWindow(QMainWindow):
                 name_lower = (entry.display_name or entry.name).lower()
                 if _matches_direct_install(name_lower, lp):
                     entry.is_direct_install = True
+        # Cleanup orphaned group members
+        if self._current_instance_path:
+            mods_dir = self._current_instance_path / ".mods"
+            if mods_dir.is_dir():
+                existing_folders = {d.name for d in mods_dir.iterdir() if d.is_dir()}
+                self._group_manager.cleanup_orphans(existing_folders)
         conflict_data = self._compute_conflict_data()
         visible_entries = [e for e in self._current_mod_entries if not e.is_direct_install]
-        mod_rows = [mod_entry_to_row(e, conflict_data) for e in visible_entries]
+        mod_rows = [mod_entry_to_row(e, conflict_data, self._group_manager) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
         self._mod_list_view._tree._apply_separator_filter()
@@ -5299,6 +5808,12 @@ class MainWindow(QMainWindow):
         # BG3: Auto-Deploy — kein Deploy-Button noetig
         self._toolbar.deploy_sep.setVisible(False)
         self._toolbar.deploy_action.setVisible(False)
+        self._toolbar.proton_action.setVisible(False)
+        self._toolbar.merger_sep.setVisible(False)
+        self._toolbar.merger_action.setVisible(False)
+        # BG3 has no LOOT support
+        self._toolbar.loot_sep.setVisible(False)
+        self._toolbar.loot_action.setVisible(False)
         # Enable conflict highlighting on mod click
         s = self._settings()
         self._mod_list_view._tree._conflict_highlight_on_select = s.value(
@@ -5681,6 +6196,71 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(tr("status.modlist_exported_check"), 5000)
         else:
             self.statusBar().showMessage(tr("status.deploy_failed"), 5000)
+
+    # ── Script Merger (Witcher 3) ────────────────────────────────
+
+    def _on_script_merger_clicked(self) -> None:
+        """Oeffnet den Script Merger Dialog fuer Witcher 3."""
+        plugin = self._current_plugin
+        if plugin is None or getattr(plugin, "GameShortName", "") != "witcher3":
+            return
+
+        vanilla_dir = plugin.vanilla_scripts_dir()
+        if vanilla_dir is None:
+            QMessageBox.warning(
+                self,
+                tr("script_merger.title"),
+                tr("script_merger.no_vanilla_dir"),
+            )
+            return
+
+        instance_path = self._current_instance_path
+        mods_dir = instance_path / ".mods"
+        profiles_dir = instance_path / ".profiles"
+
+        # Aktive Mods aus aktuellem Profil lesen
+        active = read_active_mods(
+            profiles_dir / self._profile_bar.current_profile()
+        )
+        active_names = [
+            n for n in read_global_modlist(profiles_dir)
+            if n in active and n != "_merged_"
+        ]
+
+        from anvil.widgets.script_merger_dialog import ScriptMergerDialog
+        dlg = ScriptMergerDialog(
+            parent=self,
+            vanilla_scripts_dir=vanilla_dir,
+            mods_dir=mods_dir,
+            active_mod_names=active_names,
+            profiles_dir=profiles_dir,
+            instance_path=instance_path,
+        )
+        dlg.exec()
+
+        if dlg.has_changes:
+            self._reload_mod_list()
+
+    # ── LOOT (Bethesda) ─────────────────────────────────────────
+
+    def _on_loot_sort_clicked(self) -> None:
+        """Open the LOOT sort dialog for the current Bethesda instance."""
+        plugin = self._current_plugin
+        if plugin is None:
+            return
+        loot_name = getattr(plugin, "LootGameName", "")
+        if not loot_name or not plugin.has_plugins_txt():
+            self.statusBar().showMessage(tr("loot.not_bethesda"), 5000)
+            return
+
+        game_path = self._current_game_path
+        instance_path = self._current_instance_path
+        if game_path is None or instance_path is None:
+            return
+
+        from anvil.widgets.loot_dialog import LootDialog
+        dlg = LootDialog(self, plugin, game_path, instance_path)
+        dlg.exec()
 
     def _on_bg3_context_menu(self, global_pos, section: str, mod_data: dict) -> None:
         """BG3-specific context menu."""

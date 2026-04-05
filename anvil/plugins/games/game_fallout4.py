@@ -203,7 +203,7 @@ class Fallout4Game(BaseGame):
     # TODO: .ba2 Archive -- Bethesda-Archive
     # TODO: F4SE Integration (Version check, plugin loading)
     # TODO: Creation Kit Integration (Steam ID 1946160)
-    # TODO: LOOT-Integration (--game="Fallout4")
+    LootGameName = "Fallout4"
     # TODO: Creation Club / Fallout4.ccc Parser
     # TODO: Save-Game Metadata Parsing (.fos/.f4se)
 
