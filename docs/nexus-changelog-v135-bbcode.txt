@@ -1,0 +1,55 @@
+Anvil Organizer v1.3.5
+
+[size=4][b]New Features[/b][/size]
+
+[b]Nexus Categories in Filter Panel[/b]
+[list]
+[*]New "Nexus Categories" section in the filter sidebar
+[*]Load categories directly from the Nexus API with one click
+[*]Categories appear as filter chips — click to filter your mod list
+[*]Category data is cached per instance, no repeated API calls needed
+[*]Styled consistently across all 9 themes
+[/list]
+
+[b]BG3 — Conflict Detection[/b]
+[list]
+[*]Anvil now detects file conflicts inside .pak archives
+[*]Conflict icons, tooltips, and click-to-highlight work just like other games
+[*]Uses the built-in LSPK parser — no external tools required
+[/list]
+
+[b]Mod Update Check after Installation[/b]
+[list]
+[*]After installing a mod via NXM link, Anvil queries the latest version from Nexus
+[*]newestVersion is stored in meta.ini for future comparison
+[*]If the installed version differs, a log entry and statusbar message are shown
+[/list]
+
+[b]API Counter Toggle[/b]
+[list]
+[*]The Nexus API rate limit counter in the statusbar can now be shown or hidden
+[*]Controlled via checkbox in Settings → Nexus
+[/list]
+
+[b]Secure API Key Storage[/b]
+[list]
+[*]Nexus API key is now stored in the system keychain instead of plain text config
+[*]Existing keys are automatically migrated on first launch
+[*]Falls back to config storage if no keychain is available
+[/list]
+
+[size=4][b]Bug Fixes[/b][/size]
+
+[b]BG3 — Mod Management[/b]
+[list]
+[*]Mod deactivation now physically moves .pak files out of the active directory
+[*]Mod uninstall removes .pak files from all locations (Mods folder + active directory)
+[*]Context menu actions work correctly for both active and inactive mods
+[/list]
+
+[b]Nexus Integration[/b]
+[list]
+[*]Update check queue is more robust — proper rate limiting, clean init and teardown
+[*]NXM button in the toolbar is no longer greyed out
+[*]Fixed .meta file writing — ConfigParser no longer lowercases keys in NXM downloads
+[/list]
