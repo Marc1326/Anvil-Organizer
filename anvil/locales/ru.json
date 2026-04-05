@@ -421,7 +421,8 @@
     "categories_assigned": "Категории назначены: {count} модов обновлено",
     "category_assigned_single": "Категория назначена: {category} для {name}",
     "no_nexus_category": "Категория Nexus неизвестна. Сначала выполните 'Запросить инфо Nexus'.",
-    "nexus_categories_loaded": "Категории Nexus загружены: {count} категорий"
+    "nexus_categories_loaded": "Категории Nexus загружены: {count} категорий",
+    "nexus_categories_loading": "Загрузка категорий Nexus..."
   },
   "log": {},
   "batch_query": {
@@ -563,7 +564,9 @@
     "prop_has_category": "Есть категория",
     "prop_no_category": "Без категории",
     "prop_conflict_win": "Конфликты (победитель)",
-    "prop_conflict_lose": "Конфликты (проигравший)"
+    "prop_conflict_lose": "Конфликты (проигравший)",
+    "nexus_categories": "Категории Nexus",
+    "nexus_load": "Загрузить"
   },
   "category": {
     "animations": "Анимации",

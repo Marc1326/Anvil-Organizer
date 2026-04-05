@@ -419,12 +419,12 @@ QMessageBox QPushButton {
   #filterToggleBar:hover {
     background: #2C313A; }
 
-#filterResetBtn, #filterManageBtn {
+#filterResetBtn, #filterManageBtn, #filterNexusLoadBtn {
   background: #282C34;
   border: 2px solid #3E4451;
   border-radius: 6px;
   padding: 4px 12px; }
-  #filterResetBtn:hover, #filterManageBtn:hover {
+  #filterResetBtn:hover, #filterManageBtn:hover, #filterNexusLoadBtn:hover {
     background: #2C313A; }
 
 /* ── Game Lock Overlay ───────────────────────────────────── */

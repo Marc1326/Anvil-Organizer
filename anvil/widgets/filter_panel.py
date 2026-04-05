@@ -65,6 +65,7 @@ class FilterPanel(QWidget):
 
     filter_changed = Signal()
     panel_toggled = Signal(bool)  # True = open request, False = close request
+    nexus_load_requested = Signal()  # User clicked "Laden" button
 
     def __init__(self, category_manager: CategoryManager | None = None, parent=None):
         super().__init__(parent)
@@ -136,13 +137,27 @@ class FilterPanel(QWidget):
         # CustomContextMenu für leere Fläche im Kategorien-Bereich
         self._cat_container.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._cat_container.customContextMenuRequested.connect(self._on_cat_area_context_menu)
-        # Expandieren um den gesamten restlichen Platz zu füllen (für Kontextmenü)
-        self._cat_container.setSizePolicy(
+        self._inner_layout.addWidget(self._cat_container)
+        self._cat_chips: list[FilterChip] = []
+
+        # ── Nexus-Kategorien section ─────────────────────────────
+        lbl_nexus = QLabel(tr("filter.nexus_categories"))
+        lbl_nexus.setObjectName("filterSectionLabel")
+        lbl_nexus.setStyleSheet(
+            "QLabel { font-weight: bold; padding: 2px 0; }"
+        )
+        self._inner_layout.addWidget(lbl_nexus)
+
+        self._nexus_flow = FlowLayout(h_spacing=4, v_spacing=4)
+        self._nexus_container = QWidget()
+        self._nexus_container.setLayout(self._nexus_flow)
+        self._nexus_container.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+        self._nexus_container.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Expanding
         )
-        self._inner_layout.addWidget(self._cat_container, 1)  # stretch=1
-        self._cat_chips: list[FilterChip] = []
+        self._inner_layout.addWidget(self._nexus_container, 1)  # stretch=1
+        self._nexus_chips: list[FilterChip] = []
 
         self._scroll_area.setWidget(self._inner)
         content_layout.addWidget(self._scroll_area, 1)
@@ -156,6 +171,12 @@ class FilterPanel(QWidget):
         btn_row.addWidget(btn_reset)
 
         btn_row.addStretch(1)
+
+        btn_nexus_load = QPushButton(tr("filter.nexus_load"))
+        btn_nexus_load.setObjectName("filterNexusLoadBtn")
+        btn_nexus_load.clicked.connect(lambda checked=False: self.nexus_load_requested.emit())
+        btn_row.addWidget(btn_nexus_load)
+
         content_layout.addLayout(btn_row)
 
         outer.addWidget(self._content_widget, 1)
@@ -218,23 +239,58 @@ class FilterPanel(QWidget):
         """Return set of checked category chip IDs."""
         return {c.chip_id for c in self._cat_chips if c.isChecked()}
 
+    def set_nexus_categories(self, categories: list[dict]) -> None:
+        """Populate Nexus category chips from ``[{'id': int, 'name': str}]``.
+
+        Deduplicates by ID — existing chips with matching IDs are kept.
+        """
+        for chip in self._nexus_chips:
+            try:
+                chip.toggled.disconnect(self._on_changed)
+            except (RuntimeError, TypeError):
+                pass
+            chip.hide()
+            self._nexus_flow.removeWidget(chip)
+            chip.setParent(None)
+            chip.deleteLater()
+        self._nexus_chips.clear()
+
+        seen_ids: set[int] = set()
+        for cat in categories:
+            cid = cat["id"]
+            if cid in seen_ids:
+                continue
+            seen_ids.add(cid)
+            chip = FilterChip(cat["name"], chip_id=cid)
+            chip.toggled.connect(self._on_changed)
+            self._nexus_flow.addWidget(chip)
+            chip.show()
+            self._nexus_chips.append(chip)
+
+    def active_nexus_category_ids(self) -> set[int]:
+        """Return set of checked Nexus category chip IDs."""
+        return {c.chip_id for c in self._nexus_chips if c.isChecked()}
+
     def has_active_filters(self) -> bool:
         """Return True if any chip filter is active."""
         if any(c.isChecked() for c in self._prop_chips):
             return True
         if any(c.isChecked() for c in self._cat_chips):
             return True
+        if any(c.isChecked() for c in self._nexus_chips):
+            return True
         return False
 
     def reset_all(self) -> None:
         """Uncheck all chips."""
-        for chip in self._prop_chips + self._cat_chips:
+        for chip in self._prop_chips + self._cat_chips + self._nexus_chips:
             chip.blockSignals(True)
             chip.setChecked(False)
             chip.blockSignals(False)
         self.filter_changed.emit()
 
-    def restore_state(self, prop_ids: set[int], cat_ids: set[int]) -> None:
+    def restore_state(self, prop_ids: set[int], cat_ids: set[int],
+                      nexus_ids: set[int] | None = None) -> None:
         """Restore previously saved filter chip states."""
         for chip in self._prop_chips:
             chip.blockSignals(True)
@@ -244,6 +300,11 @@ class FilterPanel(QWidget):
             chip.blockSignals(True)
             chip.setChecked(chip.chip_id in cat_ids)
             chip.blockSignals(False)
+        if nexus_ids:
+            for chip in self._nexus_chips:
+                chip.blockSignals(True)
+                chip.setChecked(chip.chip_id in nexus_ids)
+                chip.blockSignals(False)
         self.filter_changed.emit()
 
     # ── Context menu (für Kategorien-Bereich) ───────────────────────

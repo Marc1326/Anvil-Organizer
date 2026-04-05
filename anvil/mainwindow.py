@@ -218,6 +218,7 @@ class MainWindow(QMainWindow):
         self._filter_panel = FilterPanel()
         self._filter_panel.filter_changed.connect(self._on_filter_changed)
         self._filter_panel.panel_toggled.connect(self._on_filter_panel_toggled)
+        self._filter_panel.nexus_load_requested.connect(self._on_nexus_load_requested)
 
         self._filter_splitter = QSplitter(Qt.Orientation.Horizontal)
         self._filter_splitter.addWidget(self._filter_panel)
@@ -1242,10 +1243,12 @@ class MainWindow(QMainWindow):
         if s.value("ModList/remember_filters", False, type=bool):
             saved_props = _ensure_list(s.value("ModList/saved_filter_props", []))
             saved_cats = _ensure_list(s.value("ModList/saved_filter_cats", []))
+            saved_nexus = _ensure_list(s.value("ModList/saved_filter_nexus_cats", []))
             prop_set = {int(x) for x in saved_props if x != "" and x is not None}
             cat_set = {int(x) for x in saved_cats if x != "" and x is not None}
-            if prop_set or cat_set:
-                self._filter_panel.restore_state(prop_set, cat_set)
+            nexus_set = {int(x) for x in saved_nexus if x != "" and x is not None}
+            if prop_set or cat_set or nexus_set:
+                self._filter_panel.restore_state(prop_set, cat_set, nexus_set)
 
     def _entry_for_row(self, source_row: int):
         """Resolve a source-model row to the matching ModEntry by folder name.
@@ -1441,6 +1444,7 @@ class MainWindow(QMainWindow):
             text.lower(),
             self._filter_panel.active_property_ids(),
             self._filter_panel.active_category_ids(),
+            self._filter_panel.active_nexus_category_ids(),
         )
 
     def _build_bg3_file_lists(self) -> dict[str, list[dict]]:
@@ -4450,6 +4454,7 @@ class MainWindow(QMainWindow):
         from anvil.core.nexus_categories import NexusCategoryCache
         cache = NexusCategoryCache(instance_path)
         if cache.load() and not cache.is_expired():
+            self._populate_nexus_filter_chips(cache)
             return  # Cache valid
         nexus_slug = (
             getattr(self._current_plugin, "GameNexusName", "")
@@ -4458,9 +4463,55 @@ class MainWindow(QMainWindow):
         if nexus_slug:
             self._nexus_api.get_game_info(nexus_slug)
 
+    def _populate_nexus_filter_chips(self, cache=None) -> None:
+        """Build Nexus category chips from cache + current mod entries."""
+        if cache is None:
+            _name = self.instance_manager.current_instance()
+            idata = self.instance_manager.load_instance(_name) if _name else None
+            if not idata:
+                return
+            from anvil.core.nexus_categories import NexusCategoryCache
+            inst_path = Path(idata.get("path", ""))
+            cache = NexusCategoryCache(inst_path)
+            if not cache.load():
+                return
+
+        # Collect unique nexus_category IDs actually used by mods
+        used_ids: set[int] = set()
+        for entry in self._current_mod_entries:
+            if entry.nexus_category > 0:
+                used_ids.add(entry.nexus_category)
+
+        # Build chip list: only categories that mods actually use
+        chips: list[dict] = []
+        seen: set[int] = set()
+        for cid in sorted(used_ids):
+            if cid in seen:
+                continue
+            seen.add(cid)
+            name = cache.find_nexus_category(cid)
+            if name:
+                chips.append({"id": cid, "name": name})
+
+        self._filter_panel.set_nexus_categories(chips)
+
+    def _on_nexus_load_requested(self) -> None:
+        """User clicked 'Laden' in filter panel — force-refresh Nexus categories."""
+        if not self._nexus_api.has_api_key() or not self._current_plugin:
+            self.statusBar().showMessage(tr("status.nexus_api_key_missing"), 5000)
+            return
+        nexus_slug = (
+            getattr(self._current_plugin, "GameNexusName", "")
+            or getattr(self._current_plugin, "GameShortName", "")
+        )
+        if nexus_slug:
+            self.statusBar().showMessage(tr("status.nexus_categories_loading"), 3000)
+            self._nexus_api.get_game_info(nexus_slug)
+
     def _ctx_auto_assign_categories(self) -> None:
         """Batch-assign Nexus categories to all mods."""
-        idata = self._instance_manager.current_instance_data()
+        _name = self.instance_manager.current_instance()
+        idata = self.instance_manager.load_instance(_name) if _name else None
         if not idata:
             return
         inst_path = Path(idata.get("path", ""))
@@ -4491,7 +4542,8 @@ class MainWindow(QMainWindow):
         entry = self._entry_for_row(row)
         if not entry or entry.nexus_id <= 0:
             return
-        idata = self._instance_manager.current_instance_data()
+        _name = self.instance_manager.current_instance()
+        idata = self.instance_manager.load_instance(_name) if _name else None
         if not idata:
             return
         inst_path = Path(idata.get("path", ""))
@@ -4805,6 +4857,7 @@ class MainWindow(QMainWindow):
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
         self._mod_list_view._tree._apply_separator_filter()
         self._update_active_count()
+        self._populate_nexus_filter_chips()
 
         # Refresh framework status (nach Framework-Installation)
         if self._current_plugin is not None:
@@ -4921,7 +4974,8 @@ class MainWindow(QMainWindow):
             categories = data.get("categories", [])
             if categories and self._current_plugin:
                 from anvil.core.nexus_categories import NexusCategoryCache
-                idata = self._instance_manager.current_instance_data()
+                _name = self.instance_manager.current_instance()
+                idata = self.instance_manager.load_instance(_name) if _name else None
                 if idata:
                     inst_path = Path(idata.get("path", ""))
                     if inst_path.exists():
@@ -4930,6 +4984,7 @@ class MainWindow(QMainWindow):
                         cache.save(game_slug, categories)
                         self._log_panel.add_log("info",
                             tr("status.nexus_categories_loaded", count=len(categories)))
+                        self._populate_nexus_filter_chips(cache)
 
         elif tag.startswith("query_mod_info:") and isinstance(data, dict):
             # ── Separate framework query mode ─────────────────────
@@ -5145,11 +5200,14 @@ class MainWindow(QMainWindow):
         if s.value("ModList/remember_filters", False, type=bool):
             prop_ids = [int(x) for x in self._filter_panel.active_property_ids()]
             cat_ids = [int(x) for x in self._filter_panel.active_category_ids()]
+            nexus_ids = [int(x) for x in self._filter_panel.active_nexus_category_ids()]
             s.setValue("ModList/saved_filter_props", prop_ids)
             s.setValue("ModList/saved_filter_cats", cat_ids)
+            s.setValue("ModList/saved_filter_nexus_cats", nexus_ids)
         else:
             s.remove("ModList/saved_filter_props")
             s.remove("ModList/saved_filter_cats")
+            s.remove("ModList/saved_filter_nexus_cats")
 
         # Icon size → index (0=small, 1=medium, 2=large)
         cur_size = self._toolbar.iconSize()

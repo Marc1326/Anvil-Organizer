@@ -421,7 +421,8 @@
     "categories_assigned": "Categorie assegnate: {count} mod aggiornate",
     "category_assigned_single": "Categoria assegnata: {category} per {name}",
     "no_nexus_category": "Nessuna categoria Nexus nota. Esegui prima 'Recupera Info Nexus'.",
-    "nexus_categories_loaded": "Categorie Nexus caricate: {count} categorie"
+    "nexus_categories_loaded": "Categorie Nexus caricate: {count} categorie",
+    "nexus_categories_loading": "Caricamento categorie Nexus..."
   },
   "log": {},
   "batch_query": {
@@ -563,7 +564,9 @@
     "prop_has_category": "Ha categoria",
     "prop_no_category": "Senza categoria",
     "prop_conflict_win": "Conflitti (vincitore)",
-    "prop_conflict_lose": "Conflitti (perdente)"
+    "prop_conflict_lose": "Conflitti (perdente)",
+    "nexus_categories": "Categorie Nexus",
+    "nexus_load": "Carica"
   },
   "category": {
     "animations": "Animazioni",

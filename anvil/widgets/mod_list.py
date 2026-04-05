@@ -242,6 +242,7 @@ class ModListProxyModel(QSortFilterProxyModel):
         self._filter_text: str = ""
         self._filter_prop_ids: set[int] = set()
         self._filter_cat_ids: set[int] = set()
+        self._filter_nexus_cat_ids: set[int] = set()
         self._mod_entries: list = []  # Reference to MainWindow._current_mod_entries
         self._category_manager = None
 
@@ -251,11 +252,13 @@ class ModListProxyModel(QSortFilterProxyModel):
         self._hidden_rows = rows
         self.endResetModel()
 
-    def set_filter_state(self, text: str, prop_ids: set[int], cat_ids: set[int]):
+    def set_filter_state(self, text: str, prop_ids: set[int], cat_ids: set[int],
+                         nexus_cat_ids: set[int] | None = None):
         """Update filter criteria from FilterPanel and re-filter."""
         self._filter_text = text
         self._filter_prop_ids = prop_ids
         self._filter_cat_ids = cat_ids
+        self._filter_nexus_cat_ids = nexus_cat_ids or set()
         self.invalidateFilter()
 
     def set_mod_entries(self, entries: list):
@@ -267,13 +270,15 @@ class ModListProxyModel(QSortFilterProxyModel):
         self._category_manager = manager
 
     def filterAcceptsRow(self, source_row, source_parent):
+        has_filter = (self._filter_text or self._filter_prop_ids
+                      or self._filter_cat_ids or self._filter_nexus_cat_ids)
         if source_row in self._hidden_rows:
             # When search/filter is active, show mods even in collapsed separators
-            if not self._filter_text and not self._filter_prop_ids and not self._filter_cat_ids:
+            if not has_filter:
                 return False
 
         # If no filters active, accept all
-        if not self._filter_text and not self._filter_prop_ids and not self._filter_cat_ids:
+        if not has_filter:
             return True
 
         # Separators always visible (they structure the list)
@@ -337,6 +342,11 @@ class ModListProxyModel(QSortFilterProxyModel):
         if self._filter_cat_ids:
             mod_cats = set(entry.category_ids)
             if not mod_cats.intersection(self._filter_cat_ids):
+                return False
+
+        # Nexus category filters (OR: show if mod's nexus_category matches ANY chip)
+        if self._filter_nexus_cat_ids:
+            if entry.nexus_category not in self._filter_nexus_cat_ids:
                 return False
 
         return True
