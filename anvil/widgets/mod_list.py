@@ -306,13 +306,16 @@ class ModListProxyModel(QSortFilterProxyModel):
         # Property filters (OR within properties: show if ANY checked property matches)
         if self._filter_prop_ids:
             from anvil.widgets.filter_panel import (
-                PROP_ENABLED, PROP_DISABLED, PROP_HAS_CATEGORY,
-                PROP_NO_CATEGORY, PROP_CONFLICT_WIN, PROP_CONFLICT_LOSE,
+                PROP_ENABLED, PROP_DISABLED, PROP_HAS_NOTES,
+                PROP_HAS_CATEGORY, PROP_NO_CATEGORY,
+                PROP_CONFLICT_WIN, PROP_CONFLICT_LOSE,
             )
             match = False
             if PROP_ENABLED in self._filter_prop_ids and entry.enabled:
                 match = True
             if PROP_DISABLED in self._filter_prop_ids and not entry.enabled:
+                match = True
+            if PROP_HAS_NOTES in self._filter_prop_ids and getattr(entry, "notes", ""):
                 match = True
             if PROP_HAS_CATEGORY in self._filter_prop_ids and entry.category_ids:
                 match = True

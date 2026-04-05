@@ -314,6 +314,7 @@ class DownloadManager(QObject):
         """Write a .meta file next to the downloaded archive."""
         meta_path = Path(str(task.save_path) + ".meta")
         cp = configparser.ConfigParser()
+        cp.optionxform = str
         cp["General"] = {
             "gameName": task.game,
             "modID": str(task.mod_id),

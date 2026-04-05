@@ -316,14 +316,6 @@ def _build_nexus_tab(mod_path: str):
     if game_name:
         _add_row(tr("mod_detail.nexus_game"), game_name)
 
-    # Endorsement
-    endorsed = meta.get("endorsed", "3")
-    endorsed_map = {"0": tr("mod_detail.nexus_not_endorsed"),
-                    "1": tr("mod_detail.nexus_endorsed"),
-                    "2": tr("mod_detail.nexus_abstained"),
-                    "3": tr("mod_detail.nexus_unknown")}
-    _add_row(tr("mod_detail.nexus_endorsement"), endorsed_map.get(endorsed, endorsed_map["3"]))
-
     category = meta.get("nexuscategory", meta.get("nexusCategory", ""))
     if category and category != "0":
         _add_row(tr("mod_detail.nexus_category"), category)

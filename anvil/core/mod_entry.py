@@ -57,6 +57,9 @@ class ModEntry:
     # Separator color (from meta.ini, compatible with common meta.ini format)
     color: str = ""                        # Hex color e.g. "#FF0000", empty = no custom color
 
+    # Nexus metadata
+    nexus_category: int = 0                # Nexus category ID from meta.ini
+
     # Computed from filesystem
     file_count: int = 0
     total_size: int = 0                    # Bytes
@@ -137,6 +140,14 @@ def _build_entry(
         if raw_color:
             sep_color = raw_color
 
+    # Parse Nexus category ID
+    nexus_cat = 0
+    raw_ncat = meta.get("nexuscategory", meta.get("nexusCategory", "0"))
+    try:
+        nexus_cat = int(raw_ncat)
+    except (ValueError, TypeError):
+        pass
+
     return ModEntry(
         name=name,
         enabled=enabled,
@@ -154,6 +165,7 @@ def _build_entry(
         install_date=meta.get("installDate", ""),
         is_separator=is_sep,
         color=sep_color,
+        nexus_category=nexus_cat,
         file_count=file_count,
         total_size=total_size,
     )

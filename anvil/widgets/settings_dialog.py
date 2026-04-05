@@ -484,23 +484,17 @@ class SettingsDialog(QDialog):
         opt_grp = QGroupBox(tr("settings.options"))
         opt_layout = QHBoxLayout(opt_grp)
         opt_left = QVBoxLayout()
-        # Endorsement — Coming soon
-        cb = QCheckBox(tr("settings.nexus_endorsement"))
-        cb.setChecked(True)
-        _disabled(cb)
-        opt_left.addWidget(cb)
-
         # Tracking — aktiv
         self._cb_nexus_tracking = QCheckBox(tr("settings.nexus_tracking"))
         self._cb_nexus_tracking.setChecked(
             self._settings().value("Nexus/tracking_enabled", True, type=bool))
         opt_left.addWidget(self._cb_nexus_tracking)
 
-        # Category Mapping — Coming soon
-        cb = QCheckBox(tr("settings.nexus_category_mapping"))
-        cb.setChecked(True)
-        _disabled(cb)
-        opt_left.addWidget(cb)
+        # Category Mapping — aktiv
+        self._cb_nexus_catmap = QCheckBox(tr("settings.nexus_category_mapping"))
+        self._cb_nexus_catmap.setChecked(
+            self._settings().value("Nexus/category_mapping_enabled", True, type=bool))
+        opt_left.addWidget(self._cb_nexus_catmap)
 
         # API Counter ausblenden — aktiv
         self._cb_nexus_hide_api = QCheckBox(tr("settings.nexus_hide_api_counter"))
@@ -994,6 +988,7 @@ class SettingsDialog(QDialog):
         # Tab Nexus — Optionen
         settings.setValue("Nexus/tracking_enabled", self._cb_nexus_tracking.isChecked())
         settings.setValue("Nexus/hide_api_counter", self._cb_nexus_hide_api.isChecked())
+        settings.setValue("Nexus/category_mapping_enabled", self._cb_nexus_catmap.isChecked())
         # Tab-Index merken
         settings.setValue("SettingsDialog/tab_index", self._tabs.currentIndex())
         settings.sync()  # Sicherstellen dass Änderungen geschrieben werden

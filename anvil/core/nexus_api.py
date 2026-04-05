@@ -59,6 +59,40 @@ class _ApiWorker(QThread):
             self.error.emit(self._tag, str(exc))
 
 
+class _ApiPostWorker(QThread):
+    """Background thread that performs a single HTTP POST request."""
+
+    finished = Signal(str, int, dict, bytes)  # (tag, status_code, headers, body)
+    error = Signal(str, str)                  # (tag, error_message)
+
+    def __init__(self, url: str, headers: dict[str, str], body: bytes, tag: str, parent=None):
+        super().__init__(parent)
+        self._url = url
+        self._headers = headers
+        self._body = body
+        self._tag = tag
+
+    def run(self) -> None:
+        try:
+            req = urllib.request.Request(self._url, data=self._body, headers=self._headers, method="POST")
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                status = resp.status
+                headers = {k.lower(): v for k, v in resp.getheaders()}
+                body = resp.read()
+                self.finished.emit(self._tag, status, headers, body)
+        except urllib.error.HTTPError as exc:
+            status = exc.code
+            headers = {k.lower(): v for k, v in exc.headers.items()} if exc.headers else {}
+            body = b""
+            try:
+                body = exc.read()
+            except Exception:
+                pass
+            self.finished.emit(self._tag, status, headers, body)
+        except Exception as exc:
+            self.error.emit(self._tag, str(exc))
+
+
 class NexusAPI(QObject):
     """Async Nexus Mods API v1 client (stdlib only, no QtNetwork).
 
@@ -163,7 +197,33 @@ class NexusAPI(QObject):
             path += "?" + urlencode(params)
         self._get(path, tag=f"download_link:{game}:{mod_id}:{file_id}")
 
+    def get_game_info(self, game: str) -> None:
+        """Fetch game info including categories.  GET /games/{game}.json"""
+        self._get(f"/games/{game}.json", tag=f"game_categories:{game}")
+
     # ── Internal ──────────────────────────────────────────────────────
+
+    def _post(self, path: str, body: dict, tag: str = "") -> None:
+        """Send a POST request via a background QThread."""
+        if not self._api_key:
+            self.request_error.emit(tag, "Kein API-Schlüssel gesetzt.")
+            return
+
+        url = API_BASE + path
+        headers = {
+            "apikey": self._api_key,
+            "User-Agent": f"Anvil Organizer/{APP_VERSION}",
+            "Content-Type": "application/json",
+        }
+        encoded = json.dumps(body).encode("utf-8")
+
+        worker = _ApiPostWorker(url, headers, encoded, tag, parent=self)
+        worker.finished.connect(self._on_worker_finished)
+        worker.error.connect(self._on_worker_error)
+        worker.finished.connect(lambda *_: self._cleanup_worker(worker))
+        worker.error.connect(lambda *_: self._cleanup_worker(worker))
+        self._workers.append(worker)
+        worker.start()
 
     def _get(self, path: str, tag: str = "") -> None:
         """Send a GET request via a background QThread."""

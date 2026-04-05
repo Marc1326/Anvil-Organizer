@@ -1110,6 +1110,9 @@ class MainWindow(QMainWindow):
         self._filter_panel.set_categories(self._category_manager.all_categories())
         self._filter_panel.reset_all()
 
+        # Load Nexus categories cache (lazy API call if expired)
+        self._load_nexus_categories(instance_path)
+
         # Load available profiles from disk
         profiles_dir = instance_path / ".profiles"
         profiles_dir.mkdir(parents=True, exist_ok=True)
@@ -2061,7 +2064,6 @@ class MainWindow(QMainWindow):
                 meta_file = Path(str(archive) + ".meta")
                 if meta_file.is_file():
                     cp_meta = configparser.ConfigParser()
-                    cp_meta.optionxform = str
                     try:
                         cp_meta.read(str(meta_file), encoding="utf-8")
                         if cp_meta.has_section("General"):
@@ -2086,6 +2088,17 @@ class MainWindow(QMainWindow):
                                 write_meta_ini(mod_path, nexus_data)
                     except (configparser.Error, OSError):
                         pass
+                else:
+                    # Fallback: parse modID from Nexus filename (manual download)
+                    from anvil.core.nexus_filename_parser import extract_nexus_mod_id
+                    parsed_id = extract_nexus_mod_id(Path(archive).name)
+                    if parsed_id:
+                        from anvil.core.mod_metadata import write_meta_ini
+                        write_meta_ini(mod_path, {
+                            "modid": str(parsed_id),
+                            "installationFile": Path(archive).name,
+                            "repository": "Nexus",
+                        })
 
                 profiles_dir = self._current_instance_path / ".profiles"
                 global_modlist = profiles_dir / "modlist.txt"
@@ -2563,10 +2576,15 @@ class MainWindow(QMainWindow):
         # ── Sicherung / Nexus / Explorer ─────────────────────────
         act_backup = menu.addAction(tr("context.create_backup"))
         act_backup.setEnabled(single)
-        act = menu.addAction(tr("context.remove_endorsement"))
-        act.setEnabled(False)
-        act = menu.addAction(tr("context.reassign_category"))
-        act.setEnabled(False)
+
+        # Category reassign (Nexus)
+        act_reassign_cat = menu.addAction(tr("context.reassign_category"))
+        act_reassign_cat.setEnabled(
+            single and _ctx_entry is not None
+            and _ctx_entry.nexus_id > 0
+            and self._nexus_api.has_api_key()
+        )
+
         act = menu.addAction(tr("context.start_tracking"))
         act.setEnabled(False)
         nexus_info_menu = menu.addMenu(tr("context.nexus_info_menu"))
@@ -2645,6 +2663,8 @@ class MainWindow(QMainWindow):
             self._ctx_remove_mods(selected_rows)
         elif chosen == act_backup:
             self._ctx_create_backup(selected_rows[0])
+        elif chosen == act_reassign_cat:
+            self._ctx_reassign_category(selected_rows[0])
         elif chosen == act_nexus:
             self._ctx_visit_nexus(selected_rows[0])
         elif chosen == act_nexus_query:
@@ -4420,6 +4440,88 @@ class MainWindow(QMainWindow):
         with open(meta_path, "w", encoding="utf-8") as f:
             cp.write(f)
 
+    def _load_nexus_categories(self, instance_path: Path) -> None:
+        """Load Nexus categories from cache or trigger API call if expired."""
+        s = self._settings()
+        if not s.value("Nexus/category_mapping_enabled", True, type=bool):
+            return
+        if not self._nexus_api.has_api_key() or not self._current_plugin:
+            return
+        from anvil.core.nexus_categories import NexusCategoryCache
+        cache = NexusCategoryCache(instance_path)
+        if cache.load() and not cache.is_expired():
+            return  # Cache valid
+        nexus_slug = (
+            getattr(self._current_plugin, "GameNexusName", "")
+            or getattr(self._current_plugin, "GameShortName", "")
+        )
+        if nexus_slug:
+            self._nexus_api.get_game_info(nexus_slug)
+
+    def _ctx_auto_assign_categories(self) -> None:
+        """Batch-assign Nexus categories to all mods."""
+        idata = self._instance_manager.current_instance_data()
+        if not idata:
+            return
+        inst_path = Path(idata.get("path", ""))
+        from anvil.core.nexus_categories import NexusCategoryCache, assign_nexus_categories
+        cache = NexusCategoryCache(inst_path)
+        if not cache.load():
+            self.statusBar().showMessage(tr("status.no_nexus_category"), 5000)
+            return
+        cat_mgr = self._filter_panel._category_manager
+        if not cat_mgr:
+            return
+        count = 0
+        for entry in self._current_mod_entries:
+            if entry.is_separator or entry.nexus_category <= 0:
+                continue
+            added = assign_nexus_categories(
+                entry.install_path, entry.nexus_category, cache, cat_mgr)
+            if added:
+                count += 1
+        self.statusBar().showMessage(
+            tr("status.categories_assigned", count=count), 5000)
+        if count > 0:
+            self._filter_panel.set_categories(cat_mgr.all_categories())
+            self._reload_mod_list()
+
+    def _ctx_reassign_category(self, row: int) -> None:
+        """Assign Nexus category to mod (merge, not overwrite)."""
+        entry = self._entry_for_row(row)
+        if not entry or entry.nexus_id <= 0:
+            return
+        idata = self._instance_manager.current_instance_data()
+        if not idata:
+            return
+        inst_path = Path(idata.get("path", ""))
+        from anvil.core.nexus_categories import NexusCategoryCache, assign_nexus_categories
+        cache = NexusCategoryCache(inst_path)
+        if not cache.load():
+            self.statusBar().showMessage(
+                tr("status.no_nexus_category"), 5000)
+            return
+        nexus_cat = entry.nexus_category
+        if nexus_cat <= 0:
+            self.statusBar().showMessage(
+                tr("status.no_nexus_category"), 5000)
+            return
+        cat_mgr = self._filter_panel._category_manager
+        if not cat_mgr:
+            return
+        added = assign_nexus_categories(entry.install_path, nexus_cat, cache, cat_mgr)
+        if added:
+            cat_name = cat_mgr.get_name(added[0]) if added else ""
+            self.statusBar().showMessage(
+                tr("status.category_assigned_single",
+                   category=cat_name, name=entry.display_name or entry.name), 5000)
+            self._filter_panel.set_categories(cat_mgr.all_categories())
+            self._reload_mod_list()
+        else:
+            self.statusBar().showMessage(
+                tr("status.category_assigned_single",
+                   category="—", name=entry.display_name or entry.name), 5000)
+
     def _ctx_visit_nexus(self, row: int) -> None:
         """Open the mod's Nexus Mods page in the browser."""
         entry = self._entry_for_row(row)
@@ -4814,6 +4916,21 @@ class MainWindow(QMainWindow):
             from PySide6.QtCore import QTimer
             QTimer.singleShot(1000, self._update_check_next)
 
+        elif tag.startswith("game_categories:") and isinstance(data, dict):
+            # Category cache update
+            categories = data.get("categories", [])
+            if categories and self._current_plugin:
+                from anvil.core.nexus_categories import NexusCategoryCache
+                idata = self._instance_manager.current_instance_data()
+                if idata:
+                    inst_path = Path(idata.get("path", ""))
+                    if inst_path.exists():
+                        cache = NexusCategoryCache(inst_path)
+                        game_slug = tag.split(":", 1)[1]
+                        cache.save(game_slug, categories)
+                        self._log_panel.add_log("info",
+                            tr("status.nexus_categories_loaded", count=len(categories)))
+
         elif tag.startswith("query_mod_info:") and isinstance(data, dict):
             # ── Separate framework query mode ─────────────────────
             fw_qname = self._pending_fw_query_name
@@ -4836,18 +4953,6 @@ class MainWindow(QMainWindow):
                     from datetime import datetime, timezone
                     nexus_slug = self._batch_query_slug
 
-                    # Endorsement status
-                    endorsed_val = "3"  # UNKNOWN
-                    endorsement = data.get("endorsement")
-                    if isinstance(endorsement, dict):
-                        endorse_status = endorsement.get("endorse_status", "")
-                        if endorse_status == "Endorsed":
-                            endorsed_val = "1"
-                        elif endorse_status == "Abstained":
-                            endorsed_val = "2"
-                        elif endorse_status == "Undecided":
-                            endorsed_val = "0"
-
                     # SAFE fields only — NEVER touch name, version, description
                     write_meta_ini(batch_path, {
                         "modid": str(data.get("mod_id", 0)),
@@ -4856,7 +4961,6 @@ class MainWindow(QMainWindow):
                         "nexusAuthor": data.get("author", ""),
                         "nexusSummary": data.get("summary", ""),
                         "nexusCategory": str(data.get("category_id", 0)),
-                        "endorsed": endorsed_val,
                         "gameName": nexus_slug,
                         "repository": "Nexus",
                         "lastNexusQuery": datetime.now(timezone.utc).isoformat(),
@@ -4903,17 +5007,6 @@ class MainWindow(QMainWindow):
                         getattr(self._current_plugin, "GameNexusName", "")
                         or getattr(self._current_plugin, "GameShortName", "")
                     )
-                # Endorsement status
-                endorsed_val = "3"  # UNKNOWN
-                endorsement = data.get("endorsement")
-                if isinstance(endorsement, dict):
-                    status = endorsement.get("endorse_status", "")
-                    if status == "Endorsed":
-                        endorsed_val = "1"
-                    elif status == "Abstained":
-                        endorsed_val = "2"
-                    elif status == "Undecided":
-                        endorsed_val = "0"
 
                 from datetime import datetime, timezone
                 write_meta_ini(mod_path, {
@@ -4924,7 +5017,6 @@ class MainWindow(QMainWindow):
                     "nexusSummary": data.get("summary", ""),
                     "nexusDescription": data.get("description", ""),
                     "nexusCategory": str(data.get("category_id", 0)),
-                    "endorsed": endorsed_val,
                     "gameName": nexus_slug,
                     "repository": "Nexus",
                     "lastNexusQuery": datetime.now(timezone.utc).isoformat(),
@@ -4937,6 +5029,9 @@ class MainWindow(QMainWindow):
 
     def _on_nexus_error(self, tag: str, message: str) -> None:
         """Handle Nexus API errors."""
+        if tag.startswith("game_categories:"):
+            self._log_panel.add_log("error", f"Nexus categories: {message}")
+            return
         if tag.startswith("update_check:"):
             self._pending_update_check = None
             from PySide6.QtCore import QTimer

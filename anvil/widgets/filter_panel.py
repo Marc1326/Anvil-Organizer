@@ -35,7 +35,6 @@ from anvil.core.translator import tr
 # Property chip IDs (negative to avoid clash with category IDs)
 PROP_ENABLED = -1
 PROP_DISABLED = -2
-PROP_ENDORSED = -3
 PROP_HAS_NOTES = -4
 PROP_HAS_CATEGORY = -5
 PROP_NO_CATEGORY = -6
@@ -47,7 +46,6 @@ def _get_property_chips():
     return [
         (PROP_ENABLED, tr("filter.prop_enabled")),
         (PROP_DISABLED, tr("filter.prop_disabled")),
-        (PROP_ENDORSED, tr("filter.prop_endorsed")),
         (PROP_HAS_NOTES, tr("filter.prop_has_notes")),
         (PROP_HAS_CATEGORY, tr("filter.prop_has_category")),
         (PROP_NO_CATEGORY, tr("filter.prop_no_category")),
