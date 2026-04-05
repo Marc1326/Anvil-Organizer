@@ -1778,20 +1778,9 @@ class GamePanel(QWidget):
         cwd = working_dir or str(exe.parent)
 
         try:
-            proton_cmd = [str(proton_script), "run", str(exe)]
+            cmd = [str(proton_script), "run", str(exe)]
             if args:
-                proton_cmd.extend(args)
-            # Gamescope fuer HiDPI-Skalierung (4K etc.)
-            gamescope = shutil.which("gamescope")
-            if gamescope:
-                cmd = [
-                    gamescope, "-w", "1920", "-h", "1080",
-                    "-W", "3840", "-H", "2160",
-                    "--force-grab-cursor",
-                    "--", *proton_cmd,
-                ]
-            else:
-                cmd = proton_cmd
+                cmd.extend(args)
             proc = subprocess.Popen(
                 cmd, cwd=cwd, env=env,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
