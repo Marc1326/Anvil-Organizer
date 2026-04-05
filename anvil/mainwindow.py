@@ -307,6 +307,8 @@ class MainWindow(QMainWindow):
         if saved_key:
             self._nexus_api.set_api_key(saved_key)
             self._status_bar.update_api_status(logged_in=True)
+        hidden = self._settings().value("Nexus/hide_api_counter", False, type=bool)
+        self._status_bar.set_api_counter_visible(not hidden)
         self._nexus_api.request_finished.connect(self._on_nexus_response)
         self._nexus_api.request_error.connect(self._on_nexus_error)
         self._nexus_api.rate_limit_updated.connect(self._update_api_status)
@@ -317,6 +319,9 @@ class MainWindow(QMainWindow):
         self._pending_query_path: Path | None = None
         self._pending_dl_query_path: str | None = None
         self._fw_query_queue: list[tuple[str, int]] = []
+        self._update_check_queue: list = []
+        self._update_check_slug: str = ""
+        self._pending_update_check = None
         self._fw_query_slug: str = ""
         self._fw_query_total: int = 0
         self._fw_query_done: int = 0
@@ -946,8 +951,8 @@ class MainWindow(QMainWindow):
             self._batch_query_queue.clear()
         if hasattr(self, "_batch_query_active"):
             self._batch_query_active = False
-        if hasattr(self, "_update_check_queue"):
-            self._update_check_queue.clear()
+        self._update_check_queue.clear()
+        self._pending_update_check = None
         # REDmod-Prozess abbrechen falls aktiv
         self._game_panel.cancel_redmod_if_running()
 
@@ -2187,9 +2192,11 @@ class MainWindow(QMainWindow):
                             ))
                             break
                 if queue:
-                    self._update_check_queue = queue
+                    already_running = bool(self._pending_update_check)
+                    self._update_check_queue.extend(queue)
                     self._update_check_slug = nexus_slug
-                    self._update_check_next()
+                    if not already_running:
+                        self._update_check_next()
 
         if installed:
             names = ", ".join(installed)
@@ -2198,14 +2205,14 @@ class MainWindow(QMainWindow):
 
     def _update_check_next(self) -> None:
         """Send the next update-check request from the queue."""
-        queue = getattr(self, "_update_check_queue", [])
-        if not queue:
+        if not self._update_check_queue:
             return
-        name, nexus_id, version, mod_path = queue.pop(0)
+        if not self._update_check_slug:
+            self._update_check_queue.clear()
+            return
+        name, nexus_id, version, mod_path = self._update_check_queue.pop(0)
         self._pending_update_check = (name, nexus_id, version, mod_path)
-        slug = getattr(self, "_update_check_slug", "")
-        if slug:
-            self._nexus_api.update_check_mod(slug, nexus_id)
+        self._nexus_api.update_check_mod(self._update_check_slug, nexus_id)
 
     def _write_install_meta(self, archive: Path, mod_name: str) -> None:
         """Write installed=true and installationFile=mod_name to the archive's .meta file."""
@@ -4933,7 +4940,10 @@ class MainWindow(QMainWindow):
         if tag.startswith("update_check:"):
             self._pending_update_check = None
             from PySide6.QtCore import QTimer
-            QTimer.singleShot(1000, self._update_check_next)
+            if "429" in message or "Rate Limit" in message:
+                QTimer.singleShot(60000, self._update_check_next)
+            else:
+                QTimer.singleShot(1000, self._update_check_next)
             return
         if tag.startswith("query_mod_info:"):
             # Separate framework query mode
