@@ -9,7 +9,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORMTHEME", "xdgdesktopportal")
 
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QSettings, QTranslator, QLibraryInfo
+from PySide6.QtCore import QLocale, QSettings, QTranslator, QLibraryInfo
 from PySide6.QtGui import QIcon
 
 from anvil.mainwindow import MainWindow
@@ -23,7 +23,10 @@ def _init_translator():
     """Initialisiert den Translator mit der gespeicherten Sprache."""
     config_path = Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf"
     settings = QSettings(str(config_path), QSettings.Format.IniFormat)
-    saved_lang = settings.value("General/language", "de")
+    system_lang = QLocale.system().name()[:2]
+    available = {"de", "en", "es", "fr", "it", "pt", "ru"}
+    default_lang = system_lang if system_lang in available else "en"
+    saved_lang = settings.value("General/language", default_lang)
     translator = Translator.instance()
     translator.load(saved_lang)
 
