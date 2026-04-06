@@ -20,6 +20,10 @@ a = Analysis(
         'xml',
         'xml.etree',
         'xml.etree.ElementTree',
+        # Game-Plugins werden dynamisch geladen — PyInstaller sieht ihre Imports nicht
+        'anvil.core.bg3_mod_installer',
+        'anvil.core.lspk_parser',
+        'anvil.plugins.framework_mod',
     ],
     hookspath=[],
     hooksconfig={},
