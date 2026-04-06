@@ -85,9 +85,8 @@ def register_nxm_handler() -> bool:
 
     Returns True on success.
     """
-    # Find the main entry point
-    main_script = _find_main_script()
-    if not main_script:
+    exec_cmd = _build_exec_command()
+    if not exec_cmd:
         return False
 
     desktop_dir = Path.home() / ".local" / "share" / "applications"
@@ -98,7 +97,7 @@ def register_nxm_handler() -> bool:
 Type=Application
 Name=Anvil Organizer
 Comment=Anvil Organizer
-Exec=python3 {main_script} %u
+Exec={exec_cmd} %u
 Icon=anvil-organizer
 Terminal=false
 Categories=Game;
@@ -123,21 +122,38 @@ NoDisplay=true
     return True
 
 
-def _find_main_script() -> str | None:
-    """Find the main.py entry point for Anvil Organizer."""
-    # Try relative to this file
+def _build_exec_command() -> str | None:
+    """Build the Exec command for the .desktop file.
+
+    Detects AppImage, PyInstaller frozen builds, and dev environments.
+    """
+    # AppImage: $APPIMAGE is the persistent path to the .AppImage file
+    appimage = os.environ.get("APPIMAGE")
+    if appimage and Path(appimage).is_file():
+        return f'"{appimage}"'
+
+    # PyInstaller frozen binary (non-AppImage)
+    if getattr(sys, "frozen", False):
+        exe = Path(sys.executable).resolve()
+        if exe.is_file():
+            return f'"{exe}"'
+
+    # Dev environment: main.py relative to this file
     core_dir = Path(__file__).resolve().parent       # anvil/core/
     anvil_dir = core_dir.parent                       # anvil/
     project_dir = anvil_dir.parent                    # project root
     main_py = project_dir / "main.py"
     if main_py.is_file():
-        return str(main_py)
+        venv_python = project_dir / ".venv" / "bin" / "python"
+        if venv_python.is_file():
+            return f'"{venv_python}" "{main_py}"'
+        return f'python3 "{main_py}"'
 
     # Fallback: sys.argv[0]
     if sys.argv and sys.argv[0]:
         p = Path(sys.argv[0]).resolve()
         if p.is_file():
-            return str(p)
+            return f'python3 "{p}"'
 
     return None
 
