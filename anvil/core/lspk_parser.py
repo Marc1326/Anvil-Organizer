@@ -18,6 +18,7 @@ import json
 import struct
 import sys
 import xml.etree.ElementTree as ET
+import zlib
 from pathlib import Path
 
 try:
@@ -236,9 +237,10 @@ class LSPKReader:
         compression = entry["compression"]
         if compression == _COMPRESS_NONE:
             return data
+        if compression == _COMPRESS_ZLIB:
+            return zlib.decompress(data)
         if compression == _COMPRESS_LZ4:
             return lz4.block.decompress(data, uncompressed_size=entry["uncompressed_size"])
-        # Zlib/Zstd not supported
         print(f"lspk_parser: unsupported compression {compression} for {entry['name']}", file=sys.stderr)
         return None
 
