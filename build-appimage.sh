@@ -14,7 +14,7 @@ APPDIR="$SCRIPT_DIR/AnvilOrganizer.AppDir"
 RELEASE_DIR="$SCRIPT_DIR/release"
 APPIMAGETOOL="/tmp/appimagetool"
 
-VERSION="1.3.8"
+VERSION="1.3.9"
 APPIMAGE_NAME="Anvil_Organizer-${VERSION}-x86_64.AppImage"
 
 echo "========================================"
