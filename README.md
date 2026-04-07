@@ -140,16 +140,31 @@ Use **[GoodbyeWindows](https://github.com/Marc1326/GoodbyeWindows)** to transfer
 | **Git** | `git --version` | `sudo pacman -S git` | `sudo apt install git` |
 | **Qt6 libraries** | `python3 -c "from PySide6 import QtWidgets"` | `sudo pacman -S qt6-base` | `sudo apt install libgl1 libegl1 libxcb-cursor0 libxkbcommon0` |
 
-### AppImage (recommended)
+### Installer Script (recommended)
 
-No installation needed — download, make executable, run:
+One command to install Anvil with desktop entry and NXM handler:
 
 ```bash
-chmod +x Anvil_Organizer-1.3.4-x86_64.AppImage
-./Anvil_Organizer-1.3.4-x86_64.AppImage
+curl -sSL https://raw.githubusercontent.com/Marc1326/Anvil-Organizer/main/Anvil-Organizer-installer.sh | bash
 ```
 
-Download from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest).
+This downloads the latest AppImage to `~/Applications/`, creates a desktop entry, and registers the NXM link handler.
+
+### AppImage (manual)
+
+Download from [GitHub Releases](https://github.com/Marc1326/Anvil-Organizer/releases/latest), make executable, run:
+
+```bash
+chmod +x Anvil_Organizer-*-x86_64.AppImage
+./Anvil_Organizer-*-x86_64.AppImage
+```
+
+### .deb Package (Debian / Ubuntu)
+
+```bash
+# Download from GitHub Releases, then:
+sudo apt install ./anvil-organizer_*_amd64.deb
+```
 
 ### AUR (Arch Linux, CachyOS, EndeavourOS, Manjaro)
 
