@@ -123,7 +123,7 @@ class ModsettingsParser:
                 version64, publish_handle
         """
         default = {
-            "version": {"major": "4", "minor": "7", "revision": "1", "build": "3"},
+            "version": {"major": "4", "minor": "8", "revision": "0", "build": "700"},
             "mod_order": [],
             "mods": [],
         }

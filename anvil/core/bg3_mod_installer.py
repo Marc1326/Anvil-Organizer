@@ -1212,23 +1212,13 @@ class BG3ModInstaller:
             if is_base_game_mod(uuid) and uuid.lower() not in all_mods_by_uuid:
                 entry = {
                     "uuid": uuid,
-                    "name": "Gustav",
-                    "folder": "GustavDev",
-                    "md5": "",
-                    "version64": "144115207403209032",
+                    "name": "GustavX",
+                    "folder": "GustavX",
+                    "md5": "ef3fcba3f3684b3088ad1f9874d4957c",
+                    "version64": "145241946983074840",
                     "publish_handle": "0",
                 }
                 all_mods_by_uuid[uuid.lower()] = entry
-
-        # ── Build ModOrder XML ────────────────────────────────────
-        mod_order_lines: list[str] = []
-        for uuid in final_order:
-            mod_order_lines.append(
-                f'            <node id="Module">\n'
-                f'              <attribute id="UUID" type="FixedString" '
-                f'value="{_xml_escape(uuid.strip())}"/>\n'
-                f'            </node>'
-            )
 
         # ── Build Mods XML (all mods: active first, then inactive) ─
         mods_lines: list[str] = []
@@ -1252,24 +1242,19 @@ class BG3ModInstaller:
         xml = (
             f'<?xml version="1.0" encoding="UTF-8"?>\n'
             f'<save>\n'
-            f'  <version major="{version["major"]}" minor="{version["minor"]}" '
+            f'    <version major="{version["major"]}" minor="{version["minor"]}" '
             f'revision="{version["revision"]}" build="{version["build"]}"/>\n'
-            f'  <region id="ModuleSettings">\n'
-            f'    <node id="root">\n'
-            f'      <children>\n'
-            f'        <node id="ModOrder">\n'
-            f'          <children>\n'
-            f'{chr(10).join(mod_order_lines)}\n'
-            f'          </children>\n'
-            f'        </node>\n'
-            f'        <node id="Mods">\n'
-            f'          <children>\n'
+            f'    <region id="ModuleSettings">\n'
+            f'        <node id="root">\n'
+            f'            <children>\n'
+            f'                <node id="Mods">\n'
+            f'                    <children>\n'
             f'{chr(10).join(mods_lines)}\n'
-            f'          </children>\n'
+            f'                    </children>\n'
+            f'                </node>\n'
+            f'            </children>\n'
             f'        </node>\n'
-            f'      </children>\n'
-            f'    </node>\n'
-            f'  </region>\n'
+            f'    </region>\n'
             f'</save>\n'
         )
 
@@ -1296,14 +1281,14 @@ class BG3ModInstaller:
         ver64 = attrs.get("version64", "0") or "0"
 
         return (
-            f'            <node id="ModuleShortDesc">\n'
-            f'              <attribute id="Folder" type="LSString" value="{folder}"/>\n'
-            f'              <attribute id="MD5" type="LSString" value="{md5}"/>\n'
-            f'              <attribute id="Name" type="LSString" value="{name}"/>\n'
-            f'              <attribute id="PublishHandle" type="uint64" value="{pub_handle}"/>\n'
-            f'              <attribute id="UUID" type="FixedString" value="{uuid_esc}"/>\n'
-            f'              <attribute id="Version64" type="int64" value="{ver64}"/>\n'
-            f'            </node>'
+            f'                        <node id="ModuleShortDesc">\n'
+            f'                            <attribute id="Folder" type="LSString" value="{folder}"/>\n'
+            f'                            <attribute id="MD5" type="LSString" value="{md5}"/>\n'
+            f'                            <attribute id="Name" type="LSString" value="{name}"/>\n'
+            f'                            <attribute id="PublishHandle" type="uint64" value="{pub_handle}"/>\n'
+            f'                            <attribute id="UUID" type="guid" value="{uuid_esc}"/>\n'
+            f'                            <attribute id="Version64" type="int64" value="{ver64}"/>\n'
+            f'                        </node>'
         )
 
     @staticmethod
