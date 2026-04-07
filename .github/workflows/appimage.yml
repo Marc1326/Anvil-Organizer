@@ -60,6 +60,64 @@ jobs:
           VERSION=$(python -c "from anvil.version import APP_VERSION; print(APP_VERSION)")
           ARCH=x86_64 ./appimagetool AppDir "Anvil_Organizer-${VERSION}-x86_64.AppImage"
 
+      - name: Build .deb package
+        run: |
+          source .venv/bin/activate
+          VERSION=$(python -c "from anvil.version import APP_VERSION; print(APP_VERSION)")
+          PKG="anvil-organizer_${VERSION}_amd64"
+          mkdir -p "${PKG}/DEBIAN"
+          mkdir -p "${PKG}/opt/anvil-organizer"
+          mkdir -p "${PKG}/usr/bin"
+          mkdir -p "${PKG}/usr/share/applications"
+          mkdir -p "${PKG}/usr/share/icons/hicolor/256x256/apps"
+
+          # Control file
+          cat > "${PKG}/DEBIAN/control" << CTRL
+          Package: anvil-organizer
+          Version: ${VERSION}
+          Section: games
+          Priority: optional
+          Architecture: amd64
+          Depends: libxcb1, libxkbcommon0, libgl1
+          Maintainer: Marc <marc@anvil-organizer.dev>
+          Description: Anvil Organizer — Native Linux Mod Manager
+           Mod manager for Linux supporting Steam, Proton, and Nexus Mods.
+           Supports Baldur's Gate 3, Cyberpunk 2077, Skyrim, Fallout 4,
+           The Witcher 3, Starfield, and Red Dead Redemption 2.
+          CTRL
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' "${PKG}/DEBIAN/control"
+
+          # Copy PyInstaller dist
+          cp -a dist/anvil-organizer/* "${PKG}/opt/anvil-organizer/"
+
+          # Symlink in PATH
+          ln -s /opt/anvil-organizer/anvil-organizer "${PKG}/usr/bin/anvil-organizer"
+
+          # Desktop entry
+          cat > "${PKG}/usr/share/applications/anvil-organizer.desktop" << DESK
+          [Desktop Entry]
+          Type=Application
+          Name=Anvil Organizer
+          GenericName=Mod Manager
+          Comment=Native Linux Mod Manager
+          Exec=anvil-organizer %u
+          Icon=anvil-organizer
+          Terminal=false
+          Categories=Game;Utility;
+          Keywords=mod;modding;gaming;steam;proton;nexus;
+          StartupWMClass=anvil-organizer
+          MimeType=x-scheme-handler/nxm;
+          DESK
+          sed -i 's/^          //' "${PKG}/usr/share/applications/anvil-organizer.desktop"
+
+          # Icon
+          cp anvil/resources/logo.png "${PKG}/usr/share/icons/hicolor/256x256/apps/anvil-organizer.png"
+
+          # Build .deb
+          dpkg-deb --build --root-owner-group "${PKG}"
+          echo "deb_file=${PKG}.deb" >> "$GITHUB_OUTPUT"
+
       - name: Upload AppImage as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -76,4 +134,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          files: Anvil_Organizer-*-x86_64.AppImage
+          files: |
+            Anvil_Organizer-*-x86_64.AppImage
+            anvil-organizer_*_amd64.deb
+            Anvil-Organizer-installer.sh
