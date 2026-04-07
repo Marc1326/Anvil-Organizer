@@ -120,6 +120,10 @@ fi
 SIZE=$(du -h "$RELEASE_DIR/$APPIMAGE_NAME" | cut -f1)
 echo "[OK] AppImage built: $RELEASE_DIR/$APPIMAGE_NAME ($SIZE)"
 
+# ── Update latest-symlink ───────────────────────────────────
+ln -sf "$RELEASE_DIR/$APPIMAGE_NAME" "$RELEASE_DIR/Anvil_Organizer-latest.AppImage"
+echo "[OK] Symlink updated: Anvil_Organizer-latest.AppImage → $APPIMAGE_NAME"
+
 # ── Cleanup (optional — keep AppDir for debugging) ───────────
 rm -rf "$APPDIR"
 echo "[OK] AppDir cleaned up"
