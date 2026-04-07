@@ -441,7 +441,7 @@ class BG3ModListView(QWidget):
 
     def _on_reorder(self) -> None:
         """Mods reordered via DnD."""
-        self.mods_reordered.emit(self._mod_model.get_uuid_order())
+        self.mods_reordered.emit(self._mod_model.get_active_uuid_order())
 
     def _emit_context_menu(self, tree: QTreeView, pos, section: str) -> None:
         """Emit context_menu_requested with mod data."""

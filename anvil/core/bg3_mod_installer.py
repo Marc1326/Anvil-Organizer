@@ -499,14 +499,19 @@ class BG3ModInstaller:
                 seen.add(key)
                 unique_mods.append(m)
 
-        # ── Build ModOrder: Gustav first, then all others ─────────
+        # ── Build ModOrder: keep only previously active mods ─────
+        # Only mods that were already in mod_order stay active.
+        # Reactivating all mods here would break BG3 if .paks are
+        # in .disabled/ (BG3 resets modsettings.lsx when it can't
+        # find referenced paks).
+        old_order_set = {u.lower() for u in data["mod_order"]}
         gustav_uuid = None
         other_uuids: list[str] = []
 
         for m in unique_mods:
             if is_base_game_mod(m["uuid"]):
                 gustav_uuid = m["uuid"]
-            else:
+            elif m["uuid"].lower() in old_order_set:
                 other_uuids.append(m["uuid"])
 
         if gustav_uuid is None:
