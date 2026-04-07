@@ -78,7 +78,7 @@ jobs:
           Section: games
           Priority: optional
           Architecture: amd64
-          Depends: libxcb1, libxkbcommon0, libgl1
+          Depends: libxcb1, libxkbcommon0, libgl1, libxcb-cursor0, libxcb-icccm4, libxcb-keysyms1, libxcb-shape0, libxcb-xkb1, libxkbcommon-x11-0
           Maintainer: Marc <marc@anvil-organizer.dev>
           Description: Anvil Organizer — Native Linux Mod Manager
            Mod manager for Linux supporting Steam, Proton, and Nexus Mods.
