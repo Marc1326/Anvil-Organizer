@@ -157,6 +157,18 @@ class BG3ModInstaller:
 
         # Add to end of ModOrder
         mod_order.append(uuid)
+
+        # Also move to end of mods list so display order matches mod_order
+        entry = None
+        rest = []
+        for m in mods:
+            if m["uuid"].lower() == uuid.lower() and entry is None:
+                entry = m
+            else:
+                rest.append(m)
+        if entry is not None:
+            mods = rest + [entry]
+
         self._write_state(mod_order, mods)
         # Auto-deploy: immediately write modsettings.lsx
         self._write_modsettings(mod_order, mods)
