@@ -1241,6 +1241,14 @@ class BG3ModInstaller:
         mods_lines: list[str] = []
         written_uuids: set[str] = set()
 
+        # BG3 uses "last wins" — the last entry in modsettings.lsx has
+        # the highest priority.  Anvil convention is "top = highest
+        # priority" (like MO2).  Reverse user mods so that the Anvil-top
+        # mod ends up last in the XML and wins conflicts in-game.
+        gustav_part = [u for u in final_order if is_base_game_mod(u)]
+        user_part = [u for u in final_order if not is_base_game_mod(u)]
+        final_order = gustav_part + list(reversed(user_part))
+
         # Active mods first (in load order)
         for uuid in final_order:
             key = uuid.lower()
