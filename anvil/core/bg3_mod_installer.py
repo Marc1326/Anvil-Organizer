@@ -1251,6 +1251,21 @@ class BG3ModInstaller:
         user_part = [u for u in final_order if not is_base_game_mod(u)]
         final_order = gustav_part + list(reversed(user_part))
 
+        # ── Build ModOrder XML ────────────────────────────────────
+        mod_order_lines: list[str] = []
+        written_order: set[str] = set()
+        for uuid in final_order:
+            key = uuid.strip().lower()
+            if key in written_order:
+                continue
+            written_order.add(key)
+            mod_order_lines.append(
+                f'                        <node id="Module">\n'
+                f'                            <attribute id="UUID" type="FixedString" '
+                f'value="{_xml_escape(uuid.strip())}"/>\n'
+                f'                        </node>'
+            )
+
         # Active mods first (in load order)
         for uuid in final_order:
             key = uuid.lower()
@@ -1274,6 +1289,11 @@ class BG3ModInstaller:
             f'    <region id="ModuleSettings">\n'
             f'        <node id="root">\n'
             f'            <children>\n'
+            f'                <node id="ModOrder">\n'
+            f'                    <children>\n'
+            f'{chr(10).join(mod_order_lines)}\n'
+            f'                    </children>\n'
+            f'                </node>\n'
             f'                <node id="Mods">\n'
             f'                    <children>\n'
             f'{chr(10).join(mods_lines)}\n'
