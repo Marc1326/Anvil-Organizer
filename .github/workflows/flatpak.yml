@@ -1,9 +1,12 @@
 name: Build Flatpak
 
 on:
-  release:
-    types: [published]
+  push:
+    tags: ['v*']
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   flatpak:
@@ -20,3 +23,11 @@ jobs:
           manifest-path: packaging/flatpak/com.github.Marc1326.AnvilOrganizer.yml
           bundle: anvil-organizer.flatpak
           upload-artifact: true
+
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          files: anvil-organizer.flatpak

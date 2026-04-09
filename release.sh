@@ -5,10 +5,11 @@
 # Macht automatisch:
 # 1. Version-Bump in allen Dateien
 # 2. Commit + Push
-# 3. Git Tag + Push → triggert GitHub Actions
-# 4. Wartet bis alle Builds fertig sind
-# 5. Publiziert das Draft-Release → triggert Flatpak-Build
-# 6. Lädt AppImage runter + packt ZIP in release/
+# 3. Draft-Release erstellen + Git Tag pushen → triggert GitHub Actions
+# 4. Wartet bis alle 4 Builds fertig sind (AppImage, RPM, Snap, Flatpak)
+# 5. Publiziert das Draft-Release
+# 6. Desktop-Entry aktualisieren
+# 7. Lädt AppImage runter + packt ZIP in release/
 
 set -euo pipefail
 
@@ -45,7 +46,7 @@ echo "========================================="
 echo ""
 
 # --- 1. Version-Bump ---
-echo "[1/6] Version-Bump auf $VERSION ..."
+echo "[1/7] Version-Bump auf $VERSION ..."
 
 sed -i "s/^APP_VERSION = .*/APP_VERSION = \"${VERSION}\"/" anvil/version.py
 sed -i "s/^version = .*/version = \"${VERSION}\"/" pyproject.toml
@@ -61,30 +62,36 @@ echo "  ✓ packaging/snap/snapcraft.yaml"
 
 # --- 2. Commit + Push ---
 echo ""
-echo "[2/6] Commit + Push ..."
+echo "[2/7] Commit + Push ..."
 git add anvil/version.py pyproject.toml build-appimage.sh \
     packaging/rpm/anvil-organizer.spec packaging/snap/snapcraft.yaml
 git commit -m "$TAG"
 git push origin main
 echo "  ✓ Commit gepusht"
 
-# --- 3. Tag + Push ---
+# --- 3. Tag + Push + Draft ---
 echo ""
-echo "[3/6] Tag $TAG erstellen + pushen ..."
+echo "[3/7] Tag $TAG erstellen + pushen ..."
 git tag "$TAG"
 git push origin "$TAG"
 echo "  ✓ Tag gepusht — GitHub Actions gestartet"
 
+# Draft-Release SOFORT nach Tag-Push erstellen — verhindert Race-Condition
+# (Workflows finden das existierende Draft und laden ihre Assets hoch,
+#  statt dass jeder Workflow versucht sein eigenes Draft zu erstellen)
+gh release create "$TAG" --draft --title "$TAG" --notes "Release $TAG"
+echo "  ✓ Draft-Release erstellt"
+
 # --- 4. Warten auf Builds ---
 echo ""
-echo "[4/6] Warte auf GitHub Actions ..."
-echo "  Workflows: Build AppImage, Build .rpm Package, Build & Publish Snap"
+echo "[4/7] Warte auf GitHub Actions ..."
+echo "  Workflows: Build AppImage, Build .rpm Package, Build & Publish Snap, Build Flatpak"
 echo ""
 
-# Warte bis alle 3 Workflows für diesen Tag gestartet sind
+# Warte bis alle Workflows für diesen Tag gestartet sind
 sleep 10
 
-WORKFLOWS=("Build AppImage" "Build .rpm Package" "Build & Publish Snap")
+WORKFLOWS=("Build AppImage" "Build .rpm Package" "Build & Publish Snap" "Build Flatpak")
 ALL_DONE=false
 
 while [ "$ALL_DONE" = false ]; do
@@ -120,14 +127,26 @@ done
 echo ""
 
 # --- 5. Release publizieren ---
-echo "[5/6] Draft-Release publizieren ..."
+echo ""
+echo "[5/7] Draft-Release publizieren ..."
 gh release edit "$TAG" --draft=false
 echo "  ✓ Release $TAG ist live!"
-echo "  → Flatpak-Build wird jetzt automatisch gestartet"
 
-# --- 6. AppImage runterladen + ZIP ---
+# --- 6. Desktop-Entry aktualisieren ---
 echo ""
-echo "[6/6] AppImage runterladen + ZIP packen ..."
+echo "[6/7] Desktop-Entry aktualisieren ..."
+DESKTOP_FILE="$HOME/.local/share/applications/anvil-organizer.desktop"
+if [ -f "$DESKTOP_FILE" ]; then
+    APPIMAGE_PATH="$(pwd)/release/Anvil_Organizer-${VERSION}-x86_64.AppImage"
+    sed -i "s|^Exec=.*|Exec=\"${APPIMAGE_PATH}\" %u|" "$DESKTOP_FILE"
+    echo "  ✓ Desktop-Entry auf $VERSION aktualisiert"
+else
+    echo "  ⚠ Kein Desktop-Entry gefunden"
+fi
+
+# --- 7. AppImage runterladen + ZIP ---
+echo ""
+echo "[7/7] AppImage runterladen + ZIP packen ..."
 
 RELEASE_DIR="$(pwd)/release"
 APPIMAGE_NAME="Anvil_Organizer-${VERSION}-x86_64.AppImage"
