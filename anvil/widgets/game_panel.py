@@ -1631,7 +1631,14 @@ class GamePanel(QWidget):
         args = ["-applaunch", str(steam_id)]
         if hasattr(plugin, "GameLaunchArgs"):
             args.extend(plugin.GameLaunchArgs)
-        success, pid = QProcess.startDetached(steam_bin, args)
+        try:
+            proc = subprocess.Popen(
+                [steam_bin, *args],
+                env=clean_subprocess_env(),
+            )
+            success, pid = True, proc.pid
+        except OSError:
+            success, pid = False, 0
         if success:
             # Warn if Proton shim DLLs need WINEDLLOVERRIDES (Steam can't set env)
             if hasattr(plugin, "get_proton_env_overrides"):

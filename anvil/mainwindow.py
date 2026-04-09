@@ -1821,8 +1821,16 @@ class MainWindow(QMainWindow):
             print("[DEPLOY] Pre-launch full deploy (with BA2)", flush=True)
             self._sync_separator_deploy_paths()
             self._game_panel.silent_deploy()
-        from PySide6.QtCore import QProcess
-        success, pid = QProcess.startDetached(binary_path, [], working_dir)
+        success, pid = True, -1
+        try:
+            proc = subprocess.Popen(
+                [binary_path],
+                cwd=working_dir,
+                env=clean_subprocess_env(),
+            )
+            pid = proc.pid
+        except OSError:
+            success = False
         if not success:
             QMessageBox.warning(
                 self, tr("error.start_failed_title"),
