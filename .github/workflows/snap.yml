@@ -34,6 +34,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
+          draft: true
           files: ${{ steps.build.outputs.snap }}
 
       - name: Publish to Snap Store
