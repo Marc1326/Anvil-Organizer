@@ -23,9 +23,11 @@ def find_loot_binary() -> str | None:
 
     Priority:
       1. User-configured path in QSettings
-      2. 'loot' in $PATH (AUR install)
-      3. Flatpak wrapper command
+      2. 'loot' in $PATH (AUR install, or host via flatpak-spawn)
+      3. Flatpak wrapper command (checks host flatpak if inside sandbox)
     """
+    from anvil.core.subprocess_env import is_flatpak, host_which
+
     settings = QSettings()
     user_path = settings.value("LOOT/binary_path", "", type=str)
     if user_path:
@@ -33,26 +35,32 @@ def find_loot_binary() -> str | None:
         if Path(user_path).is_file() or user_path.startswith("flatpak"):
             return user_path
 
-    # Try system PATH
-    system_loot = shutil.which("loot")
+    # Try system PATH (host_which checks host system if in Flatpak)
+    system_loot = host_which("loot")
     if system_loot:
         return system_loot
 
-    # Try Flatpak
-    flatpak = shutil.which("flatpak")
-    if flatpak:
-        # Check if LOOT flatpak is installed
-        import subprocess
-        try:
+    # Try Flatpak — use host flatpak if we're inside a Flatpak sandbox
+    import subprocess
+    try:
+        if is_flatpak():
+            result = subprocess.run(
+                ["flatpak-spawn", "--host", "flatpak", "info", "io.github.loot.loot"],
+                capture_output=True, timeout=5,
+            )
+        else:
+            flatpak = shutil.which("flatpak")
+            if not flatpak:
+                return None
             result = subprocess.run(
                 ["flatpak", "info", "io.github.loot.loot"],
                 capture_output=True, timeout=5,
                 env=clean_subprocess_env(),
             )
-            if result.returncode == 0:
-                return "flatpak run io.github.loot.loot"
-        except (OSError, subprocess.TimeoutExpired):
-            pass
+        if result.returncode == 0:
+            return "flatpak run io.github.loot.loot"
+    except (OSError, subprocess.TimeoutExpired):
+        pass
 
     return None
 
@@ -136,9 +144,18 @@ class LootRunner(QObject):
                 # host covers ~, /run/media; add /mnt explicitly for mount points
                 run_args.insert(idx, "--filesystem=host")
                 run_args.insert(idx + 1, "--filesystem=/mnt")
-            args = run_args + args
+            # Inside Flatpak sandbox: use flatpak-spawn --host to reach host flatpak
+            if is_flatpak():
+                program = "flatpak-spawn"
+                args = ["--host", "flatpak"] + run_args + args
+            else:
+                args = run_args + args
         else:
             program = binary
+            # Inside Flatpak sandbox with native LOOT path: use flatpak-spawn
+            if is_flatpak():
+                program = "flatpak-spawn"
+                args = ["--host", binary] + args
 
         print(f"{_TAG} Starting: {program} {' '.join(args)}")
         self._process.start(program, args)

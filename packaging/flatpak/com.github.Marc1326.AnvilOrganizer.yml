@@ -23,6 +23,8 @@ finish-args:
   - --talk-name=org.kde.StatusNotifierWatcher
   # NXM URL handler
   - --talk-name=org.freedesktop.portal.Desktop
+  # Host access (launch Steam, LOOT, Proton from sandbox)
+  - --talk-name=org.freedesktop.Flatpak
 
 modules:
   - name: krb5

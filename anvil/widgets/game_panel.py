@@ -1615,8 +1615,8 @@ class GamePanel(QWidget):
 
     def _launch_via_steam(self, plugin) -> None:
         """Launch the main game binary via steam -applaunch."""
-        import shutil
-        steam_bin = shutil.which("steam")
+        from anvil.core.subprocess_env import host_which, host_popen
+        steam_bin = host_which("steam")
         if not steam_bin:
             QMessageBox.warning(
                 self, tr("game_panel.start"),
@@ -1632,7 +1632,7 @@ class GamePanel(QWidget):
         if hasattr(plugin, "GameLaunchArgs"):
             args.extend(plugin.GameLaunchArgs)
         try:
-            proc = subprocess.Popen(
+            proc = host_popen(
                 [steam_bin, *args],
                 env=clean_subprocess_env(),
             )
@@ -1734,7 +1734,8 @@ class GamePanel(QWidget):
         working_dir = str(binary_path.parent)
 
         try:
-            proc = subprocess.Popen(
+            from anvil.core.subprocess_env import host_popen
+            proc = host_popen(
                 [str(proton_script), "run", binary_path.name],
                 cwd=working_dir,
                 env=env,
