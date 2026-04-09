@@ -13,9 +13,9 @@ finish-args:
   # File access (home for mod instances, game dirs)
   - --filesystem=home
   # Removable media (USB drives with mods)
-  - --filesystem=/media:ro
-  - --filesystem=/mnt:ro
-  - --filesystem=/run/media:ro
+  - --filesystem=/media
+  - --filesystem=/mnt
+  - --filesystem=/run/media
   # Network (Nexus API, NXM downloads)
   - --share=network
   # Desktop integration
