@@ -35,6 +35,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Anvil Organizer")
     app.setApplicationVersion(APP_VERSION)
+    app.setDesktopFileName("com.github.Marc1326.AnvilOrganizer")
 
     # Icon-Theme für sichtbare Dialog-Icons (dark + light kompatibel)
     if not QIcon.themeName():

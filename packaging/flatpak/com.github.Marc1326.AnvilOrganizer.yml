@@ -84,6 +84,10 @@ modules:
       - pip3 install --no-build-isolation --no-deps --prefix=/app .
       - install -Dm644 anvil-organizer.desktop
           /app/share/applications/com.github.Marc1326.AnvilOrganizer.desktop
+      - sed -i 's/^Icon=.*/Icon=com.github.Marc1326.AnvilOrganizer/'
+          /app/share/applications/com.github.Marc1326.AnvilOrganizer.desktop
+      - sed -i 's/^StartupWMClass=.*/StartupWMClass=com.github.Marc1326.AnvilOrganizer/'
+          /app/share/applications/com.github.Marc1326.AnvilOrganizer.desktop
       - install -Dm644 anvil/resources/logo.png
           /app/share/icons/hicolor/256x256/apps/com.github.Marc1326.AnvilOrganizer.png
     sources:
