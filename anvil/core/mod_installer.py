@@ -14,6 +14,8 @@ import re
 import shutil
 import subprocess
 import sys
+
+from anvil.core.subprocess_env import clean_subprocess_env
 import tempfile
 import zipfile
 from pathlib import Path
@@ -412,6 +414,7 @@ class ModInstaller:
                 ["unrar", "x", "-o+", "-y", str(archive), str(dest) + "/"],
                 check=True,
                 capture_output=True,
+                env=clean_subprocess_env(),
             )
             ModInstaller._validate_extracted_paths(dest, "RAR")
             return True
@@ -435,6 +438,7 @@ class ModInstaller:
                 ["7z", "x", str(archive), f"-o{dest}", "-y"],
                 check=True,
                 capture_output=True,
+                env=clean_subprocess_env(),
             )
             ModInstaller._validate_extracted_paths(dest, "7z")
             return True

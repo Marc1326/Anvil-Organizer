@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from anvil.core.subprocess_env import clean_subprocess_env
+
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -965,7 +967,7 @@ class SettingsDialog(QDialog):
     def _open_plugin_folder(self):
         """Open the user plugin directory in the file manager."""
         path = ensure_user_plugin_dir()
-        subprocess.Popen(["xdg-open", str(path)])
+        subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
 
     # ── Script-Merger-Tab helpers ────────────────────────────────────
 
@@ -1078,7 +1080,7 @@ class SettingsDialog(QDialog):
 
     def _open_styles_folder(self):
         """Open the styles directory in the file manager."""
-        subprocess.Popen(["xdg-open", str(get_styles_dir())])
+        subprocess.Popen(["xdg-open", str(get_styles_dir())], env=clean_subprocess_env())
 
     def _on_loot_browse(self) -> None:
         """Browse for LOOT binary."""

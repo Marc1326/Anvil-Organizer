@@ -12,6 +12,8 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+
+from anvil.core.subprocess_env import clean_subprocess_env
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -115,6 +117,7 @@ NoDisplay=true
             ["xdg-mime", "default", "anvil-organizer.desktop", "x-scheme-handler/nxm"],
             check=True,
             capture_output=True,
+            env=clean_subprocess_env(),
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False

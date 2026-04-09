@@ -24,6 +24,8 @@ a = Analysis(
         'anvil.core.bg3_mod_installer',
         'anvil.core.lspk_parser',
         'anvil.plugins.framework_mod',
+        'keyring',
+        'keyring.backends',
     ],
     hookspath=[],
     hooksconfig={},

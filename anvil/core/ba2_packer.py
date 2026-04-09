@@ -24,6 +24,8 @@ from configparser import ConfigParser
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from anvil.core.subprocess_env import clean_env
+
 from PySide6.QtCore import QSettings
 
 
@@ -163,7 +165,7 @@ class BA2Packer:
         if prefix is None:
             return None
 
-        env = os.environ.copy()
+        env = clean_env(os.environ.copy())
         env["WINEPREFIX"] = str(prefix)
         env["WINEDEBUG"] = "-all"
 

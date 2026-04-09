@@ -3,6 +3,8 @@
 import os
 import subprocess
 
+from anvil.core.subprocess_env import clean_subprocess_env
+
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -490,7 +492,7 @@ def _build_images_tab(mod_path: str):
     def _open_explorer(checked=False):
         path = _current_path[0]
         if path:
-            subprocess.Popen(["xdg-open", os.path.dirname(path)])
+            subprocess.Popen(["xdg-open", os.path.dirname(path)], env=clean_subprocess_env())
 
     btn_explorer.clicked.connect(_open_explorer)
 
@@ -639,7 +641,7 @@ def _build_textfiles_tab(mod_path: str):
         if path:
             dirpath = os.path.dirname(path)
             try:
-                subprocess.Popen(["xdg-open", dirpath])
+                subprocess.Popen(["xdg-open", dirpath], env=clean_subprocess_env())
             except Exception:
                 pass
 
@@ -832,7 +834,7 @@ def _build_ini_tab(mod_path: str):
         if path:
             dirpath = os.path.dirname(path)
             try:
-                subprocess.Popen(["xdg-open", dirpath])
+                subprocess.Popen(["xdg-open", dirpath], env=clean_subprocess_env())
             except Exception:
                 pass
 
@@ -1077,7 +1079,7 @@ def _build_filetree_tab(mod_path: str):
     btn_row = QHBoxLayout()
     btn_explore = QPushButton(tr("button.open_in_explorer"))
     btn_explore.clicked.connect(
-        lambda: subprocess.Popen(["xdg-open", mod_path]) if os.path.isdir(mod_path) else None
+        lambda: subprocess.Popen(["xdg-open", mod_path], env=clean_subprocess_env()) if os.path.isdir(mod_path) else None
     )
     btn_row.addWidget(btn_explore)
     btn_row.addStretch()

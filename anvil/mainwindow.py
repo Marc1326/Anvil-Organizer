@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 
 from PySide6.QtWidgets import (
@@ -34,6 +35,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QModelIndex, QSettings, QTimer, QUrl, QSize
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
 
+from anvil.core.subprocess_env import clean_subprocess_env
 from anvil.core.ui_helpers import _center_on_parent, get_text_input
 from anvil.styles.dark_theme import load_theme, default_theme
 from anvil.widgets.toolbar import create_toolbar
@@ -3329,40 +3331,36 @@ class MainWindow(QMainWindow):
 
     def _open_mods_folder(self) -> None:
         """Open the mods folder in file manager."""
-        import subprocess
         if not self._current_instance_path:
             return
         path = self._current_instance_path / ".mods"
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)])
+            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
 
     def _open_game_folder(self) -> None:
         """Open the game installation folder in file manager."""
-        import subprocess
         if not self._current_game_path:
             return
         if self._current_game_path.is_dir():
-            subprocess.Popen(["xdg-open", str(self._current_game_path)])
+            subprocess.Popen(["xdg-open", str(self._current_game_path)], env=clean_subprocess_env())
 
     def _open_mygames_folder(self) -> None:
         """Open the My Games folder in file manager."""
-        import subprocess
         if not self._current_plugin:
             return
         if hasattr(self._current_plugin, "gameDocumentsDirectory"):
             path = self._current_plugin.gameDocumentsDirectory()
             if path and path.is_dir():
-                subprocess.Popen(["xdg-open", str(path)])
+                subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
 
     def _open_saves_folder(self) -> None:
         """Open the save game directory in file manager."""
-        import subprocess
         if not self._current_plugin:
             return
         if hasattr(self._current_plugin, "gameSavesDirectory"):
             path = self._current_plugin.gameSavesDirectory()
             if path and path.is_dir():
-                subprocess.Popen(["xdg-open", str(path)])
+                subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
             else:
                 from PySide6.QtWidgets import QMessageBox
                 QMessageBox.information(
@@ -3372,73 +3370,65 @@ class MainWindow(QMainWindow):
 
     def _open_ini_folder(self) -> None:
         """Open the INI folder in file manager (same as My Games for most games)."""
-        import subprocess
         if not self._current_plugin:
             return
         if hasattr(self._current_plugin, "gameDocumentsDirectory"):
             path = self._current_plugin.gameDocumentsDirectory()
             if path and path.is_dir():
-                subprocess.Popen(["xdg-open", str(path)])
+                subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
 
     def _open_instance_folder(self) -> None:
         """Open the instance folder in file manager."""
-        import subprocess
         if not self._current_instance_path:
             return
         if self._current_instance_path.is_dir():
-            subprocess.Popen(["xdg-open", str(self._current_instance_path)])
+            subprocess.Popen(["xdg-open", str(self._current_instance_path)], env=clean_subprocess_env())
 
     def _open_profile_folder(self) -> None:
         """Open the profile folder in file manager."""
-        import subprocess
         print(f"DEBUG _open_profile_folder: profile={self._current_profile_path}")
         if not self._current_profile_path:
             print("DEBUG _open_profile_folder: No profile path, returning")
             return
         if self._current_profile_path.is_dir():
-            subprocess.Popen(["xdg-open", str(self._current_profile_path)])
+            subprocess.Popen(["xdg-open", str(self._current_profile_path)], env=clean_subprocess_env())
 
     def _open_downloads_folder(self) -> None:
         """Open the downloads folder in file manager."""
-        import subprocess
         if not self._current_instance_path:
             return
         path = self._current_downloads_path or (self._current_instance_path / ".downloads")
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)])
+            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
 
     def _open_ao_install_folder(self) -> None:
         """Open the Anvil Organizer installation folder in file manager."""
-        import subprocess
         from anvil.core.resource_path import get_anvil_base
         path = get_anvil_base().parent
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)])
+            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
 
     def _open_ao_plugins_folder(self) -> None:
         """Open the Anvil Organizer plugins folder in file manager."""
-        import subprocess
         from anvil.core.resource_path import get_anvil_base
         path = get_anvil_base() / "plugins"
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)])
+            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
 
     def _open_ao_styles_folder(self) -> None:
         """Open the Anvil Organizer styles folder in file manager."""
-        import subprocess
         from anvil.core.resource_path import get_anvil_base
         path = get_anvil_base() / "styles"
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)])
+            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
 
     def _open_ao_logs_folder(self) -> None:
         """Open the Anvil Organizer logs folder in file manager."""
-        import subprocess
         path = Path.home() / ".anvil-organizer" / "logs"
         if not path.exists():
             path.mkdir(parents=True, exist_ok=True)
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)])
+            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
 
     def _create_backup(self) -> None:
         """Create a ZIP backup of modlist, categories, and all meta.ini files."""
@@ -5266,13 +5256,12 @@ class MainWindow(QMainWindow):
 
     def _ctx_open_explorer(self, row: int) -> None:
         """Open the mod folder in the file manager."""
-        import subprocess
         entry = self._entry_for_row(row)
         if not entry:
             return
         mod_path = self._current_instance_path / ".mods" / entry.name
         if mod_path.is_dir():
-            subprocess.Popen(["xdg-open", str(mod_path)])
+            subprocess.Popen(["xdg-open", str(mod_path)], env=clean_subprocess_env())
 
     def _ctx_show_info(self, row: int) -> None:
         """Show mod information dialog."""
@@ -6327,10 +6316,9 @@ class MainWindow(QMainWindow):
                 else:
                     self.statusBar().showMessage(tr("status.uninstall_failed"), 5000)
         elif chosen == act_explorer:
-            import subprocess
             mods_path = self._bg3_installer._mods_path
             if mods_path and mods_path.is_dir():
-                subprocess.Popen(["xdg-open", str(mods_path)])
+                subprocess.Popen(["xdg-open", str(mods_path)], env=clean_subprocess_env())
 
     # ── Framework context menu + handlers ──────────────────────────
 
@@ -6364,7 +6352,6 @@ class MainWindow(QMainWindow):
             self._fw_uninstall(name)
         elif chosen == act_explorer:
             if self._current_game_path and self._current_game_path.is_dir():
-                import subprocess
                 # Open the directory where the framework is actually installed
                 target_dir = self._current_game_path
                 if self._current_plugin:
@@ -6376,7 +6363,7 @@ class MainWindow(QMainWindow):
                                 if candidate.is_dir():
                                     target_dir = candidate
                             break
-                subprocess.Popen(["xdg-open", str(target_dir)])
+                subprocess.Popen(["xdg-open", str(target_dir)], env=clean_subprocess_env())
 
     def _fw_reinstall(self, fw_name: str) -> None:
         """Reinstall a framework from its archive in the downloads directory."""

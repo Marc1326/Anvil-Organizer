@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from anvil.core.resource_path import get_anvil_base
+from anvil.core.subprocess_env import clean_subprocess_env, clean_env
 
 _DEPLOY_LOG = Path("/tmp/anvil-deploy.log")
 
@@ -1664,7 +1665,7 @@ class GamePanel(QWidget):
 
         proton_script, compat_data, steam_root = proton_info
 
-        env = os.environ.copy()
+        env = clean_env(os.environ.copy())
         env["STEAM_COMPAT_DATA_PATH"] = str(compat_data)
         env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_root)
         if self._current_game_path:
@@ -2506,11 +2507,11 @@ class GamePanel(QWidget):
         elif act_query and chosen == act_query:
             self.dl_query_info_requested.emit(first)
         elif chosen == act_open:
-            subprocess.Popen(["xdg-open", first])
+            subprocess.Popen(["xdg-open", first], env=clean_subprocess_env())
         elif chosen == act_meta:
-            subprocess.Popen(["xdg-open", str(meta_path)])
+            subprocess.Popen(["xdg-open", str(meta_path)], env=clean_subprocess_env())
         elif chosen == act_show:
-            subprocess.Popen(["xdg-open", str(Path(first).parent)])
+            subprocess.Popen(["xdg-open", str(Path(first).parent)], env=clean_subprocess_env())
         elif chosen == act_delete:
             count = len(paths)
             if count == 1:

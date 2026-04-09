@@ -7,10 +7,13 @@ Supports native binary and Flatpak wrapper.
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QProcess, QSettings, Signal
+from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QSettings, Signal
+
+from anvil.core.subprocess_env import clean_subprocess_env
 
 _TAG = "[LootRunner]"
 
@@ -44,6 +47,7 @@ def find_loot_binary() -> str | None:
             result = subprocess.run(
                 ["flatpak", "info", "io.github.loot.loot"],
                 capture_output=True, timeout=5,
+                env=clean_subprocess_env(),
             )
             if result.returncode == 0:
                 return "flatpak run io.github.loot.loot"
@@ -107,6 +111,14 @@ class LootRunner(QObject):
         ]
 
         self._process = QProcess(self)
+        # Clean LD_LIBRARY_PATH for AppImage compatibility
+        qenv = QProcessEnvironment.systemEnvironment()
+        orig = os.environ.get("LD_LIBRARY_PATH_ORIG")
+        if orig is not None:
+            qenv.insert("LD_LIBRARY_PATH", orig)
+        elif qenv.contains("LD_LIBRARY_PATH"):
+            qenv.remove("LD_LIBRARY_PATH")
+        self._process.setProcessEnvironment(qenv)
         self._process.setProcessChannelMode(
             QProcess.ProcessChannelMode.MergedChannels
         )

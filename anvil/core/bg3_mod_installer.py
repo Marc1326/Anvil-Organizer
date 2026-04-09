@@ -18,6 +18,8 @@ import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
+
+from anvil.core.subprocess_env import clean_subprocess_env
 import zipfile
 from datetime import date, datetime
 from pathlib import Path
@@ -1368,6 +1370,7 @@ class BG3ModInstaller:
                 subprocess.run(
                     [unrar, "x", "-o+", str(archive_path), tmp + "/"],
                     check=True, capture_output=True,
+                    env=clean_subprocess_env(),
                 )
                 BG3ModInstaller._validate_extracted_paths(tmp, "RAR")
                 return tmp
@@ -1381,6 +1384,7 @@ class BG3ModInstaller:
                 subprocess.run(
                     [p7z, "x", f"-o{tmp}", str(archive_path), "-y"],
                     check=True, capture_output=True,
+                    env=clean_subprocess_env(),
                 )
                 BG3ModInstaller._validate_extracted_paths(tmp, "7z")
                 return tmp

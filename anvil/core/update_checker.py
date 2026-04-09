@@ -12,6 +12,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from anvil.core.subprocess_env import clean_subprocess_env
+
 from PySide6.QtCore import QObject, QThread, Signal
 
 
@@ -28,6 +30,7 @@ def _git(*args: str, cwd: Path = _PROJECT_ROOT) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         timeout=_GIT_TIMEOUT,
+        env=clean_subprocess_env(),
     )
 
 
@@ -135,6 +138,7 @@ class _GitPullWorker(QThread):
                         capture_output=True,
                         text=True,
                         timeout=120,
+                        env=clean_subprocess_env(),
                     )
                     pip_ran = True
                 except (subprocess.TimeoutExpired, OSError):
