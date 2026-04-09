@@ -25,6 +25,21 @@ finish-args:
   - --talk-name=org.freedesktop.portal.Desktop
 
 modules:
+  - name: krb5
+    subdir: src
+    config-opts:
+      - --disable-static
+      - --disable-rpc
+    sources:
+      - type: archive
+        url: https://kerberos.org/dist/krb5/1.21/krb5-1.21.3.tar.gz
+        sha256: b7a4cd5ead67fb08b980b21abd150ff7217e85ea320c9ed0c6dadd304840ad35
+    cleanup:
+      - /bin
+      - /sbin
+      - /share/man
+      - /share/et
+
   - name: python-lz4
     buildsystem: simple
     build-commands:
