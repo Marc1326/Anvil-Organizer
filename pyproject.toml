@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "anvil-organizer"
-version = "1.4.5"
+version = "1.4.6"
 description = "A native Linux mod manager inspired by Mod Organizer 2"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
