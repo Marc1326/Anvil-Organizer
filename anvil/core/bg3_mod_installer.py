@@ -382,25 +382,17 @@ class BG3ModInstaller:
 
         final_order = header + user_mods
 
-        # Update mods list order to match new active order
-        # (keeps inactive mods at their relative slots)
+        # Rebuild mods list: active mods in new order first, then inactive
         active_set = {u.lower() for u in final_order}
         mods_by_uuid = {m["uuid"].lower(): m for m in mods}
-        active_iter = iter(final_order)
         new_mods: list[dict] = []
+        for uuid in final_order:
+            entry = mods_by_uuid.get(uuid.lower())
+            if entry:
+                new_mods.append(entry)
         for m in mods:
-            if m["uuid"].lower() in active_set:
-                try:
-                    next_uuid = next(active_iter)
-                    new_mods.append(mods_by_uuid.get(next_uuid.lower(), m))
-                except StopIteration:
-                    new_mods.append(m)
-            else:
+            if m["uuid"].lower() not in active_set:
                 new_mods.append(m)
-        # Safety: remaining active mods not yet placed
-        for remaining in active_iter:
-            if remaining.lower() in mods_by_uuid:
-                new_mods.append(mods_by_uuid[remaining.lower()])
 
         self._write_state(final_order, new_mods)
         # Auto-deploy: immediately write modsettings.lsx
@@ -1242,14 +1234,6 @@ class BG3ModInstaller:
         # ── Build Mods XML (all mods: active first, then inactive) ─
         mods_lines: list[str] = []
         written_uuids: set[str] = set()
-
-        # BG3 uses "last wins" — the last entry in modsettings.lsx has
-        # the highest priority.  Anvil convention is "top = highest
-        # priority" (like MO2).  Reverse user mods so that the Anvil-top
-        # mod ends up last in the XML and wins conflicts in-game.
-        gustav_part = [u for u in final_order if is_base_game_mod(u)]
-        user_part = [u for u in final_order if not is_base_game_mod(u)]
-        final_order = gustav_part + list(reversed(user_part))
 
         # ── Build ModOrder XML ────────────────────────────────────
         mod_order_lines: list[str] = []
