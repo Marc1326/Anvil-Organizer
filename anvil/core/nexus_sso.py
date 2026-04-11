@@ -22,9 +22,11 @@ import os
 import ssl
 import socket
 import struct
+import subprocess
 import uuid
-import webbrowser
 from urllib.parse import urlparse
+
+from anvil.core.subprocess_env import clean_subprocess_env
 
 from PySide6.QtCore import QObject, Signal, QThread, QTimer
 
@@ -160,7 +162,7 @@ class _WebSocketWorker(QThread):
             # First message: connection_token
             if "connection_token" in payload:
                 url = f"https://www.nexusmods.com/sso?id={self._session_id}&application={APPLICATION_SLUG}"
-                webbrowser.open(url)
+                subprocess.Popen(["xdg-open", url], env=clean_subprocess_env())
                 self.state_changed.emit(_SSOState.WAITING_BROWSER, "")
 
             # Second message: api_key
