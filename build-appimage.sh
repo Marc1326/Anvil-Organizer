@@ -94,6 +94,11 @@ cp "$SCRIPT_DIR/anvil/resources/logo.png" "$APPDIR/anvil-organizer.png"
 # Copy dist contents
 cp -a "$DIST_DIR"/* "$APPDIR/usr/bin/"
 
+# Remove libs that break host subprocesses via LD_LIBRARY_PATH leaking
+rm -f "$APPDIR/usr/bin/_internal"/libreadline.so* \
+      "$APPDIR/usr/bin/_internal"/libtinfo.so*
+echo "[OK] Removed libreadline/libtinfo (host-subprocess conflict)"
+
 echo "[OK] AppDir created"
 
 # ── Download appimagetool if needed ──────────────────────────

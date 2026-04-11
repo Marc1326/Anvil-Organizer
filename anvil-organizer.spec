@@ -40,6 +40,11 @@ a = Analysis(
     optimize=0,
 )
 
+# Remove libs that break host subprocesses (xdg-open, kdialog, /bin/sh)
+# when PyInstaller's LD_LIBRARY_PATH leaks into child processes.
+a.binaries = [b for b in a.binaries
+              if not b[0].startswith(('libreadline.', 'libtinfo.'))]
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
