@@ -79,8 +79,10 @@ echo "  ✓ Tag gepusht — GitHub Actions gestartet"
 # Draft-Release SOFORT nach Tag-Push erstellen — verhindert Race-Condition
 # (Workflows finden das existierende Draft und laden ihre Assets hoch,
 #  statt dass jeder Workflow versucht sein eigenes Draft zu erstellen)
-gh release create "$TAG" --draft --title "$TAG" --notes "Release $TAG"
-echo "  ✓ Draft-Release erstellt"
+gh release create "$TAG" --draft --title "$TAG" --notes "Release $TAG" \
+    install-flatpak.sh \
+    Anvil-Organizer-installer.sh
+echo "  ✓ Draft-Release erstellt (+ Installer-Scripts)"
 
 # --- 4. Warten auf Builds ---
 echo ""
@@ -144,25 +146,38 @@ else
     echo "  ⚠ Kein Desktop-Entry gefunden"
 fi
 
-# --- 7. AppImage runterladen + ZIP ---
+# --- 7. Assets runterladen + in release/ packen ---
 echo ""
-echo "[7/7] AppImage runterladen + ZIP packen ..."
+echo "[7/7] Assets runterladen + in release/ packen ..."
 
 RELEASE_DIR="$(pwd)/release"
 APPIMAGE_NAME="Anvil_Organizer-${VERSION}-x86_64.AppImage"
 ZIP_NAME="Anvil_Organizer-${VERSION}-x86_64.zip"
+FLATPAK_NAME="anvil-organizer.flatpak"
 
 mkdir -p "$RELEASE_DIR"
 
+# AppImage runterladen
 gh release download "$TAG" --pattern "$APPIMAGE_NAME" --dir "$RELEASE_DIR" --clobber
 chmod +x "${RELEASE_DIR}/${APPIMAGE_NAME}"
+
+# Flatpak-Bundle runterladen (falls vorhanden)
+gh release download "$TAG" --pattern "$FLATPAK_NAME" --dir "$RELEASE_DIR" --clobber 2>/dev/null \
+    && echo "  ✓ ${FLATPAK_NAME} heruntergeladen" \
+    || echo "  ⚠ ${FLATPAK_NAME} nicht im Release (Flatpak-Build fehlgeschlagen?)"
+
+# Installer-Scripts in release/ kopieren
+cp install-flatpak.sh "${RELEASE_DIR}/"
+cp Anvil-Organizer-installer.sh "${RELEASE_DIR}/"
 
 # Symlink aktualisieren
 ln -sf "$APPIMAGE_NAME" "${RELEASE_DIR}/Anvil_Organizer-latest.AppImage"
 
-# ZIP erstellen
+# ZIP erstellen (AppImage + Flatpak + Installer-Scripts)
 cd "$RELEASE_DIR"
-zip "$ZIP_NAME" "$APPIMAGE_NAME"
+ZIP_FILES="$APPIMAGE_NAME install-flatpak.sh Anvil-Organizer-installer.sh"
+[ -f "$FLATPAK_NAME" ] && ZIP_FILES="$ZIP_FILES $FLATPAK_NAME"
+zip "$ZIP_NAME" $ZIP_FILES
 cd - >/dev/null
 
 echo "  ✓ ${APPIMAGE_NAME} heruntergeladen"
