@@ -3941,35 +3941,106 @@ class MainWindow(QMainWindow):
             return
 
         if not self._current_profile_path:
+            QMessageBox.warning(
+                self,
+                tr("error.import_failed_title"),
+                tr("export_import.import_no_profile"),
+            )
             return
 
         try:
             with open(path, "r", encoding="utf-8") as f:
-                reader = csv.reader(f, delimiter=";")
-                header = next(reader, None)
-                if not header:
-                    return
+                raw = f.read()
 
-                # CSV-Spalten: Name, Category, Version, Priority, Active
-                csv_mods: dict[str, bool] = {}
-                for row in reader:
-                    if len(row) < 5:
-                        continue
-                    mod_name = row[0].strip()
-                    active = row[4].strip().lower() in ("yes", "1", "true", "ja")
-                    csv_mods[mod_name] = active
+            if not raw.strip():
+                QMessageBox.warning(
+                    self,
+                    tr("error.import_failed_title"),
+                    tr("export_import.import_empty_csv"),
+                )
+                return
+
+            # Delimiter auto-erkennen: erste Zeile prüfen
+            first_line = raw.split("\n", 1)[0]
+            if first_line.count(";") >= first_line.count(","):
+                delimiter = ";"
+            else:
+                delimiter = ","
+
+            reader = csv.reader(raw.strip().splitlines(), delimiter=delimiter)
+            header = next(reader, None)
+            if not header:
+                QMessageBox.warning(
+                    self,
+                    tr("error.import_failed_title"),
+                    tr("export_import.import_empty_csv"),
+                )
+                return
+
+            # Spalten per Header-Name finden (case-insensitive)
+            header_lower = [h.strip().lower() for h in header]
+            name_col = None
+            active_col = None
+            for i, h in enumerate(header_lower):
+                if h in ("name", "mod", "mod name", "modname"):
+                    name_col = i
+                elif h in ("active", "enabled", "aktiv"):
+                    active_col = i
+
+            if name_col is None:
+                # Fallback: erste Spalte = Name
+                name_col = 0
+            if active_col is None:
+                # Fallback: letzte Spalte oder Spalte 4
+                active_col = min(4, len(header) - 1)
+
+            csv_mods: dict[str, bool] = {}
+            skipped = 0
+            for row in reader:
+                if len(row) <= max(name_col, active_col):
+                    skipped += 1
+                    continue
+                mod_name = row[name_col].strip()
+                if not mod_name:
+                    skipped += 1
+                    continue
+                active_val = row[active_col].strip().lower()
+                active = active_val in ("yes", "1", "true", "ja", "on")
+                csv_mods[mod_name] = active
+
+            if not csv_mods:
+                QMessageBox.warning(
+                    self,
+                    tr("error.import_failed_title"),
+                    tr("export_import.import_no_mods"),
+                )
+                return
+
+            # Lookup-Map für case-insensitive Matching
+            csv_lower: dict[str, bool] = {k.lower(): v for k, v in csv_mods.items()}
 
             # Auf aktuelle Modliste anwenden
             changed = 0
+            matched = 0
             for entry in self._current_mod_entries:
                 if entry.is_separator:
                     continue
                 display = entry.display_name or entry.name
+                # Exakt → case-insensitive → Ordnername als Fallback
                 if display in csv_mods:
                     new_state = csv_mods[display]
-                    if entry.enabled != new_state:
-                        entry.enabled = new_state
-                        changed += 1
+                elif display.lower() in csv_lower:
+                    new_state = csv_lower[display.lower()]
+                elif entry.name in csv_mods:
+                    new_state = csv_mods[entry.name]
+                elif entry.name.lower() in csv_lower:
+                    new_state = csv_lower[entry.name.lower()]
+                else:
+                    continue
+                matched += 1
+                if entry.enabled != new_state:
+                    entry.enabled = new_state
+                    changed += 1
 
             if changed > 0:
                 active_mods = {e.name for e in self._current_mod_entries if e.enabled}
@@ -3977,9 +4048,12 @@ class MainWindow(QMainWindow):
                 self._reload_mod_list()
                 self._do_redeploy()
 
-            self.statusBar().showMessage(
-                tr("export_import.import_csv_status", count=changed), 5000,
-            )
+            not_found = len(csv_mods) - matched
+            msg = tr("export_import.import_csv_result",
+                      changed=changed, matched=matched,
+                      total=len(csv_mods), not_found=not_found)
+            QMessageBox.information(self, tr("export_import.import_csv_title"), msg)
+
         except OSError as exc:
             QMessageBox.warning(
                 self,
