@@ -29,6 +29,8 @@ classifiers = [
 dependencies = [
     "PySide6>=6.6.0",
     "lz4>=4.0.0",
+    "keyring>=23.0.0",
+    "cryptography>=3.4",
 ]
 
 [project.urls]

@@ -728,7 +728,16 @@ class MainWindow(QMainWindow):
             on_clear_modindex=self._clear_modindex_cache,
         )
         _center_on_parent(dlg)
-        if dlg.exec() == SettingsDialog.DialogCode.Accepted:
+        accepted = dlg.exec() == SettingsDialog.DialogCode.Accepted
+        # Re-read API key (SSO/manual entry saves immediately, even before OK)
+        new_key = SettingsDialog.load_api_key()
+        if new_key:
+            self._nexus_api.set_api_key(new_key)
+            self._status_bar.update_api_status(logged_in=True)
+        else:
+            self._nexus_api.set_api_key("")
+            self._status_bar.update_api_status(logged_in=False)
+        if accepted:
             # Apply API counter visibility immediately
             hidden = self._settings().value("Nexus/hide_api_counter", False, type=bool)
             self._status_bar.set_api_counter_visible(not hidden)

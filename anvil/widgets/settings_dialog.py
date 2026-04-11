@@ -1002,71 +1002,22 @@ class SettingsDialog(QDialog):
         path = str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf")
         return QSettings(path, QSettings.Format.IniFormat)
 
-    # ── Secure API key storage via system keychain ───────────────────
-
-    _KEYRING_SERVICE = "AnvilOrganizer"
-    _KEYRING_USER = "nexus_api_key"
+    # ── API key storage (delegates to anvil.core.secure_storage) ─────
 
     @staticmethod
-    def save_api_key(api_key: str) -> bool:
-        """Store the Nexus API key in the system keychain.
-
-        Returns True if keyring succeeded, False if QSettings fallback was used.
-        """
-        try:
-            import keyring
-            keyring.set_password(
-                SettingsDialog._KEYRING_SERVICE,
-                SettingsDialog._KEYRING_USER,
-                api_key,
-            )
-            return True
-        except Exception as e:
-            print(f"keyring: failed to store API key: {e}", file=sys.stderr)
-            # Fallback: QSettings (better than losing the key entirely)
-            SettingsDialog._settings().setValue("nexus/api_key", api_key)
-            return False
+    def save_api_key(api_key: str) -> None:
+        from anvil.core.secure_storage import save_api_key
+        save_api_key(api_key)
 
     @staticmethod
     def load_api_key() -> str:
-        """Load the Nexus API key from system keychain (with migration)."""
-        # Try keyring first
-        try:
-            import keyring
-            key = keyring.get_password(
-                SettingsDialog._KEYRING_SERVICE,
-                SettingsDialog._KEYRING_USER,
-            )
-            if key:
-                return key
-        except Exception as e:
-            print(f"keyring: failed to load API key: {e}", file=sys.stderr)
-
-        # Migrate from old QSettings storage
-        settings = SettingsDialog._settings()
-        old_key = settings.value("nexus/api_key", "")
-        if old_key:
-            migrated = SettingsDialog.save_api_key(old_key)
-            if migrated:
-                settings.remove("nexus/api_key")
-                print("keyring: migrated API key from config to system keychain",
-                      file=sys.stderr)
-            return old_key
-        return ""
+        from anvil.core.secure_storage import load_api_key
+        return load_api_key()
 
     @staticmethod
     def delete_api_key() -> None:
-        """Remove the Nexus API key from system keychain."""
-        try:
-            import keyring
-            keyring.delete_password(
-                SettingsDialog._KEYRING_SERVICE,
-                SettingsDialog._KEYRING_USER,
-            )
-        except Exception:
-            pass
-        # Also clean up old QSettings entry if present
-        SettingsDialog._settings().remove("nexus/api_key")
+        from anvil.core.secure_storage import delete_api_key
+        delete_api_key()
 
     def _on_theme_changed(self, theme_name: str):
         """Apply selected theme live as preview."""
