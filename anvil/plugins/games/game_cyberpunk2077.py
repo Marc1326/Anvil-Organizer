@@ -71,6 +71,8 @@ class Cyberpunk2077Game(BaseGame):
         "redscript",
         "Native Settings UI",
         "mod_settings",
+        "JB Third Person Mod",
+        "SPAWN0 - Male and female body correction",
     ]
 
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()

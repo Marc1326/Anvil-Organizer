@@ -1008,8 +1008,11 @@ class SettingsDialog(QDialog):
     _KEYRING_USER = "nexus_api_key"
 
     @staticmethod
-    def save_api_key(api_key: str) -> None:
-        """Store the Nexus API key in the system keychain."""
+    def save_api_key(api_key: str) -> bool:
+        """Store the Nexus API key in the system keychain.
+
+        Returns True if keyring succeeded, False if QSettings fallback was used.
+        """
         try:
             import keyring
             keyring.set_password(
@@ -1017,10 +1020,12 @@ class SettingsDialog(QDialog):
                 SettingsDialog._KEYRING_USER,
                 api_key,
             )
+            return True
         except Exception as e:
             print(f"keyring: failed to store API key: {e}", file=sys.stderr)
             # Fallback: QSettings (better than losing the key entirely)
             SettingsDialog._settings().setValue("nexus/api_key", api_key)
+            return False
 
     @staticmethod
     def load_api_key() -> str:
@@ -1041,10 +1046,11 @@ class SettingsDialog(QDialog):
         settings = SettingsDialog._settings()
         old_key = settings.value("nexus/api_key", "")
         if old_key:
-            SettingsDialog.save_api_key(old_key)
-            settings.remove("nexus/api_key")
-            print("keyring: migrated API key from config to system keychain",
-                  file=sys.stderr)
+            migrated = SettingsDialog.save_api_key(old_key)
+            if migrated:
+                settings.remove("nexus/api_key")
+                print("keyring: migrated API key from config to system keychain",
+                      file=sys.stderr)
             return old_key
         return ""
 
