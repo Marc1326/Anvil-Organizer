@@ -5,10 +5,13 @@ If a second instance is started with an nxm:// URL, it forwards
 the URL to the running instance via Unix domain socket and exits.
 """
 
+from pathlib import Path
+
 from PySide6.QtCore import Signal, QObject, QByteArray
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
-SERVER_NAME = "anvil-organizer-single-instance"
+# Absolute path in home dir so Flatpak sandbox and host share the same socket
+SERVER_NAME = str(Path.home() / ".anvil-organizer" / "instance.sock")
 
 
 class SingleInstance(QObject):

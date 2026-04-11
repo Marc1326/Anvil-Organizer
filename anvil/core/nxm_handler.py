@@ -128,8 +128,13 @@ NoDisplay=true
 def _build_exec_command() -> str | None:
     """Build the Exec command for the .desktop file.
 
-    Detects AppImage, PyInstaller frozen builds, and dev environments.
+    Detects Flatpak, AppImage, PyInstaller frozen builds, and dev environments.
     """
+    # Flatpak: use flatpak run with the app ID
+    flatpak_id = os.environ.get("FLATPAK_ID")
+    if flatpak_id:
+        return f"flatpak run {flatpak_id}"
+
     # AppImage: $APPIMAGE is the persistent path to the .AppImage file
     appimage = os.environ.get("APPIMAGE")
     if appimage and Path(appimage).is_file():
