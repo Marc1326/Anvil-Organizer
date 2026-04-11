@@ -33,20 +33,23 @@ def _cred_path() -> Path:
 # ── Keyring probe ────────────────────────────────────────────────────
 
 def _check_keyring() -> bool:
-    """Test once whether the system keyring is usable."""
+    """Test whether the system keyring is usable.
+
+    Only caches a positive result.  A negative result is retried on the
+    next call because D-Bus / the keyring daemon may not be ready yet at
+    early startup.
+    """
     global _keyring_available
-    if _keyring_available is not None:
-        return _keyring_available
+    if _keyring_available is True:
+        return True
     try:
         import keyring
         import keyring.errors
-        # Some backends accept set_password but silently fail on get.
-        # A quick get_password call is the safest probe.
         keyring.get_password(_SERVICE, "__probe__")
         _keyring_available = True
+        return True
     except Exception:
-        _keyring_available = False
-    return _keyring_available
+        return False
 
 
 # ── Encrypted file backend ───────────────────────────────────────────

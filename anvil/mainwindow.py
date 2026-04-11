@@ -3057,7 +3057,25 @@ class MainWindow(QMainWindow):
             )
             return
 
-        add_mod_to_modlist(self._current_profile_path, folder_name, True)
+        # Globale Modlist aktualisieren (nicht Legacy per-Profile)
+        profiles_dir = self._current_instance_path / ".profiles"
+        global_list = read_global_modlist(profiles_dir)
+        # Position: vor der aktuellen Auswahl, oder ganz oben
+        tree = self._mod_list_view._tree
+        sel_indexes = tree.selectionModel().selectedRows()
+        if sel_indexes:
+            source_idx = self._mod_list_view._proxy_model.mapToSource(sel_indexes[0])
+            insert_pos = source_idx.row()
+        else:
+            insert_pos = 0
+        global_list.insert(insert_pos, folder_name)
+        write_global_modlist(profiles_dir, global_list)
+
+        # Separator als aktiv markieren
+        active = read_active_mods(self._current_profile_path)
+        active.add(folder_name)
+        write_active_mods(self._current_profile_path, active)
+
         self._reload_mod_list()
         self.statusBar().showMessage(tr("status.separator_created", name=name), 5000)
 
@@ -4654,10 +4672,28 @@ class MainWindow(QMainWindow):
                     if nexus_id > 0:
                         break
 
-        # Step 3: No ID found → status message only
+        # Step 3: No ID found → ask user for Nexus URL or mod ID
         if nexus_id <= 0:
-            self.statusBar().showMessage(tr("status.nexus_no_id_found"), 5000)
-            return
+            from PySide6.QtWidgets import QInputDialog
+            text, ok = QInputDialog.getText(
+                self,
+                tr("dialog.nexus_query_title"),
+                tr("dialog.nexus_query_prompt"),
+            )
+            if not ok or not text.strip():
+                return
+            text = text.strip()
+            # Parse: full URL (nexusmods.com/.../mods/123) or plain number
+            m = re.search(r'/mods/(\d+)', text)
+            if m:
+                nexus_id = int(m.group(1))
+            elif text.isdigit():
+                nexus_id = int(text)
+            else:
+                self.statusBar().showMessage(tr("status.nexus_query_invalid_id"), 5000)
+                return
+            if nexus_id <= 0:
+                return
 
         self._pending_query_path = entry.install_path
         self._pending_dl_query_path = None
