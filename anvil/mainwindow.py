@@ -707,9 +707,22 @@ class MainWindow(QMainWindow):
     def _on_menu_profiles(self) -> None:
         """Werkzeuge → Profile... (Strg+P)."""
         from anvil.widgets.profile_dialog import ProfileDialog
-        dlg = ProfileDialog(self)
+        dlg = ProfileDialog(
+            self,
+            instance_path=self._current_instance_path,
+            active_profile=self._profile_bar.current_profile(),
+        )
+        dlg.profile_created.connect(self._on_profile_created)
+        dlg.profile_renamed.connect(self._on_profile_renamed)
+        dlg.profile_deleted.connect(self._on_profile_deleted)
+        dlg.profile_selected.connect(self._on_dialog_profile_selected)
         _center_on_parent(dlg)
         dlg.exec()
+        # ProfileBar aktualisieren
+        self._profile_bar.set_profiles(
+            self._get_profile_list(),
+            active=self._profile_bar.current_profile(),
+        )
 
     def _on_menu_executables(self) -> None:
         """Werkzeuge → Executables... (Strg+E)."""
@@ -3801,6 +3814,32 @@ class MainWindow(QMainWindow):
             self._on_profile_changed(new_active)
 
         Toast(self, tr("toast.profile_deleted", name=name))
+
+    def _on_dialog_profile_selected(self, name: str) -> None:
+        """Handle profile selection from ProfileDialog."""
+        self._profile_bar.set_profiles(self._get_profile_list(), active=name)
+        self._on_profile_changed(name)
+
+    def _get_profile_list(self) -> list[str]:
+        """Profil-Liste von Disk lesen (mit gespeicherter Reihenfolge)."""
+        if not self._current_instance_path:
+            return ["Default"]
+        profiles_dir = self._current_instance_path / ".profiles"
+        if not profiles_dir.is_dir():
+            return ["Default"]
+        profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir()])
+        if not profile_folders:
+            return ["Default"]
+        order_file = profiles_dir / "profiles_order.json"
+        if order_file.exists():
+            try:
+                saved_order = json.loads(order_file.read_text())
+                ordered = [p for p in saved_order if p in profile_folders]
+                ordered += [p for p in profile_folders if p not in saved_order]
+                profile_folders = ordered
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return profile_folders
 
     def _on_profiles_reordered(self, order: list[str]) -> None:
         """Handle profile reorder via drag & drop."""

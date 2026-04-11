@@ -9,7 +9,6 @@ from PySide6.QtWidgets import QToolBar, QToolButton, QWidget, QSizePolicy, QMenu
 from PySide6.QtCore import Qt, QSize
 
 from anvil.widgets.instance_manager_dialog import InstanceManagerDialog
-from anvil.widgets.profile_dialog import ProfileDialog
 from anvil.widgets.executables_dialog import ExecutablesDialog
 from anvil.widgets.donate_dialog import DonateDialog
 from anvil.core.translator import tr
@@ -88,7 +87,11 @@ def create_toolbar(parent=None):
     bar.addSeparator()
 
     profile_btn = _add_btn("profiles.svg", "Profiles")
-    profile_btn.clicked.connect(lambda: ProfileDialog(bar.window()).exec())
+    def _open_profiles():
+        win = bar.window()
+        if win and hasattr(win, "_on_menu_profiles"):
+            win._on_menu_profiles()
+    profile_btn.clicked.connect(_open_profiles)
 
     bar.addSeparator()
 
