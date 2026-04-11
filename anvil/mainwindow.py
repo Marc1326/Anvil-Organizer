@@ -5525,16 +5525,34 @@ class MainWindow(QMainWindow):
             expires=nxm_link.expires or None,
         )
 
-        # Store nxm link for when download links arrive
-        self._pending_nxm = nxm_link
+        # Store nxm link keyed by (mod_id, file_id) so rapid clicks don't overwrite
+        if not hasattr(self, "_pending_nxm_links"):
+            self._pending_nxm_links = {}
+        self._pending_nxm_links[(nxm_link.mod_id, nxm_link.file_id)] = {
+            "nxm": nxm_link,
+            "mod_name": "",
+            "mod_version": "",
+        }
 
     def _on_nexus_response(self, tag: str, data: object) -> None:
         """Handle Nexus API responses."""
         if tag.startswith("download_link:") and isinstance(data, list) and data:
             # Download link response — start download
-            nxm = getattr(self, "_pending_nxm", None)
-            if not nxm:
+            # Parse tag: "download_link:{game}:{mod_id}:{file_id}"
+            parts = tag.split(":")
+            if len(parts) < 4:
                 return
+            try:
+                tag_mod_id = int(parts[2])
+                tag_file_id = int(parts[3])
+            except (ValueError, IndexError):
+                return
+
+            pending = getattr(self, "_pending_nxm_links", {})
+            entry = pending.get((tag_mod_id, tag_file_id))
+            if not entry:
+                return
+            nxm = entry["nxm"]
 
             # Use first available download URL
             url = data[0].get("URI", "")
@@ -5547,10 +5565,6 @@ class MainWindow(QMainWindow):
             parsed = urlparse(url)
             file_name = Path(parsed.path).name or f"mod_{nxm.mod_id}_{nxm.file_id}.zip"
 
-            # Get mod info from cache if available
-            mod_name = getattr(self, "_pending_nxm_mod_name", "")
-            mod_version = getattr(self, "_pending_nxm_mod_version", "")
-
             dm = self._game_panel.download_manager()
             dl_id = dm.enqueue(
                 url=url,
@@ -5558,8 +5572,8 @@ class MainWindow(QMainWindow):
                 game=nxm.game,
                 mod_id=nxm.mod_id,
                 file_id=nxm.file_id,
-                mod_name=mod_name,
-                mod_version=mod_version,
+                mod_name=entry["mod_name"],
+                mod_version=entry["mod_version"],
             )
             self.statusBar().showMessage(
                 tr("status.nexus_download_started", name=file_name), 5000,
@@ -5567,14 +5581,22 @@ class MainWindow(QMainWindow):
 
             # Switch to Downloads tab
             self._game_panel._tabs.setCurrentIndex(3)
-            self._pending_nxm = None
-            self._pending_nxm_mod_name = ""
-            self._pending_nxm_mod_version = ""
+            pending.pop((tag_mod_id, tag_file_id), None)
 
         elif tag.startswith("mod_info:") and isinstance(data, dict):
-            # Store mod name/version for when download starts
-            self._pending_nxm_mod_name = data.get("name", "")
-            self._pending_nxm_mod_version = data.get("version", "")
+            # Store mod name/version — match by mod_id to correct pending entry
+            parts = tag.split(":")
+            if len(parts) >= 3:
+                try:
+                    tag_mod_id = int(parts[2])
+                except (ValueError, IndexError):
+                    tag_mod_id = None
+                if tag_mod_id is not None:
+                    pending = getattr(self, "_pending_nxm_links", {})
+                    for key, entry in pending.items():
+                        if key[0] == tag_mod_id:
+                            entry["mod_name"] = data.get("name", "")
+                            entry["mod_version"] = data.get("version", "")
 
         elif tag.startswith("update_check:") and isinstance(data, dict):
             # ── Post-install update check ─────────────────────────
