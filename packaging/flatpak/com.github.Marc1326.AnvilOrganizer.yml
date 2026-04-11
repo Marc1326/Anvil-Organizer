@@ -23,6 +23,10 @@ finish-args:
   - --talk-name=org.kde.StatusNotifierWatcher
   # NXM URL handler
   - --talk-name=org.freedesktop.portal.Desktop
+  # Keyring / Secret Service (store Nexus API key)
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.kde.kwalletd5
+  - --talk-name=org.kde.kwalletd6
   # Host access (launch Steam, LOOT, Proton from sandbox)
   - --talk-name=org.freedesktop.Flatpak
 
@@ -50,6 +54,88 @@ modules:
       - type: archive
         url: https://files.pythonhosted.org/packages/source/l/lz4/lz4-4.3.3.tar.gz
         sha256: 01fe674ef2889dbb9899d8a67361e0c4a2c833af5aeb37dd505727cf5d2a131e
+
+  # ── Credential storage: keyring + encrypted-file fallback ──
+  - name: python-pycparser
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app pycparser-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/0c/c3/44f3fbbfa403ea2a7c779186dc20772604442dde72947e7d01069cbe98e3/pycparser-3.0-py3-none-any.whl
+        sha256: b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992
+
+  - name: python-cffi
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app cffi-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/78/2d/7fa73dfa841b5ac06c7b8855cfc18622132e365f5b81d02230333ff26e9e/cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+        sha256: 3e17ed538242334bf70832644a32a7aae3d83b57567f9fd60a26257e992b79ba
+
+  - name: python-cryptography
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app cryptography-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/2d/cf/054b9d8220f81509939599c8bdbc0c408dbd2bdd41688616a20731371fe0/cryptography-46.0.7-cp311-abi3-manylinux_2_28_x86_64.whl
+        sha256: 420b1e4109cc95f0e5700eed79908cef9268265c773d3a66f7af1eef53d409ef
+
+  - name: python-jeepney
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app jeepney-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/b2/a3/e137168c9c44d18eff0376253da9f1e9234d0239e0ee230d2fee6cea8e55/jeepney-0.9.0-py3-none-any.whl
+        sha256: 97e5714520c16fc0a45695e5365a2e11b81ea79bba796e26f9f1d178cb182683
+
+  - name: python-secretstorage
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app secretstorage-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/b7/46/f5af3402b579fd5e11573ce652019a67074317e18c1935cc0b4ba9b35552/secretstorage-3.5.0-py3-none-any.whl
+        sha256: 0ce65888c0725fcb2c5bc0fdb8e5438eece02c523557ea40ce0703c266248137
+
+  - name: python-jaraco-classes
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app jaraco.classes-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/7f/66/b15ce62552d84bbfcec9a4873ab79d993a1dd4edb922cbfccae192bd5b5f/jaraco.classes-3.4.0-py3-none-any.whl
+        sha256: f662826b6bed8cace05e7ff873ce0f9283b5c924470fe664fff1c2f00f581790
+
+  - name: python-jaraco-functools
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app jaraco_functools-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/fd/c4/813bb09f0985cb21e959f21f2464169eca882656849adf727ac7bb7e1767/jaraco_functools-4.4.0-py3-none-any.whl
+        sha256: 9eec1e36f45c818d9bf307c8948eb03b2b56cd44087b3cdc989abca1f20b9176
+
+  - name: python-jaraco-context
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app jaraco_context-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/f2/58/bc8954bda5fcda97bd7c19be11b85f91973d67a706ed4a3aec33e7de22db/jaraco_context-6.1.2-py3-none-any.whl
+        sha256: bf8150b79a2d5d91ae48629d8b427a8f7ba0e1097dd6202a9059f29a36379535
+
+  - name: python-keyring
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app keyring-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/81/db/e655086b7f3a705df045bf0933bdd9c2f79bb3c97bfef1384598bb79a217/keyring-25.7.0-py3-none-any.whl
+        sha256: be4a0b195f149690c166e850609a477c532ddbfbaed96a404d4e43f8d5e2689f
 
   - name: python-shiboken6
     buildsystem: simple

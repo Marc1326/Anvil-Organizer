@@ -154,7 +154,10 @@ def save_api_key(key: str) -> None:
             print(f"credentials: keyring write failed: {e}", file=sys.stderr)
 
     # Fallback to encrypted file
-    _write_file(key)
+    try:
+        _write_file(key)
+    except Exception as e:
+        print(f"credentials: encrypted file write failed: {e}", file=sys.stderr)
 
 
 def delete_api_key() -> None:
