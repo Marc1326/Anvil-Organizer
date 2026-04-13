@@ -709,6 +709,8 @@ class BaseGame:
         Returns a list of (FrameworkMod, is_installed) tuples.
         A framework is considered installed if *any* of its
         ``detect_installed`` paths exist in the game directory.
+        Files with the ``.anvil-disabled`` suffix count as installed
+        (deactivated frameworks remain visible in the UI).
         """
         print(f"[get_installed_frameworks] _game_path={self._game_path}", flush=True)
         result: list[tuple[FrameworkMod, bool]] = []
@@ -721,12 +723,15 @@ class BaseGame:
                         pattern = Path(det_path).name
                         if parent.is_dir() and any(
                             fnmatch.fnmatch(f.name, pattern)
+                            or fnmatch.fnmatch(f.name, pattern + ".anvil-disabled")
                             for f in parent.iterdir()
                         ):
                             installed = True
                             break
                     else:
-                        if (self._game_path / det_path).exists():
+                        p = self._game_path / det_path
+                        disabled = p.with_name(p.name + ".anvil-disabled")
+                        if p.exists() or disabled.exists():
                             installed = True
                             break
             print(f"[get_installed_frameworks]   fw={fw.name} installed={installed}", flush=True)

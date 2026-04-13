@@ -1995,7 +1995,9 @@ class MainWindow(QMainWindow):
                 if answer != QMessageBox.StandardButton.Yes:
                     shutil.rmtree(temp_dir, ignore_errors=True)
                     return True  # handled (user declined update)
-            result = installer.install_framework(temp_dir, fw, game_path)
+            result = installer.install_framework(
+                temp_dir, fw, game_path, archive_path=archive,
+            )
             if result:
                 self.statusBar().showMessage(
                     tr("status.framework_installed", names=result["name"]), 5000,
@@ -2032,6 +2034,7 @@ class MainWindow(QMainWindow):
                 )
                 result = installer.install_framework(
                     temp_dir, new_fw, self._current_game_path,
+                    archive_path=archive,
                 )
                 if result:
                     self._current_plugin.save_framework_to_json(
@@ -2107,7 +2110,9 @@ class MainWindow(QMainWindow):
                             if answer != QMessageBox.StandardButton.Yes:
                                 shutil.rmtree(temp_dir, ignore_errors=True)
                                 continue
-                        result = installer.install_framework(temp_dir, fw, game_path)
+                        result = installer.install_framework(
+                            temp_dir, fw, game_path, archive_path=archive,
+                        )
                         if result:
                             frameworks_installed.append(result["name"])
                             self._auto_install_companion_frameworks(
@@ -2150,7 +2155,8 @@ class MainWindow(QMainWindow):
                         )
                         game_path = self._current_game_path
                         result = installer.install_framework(
-                            temp_dir, new_fw, game_path
+                            temp_dir, new_fw, game_path,
+                            archive_path=archive,
                         )
                         if result:
                             frameworks_installed.append(result["name"])

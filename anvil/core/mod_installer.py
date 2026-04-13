@@ -273,6 +273,7 @@ class ModInstaller:
         temp_dir: Path,
         framework: "FrameworkMod",
         game_path: Path,
+        archive_path: Path | None = None,
     ) -> dict | None:
         """Install a framework mod into the game directory.
 
@@ -280,6 +281,8 @@ class ModInstaller:
             temp_dir: Path to extracted framework files.
             framework: FrameworkMod with pattern and target info.
             game_path: Path to the game installation directory.
+            archive_path: Source archive path (optional, used to read
+                Nexus ``.meta`` version info for state persistence).
 
         Returns:
             Dict with installation info, or None on failure.
@@ -302,6 +305,13 @@ class ModInstaller:
                 dest.mkdir(parents=True, exist_ok=True)
             elif src_item.is_file():
                 dest.parent.mkdir(parents=True, exist_ok=True)
+                # Drop any leftover disabled twin from a previous deactivation
+                disabled_twin = dest.with_name(dest.name + ".anvil-disabled")
+                if disabled_twin.exists():
+                    try:
+                        disabled_twin.unlink()
+                    except OSError:
+                        pass
                 shutil.copy2(src_item, dest)
                 installed_files.append(str(dest.relative_to(game_path)))
         print(f"DEBUG install_framework: files={installed_files}")
@@ -309,12 +319,27 @@ class ModInstaller:
         # Clean up temp dir
         shutil.rmtree(temp_dir, ignore_errors=True)
 
+        # Persist state: newly installed frameworks are locked + active
+        from anvil.core import framework_state
+        version = (
+            framework_state.read_meta_version(archive_path)
+            if archive_path is not None else ""
+        )
+        framework_state.set_entry(
+            self.instance_path,
+            framework.name,
+            locked=True,
+            active=True,
+            version=version,
+        )
+
         return {
             "name": framework.name,
             "type": "framework",
             "target": framework.target,
             "files": installed_files,
             "status": "installed",
+            "version": version,
         }
 
     @staticmethod
