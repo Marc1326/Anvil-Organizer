@@ -81,6 +81,7 @@ from anvil.widgets.instance_wizard import CreateInstanceWizard
 from anvil.widgets.category_dialog import CategoryDialog
 from anvil.widgets.log_panel import LogPanel
 from anvil.core import _todo
+from anvil.core import framework_state
 from anvil.core.translator import tr
 
 
@@ -1317,13 +1318,10 @@ class MainWindow(QMainWindow):
 
         # Framework detection (nach Deploy, damit Shims vorhanden sind)
         if plugin is not None:
-            fw_list = []
-            for fw, installed in plugin.get_installed_frameworks():
-                fw_list.append({
-                    "name": fw.name,
-                    "description": fw.description,
-                    "installed": installed,
-                })
+            fw_list = [
+                self._build_fw_dict(fw, installed)
+                for fw, installed in plugin.get_installed_frameworks()
+            ]
             self._mod_list_view.load_frameworks(fw_list)
         else:
             self._mod_list_view.load_frameworks([])
@@ -5533,13 +5531,10 @@ class MainWindow(QMainWindow):
 
         # Refresh framework status (nach Framework-Installation)
         if self._current_plugin is not None:
-            fw_list = []
-            for fw, installed in self._current_plugin.get_installed_frameworks():
-                fw_list.append({
-                    "name": fw.name,
-                    "description": fw.description,
-                    "installed": installed,
-                })
+            fw_list = [
+                self._build_fw_dict(fw, installed)
+                for fw, installed in self._current_plugin.get_installed_frameworks()
+            ]
             self._mod_list_view.load_frameworks(fw_list)
 
     # ── Nexus API integration ─────────────────────────────────────────
@@ -6257,6 +6252,15 @@ class MainWindow(QMainWindow):
                 "installed": True,
                 **ov,
             })
+        # Enrich with per-instance state (lock/active/version)
+        if self._current_instance_path:
+            for fw in fw_items:
+                st = framework_state.get(
+                    self._current_instance_path, fw.get("name", ""),
+                )
+                fw.setdefault("locked", st.get("locked", False))
+                fw.setdefault("active", st.get("active", True))
+                fw.setdefault("version", st.get("version", ""))
         self._mod_list_view.load_frameworks(fw_items)
 
     def _on_bg3_mod_activated(self, uuid: str) -> None:
@@ -6515,6 +6519,22 @@ class MainWindow(QMainWindow):
                 subprocess.Popen(["xdg-open", str(mods_path)], env=clean_subprocess_env())
 
     # ── Framework context menu + handlers ──────────────────────────
+
+    def _build_fw_dict(self, fw, installed: bool) -> dict:
+        """Build a framework UI-dict enriched with per-instance state."""
+        st = framework_state.get(self._current_instance_path, fw.name) \
+            if self._current_instance_path else {}
+        critical = bool(getattr(fw, "required_by", None))
+        return {
+            "name": fw.name,
+            "description": fw.description,
+            "installed": installed,
+            "locked": bool(st.get("locked", False)),
+            "active": bool(st.get("active", True)),
+            "version": str(st.get("version", "")),
+            "is_critical": critical,
+            "nexus_id": int(getattr(fw, "nexus_id", 0) or 0),
+        }
 
     def _on_fw_context_menu(self, global_pos, fw_data: dict) -> None:
         """Context menu for framework mods: reinstall or uninstall."""

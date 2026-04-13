@@ -584,6 +584,7 @@
     "read_error": "(Ошибка чтения)",
     "installed": "Установлено",
     "not_installed": "Не установлено",
+    "deactivated": "Отключено",
     "downloading": "Загрузка...",
     "error_prefix": "Ошибка: {message}",
     "delete_confirm_single": "Действительно удалить архив \"{name}\"?",

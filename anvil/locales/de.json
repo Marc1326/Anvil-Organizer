@@ -584,6 +584,7 @@
     "read_error": "(Fehler beim Lesen)",
     "installed": "Installiert",
     "not_installed": "Nicht installiert",
+    "deactivated": "Deaktiviert",
     "downloading": "Downloading...",
     "error_prefix": "Fehler: {message}",
     "delete_confirm_single": "Archiv \"{name}\" wirklich löschen?",

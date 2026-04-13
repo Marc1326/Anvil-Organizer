@@ -584,6 +584,7 @@
     "read_error": "(Error reading)",
     "installed": "Installed",
     "not_installed": "Not installed",
+    "deactivated": "Disabled",
     "downloading": "Downloading...",
     "error_prefix": "Error: {message}",
     "delete_confirm_single": "Really delete archive \"{name}\"?",

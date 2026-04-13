@@ -1101,7 +1101,12 @@ class ModListView(QWidget):
         )
         self._fw_label.set_count(0)
         fw_layout.addWidget(self._fw_label)
-        self._fw_tree.setHeaderLabels([tr("label.name"), tr("label.header_description"), tr("game_panel.header_status")])
+        self._fw_tree.setHeaderLabels([
+            tr("label.name"),
+            tr("label.header_description"),
+            tr("game_panel.header_status"),
+            tr("label.header_version"),
+        ])
         self._fw_tree.setRootIsDecorated(False)
         self._fw_tree.setAlternatingRowColors(True)
         self._fw_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1116,9 +1121,10 @@ class ModListView(QWidget):
         fw_hdr.setCascadingSectionResizes(True)
         fw_hdr.setMinimumSectionSize(30)
         fw_hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self._fw_tree.setColumnWidth(0, 180)
-        self._fw_tree.setColumnWidth(1, 280)
-        self._fw_tree.setColumnWidth(2, 100)
+        self._fw_tree.setColumnWidth(0, 200)
+        self._fw_tree.setColumnWidth(1, 260)
+        self._fw_tree.setColumnWidth(2, 110)
+        self._fw_tree.setColumnWidth(3, 90)
         self._ph_frameworks = PersistentHeader(fw_hdr, "frameworks")
         fw_layout.addWidget(self._fw_tree)
 
@@ -1176,7 +1182,8 @@ class ModListView(QWidget):
     def load_frameworks(self, frameworks: list[dict]) -> None:
         """Populate the frameworks tree.
 
-        Each dict should have: name, description, installed (bool).
+        Each dict may contain: name, description, installed (bool),
+        locked (bool), active (bool), version (str).
         If the list is empty the section is hidden.
         """
         self._fw_tree.clear()
@@ -1189,14 +1196,27 @@ class ModListView(QWidget):
 
         for fw in frameworks:
             item = QTreeWidgetItem()
-            item.setText(0, fw.get("name", "?"))
-            item.setText(1, fw.get("description", ""))
+            name = fw.get("name", "?")
+            locked = bool(fw.get("locked", False))
+            active = bool(fw.get("active", True))
             installed = fw.get("installed", False)
-            item.setText(2, tr("game_panel.installed") if installed else tr("game_panel.not_installed"))
-            if installed:
-                item.setForeground(2, QBrush(QColor("#4CAF50")))
-            else:
+
+            item.setText(0, ("\U0001F512 " if locked else "") + name)
+            item.setText(1, fw.get("description", ""))
+
+            if not installed:
+                item.setText(2, tr("game_panel.not_installed"))
                 item.setForeground(2, QBrush(QColor("#F44336")))
+            elif not active:
+                item.setText(2, tr("game_panel.deactivated"))
+                item.setForeground(2, QBrush(QColor("#9E9E9E")))
+            else:
+                item.setText(2, tr("game_panel.installed"))
+                item.setForeground(2, QBrush(QColor("#4CAF50")))
+
+            item.setText(3, fw.get("version", ""))
+            item.setForeground(3, QBrush(QColor("#BDBDBD")))
+
             item.setData(0, Qt.ItemDataRole.UserRole, fw)
             self._fw_tree.addTopLevelItem(item)
 

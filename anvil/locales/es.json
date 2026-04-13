@@ -584,6 +584,7 @@
     "read_error": "(Error de lectura)",
     "installed": "Instalado",
     "not_installed": "No instalado",
+    "deactivated": "Desactivado",
     "downloading": "Descargando...",
     "error_prefix": "Error: {message}",
     "delete_confirm_single": "¿Eliminar realmente el archivo \"{name}\"?",
