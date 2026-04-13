@@ -6564,13 +6564,14 @@ class MainWindow(QMainWindow):
                 tr("status.no_downloads_folder"),
             )
             return
-        archive = None
-        fw_lower = fw_name.lower()
-        for f in downloads_path.rglob("*"):
-            if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
-                if fw_lower in f.stem.lower():
-                    archive = f
-                    break
+
+        fw_obj = None
+        for fw in self._current_plugin.all_framework_mods():
+            if fw.name == fw_name:
+                fw_obj = fw
+                break
+
+        archive = self._find_framework_archive(downloads_path, fw_obj, fw_name)
         if not archive:
             QMessageBox.information(
                 self, tr("dialog.reinstall_title"),
@@ -6579,6 +6580,99 @@ class MainWindow(QMainWindow):
             return
         self._install_archives([archive])
         self._game_panel.refresh_downloads()
+
+    def _find_framework_archive(
+        self,
+        downloads_path: Path,
+        fw_obj,
+        fw_name: str,
+    ) -> Path | None:
+        """Find the archive for a framework in the downloads directory.
+
+        Match strategies (first winner wins, newest mtime per strategy):
+          1. Nexus .meta file with matching modID (language-independent)
+          2. Nexus mod-ID pattern in filename (``-{id}-`` / ``-{id}.``)
+          3. Content match: extract and run ``is_framework_mod``
+          4. Legacy substring match on the display name
+        """
+        candidates = [
+            f for f in downloads_path.rglob("*")
+            if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS
+        ]
+        if not candidates:
+            return None
+
+        nexus_id = getattr(fw_obj, "nexus_id", 0) if fw_obj else 0
+
+        def newest(files: list[Path]) -> Path | None:
+            if not files:
+                return None
+            return max(files, key=lambda p: p.stat().st_mtime)
+
+        # 1. Nexus .meta file with matching modID
+        if nexus_id > 0:
+            meta_hits: list[Path] = []
+            for f in candidates:
+                meta = f.with_suffix(f.suffix + ".meta")
+                if not meta.is_file():
+                    continue
+                try:
+                    cp = configparser.ConfigParser(interpolation=None, strict=False)
+                    cp.read(meta, encoding="utf-8")
+                    if cp.has_option("General", "modID"):
+                        try:
+                            if int(cp.get("General", "modID")) == nexus_id:
+                                meta_hits.append(f)
+                        except ValueError:
+                            pass
+                except (OSError, configparser.Error):
+                    continue
+            hit = newest(meta_hits)
+            if hit:
+                return hit
+
+        # 2. Nexus ID pattern in filename
+        if nexus_id > 0:
+            id_str = str(nexus_id)
+            id_hits = [
+                f for f in candidates
+                if f"-{id_str}-" in f.stem or f.stem.endswith(f"-{id_str}")
+            ]
+            hit = newest(id_hits)
+            if hit:
+                return hit
+
+        # 3. Content match via extraction
+        if fw_obj is not None:
+            flatten = getattr(self._current_plugin, "GameFlattenArchive", True)
+            se_dir = getattr(self._current_plugin, "ScriptExtenderDir", "")
+            installer = ModInstaller(
+                self._current_instance_path, flatten=flatten,
+                script_extender_dir=se_dir,
+            )
+            content_hits: list[Path] = []
+            for f in candidates:
+                temp_dir = installer.extract_to_temp(f)
+                if temp_dir is None:
+                    continue
+                try:
+                    file_list = [
+                        str(p.relative_to(temp_dir))
+                        for p in temp_dir.rglob("*") if p.is_file()
+                    ]
+                    detected = self._current_plugin.is_framework_mod(file_list)
+                    if detected is not None and detected.name == fw_obj.name:
+                        content_hits.append(f)
+                finally:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+            hit = newest(content_hits)
+            if hit:
+                return hit
+
+        # 4. Legacy substring fallback
+        fw_lower = fw_name.lower()
+        substr_hits = [f for f in candidates if fw_lower in f.stem.lower()]
+        return newest(substr_hits)
 
     def _fw_uninstall(self, fw_name: str) -> None:
         """Uninstall a framework by removing its detect_installed files from game dir."""
