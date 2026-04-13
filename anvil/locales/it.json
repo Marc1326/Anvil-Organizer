@@ -123,7 +123,13 @@
     "rename_group": "Rinomina gruppo...",
     "add_to_group": "Aggiungi al gruppo",
     "remove_from_group": "Rimuovi dal gruppo",
-    "group_color": "Cambia colore del gruppo..."
+    "group_color": "Cambia colore del gruppo...",
+    "fw_info": "Informazioni",
+    "fw_check_update": "Controlla aggiornamenti",
+    "fw_activate": "Attiva",
+    "fw_deactivate": "Disattiva",
+    "fw_lock": "Blocca framework",
+    "fw_unlock": "Sblocca framework"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -253,7 +259,8 @@
     "dissolve_confirm": "Dissolvere il gruppo '{name}'? I mod verranno mantenuti.",
     "rename_group_title": "Rinomina gruppo",
     "rename_group_prompt": "Nuovo nome:",
-    "group_already_member": "'{mod}' è già nel gruppo '{group}'."
+    "group_already_member": "'{mod}' è già nel gruppo '{group}'.",
+    "fw_update_title": "Aggiornamento framework"
   },
   "button": {
     "cancel": "Annulla",
@@ -472,7 +479,14 @@
     "category_assigned_single": "Categoria assegnata: {category} per {name}",
     "no_nexus_category": "Nessuna categoria Nexus nota. Esegui prima 'Recupera Info Nexus'.",
     "nexus_categories_loaded": "Categorie Nexus caricate: {count} categorie",
-    "nexus_categories_loading": "Caricamento categorie Nexus..."
+    "nexus_categories_loading": "Caricamento categorie Nexus...",
+    "fw_locked_cant_uninstall": "{name} è bloccato. Sbloccalo prima.",
+    "fw_locked": "{name} bloccato",
+    "fw_unlocked": "{name} sbloccato",
+    "fw_activated": "{name} attivato",
+    "fw_deactivated": "{name} disattivato",
+    "fw_update_available": "{name}: Nuova versione {newest} (installata: {current})",
+    "fw_no_update": "{name} è aggiornato (versione {version})"
   },
   "log": {},
   "batch_query": {
@@ -1142,5 +1156,9 @@
     "proton_not_found": "Proton non trovato per questo gioco.\nAssicurati di aver avviato il gioco almeno una volta tramite Steam.",
     "launch": "Avvia",
     "launch_failed": "Avvio dello strumento non riuscito:\n{error}"
+  },
+  "common": {
+    "yes": "Sì",
+    "no": "No"
   }
 }

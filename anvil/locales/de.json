@@ -123,7 +123,13 @@
     "rename_group": "Gruppe umbenennen...",
     "add_to_group": "Zur Gruppe hinzufügen",
     "remove_from_group": "Aus Gruppe entfernen",
-    "group_color": "Gruppenfarbe ändern..."
+    "group_color": "Gruppenfarbe ändern...",
+    "fw_info": "Info",
+    "fw_check_update": "Auf Updates prüfen",
+    "fw_activate": "Aktivieren",
+    "fw_deactivate": "Deaktivieren",
+    "fw_lock": "Framework sperren",
+    "fw_unlock": "Framework entsperren"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -253,7 +259,8 @@
     "dissolve_confirm": "Gruppe '{name}' auflösen? Die Mods bleiben erhalten.",
     "rename_group_title": "Gruppe umbenennen",
     "rename_group_prompt": "Neuer Name:",
-    "group_already_member": "'{mod}' ist bereits in Gruppe '{group}'."
+    "group_already_member": "'{mod}' ist bereits in Gruppe '{group}'.",
+    "fw_update_title": "Framework-Update"
   },
   "button": {
     "cancel": "Abbrechen",
@@ -472,7 +479,14 @@
     "category_assigned_single": "Kategorie zugeordnet: {category} für {name}",
     "no_nexus_category": "Keine Nexus-Kategorie bekannt. Zuerst 'Nexus-Info abrufen'.",
     "nexus_categories_loaded": "Nexus-Kategorien geladen: {count} Kategorien",
-    "nexus_categories_loading": "Nexus-Kategorien werden geladen..."
+    "nexus_categories_loading": "Nexus-Kategorien werden geladen...",
+    "fw_locked_cant_uninstall": "{name} ist gesperrt. Bitte zuerst entsperren.",
+    "fw_locked": "{name} gesperrt",
+    "fw_unlocked": "{name} entsperrt",
+    "fw_activated": "{name} aktiviert",
+    "fw_deactivated": "{name} deaktiviert",
+    "fw_update_available": "{name}: Neue Version {newest} (installiert: {current})",
+    "fw_no_update": "{name} ist aktuell (Version {version})"
   },
   "log": {},
   "batch_query": {
@@ -1142,5 +1156,9 @@
     "proton_not_found": "Proton wurde fuer dieses Spiel nicht gefunden.\nStelle sicher, dass das Spiel mindestens einmal ueber Steam gestartet wurde.",
     "launch": "Starten",
     "launch_failed": "Tool-Start fehlgeschlagen:\n{error}"
+  },
+  "common": {
+    "yes": "Ja",
+    "no": "Nein"
   }
 }

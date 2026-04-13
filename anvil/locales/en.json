@@ -123,7 +123,13 @@
     "rename_group": "Rename Group...",
     "add_to_group": "Add to Group",
     "remove_from_group": "Remove from Group",
-    "group_color": "Change Group Color..."
+    "group_color": "Change Group Color...",
+    "fw_info": "Info",
+    "fw_check_update": "Check for updates",
+    "fw_activate": "Activate",
+    "fw_deactivate": "Deactivate",
+    "fw_lock": "Lock framework",
+    "fw_unlock": "Unlock framework"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -253,7 +259,8 @@
     "dissolve_confirm": "Dissolve group '{name}'? Mods will be kept.",
     "rename_group_title": "Rename Group",
     "rename_group_prompt": "New name:",
-    "group_already_member": "'{mod}' is already in group '{group}'."
+    "group_already_member": "'{mod}' is already in group '{group}'.",
+    "fw_update_title": "Framework update"
   },
   "button": {
     "cancel": "Cancel",
@@ -472,7 +479,14 @@
     "category_assigned_single": "Category assigned: {category} for {name}",
     "no_nexus_category": "No Nexus category known. Run 'Query Nexus Info' first.",
     "nexus_categories_loaded": "Nexus categories loaded: {count} categories",
-    "nexus_categories_loading": "Loading Nexus categories..."
+    "nexus_categories_loading": "Loading Nexus categories...",
+    "fw_locked_cant_uninstall": "{name} is locked. Please unlock first.",
+    "fw_locked": "{name} locked",
+    "fw_unlocked": "{name} unlocked",
+    "fw_activated": "{name} activated",
+    "fw_deactivated": "{name} deactivated",
+    "fw_update_available": "{name}: New version {newest} (installed: {current})",
+    "fw_no_update": "{name} is up to date (version {version})"
   },
   "log": {},
   "batch_query": {
@@ -1142,5 +1156,9 @@
     "proton_not_found": "Proton not found for this game.\nMake sure the game has been run at least once via Steam.",
     "launch": "Launch",
     "launch_failed": "Failed to launch tool:\n{error}"
+  },
+  "common": {
+    "yes": "Yes",
+    "no": "No"
   }
 }

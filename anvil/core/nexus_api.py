@@ -165,6 +165,11 @@ class NexusAPI(QObject):
         self._get(f"/games/{game}/mods/{mod_id}.json",
                   tag=f"update_check:{game}:{mod_id}")
 
+    def update_check_framework(self, game: str, mod_id: int, name: str) -> None:
+        """Fetch mod metadata for a framework update check."""
+        self._get(f"/games/{game}/mods/{mod_id}.json",
+                  tag=f"fw_update:{name}")
+
     def get_mod_files(self, game: str, mod_id: int) -> None:
         """Fetch file list for a mod.  GET /games/{game}/mods/{mod_id}/files.json"""
         self._get(

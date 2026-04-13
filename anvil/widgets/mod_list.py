@@ -979,6 +979,19 @@ class _DropFrameworkTree(QTreeWidget):
     """QTreeWidget that accepts external archive file drops for framework installation."""
 
     archives_dropped = Signal(list)  # list of file path strings
+    ctrl_click = Signal(dict)  # fw_data of clicked row with Ctrl held
+
+    def mousePressEvent(self, event):
+        if (event.button() == Qt.MouseButton.LeftButton
+                and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+            item = self.itemAt(event.position().toPoint())
+            if item is not None:
+                fw_data = item.data(0, Qt.ItemDataRole.UserRole)
+                if fw_data:
+                    self.ctrl_click.emit(fw_data)
+                    event.accept()
+                    return
+        super().mousePressEvent(event)
 
     def dragEnterEvent(self, event):
         print(f"[FW-TREE] dragEnterEvent: hasUrls={event.mimeData().hasUrls()}", flush=True)
@@ -1022,6 +1035,7 @@ class ModListView(QWidget):
     context_menu_requested = Signal(QPoint)  # global pos for context menu
     fw_context_menu_requested = Signal(QPoint, dict)  # global pos + fw_data for framework context menu
     fw_archives_dropped = Signal(list)  # archive paths dropped on framework tree
+    fw_ctrl_click = Signal(dict)  # Ctrl+Left-Click on framework row
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -1116,6 +1130,7 @@ class ModListView(QWidget):
         self._fw_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._fw_tree.customContextMenuRequested.connect(self._on_fw_context_menu)
         self._fw_tree.archives_dropped.connect(self.fw_archives_dropped)
+        self._fw_tree.ctrl_click.connect(self.fw_ctrl_click)
         fw_hdr = self._fw_tree.header()
         fw_hdr.setStretchLastSection(False)
         fw_hdr.setCascadingSectionResizes(True)

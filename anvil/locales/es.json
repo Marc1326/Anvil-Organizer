@@ -123,7 +123,13 @@
     "rename_group": "Renombrar grupo...",
     "add_to_group": "Agregar al grupo",
     "remove_from_group": "Quitar del grupo",
-    "group_color": "Cambiar color del grupo..."
+    "group_color": "Cambiar color del grupo...",
+    "fw_info": "Información",
+    "fw_check_update": "Buscar actualizaciones",
+    "fw_activate": "Activar",
+    "fw_deactivate": "Desactivar",
+    "fw_lock": "Bloquear framework",
+    "fw_unlock": "Desbloquear framework"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -253,7 +259,8 @@
     "dissolve_confirm": "Disolver grupo '{name}'? Los mods se conservarán.",
     "rename_group_title": "Renombrar grupo",
     "rename_group_prompt": "Nuevo nombre:",
-    "group_already_member": "'{mod}' ya está en el grupo '{group}'."
+    "group_already_member": "'{mod}' ya está en el grupo '{group}'.",
+    "fw_update_title": "Actualización de framework"
   },
   "button": {
     "cancel": "Cancelar",
@@ -472,7 +479,14 @@
     "category_assigned_single": "Categoría asignada: {category} para {name}",
     "no_nexus_category": "Sin categoría Nexus conocida. Ejecuta 'Consultar Info Nexus' primero.",
     "nexus_categories_loaded": "Categorías Nexus cargadas: {count} categorías",
-    "nexus_categories_loading": "Cargando categorías Nexus..."
+    "nexus_categories_loading": "Cargando categorías Nexus...",
+    "fw_locked_cant_uninstall": "{name} está bloqueado. Desbloquee primero.",
+    "fw_locked": "{name} bloqueado",
+    "fw_unlocked": "{name} desbloqueado",
+    "fw_activated": "{name} activado",
+    "fw_deactivated": "{name} desactivado",
+    "fw_update_available": "{name}: Nueva versión {newest} (instalada: {current})",
+    "fw_no_update": "{name} está actualizado (versión {version})"
   },
   "log": {},
   "batch_query": {
@@ -1142,5 +1156,9 @@
     "proton_not_found": "Proton no encontrado para este juego.\nAsegurese de haber ejecutado el juego al menos una vez a traves de Steam.",
     "launch": "Iniciar",
     "launch_failed": "Error al iniciar la herramienta:\n{error}"
+  },
+  "common": {
+    "yes": "Sí",
+    "no": "No"
   }
 }

@@ -123,7 +123,13 @@
     "rename_group": "Renommer le groupe...",
     "add_to_group": "Ajouter au groupe",
     "remove_from_group": "Retirer du groupe",
-    "group_color": "Changer la couleur du groupe..."
+    "group_color": "Changer la couleur du groupe...",
+    "fw_info": "Informations",
+    "fw_check_update": "Vérifier les mises à jour",
+    "fw_activate": "Activer",
+    "fw_deactivate": "Désactiver",
+    "fw_lock": "Verrouiller le framework",
+    "fw_unlock": "Déverrouiller le framework"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -253,7 +259,8 @@
     "dissolve_confirm": "Dissoudre le groupe '{name}' ? Les mods seront conservés.",
     "rename_group_title": "Renommer le groupe",
     "rename_group_prompt": "Nouveau nom :",
-    "group_already_member": "'{mod}' est déjà dans le groupe '{group}'."
+    "group_already_member": "'{mod}' est déjà dans le groupe '{group}'.",
+    "fw_update_title": "Mise à jour du framework"
   },
   "button": {
     "cancel": "Annuler",
@@ -472,7 +479,14 @@
     "category_assigned_single": "Catégorie attribuée : {category} pour {name}",
     "no_nexus_category": "Aucune catégorie Nexus connue. Exécutez d'abord 'Récupérer les infos Nexus'.",
     "nexus_categories_loaded": "Catégories Nexus chargées : {count} catégories",
-    "nexus_categories_loading": "Chargement des catégories Nexus..."
+    "nexus_categories_loading": "Chargement des catégories Nexus...",
+    "fw_locked_cant_uninstall": "{name} est verrouillé. Veuillez le déverrouiller d'abord.",
+    "fw_locked": "{name} verrouillé",
+    "fw_unlocked": "{name} déverrouillé",
+    "fw_activated": "{name} activé",
+    "fw_deactivated": "{name} désactivé",
+    "fw_update_available": "{name}: Nouvelle version {newest} (installée : {current})",
+    "fw_no_update": "{name} est à jour (version {version})"
   },
   "log": {},
   "batch_query": {
@@ -1142,5 +1156,9 @@
     "proton_not_found": "Proton introuvable pour ce jeu.\nAssurez-vous d'avoir lance le jeu au moins une fois via Steam.",
     "launch": "Lancer",
     "launch_failed": "Echec du lancement de l'outil :\n{error}"
+  },
+  "common": {
+    "yes": "Oui",
+    "no": "Non"
   }
 }

@@ -356,6 +356,7 @@ class MainWindow(QMainWindow):
         )
         self._mod_list_view.fw_context_menu_requested.connect(self._on_fw_context_menu)
         self._mod_list_view.fw_archives_dropped.connect(self._on_fw_archives_dropped)
+        self._mod_list_view.fw_ctrl_click.connect(self._on_fw_ctrl_click)
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
         self._game_panel.game_started.connect(self._on_game_started)
@@ -5658,6 +5659,24 @@ class MainWindow(QMainWindow):
             from PySide6.QtCore import QTimer
             QTimer.singleShot(1000, self._update_check_next)
 
+        elif tag.startswith("fw_update:") and isinstance(data, dict):
+            name = tag.split(":", 1)[1]
+            current = getattr(self, "_fw_update_check_current", "") or ""
+            newest = str(data.get("version", "") or "")
+            if newest and current and newest != current:
+                QMessageBox.information(
+                    self, tr("dialog.fw_update_title"),
+                    tr("status.fw_update_available",
+                       name=name, current=current, newest=newest),
+                )
+            else:
+                QMessageBox.information(
+                    self, tr("dialog.fw_update_title"),
+                    tr("status.fw_no_update", name=name, version=newest or current or "?"),
+                )
+            self._fw_update_check_name = ""
+            self._fw_update_check_current = ""
+
         elif tag.startswith("game_categories:") and isinstance(data, dict):
             # Category cache update
             categories = data.get("categories", [])
@@ -6537,20 +6556,47 @@ class MainWindow(QMainWindow):
         }
 
     def _on_fw_context_menu(self, global_pos, fw_data: dict) -> None:
-        """Context menu for framework mods: reinstall or uninstall."""
+        """Context menu for framework mods."""
         menu = QMenu(self)
         name = fw_data.get("name", "")
         installed = fw_data.get("installed", False)
+        locked = bool(fw_data.get("locked", False))
+        active = bool(fw_data.get("active", True))
+        critical = bool(fw_data.get("is_critical", False))
+        nexus_id = int(fw_data.get("nexus_id", 0) or 0)
+
+        act_info = menu.addAction(tr("context.fw_info"))
+        act_info.setEnabled(installed)
 
         act_nexus_query_fw = menu.addAction(tr("context.nexus_query_frameworks"))
         _has_fw = bool(self._current_plugin and any(
             fw.nexus_id > 0 and inst for fw, inst in self._current_plugin.get_installed_frameworks()
         ))
         act_nexus_query_fw.setEnabled(self._nexus_api.has_api_key() and _has_fw)
+
+        act_check_update = menu.addAction(tr("context.fw_check_update"))
+        act_check_update.setEnabled(
+            installed and nexus_id > 0 and self._nexus_api.has_api_key(),
+        )
+
+        menu.addSeparator()
+
+        if active:
+            act_toggle_active = menu.addAction(tr("context.fw_deactivate"))
+        else:
+            act_toggle_active = menu.addAction(tr("context.fw_activate"))
+        act_toggle_active.setEnabled(installed and not critical and not locked)
+
+        if locked:
+            act_toggle_lock = menu.addAction(tr("context.fw_unlock"))
+        else:
+            act_toggle_lock = menu.addAction(tr("context.fw_lock"))
+        act_toggle_lock.setEnabled(installed)
+
         menu.addSeparator()
         act_reinstall = menu.addAction(tr("context.reinstall_framework"))
         act_uninstall = menu.addAction(tr("context.uninstall_framework"))
-        act_uninstall.setEnabled(installed)
+        act_uninstall.setEnabled(installed and not locked)
         menu.addSeparator()
         act_explorer = menu.addAction(tr("context.open_file_manager"))
 
@@ -6558,8 +6604,16 @@ class MainWindow(QMainWindow):
         if not chosen:
             return
 
-        if chosen == act_nexus_query_fw:
+        if chosen == act_info:
+            self._fw_show_info(fw_data)
+        elif chosen == act_nexus_query_fw:
             self._query_framework_nexus()
+        elif chosen == act_check_update:
+            self._fw_check_update(fw_data)
+        elif chosen == act_toggle_active:
+            self._fw_toggle_active(name)
+        elif chosen == act_toggle_lock:
+            self._fw_toggle_lock(name)
         elif chosen == act_reinstall:
             self._fw_reinstall(name)
         elif chosen == act_uninstall:
@@ -6704,6 +6758,15 @@ class MainWindow(QMainWindow):
         """Uninstall a framework by removing its detect_installed files from game dir."""
         if not self._current_plugin or not self._current_game_path:
             return
+        # Lock-Guard
+        if self._current_instance_path:
+            st = framework_state.get(self._current_instance_path, fw_name)
+            if st.get("locked"):
+                QMessageBox.information(
+                    self, tr("dialog.uninstall_framework_title"),
+                    tr("status.fw_locked_cant_uninstall", name=fw_name),
+                )
+                return
         fw_obj = None
         for fw in self._current_plugin.all_framework_mods():
             if fw.name == fw_name:
@@ -6722,17 +6785,148 @@ class MainWindow(QMainWindow):
         removed = 0
         for det_path in fw_obj.detect_installed:
             full = game_path / det_path
-            if full.is_file():
-                full.unlink()
-                removed += 1
-            elif full.is_dir():
-                shutil.rmtree(full, ignore_errors=True)
-                removed += 1
+            disabled = full.with_name(full.name + framework_state.DISABLED_SUFFIX)
+            for target in (full, disabled):
+                if target.is_file():
+                    target.unlink()
+                    removed += 1
+                elif target.is_dir():
+                    shutil.rmtree(target, ignore_errors=True)
+                    removed += 1
         if removed:
+            if self._current_instance_path:
+                framework_state.remove(self._current_instance_path, fw_name)
             self.statusBar().showMessage(tr("status.framework_uninstalled", name=fw_name), 5000)
         else:
             self.statusBar().showMessage(tr("status.uninstall_failed"), 5000)
         self._reload_mod_list()
+
+    def _fw_show_info(self, fw_data: dict) -> None:
+        """Show info dialog for a single framework."""
+        name = fw_data.get("name", "?")
+        lines = [
+            f"Name: {name}",
+            f"{tr('label.header_description')}: {fw_data.get('description', '') or '—'}",
+            f"{tr('game_panel.header_status')}: "
+            f"{tr('game_panel.installed') if fw_data.get('installed') else tr('game_panel.not_installed')}",
+            f"{tr('label.header_version')}: {fw_data.get('version') or '—'}",
+            f"{tr('context.fw_lock')}: "
+            f"{tr('common.yes') if fw_data.get('locked') else tr('common.no')}",
+            f"{tr('context.fw_activate')}: "
+            f"{tr('common.yes') if fw_data.get('active', True) else tr('common.no')}",
+            f"Nexus-ID: {fw_data.get('nexus_id') or '—'}",
+        ]
+        # Collect detect-paths from plugin
+        if self._current_plugin and self._current_game_path:
+            for fw in self._current_plugin.all_framework_mods():
+                if fw.name == name:
+                    paths = []
+                    for det in fw.detect_installed:
+                        p = self._current_game_path / det
+                        disabled = p.with_name(p.name + framework_state.DISABLED_SUFFIX)
+                        if p.exists():
+                            paths.append(str(p))
+                        elif disabled.exists():
+                            paths.append(str(disabled))
+                    if paths:
+                        lines.append("")
+                        lines.append("Dateien:")
+                        lines.extend(f"  {p}" for p in paths)
+                    break
+
+        dlg = QDialog(self)
+        dlg.setObjectName("InfoDialog")
+        dlg.setWindowTitle(tr("dialog.info_title", name=name))
+        layout = QVBoxLayout(dlg)
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setPlainText("\n".join(lines))
+        layout.addWidget(text_edit)
+        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        btn_box.accepted.connect(dlg.accept)
+        layout.addWidget(btn_box)
+        dlg.setMinimumSize(600, 400)
+        dlg.resize(600, 400)
+        _center_on_parent(dlg)
+        dlg.exec()
+
+    def _fw_toggle_lock(self, fw_name: str) -> None:
+        """Toggle lock state of a framework."""
+        if not self._current_instance_path:
+            return
+        st = framework_state.get(self._current_instance_path, fw_name)
+        new_locked = not bool(st.get("locked", False))
+        framework_state.set_entry(
+            self._current_instance_path, fw_name, locked=new_locked,
+        )
+        self.statusBar().showMessage(
+            tr("status.fw_locked" if new_locked else "status.fw_unlocked", name=fw_name),
+            3000,
+        )
+        self._reload_mod_list()
+
+    def _fw_toggle_active(self, fw_name: str) -> None:
+        """Activate/deactivate a framework by renaming its files to .anvil-disabled."""
+        if not self._current_plugin or not self._current_game_path:
+            return
+        fw_obj = None
+        for fw in self._current_plugin.all_framework_mods():
+            if fw.name == fw_name:
+                fw_obj = fw
+                break
+        if not fw_obj:
+            return
+        game_path = self._current_game_path
+        # Determine new state: if any file is active → deactivate; else activate
+        any_active = False
+        for det in fw_obj.detect_installed:
+            if (game_path / det).exists():
+                any_active = True
+                break
+        if any_active:
+            # Deactivate: rename active → .anvil-disabled
+            for det in fw_obj.detect_installed:
+                src = game_path / det
+                dst = src.with_name(src.name + framework_state.DISABLED_SUFFIX)
+                if src.exists() and not dst.exists():
+                    src.rename(dst)
+            new_active = False
+        else:
+            # Activate: rename .anvil-disabled → active
+            for det in fw_obj.detect_installed:
+                target = game_path / det
+                src = target.with_name(target.name + framework_state.DISABLED_SUFFIX)
+                if src.exists() and not target.exists():
+                    src.rename(target)
+            new_active = True
+        if self._current_instance_path:
+            framework_state.set_entry(
+                self._current_instance_path, fw_name, active=new_active,
+            )
+        self.statusBar().showMessage(
+            tr("status.fw_activated" if new_active else "status.fw_deactivated", name=fw_name),
+            3000,
+        )
+        self._reload_mod_list()
+
+    def _on_fw_ctrl_click(self, fw_data: dict) -> None:
+        """Ctrl+Click on a framework row toggles its lock state."""
+        name = fw_data.get("name", "")
+        if name and fw_data.get("installed"):
+            self._fw_toggle_lock(name)
+
+    def _fw_check_update(self, fw_data: dict) -> None:
+        """Check Nexus for a newer version of this framework."""
+        nexus_id = int(fw_data.get("nexus_id", 0) or 0)
+        if nexus_id <= 0 or not self._current_plugin:
+            return
+        slug = getattr(self._current_plugin, "NexusSlug", "")
+        if not slug:
+            return
+        name = fw_data.get("name", "")
+        self._fw_update_check_name = name
+        self._fw_update_check_current = str(fw_data.get("version", ""))
+        self._nexus_api.update_check_framework(slug, nexus_id, name)
 
     def _on_fw_archives_dropped(self, paths: list) -> None:
         """Handle archives dropped onto the framework tree."""

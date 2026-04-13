@@ -123,7 +123,13 @@
     "rename_group": "Переименовать группу...",
     "add_to_group": "Добавить в группу",
     "remove_from_group": "Удалить из группы",
-    "group_color": "Изменить цвет группы..."
+    "group_color": "Изменить цвет группы...",
+    "fw_info": "Информация",
+    "fw_check_update": "Проверить обновления",
+    "fw_activate": "Включить",
+    "fw_deactivate": "Отключить",
+    "fw_lock": "Заблокировать фреймворк",
+    "fw_unlock": "Разблокировать фреймворк"
   },
   "toolbar": {
     "deploy": "Развернуть",
@@ -253,7 +259,8 @@
     "dissolve_confirm": "Распустить группу '{name}'? Моды будут сохранены.",
     "rename_group_title": "Переименовать группу",
     "rename_group_prompt": "Новое имя:",
-    "group_already_member": "'{mod}' уже в группе '{group}'."
+    "group_already_member": "'{mod}' уже в группе '{group}'.",
+    "fw_update_title": "Обновление фреймворка"
   },
   "button": {
     "cancel": "Отмена",
@@ -472,7 +479,14 @@
     "category_assigned_single": "Категория назначена: {category} для {name}",
     "no_nexus_category": "Категория Nexus неизвестна. Сначала выполните 'Запросить инфо Nexus'.",
     "nexus_categories_loaded": "Категории Nexus загружены: {count} категорий",
-    "nexus_categories_loading": "Загрузка категорий Nexus..."
+    "nexus_categories_loading": "Загрузка категорий Nexus...",
+    "fw_locked_cant_uninstall": "{name} заблокирован. Сначала разблокируйте.",
+    "fw_locked": "{name} заблокирован",
+    "fw_unlocked": "{name} разблокирован",
+    "fw_activated": "{name} включён",
+    "fw_deactivated": "{name} отключён",
+    "fw_update_available": "{name}: Новая версия {newest} (установлено: {current})",
+    "fw_no_update": "{name} актуален (версия {version})"
   },
   "log": {},
   "batch_query": {
@@ -1142,5 +1156,9 @@
     "proton_not_found": "Proton ne nayden dlya etoy igry.\nUbedites chto igra byla zapushchena khotya by raz cherez Steam.",
     "launch": "Zapustit",
     "launch_failed": "Ne udalos zapustit instrument:\n{error}"
+  },
+  "common": {
+    "yes": "Да",
+    "no": "Нет"
   }
 }
