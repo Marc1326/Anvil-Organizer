@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import configparser
+import fnmatch
 import json
 import os
 import re
@@ -5157,6 +5158,11 @@ class MainWindow(QMainWindow):
             if name:
                 chips.append({"id": cid, "name": name})
 
+        # Skip rebuild if chip set is unchanged — avoids visible re-layout flash
+        new_ids = frozenset(c["id"] for c in chips)
+        if getattr(self, "_last_nexus_chip_ids", None) == new_ids:
+            return
+        self._last_nexus_chip_ids = new_ids
         self._filter_panel.set_nexus_categories(chips)
 
     def _on_nexus_load_requested(self) -> None:
@@ -6882,7 +6888,7 @@ class MainWindow(QMainWindow):
             tr("status.fw_locked" if new_locked else "status.fw_unlocked", name=fw_name),
             3000,
         )
-        self._reload_mod_list()
+        QTimer.singleShot(0, self._reload_mod_list)
 
     def _fw_toggle_active(self, fw_name: str) -> None:
         """Activate/deactivate a framework by renaming its files to .anvil-disabled."""
@@ -6896,24 +6902,55 @@ class MainWindow(QMainWindow):
         if not fw_obj:
             return
         game_path = self._current_game_path
+        suffix = framework_state.DISABLED_SUFFIX
+
+        def resolve_paths(det: str) -> list[Path]:
+            """Return actual files on disk for a detect pattern (supports globs)."""
+            if '*' in det or '?' in det:
+                parent = (game_path / det).parent
+                pat = Path(det).name
+                if not parent.is_dir():
+                    return []
+                return [
+                    f for f in parent.iterdir()
+                    if fnmatch.fnmatch(f.name, pat)
+                    or fnmatch.fnmatch(f.name, pat + suffix)
+                ]
+            p = game_path / det
+            disabled = p.with_name(p.name + suffix)
+            found = []
+            if p.exists():
+                found.append(p)
+            if disabled.exists():
+                found.append(disabled)
+            return found
+
         any_active = False
         for det in fw_obj.detect_installed:
-            if (game_path / det).exists():
-                any_active = True
+            for f in resolve_paths(det):
+                if not f.name.endswith(suffix):
+                    any_active = True
+                    break
+            if any_active:
                 break
+
         if any_active:
             for det in fw_obj.detect_installed:
-                src = game_path / det
-                dst = src.with_name(src.name + framework_state.DISABLED_SUFFIX)
-                if src.exists() and not dst.exists():
-                    src.rename(dst)
+                for f in resolve_paths(det):
+                    if f.name.endswith(suffix):
+                        continue
+                    dst = f.with_name(f.name + suffix)
+                    if not dst.exists():
+                        f.rename(dst)
             new_active = False
         else:
             for det in fw_obj.detect_installed:
-                target = game_path / det
-                src = target.with_name(target.name + framework_state.DISABLED_SUFFIX)
-                if src.exists() and not target.exists():
-                    src.rename(target)
+                for f in resolve_paths(det):
+                    if not f.name.endswith(suffix):
+                        continue
+                    target = f.with_name(f.name[:-len(suffix)])
+                    if not target.exists():
+                        f.rename(target)
             new_active = True
         if self._current_instance_path:
             framework_state.set_entry(
@@ -6923,7 +6960,7 @@ class MainWindow(QMainWindow):
             tr("status.fw_activated" if new_active else "status.fw_deactivated", name=fw_name),
             3000,
         )
-        self._reload_mod_list()
+        QTimer.singleShot(0, self._reload_mod_list)
 
     def _on_fw_active_toggle(self, fw_data: dict) -> None:
         """Click on the status column toggles active/inactive."""
