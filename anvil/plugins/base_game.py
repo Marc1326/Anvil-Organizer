@@ -712,7 +712,6 @@ class BaseGame:
         Files with the ``.anvil-disabled`` suffix count as installed
         (deactivated frameworks remain visible in the UI).
         """
-        print(f"[get_installed_frameworks] _game_path={self._game_path}", flush=True)
         result: list[tuple[FrameworkMod, bool]] = []
         for fw in self.all_framework_mods():
             installed = False
@@ -734,7 +733,6 @@ class BaseGame:
                         if p.exists() or disabled.exists():
                             installed = True
                             break
-            print(f"[get_installed_frameworks]   fw={fw.name} installed={installed}", flush=True)
             result.append((fw, installed))
         return result
 

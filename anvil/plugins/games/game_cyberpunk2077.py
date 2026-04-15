@@ -178,6 +178,7 @@ class Cyberpunk2077Game(BaseGame):
                 detect_installed=["bin/x64/version.dll"],
                 required_by=["CET-Mods", "Lua-Scripts"],
                 nexus_id=107,
+                essential=True,
             ),
             FrameworkMod(
                 name="RED4ext",
@@ -187,6 +188,7 @@ class Cyberpunk2077Game(BaseGame):
                 detect_installed=["bin/x64/winmm.dll", "red4ext/RED4ext.dll"],
                 required_by=["ArchiveXL", "TweakXL", "Codeware"],
                 nexus_id=2380,
+                essential=True,
             ),
             FrameworkMod(
                 name="redscript",
@@ -196,6 +198,7 @@ class Cyberpunk2077Game(BaseGame):
                 detect_installed=["engine/tools/scc.exe"],
                 required_by=["REDscript-Mods"],
                 nexus_id=1511,
+                essential=True,
             ),
             FrameworkMod(
                 name="ArchiveXL",
@@ -205,6 +208,7 @@ class Cyberpunk2077Game(BaseGame):
                 detect_installed=["red4ext/plugins/ArchiveXL/ArchiveXL.dll"],
                 required_by=["Custom-Items", "Custom-Appearances"],
                 nexus_id=4198,
+                essential=True,
             ),
             FrameworkMod(
                 name="TweakXL",
@@ -214,6 +218,7 @@ class Cyberpunk2077Game(BaseGame):
                 detect_installed=["red4ext/plugins/TweakXL/TweakXL.dll"],
                 required_by=["Custom-Items", "Gameplay-Tweaks"],
                 nexus_id=4197,
+                essential=True,
             ),
             FrameworkMod(
                 name="Codeware",

@@ -486,7 +486,10 @@
     "fw_activated": "{name} aktiviert",
     "fw_deactivated": "{name} deaktiviert",
     "fw_update_available": "{name}: Neue Version {newest} (installiert: {current})",
-    "fw_no_update": "{name} ist aktuell (Version {version})"
+    "fw_no_update": "{name} ist aktuell (Version {version})",
+    "fw_checking": "Prüfe Nexus-Version für {name}…",
+    "fw_update_error": "Update-Prüfung für {name} fehlgeschlagen:\n{reason}",
+    "fw_no_nexus_id": "Für {name} ist keine Nexus-ID hinterlegt."
   },
   "log": {},
   "batch_query": {

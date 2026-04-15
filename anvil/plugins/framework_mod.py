@@ -37,3 +37,4 @@ class FrameworkMod:
     detect_installed: list[str]
     required_by: list[str] = field(default_factory=list)
     nexus_id: int = 0
+    essential: bool = False

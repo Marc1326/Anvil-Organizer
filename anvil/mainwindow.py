@@ -356,7 +356,7 @@ class MainWindow(QMainWindow):
         )
         self._mod_list_view.fw_context_menu_requested.connect(self._on_fw_context_menu)
         self._mod_list_view.fw_archives_dropped.connect(self._on_fw_archives_dropped)
-        self._mod_list_view.fw_ctrl_click.connect(self._on_fw_ctrl_click)
+        self._mod_list_view.fw_active_toggle.connect(self._on_fw_active_toggle)
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
         self._game_panel.game_started.connect(self._on_game_started)
@@ -5663,19 +5663,29 @@ class MainWindow(QMainWindow):
             name = tag.split(":", 1)[1]
             current = getattr(self, "_fw_update_check_current", "") or ""
             newest = str(data.get("version", "") or "")
+            if newest and self._current_instance_path:
+                if not current:
+                    framework_state.set_entry(
+                        self._current_instance_path, name, version=newest,
+                    )
+                    current = newest
             if newest and current and newest != current:
+                txt = tr("status.fw_update_available",
+                         name=name, current=current, newest=newest)
+                self._log_panel.add_log("info", txt)
                 QMessageBox.information(
-                    self, tr("dialog.fw_update_title"),
-                    tr("status.fw_update_available",
-                       name=name, current=current, newest=newest),
+                    self, tr("dialog.fw_update_title"), txt,
                 )
             else:
+                txt = tr("status.fw_no_update",
+                         name=name, version=newest or current or "?")
+                self._log_panel.add_log("info", txt)
                 QMessageBox.information(
-                    self, tr("dialog.fw_update_title"),
-                    tr("status.fw_no_update", name=name, version=newest or current or "?"),
+                    self, tr("dialog.fw_update_title"), txt,
                 )
             self._fw_update_check_name = ""
             self._fw_update_check_current = ""
+            self._reload_mod_list()
 
         elif tag.startswith("game_categories:") and isinstance(data, dict):
             # Category cache update
@@ -5794,6 +5804,14 @@ class MainWindow(QMainWindow):
         """Handle Nexus API errors."""
         if tag.startswith("game_categories:"):
             self._log_panel.add_log("error", f"Nexus categories: {message}")
+            return
+        if tag.startswith("fw_update:"):
+            name = tag.split(":", 1)[1]
+            txt = tr("status.fw_update_error", name=name, reason=message)
+            self._log_panel.add_log("error", txt)
+            QMessageBox.warning(self, tr("dialog.fw_update_title"), txt)
+            self._fw_update_check_name = ""
+            self._fw_update_check_current = ""
             return
         if tag.startswith("update_check:"):
             self._pending_update_check = None
@@ -6541,16 +6559,25 @@ class MainWindow(QMainWindow):
 
     def _build_fw_dict(self, fw, installed: bool) -> dict:
         """Build a framework UI-dict enriched with per-instance state."""
-        st = framework_state.get(self._current_instance_path, fw.name) \
+        raw = framework_state.load(self._current_instance_path) \
             if self._current_instance_path else {}
-        critical = bool(getattr(fw, "required_by", None))
+        entry = raw.get(fw.name)
+        if entry is None:
+            locked = True
+            active = True
+            version = ""
+        else:
+            locked = bool(entry.get("locked", False))
+            active = bool(entry.get("active", True))
+            version = str(entry.get("version", ""))
+        critical = bool(getattr(fw, "essential", False))
         return {
             "name": fw.name,
             "description": fw.description,
             "installed": installed,
-            "locked": bool(st.get("locked", False)),
-            "active": bool(st.get("active", True)),
-            "version": str(st.get("version", "")),
+            "locked": locked,
+            "active": active,
+            "version": version,
             "is_critical": critical,
             "nexus_id": int(getattr(fw, "nexus_id", 0) or 0),
         }
@@ -6560,13 +6587,22 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         name = fw_data.get("name", "")
         installed = fw_data.get("installed", False)
-        locked = bool(fw_data.get("locked", False))
-        active = bool(fw_data.get("active", True))
         critical = bool(fw_data.get("is_critical", False))
         nexus_id = int(fw_data.get("nexus_id", 0) or 0)
 
-        act_info = menu.addAction(tr("context.fw_info"))
-        act_info.setEnabled(installed)
+        locked = bool(fw_data.get("locked", False))
+        act_toggle_lock = menu.addAction(
+            tr("context.fw_unlock" if locked else "context.fw_lock"),
+        )
+        act_toggle_lock.setEnabled(installed)
+
+        menu.addSeparator()
+
+        act_reinstall = menu.addAction(tr("context.reinstall_framework"))
+        act_uninstall = menu.addAction(tr("context.uninstall_framework"))
+        act_uninstall.setEnabled(installed and not locked)
+
+        menu.addSeparator()
 
         act_nexus_query_fw = menu.addAction(tr("context.nexus_query_frameworks"))
         _has_fw = bool(self._current_plugin and any(
@@ -6580,25 +6616,10 @@ class MainWindow(QMainWindow):
         )
 
         menu.addSeparator()
-
-        if active:
-            act_toggle_active = menu.addAction(tr("context.fw_deactivate"))
-        else:
-            act_toggle_active = menu.addAction(tr("context.fw_activate"))
-        act_toggle_active.setEnabled(installed and not critical and not locked)
-
-        if locked:
-            act_toggle_lock = menu.addAction(tr("context.fw_unlock"))
-        else:
-            act_toggle_lock = menu.addAction(tr("context.fw_lock"))
-        act_toggle_lock.setEnabled(installed)
-
-        menu.addSeparator()
-        act_reinstall = menu.addAction(tr("context.reinstall_framework"))
-        act_uninstall = menu.addAction(tr("context.uninstall_framework"))
-        act_uninstall.setEnabled(installed and not locked)
-        menu.addSeparator()
         act_explorer = menu.addAction(tr("context.open_file_manager"))
+        menu.addSeparator()
+        act_info = menu.addAction(tr("context.fw_info"))
+        act_info.setEnabled(installed)
 
         chosen = menu.exec(global_pos)
         if not chosen:
@@ -6606,14 +6627,12 @@ class MainWindow(QMainWindow):
 
         if chosen == act_info:
             self._fw_show_info(fw_data)
+        elif chosen == act_toggle_lock:
+            self._fw_toggle_lock(name)
         elif chosen == act_nexus_query_fw:
             self._query_framework_nexus()
         elif chosen == act_check_update:
             self._fw_check_update(fw_data)
-        elif chosen == act_toggle_active:
-            self._fw_toggle_active(name)
-        elif chosen == act_toggle_lock:
-            self._fw_toggle_lock(name)
         elif chosen == act_reinstall:
             self._fw_reinstall(name)
         elif chosen == act_uninstall:
@@ -6877,14 +6896,12 @@ class MainWindow(QMainWindow):
         if not fw_obj:
             return
         game_path = self._current_game_path
-        # Determine new state: if any file is active → deactivate; else activate
         any_active = False
         for det in fw_obj.detect_installed:
             if (game_path / det).exists():
                 any_active = True
                 break
         if any_active:
-            # Deactivate: rename active → .anvil-disabled
             for det in fw_obj.detect_installed:
                 src = game_path / det
                 dst = src.with_name(src.name + framework_state.DISABLED_SUFFIX)
@@ -6892,7 +6909,6 @@ class MainWindow(QMainWindow):
                     src.rename(dst)
             new_active = False
         else:
-            # Activate: rename .anvil-disabled → active
             for det in fw_obj.detect_installed:
                 target = game_path / det
                 src = target.with_name(target.name + framework_state.DISABLED_SUFFIX)
@@ -6909,30 +6925,44 @@ class MainWindow(QMainWindow):
         )
         self._reload_mod_list()
 
-    def _on_fw_ctrl_click(self, fw_data: dict) -> None:
-        """Ctrl+Click on a framework row toggles its lock state."""
+    def _on_fw_active_toggle(self, fw_data: dict) -> None:
+        """Click on the status column toggles active/inactive."""
         name = fw_data.get("name", "")
-        if name and fw_data.get("installed"):
-            self._fw_toggle_lock(name)
+        if not name or not fw_data.get("installed"):
+            return
+        if fw_data.get("locked"):
+            return
+        self._fw_toggle_active(name)
 
     def _fw_check_update(self, fw_data: dict) -> None:
         """Check Nexus for a newer version of this framework."""
+        name = fw_data.get("name", "")
         nexus_id = int(fw_data.get("nexus_id", 0) or 0)
         if nexus_id <= 0 or not self._current_plugin:
+            QMessageBox.information(
+                self, tr("dialog.fw_update_title"),
+                tr("status.fw_no_nexus_id", name=name),
+            )
             return
         slug = getattr(self._current_plugin, "NexusSlug", "")
         if not slug:
             return
-        name = fw_data.get("name", "")
+        if not self._nexus_api.has_api_key():
+            QMessageBox.warning(
+                self, tr("dialog.fw_update_title"),
+                tr("status.nexus_api_key_missing"),
+            )
+            return
         self._fw_update_check_name = name
         self._fw_update_check_current = str(fw_data.get("version", ""))
+        msg = tr("status.fw_checking", name=name)
+        self._log_panel.add_log("info", msg)
+        self.statusBar().showMessage(msg, 3000)
         self._nexus_api.update_check_framework(slug, nexus_id, name)
 
     def _on_fw_archives_dropped(self, paths: list) -> None:
         """Handle archives dropped onto the framework tree."""
-        print(f"[FW-DROP] _on_fw_archives_dropped called with: {paths}", flush=True)
         if not self._current_instance_path or not self._current_plugin:
-            print(f"[FW-DROP] early return: instance={self._current_instance_path}, plugin={self._current_plugin}", flush=True)
             return
 
         # Filter: only install archives that are actually framework mods
@@ -6944,19 +6974,14 @@ class MainWindow(QMainWindow):
 
         for p in paths:
             archive = Path(p)
-            print(f"[FW-DROP] processing: {archive}", flush=True)
             temp_dir = installer.extract_to_temp(archive)
-            print(f"[FW-DROP] extract_to_temp → {temp_dir}", flush=True)
             if temp_dir is None:
-                print(f"[FW-DROP] SKIPPED (extract returned None): {archive.name}", flush=True)
                 continue
             file_list = [
                 str(f.relative_to(temp_dir))
                 for f in temp_dir.rglob("*") if f.is_file()
             ]
-            print(f"[FW-DROP] file_list ({len(file_list)} files): {file_list[:15]}", flush=True)
             fw = self._current_plugin.is_framework_mod(file_list)
-            print(f"[FW-DROP] is_framework_mod → {fw}", flush=True)
             shutil.rmtree(temp_dir, ignore_errors=True)
             if fw is not None:
                 fw_archives.append(archive)

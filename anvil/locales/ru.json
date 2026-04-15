@@ -486,7 +486,10 @@
     "fw_activated": "{name} включён",
     "fw_deactivated": "{name} отключён",
     "fw_update_available": "{name}: Новая версия {newest} (установлено: {current})",
-    "fw_no_update": "{name} актуален (версия {version})"
+    "fw_no_update": "{name} актуален (версия {version})",
+    "fw_checking": "Проверка версии Nexus для {name}…",
+    "fw_update_error": "Проверка обновления для {name} не удалась:\n{reason}",
+    "fw_no_nexus_id": "Для {name} не указан Nexus ID."
   },
   "log": {},
   "batch_query": {

@@ -174,8 +174,17 @@ class CheckboxDelegate(QStyledItemDelegate):
             painter.drawPolygon(tri)
         else:
             # Normal mod: circle + check
-            check = index.data(Qt.ItemDataRole.CheckStateRole)
-            enabled = check == Qt.CheckState.Checked
+            # Prefer option.checkState (set by initStyleOption from the model)
+            # over index.data(CheckStateRole) — the latter returns None for
+            # QTreeWidget in some Qt versions while option.checkState is always
+            # populated when ItemIsUserCheckable is set.
+            cs = getattr(option, "checkState", None)
+            if cs is None:
+                cs = index.data(Qt.ItemDataRole.CheckStateRole)
+            try:
+                enabled = int(cs) == int(Qt.CheckState.Checked)
+            except (TypeError, ValueError):
+                enabled = cs == Qt.CheckState.Checked
 
             size = 16
             x = option.rect.x() + (option.rect.width() - size) // 2
@@ -223,8 +232,9 @@ class CheckboxDelegate(QStyledItemDelegate):
         # Normal mod: toggle checkbox on Release, consume DblClick
         if event.type() == event.Type.MouseButtonRelease:
             current = index.data(Qt.ItemDataRole.CheckStateRole)
-            new_val = Qt.CheckState.Unchecked if current == Qt.CheckState.Checked else Qt.CheckState.Checked
-            model.setData(index, new_val.value, Qt.ItemDataRole.CheckStateRole)
+            is_on = current == Qt.CheckState.Checked.value or current == Qt.CheckState.Checked
+            new_val = Qt.CheckState.Unchecked.value if is_on else Qt.CheckState.Checked.value
+            model.setData(index, new_val, Qt.ItemDataRole.CheckStateRole)
             return True
         if event.type() == event.Type.MouseButtonDblClick:
             return True
@@ -979,19 +989,6 @@ class _DropFrameworkTree(QTreeWidget):
     """QTreeWidget that accepts external archive file drops for framework installation."""
 
     archives_dropped = Signal(list)  # list of file path strings
-    ctrl_click = Signal(dict)  # fw_data of clicked row with Ctrl held
-
-    def mousePressEvent(self, event):
-        if (event.button() == Qt.MouseButton.LeftButton
-                and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
-            item = self.itemAt(event.position().toPoint())
-            if item is not None:
-                fw_data = item.data(0, Qt.ItemDataRole.UserRole)
-                if fw_data:
-                    self.ctrl_click.emit(fw_data)
-                    event.accept()
-                    return
-        super().mousePressEvent(event)
 
     def dragEnterEvent(self, event):
         print(f"[FW-TREE] dragEnterEvent: hasUrls={event.mimeData().hasUrls()}", flush=True)
@@ -1035,7 +1032,7 @@ class ModListView(QWidget):
     context_menu_requested = Signal(QPoint)  # global pos for context menu
     fw_context_menu_requested = Signal(QPoint, dict)  # global pos + fw_data for framework context menu
     fw_archives_dropped = Signal(list)  # archive paths dropped on framework tree
-    fw_ctrl_click = Signal(dict)  # Ctrl+Left-Click on framework row
+    fw_active_toggle = Signal(dict)  # Left-click on framework status column
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -1116,12 +1113,15 @@ class ModListView(QWidget):
         self._fw_label.set_count(0)
         fw_layout.addWidget(self._fw_label)
         self._fw_tree.setHeaderLabels([
+            "",  # check column (toggle button, like mod list)
             tr("label.name"),
             tr("label.header_description"),
-            tr("game_panel.header_status"),
             tr("label.header_version"),
         ])
+        self._fw_tree.setItemDelegateForColumn(0, self._check_delegate)
+        self._fw_tree.itemChanged.connect(self._on_fw_item_changed)
         self._fw_tree.setRootIsDecorated(False)
+        self._fw_tree.setIndentation(0)
         self._fw_tree.setAlternatingRowColors(True)
         self._fw_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._fw_tree.setUniformRowHeights(True)
@@ -1130,15 +1130,15 @@ class ModListView(QWidget):
         self._fw_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._fw_tree.customContextMenuRequested.connect(self._on_fw_context_menu)
         self._fw_tree.archives_dropped.connect(self.fw_archives_dropped)
-        self._fw_tree.ctrl_click.connect(self.fw_ctrl_click)
         fw_hdr = self._fw_tree.header()
         fw_hdr.setStretchLastSection(False)
         fw_hdr.setCascadingSectionResizes(True)
         fw_hdr.setMinimumSectionSize(30)
         fw_hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self._fw_tree.setColumnWidth(0, 200)
-        self._fw_tree.setColumnWidth(1, 260)
-        self._fw_tree.setColumnWidth(2, 110)
+        fw_hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self._fw_tree.setColumnWidth(0, 36)
+        self._fw_tree.setColumnWidth(1, 220)
+        self._fw_tree.setColumnWidth(2, 300)
         self._fw_tree.setColumnWidth(3, 90)
         self._ph_frameworks = PersistentHeader(fw_hdr, "frameworks")
         fw_layout.addWidget(self._fw_tree)
@@ -1158,6 +1158,29 @@ class ModListView(QWidget):
         fw_container.setVisible(False)
         self._fw_container = fw_container
         layout.addWidget(self._splitter)
+
+    def _on_fw_item_changed(self, item, column: int) -> None:
+        """Handle CheckState toggle in the framework tree (col 0)."""
+        if column != 0:
+            return
+        fw_data = item.data(0, Qt.ItemDataRole.UserRole)
+        if not fw_data:
+            return
+        want_active = item.checkState(0) == Qt.CheckState.Checked
+        if fw_data.get("locked"):
+            self._fw_tree.blockSignals(True)
+            try:
+                item.setCheckState(
+                    0,
+                    Qt.CheckState.Checked if fw_data.get("active", True)
+                    else Qt.CheckState.Unchecked,
+                )
+            finally:
+                self._fw_tree.blockSignals(False)
+            return
+        if want_active == bool(fw_data.get("active", True)):
+            return
+        self.fw_active_toggle.emit(fw_data)
 
     def _on_fw_splitter_moved(self) -> None:
         """Hide/show the framework tree based on available space (respects collapsed state)."""
@@ -1209,35 +1232,39 @@ class ModListView(QWidget):
         self._fw_container.setVisible(True)
         self._fw_label.set_count(len(frameworks))
 
-        for fw in frameworks:
-            item = QTreeWidgetItem()
-            name = fw.get("name", "?")
-            locked = bool(fw.get("locked", False))
-            active = bool(fw.get("active", True))
-            installed = fw.get("installed", False)
+        self._fw_tree.blockSignals(True)
+        try:
+            for fw in frameworks:
+                item = QTreeWidgetItem()
+                name = fw.get("name", "?")
+                active = bool(fw.get("active", True))
+                installed = fw.get("installed", False)
+                locked = bool(fw.get("locked", False))
 
-            item.setText(0, ("\U0001F512 " if locked else "") + name)
-            item.setText(1, fw.get("description", ""))
+                item.setText(1, ("\U0001F512 " if locked else "") + name)
+                item.setText(2, fw.get("description", ""))
+                item.setText(3, fw.get("version", ""))
+                item.setForeground(3, QBrush(QColor("#BDBDBD")))
 
-            if not installed:
-                item.setText(2, tr("game_panel.not_installed"))
-                item.setForeground(2, QBrush(QColor("#F44336")))
-            elif not active:
-                item.setText(2, tr("game_panel.deactivated"))
-                item.setForeground(2, QBrush(QColor("#9E9E9E")))
-            else:
-                item.setText(2, tr("game_panel.installed"))
-                item.setForeground(2, QBrush(QColor("#4CAF50")))
-
-            item.setText(3, fw.get("version", ""))
-            item.setForeground(3, QBrush(QColor("#BDBDBD")))
-
-            item.setData(0, Qt.ItemDataRole.UserRole, fw)
-            self._fw_tree.addTopLevelItem(item)
+                flags = item.flags() | Qt.ItemFlag.ItemIsUserCheckable
+                if not installed:
+                    flags &= ~Qt.ItemFlag.ItemIsEnabled
+                item.setFlags(flags)
+                want_state = (
+                    Qt.CheckState.Checked if (installed and active)
+                    else Qt.CheckState.Unchecked
+                )
+                item.setCheckState(0, want_state)
+                item.setData(0, Qt.ItemDataRole.UserRole, fw)
+                self._fw_tree.addTopLevelItem(item)
+        finally:
+            self._fw_tree.blockSignals(False)
 
     def restore_framework_widths(self) -> None:
         """Restore saved column widths for the frameworks tree."""
         self._ph_frameworks.restore()
+        # Col 0 is the fixed check column — always force to 36px regardless of saved state
+        self._fw_tree.setColumnWidth(0, 36)
 
     def _on_fw_context_menu(self, pos) -> None:
         """Forward framework context menu request with item data."""
