@@ -18,8 +18,10 @@ _SERVICE = "AnvilOrganizer"
 _ACCOUNT = "nexus_api_key"
 _CRED_FILE = "credentials.bin"
 _SALT = b"anvil-organizer-credential-store"
+_TAG = "[secure_storage]"
 
 _keyring_available: bool | None = None
+_logged_negative: bool = False
 
 
 def _config_dir() -> Path:
@@ -32,6 +34,37 @@ def _cred_path() -> Path:
 
 # ── Keyring probe ────────────────────────────────────────────────────
 
+def _probe_keyring() -> bool:
+    """Verify that a real Secret Service is reachable on the session bus.
+
+    A bare ``import keyring`` succeeds even when no daemon is running —
+    python-keyring then silently falls back to a null backend that
+    accepts writes but never persists them.  We therefore check D-Bus
+    directly and confirm the secretstorage collection actually opens.
+    """
+    try:
+        import subprocess
+        result = subprocess.run(
+            [
+                "dbus-send", "--session", "--print-reply",
+                "--dest=org.freedesktop.DBus",
+                "/org/freedesktop/DBus",
+                "org.freedesktop.DBus.NameHasOwner",
+                "string:org.freedesktop.secrets",
+            ],
+            capture_output=True, text=True, timeout=3,
+        )
+        if "boolean true" not in result.stdout:
+            return False
+        import secretstorage
+        conn = secretstorage.dbus_init()
+        list(secretstorage.get_all_collections(conn))
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
 def _check_keyring() -> bool:
     """Test whether the system keyring is usable.
 
@@ -39,17 +72,20 @@ def _check_keyring() -> bool:
     next call because D-Bus / the keyring daemon may not be ready yet at
     early startup.
     """
-    global _keyring_available
+    global _keyring_available, _logged_negative
     if _keyring_available is True:
         return True
-    try:
-        import keyring
-        import keyring.errors
-        keyring.get_password(_SERVICE, "__probe__")
+    if _probe_keyring():
         _keyring_available = True
+        print(f"{_TAG} keyring backend available", file=sys.stderr)
         return True
-    except Exception:
-        return False
+    if not _logged_negative:
+        print(
+            f"{_TAG} no keyring backend — using encrypted file fallback",
+            file=sys.stderr,
+        )
+        _logged_negative = True
+    return False
 
 
 # ── Encrypted file backend ───────────────────────────────────────────
