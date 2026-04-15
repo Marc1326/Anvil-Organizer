@@ -378,7 +378,15 @@ class MainWindow(QMainWindow):
         # ── Game Running Lock ─────────────────────────────────────────
         self._game_running: bool = False
 
+        # ── Framework Auto-Re-Lock (5-min unlock-box) ─────────────────
+        self._fw_relock_timer = QTimer(self)
+        self._fw_relock_timer.setInterval(30_000)  # 30s check interval
+        self._fw_relock_timer.timeout.connect(self._fw_relock_tick)
+        self._fw_relock_timer.start()
+
         # ── Erster Start / Instanz laden ──────────────────────────────
+        # Locke Frameworks in ALLEN Instanzen bevor die aktuelle geladen wird
+        self._fw_relock_startup_scan()
         self._check_first_start()
 
         # App-weiter Event-Filter für ContextMenu-Events (Wayland-Kompatibilität)
@@ -1057,6 +1065,8 @@ class MainWindow(QMainWindow):
                 self._bg3_save_separators()
             # Collapsed Separators + Splitter + Filter-State sichern
             self._save_ui_state()
+            # Frameworks der verlassenen Instanz locken (Game-Switch)
+            framework_state.lock_all(self._current_instance_path)
 
         # ── Schritt 4: Deploy purgen ──
         # silent_purge() braucht _deployer und _current_plugin (noch nicht None!)
@@ -1171,6 +1181,9 @@ class MainWindow(QMainWindow):
         # 3. Instance path
         self._current_instance_path = self.instance_manager.instances_path() / instance_name
         instance_path = self._current_instance_path
+        # Falls in dieser Instanz noch Frameworks unlocked sind, locken.
+        if framework_state.has_unlocked(instance_path):
+            framework_state.lock_all(instance_path)
 
         # 4. Downloads tab — Pfade aus Instance-Config lesen
         def resolve_path(val: str) -> Path:
@@ -1836,6 +1849,9 @@ class MainWindow(QMainWindow):
     def _on_start_game(self, binary_path: str, working_dir: str) -> None:
         """Launch the selected game executable."""
         self._redeploy_timer.stop()
+        # Vor dem Spielstart: alle Frameworks dieser Instanz locken
+        if self._current_instance_path:
+            self._auto_relock_instance(self._current_instance_path, "game_start")
         # Full deploy (with BA2) before game start
         if self._current_instance_path:
             print("[PURGE] Pre-launch purge", flush=True)
@@ -6884,11 +6900,66 @@ class MainWindow(QMainWindow):
         framework_state.set_entry(
             self._current_instance_path, fw_name, locked=new_locked,
         )
+        # Shared unlock-box: every unlock resets the 5-min timer;
+        # when nothing is unlocked anymore, drop the box.
+        if not new_locked:
+            from datetime import datetime, timedelta, timezone
+            framework_state.set_box_expiry(
+                self._current_instance_path,
+                datetime.now(timezone.utc) + timedelta(minutes=5),
+            )
+        elif not framework_state.has_unlocked(self._current_instance_path):
+            framework_state.clear_box(self._current_instance_path)
         self.statusBar().showMessage(
             tr("status.fw_locked" if new_locked else "status.fw_unlocked", name=fw_name),
             3000,
         )
         QTimer.singleShot(0, self._reload_mod_list)
+
+    # ── Framework Auto-Re-Lock ────────────────────────────────────────
+
+    def _auto_relock_instance(self, instance_path: Path, reason: str) -> list[str]:
+        """Lock all frameworks in ``instance_path`` and show a status
+        message. Refreshes the framework panel when the current instance
+        is affected. Returns the list of framework names that changed."""
+        if not instance_path or not instance_path.is_dir():
+            return []
+        changed = framework_state.lock_all(instance_path)
+        if not changed:
+            return []
+        if self._current_instance_path == instance_path:
+            self.statusBar().showMessage(
+                tr("status.fw_auto_relocked", count=len(changed), reason=tr(f"status.fw_auto_reason_{reason}")),
+                5000,
+            )
+            QTimer.singleShot(0, self._reload_mod_list)
+        return changed
+
+    def _fw_relock_tick(self) -> None:
+        """Periodic check: if the shared unlock-box of the current
+        instance has expired, lock everything."""
+        inst = self._current_instance_path
+        if not inst:
+            return
+        expires = framework_state.get_box_expiry(inst)
+        if expires is None:
+            return
+        from datetime import datetime, timezone
+        if datetime.now(timezone.utc) >= expires:
+            self._auto_relock_instance(inst, "timeout")
+
+    def _fw_relock_startup_scan(self) -> None:
+        """On Anvil start, lock all frameworks in all instances across
+        all games that still have unlocked entries."""
+        try:
+            inst_root = self.instance_manager.instances_path()
+        except Exception:
+            return
+        if not inst_root or not inst_root.is_dir():
+            return
+        for inst in inst_root.iterdir():
+            if inst.is_dir() and framework_state.has_unlocked(inst):
+                framework_state.lock_all(inst)
 
     def _fw_toggle_active(self, fw_name: str) -> None:
         """Activate/deactivate a framework by renaming its files to .anvil-disabled."""
