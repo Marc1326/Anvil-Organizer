@@ -104,6 +104,13 @@ def _matches_direct_install(name_lower: str, patterns: list[str]) -> bool:
     return False
 
 
+def _path_matches(base: Path, rel: str) -> bool:
+    """True wenn *rel* unter *base* existiert — mit Wildcard-Support."""
+    if any(c in rel for c in "*?["):
+        return any(base.glob(rel))
+    return (base / rel).exists()
+
+
 def _ensure_list(val) -> list:
     """QSettings gibt bei 1 Element einen String statt Liste zurück."""
     if val is None:
@@ -1998,7 +2005,7 @@ class MainWindow(QMainWindow):
         if fw is not None:
             game_path = self._current_game_path
             already_installed = any(
-                (game_path / dp).exists() for dp in fw.detect_installed
+                _path_matches(game_path, dp) for dp in fw.detect_installed
             )
             if already_installed:
                 answer = QMessageBox.question(
@@ -2112,7 +2119,7 @@ class MainWindow(QMainWindow):
                     if game_path:
                         # Check if framework is already installed
                         already_installed = any(
-                            (game_path / dp).exists()
+                            _path_matches(game_path, dp)
                             for dp in fw.detect_installed
                         )
                         if already_installed:
