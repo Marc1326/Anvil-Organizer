@@ -87,6 +87,12 @@ class _DraggableDownloadTable(QTableWidget):
             if name_item:
                 path = name_item.data(Qt.ItemDataRole.UserRole)
                 if path:
+                    p = Path(path)
+                    # Skip files still being downloaded (.part exists)
+                    if Path(str(p) + ".part").exists():
+                        continue
+                    if not p.exists():
+                        continue
                     urls.append(QUrl.fromLocalFile(str(path)))
         if urls:
             mime.setUrls(urls)
@@ -2297,6 +2303,9 @@ class GamePanel(QWidget):
             return
         path = self._get_dl_archive_path(row)
         if path:
+            # Skip files still being downloaded
+            if Path(str(path) + ".part").exists():
+                return
             self.install_requested.emit([path])
 
     def _read_meta_mod_id(self, archive_path: str) -> str | None:

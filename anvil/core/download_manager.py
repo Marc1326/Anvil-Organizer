@@ -40,6 +40,7 @@ class _DownloadWorker(QThread):
         self._cancelled = True
 
     def run(self) -> None:
+        part_path = Path(str(self._save_path) + ".part")
         try:
             parsed = urlparse(self._url)
             safe_path = quote(parsed.path, safe="/:@!$&'()*+,;=-._~")
@@ -53,7 +54,7 @@ class _DownloadWorker(QThread):
                 received = 0
 
                 self._save_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(self._save_path, "wb") as f:
+                with open(part_path, "wb") as f:
                     while True:
                         if self._cancelled:
                             self.error.emit("Abgebrochen")
@@ -65,9 +66,18 @@ class _DownloadWorker(QThread):
                         received += len(chunk)
                         self.progress.emit(received, total)
 
+            # Atomic rename: .part → final path
+            part_path.rename(self._save_path)
             self.finished.emit(b"")
         except Exception as exc:
             self.error.emit(str(exc))
+        finally:
+            # Clean up .part file on error/cancel
+            if part_path.exists():
+                try:
+                    part_path.unlink()
+                except OSError:
+                    pass
 
 
 @dataclass
@@ -214,12 +224,14 @@ class DownloadManager(QObject):
         if download_id in self._queue:
             self._queue.remove(download_id)
 
-        # Clean up partial file
-        if task.save_path.exists() and task.bytes_received < task.bytes_total:
-            try:
-                task.save_path.unlink()
-            except OSError:
-                pass
+        # Clean up partial file (.part or final)
+        part_path = Path(str(task.save_path) + ".part")
+        for p in (part_path, task.save_path):
+            if p.exists() and task.bytes_received < task.bytes_total:
+                try:
+                    p.unlink()
+                except OSError:
+                    pass
 
         self._start_next()
 
