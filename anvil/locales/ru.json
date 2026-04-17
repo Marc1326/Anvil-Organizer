@@ -533,6 +533,7 @@
     "install_failed_title": "Установка не удалась",
     "install_failed_message": "Не удалось установить мод \"{name}\".\nПроверьте, что архив корректен и необходимые инструменты установлены.",
     "install_failed_archive": "Не удалось установить мод:\n{name}",
+    "extract_failed": "Не удалось распаковать архив: {name}",
     "backup_failed_title": "Резервное копирование не удалось",
     "mod_create_error": "Создание мода",
     "start_failed_title": "Запуск не удался",

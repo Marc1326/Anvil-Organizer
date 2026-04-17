@@ -533,6 +533,7 @@
     "install_failed_title": "Installation échouée",
     "install_failed_message": "Impossible d'installer le Mod \"{name}\".\nVérifiez que l'archive est valide et que les outils nécessaires sont installés.",
     "install_failed_archive": "Impossible d'installer le Mod :\n{name}",
+    "extract_failed": "Impossible d'extraire l'archive : {name}",
     "backup_failed_title": "Sauvegarde échouée",
     "mod_create_error": "Créer un Mod",
     "start_failed_title": "Démarrage échoué",

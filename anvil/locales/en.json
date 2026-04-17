@@ -533,6 +533,7 @@
     "install_failed_title": "Installation Failed",
     "install_failed_message": "Could not install mod \"{name}\".\nCheck if the archive is valid and required tools are installed.",
     "install_failed_archive": "Could not install mod:\n{name}",
+    "extract_failed": "Could not extract archive: {name}",
     "backup_failed_title": "Backup Failed",
     "mod_create_error": "Create Mod",
     "start_failed_title": "Start Failed",

@@ -2028,52 +2028,6 @@ class MainWindow(QMainWindow):
                 self._reload_mod_list()
             return True
 
-        # 2. Heuristic: unknown framework?
-        detection = self._current_plugin.detect_possible_framework(file_list)
-        if detection is not None:
-            from anvil.widgets.framework_detect_dialog import FrameworkDetectDialog
-            dlg = FrameworkDetectDialog(
-                self,
-                archive_name=archive.stem,
-                score=detection["score"],
-                reasons=detection["reasons"],
-                detected_files=detection["detected_files"],
-            )
-            _center_on_parent(dlg)
-            if dlg.exec() == QDialog.DialogCode.Accepted:
-                fw_name = dlg.framework_name()
-                fw_target = dlg.framework_target()
-                fw_detect = dlg.framework_detect_installed()
-                fw_pattern = [
-                    Path(f).name for f in detection["detected_files"]
-                ]
-                from anvil.plugins.framework_mod import FrameworkMod
-                new_fw = FrameworkMod(
-                    name=fw_name,
-                    pattern=fw_pattern,
-                    target=fw_target,
-                    description="",
-                    detect_installed=fw_detect or fw_pattern,
-                )
-                result = installer.install_framework(
-                    temp_dir, new_fw, self._current_game_path,
-                    archive_path=archive,
-                )
-                if result:
-                    self._current_plugin.save_framework_to_json(
-                        fw_name, fw_target,
-                        fw_detect or fw_pattern, fw_pattern,
-                    )
-                    self.statusBar().showMessage(
-                        tr("status.framework_installed", names=fw_name), 5000,
-                    )
-                    self._reload_mod_list()
-                return True
-            else:
-                # User declined — not a framework, continue normal install
-                shutil.rmtree(temp_dir, ignore_errors=True)
-                return False
-
         # Not a framework
         shutil.rmtree(temp_dir, ignore_errors=True)
         return False
@@ -2101,6 +2055,9 @@ class MainWindow(QMainWindow):
             # 1. Extract to temp
             temp_dir = installer.extract_to_temp(archive)
             if temp_dir is None:
+                self.statusBar().showMessage(
+                    tr("error.extract_failed", name=archive.name), 8000,
+                )
                 continue
             print(f"DEBUG _install_archives: temp_dir={temp_dir}", flush=True)
 
@@ -2190,10 +2147,7 @@ class MainWindow(QMainWindow):
                                 fw_pattern,
                             )
                         continue
-                    else:
-                        # User declined — don't install, keep in downloads
-                        shutil.rmtree(temp_dir, ignore_errors=True)
-                        continue
+                    # User declined — install as normal mod (fall through)
 
             # 3. FOMOD installer check
             fomod_name_override = None

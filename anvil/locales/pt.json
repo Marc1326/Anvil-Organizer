@@ -533,6 +533,7 @@
     "install_failed_title": "Instalação falhou",
     "install_failed_message": "Não foi possível instalar o Mod \"{name}\".\nVerifique se o arquivo é válido e se as ferramentas necessárias estão instaladas.",
     "install_failed_archive": "Não foi possível instalar o Mod:\n{name}",
+    "extract_failed": "Não foi possível extrair o arquivo: {name}",
     "backup_failed_title": "Cópia de segurança falhou",
     "mod_create_error": "Criar Mod",
     "start_failed_title": "Arranque falhou",

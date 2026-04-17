@@ -533,6 +533,7 @@
     "install_failed_title": "Installation fehlgeschlagen",
     "install_failed_message": "Mod \"{name}\" konnte nicht installiert werden.\nPrüfe ob das Archiv gültig ist und die nötigen Tools installiert sind.",
     "install_failed_archive": "Die Mod konnte nicht installiert werden:\n{name}",
+    "extract_failed": "Archiv konnte nicht entpackt werden: {name}",
     "backup_failed_title": "Sicherung fehlgeschlagen",
     "mod_create_error": "Mod erstellen",
     "start_failed_title": "Starten fehlgeschlagen",
