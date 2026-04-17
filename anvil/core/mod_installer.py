@@ -293,7 +293,11 @@ class ModInstaller:
         # Find the actual directory containing the framework files.
         # Archives often wrap files in subdirectories (e.g. bin/ or
         # ModLoader/) that must be stripped when installing.
-        install_root = self._find_install_root(temp_dir, framework.pattern)
+        install_root = self._find_install_root(
+            temp_dir, framework.pattern,
+            detect_installed=framework.detect_installed,
+            target=framework.target,
+        )
         print(f"DEBUG install_framework: install_root={install_root}")
 
         installed_files: list[str] = []
@@ -343,7 +347,9 @@ class ModInstaller:
         }
 
     @staticmethod
-    def _find_install_root(temp_dir: Path, patterns: list[str]) -> Path:
+    def _find_install_root(temp_dir: Path, patterns: list[str],
+                           detect_installed: list[str] | None = None,
+                           target: str = "") -> Path:
         """Find the directory containing the framework files.
 
         Archives often wrap framework files in a subdirectory:
@@ -358,30 +364,76 @@ class ModInstaller:
 
         Falls back to *temp_dir* itself if patterns match at the root.
         """
+        import fnmatch as _fnmatch
+
+        # Strategy 1: Use detect_installed + target to compute expected
+        # suffix.  E.g. detect_installed="Data/SFSE/Plugins/versionlib-*.bin"
+        # with target="Data/SFSE" → expected suffix = "Plugins/versionlib-*.bin"
+        if detect_installed and target:
+            for dp in detect_installed:
+                dp_norm = dp.replace("\\", "/")
+                target_norm = target.replace("\\", "/").rstrip("/")
+                if dp_norm.lower().startswith(target_norm.lower() + "/"):
+                    suffix = dp_norm[len(target_norm) + 1:]
+                    suffix_lower = suffix.lower()
+                    for item in temp_dir.rglob("*"):
+                        if not item.is_file():
+                            continue
+                        rel = str(item.relative_to(temp_dir)).replace("\\", "/")
+                        rel_lower = rel.lower()
+                        if _fnmatch.fnmatch(rel_lower, "*/" + suffix_lower) or \
+                           _fnmatch.fnmatch(rel_lower, suffix_lower):
+                            # Strip suffix from rel to get the prefix
+                            # e.g. rel="SFSE/Plugins/versionlib-1.bin"
+                            #      suffix="Plugins/versionlib-*.bin"
+                            # → prefix = "SFSE"
+                            suffix_parts = suffix.count("/")
+                            rel_parts = rel.split("/")
+                            if len(rel_parts) > suffix_parts + 1:
+                                prefix = "/".join(rel_parts[:-(suffix_parts + 1)])
+                                result = temp_dir / prefix
+                                print(f"DEBUG _find_install_root: suffix strategy: "
+                                      f"dp={dp}, suffix={suffix}, prefix={prefix}")
+                                return result
+                            return temp_dir
+
+        # Strategy 2: Literal + wildcard pattern matching (original logic)
         for pat in patterns:
             pat_lower = pat.lower().rstrip("/")
             if not pat_lower:
                 continue
+            has_wildcard = '*' in pat_lower or '?' in pat_lower
             for item in temp_dir.rglob("*"):
                 rel = item.relative_to(temp_dir)
                 rel_str = str(rel).replace("\\", "/")
                 rel_lower = rel_str.lower()
-                idx = rel_lower.find(pat_lower)
-                if idx >= 0:
-                    print(f"DEBUG _find_install_root: pat={pat}, rel={rel_str}, idx={idx}")
-                if idx < 0:
-                    continue
-                # Pattern at root level — no wrapper to strip
-                if idx == 0:
+                if has_wildcard:
+                    # Wildcard: match filename or full relative path
+                    if not (_fnmatch.fnmatch(rel_lower, pat_lower) or
+                            _fnmatch.fnmatch(rel_lower, "*/" + pat_lower) or
+                            _fnmatch.fnmatch(rel_str.split("/")[-1].lower(), pat_lower)):
+                        continue
+                    # Found — compute prefix (everything before the matched part)
+                    parts = rel_str.split("/")
+                    pat_depth = pat_lower.count("/") + 1
+                    if len(parts) > pat_depth:
+                        prefix = "/".join(parts[:-pat_depth])
+                        result = temp_dir / prefix
+                        print(f"DEBUG _find_install_root: wildcard: pat={pat}, rel={rel_str}, prefix={prefix}")
+                        return result
                     return temp_dir
-                # Pattern nested in wrapper dir — strip it
-                prefix_str = rel_str[:idx].rstrip("/")
-                if prefix_str:
-                    result = temp_dir / prefix_str
-                    print(f"DEBUG _find_install_root: result={result}")
-                    return result
-                print(f"DEBUG _find_install_root: result={temp_dir} (no prefix)")
-                return temp_dir
+                else:
+                    idx = rel_lower.find(pat_lower)
+                    if idx < 0:
+                        continue
+                    if idx == 0:
+                        return temp_dir
+                    prefix_str = rel_str[:idx].rstrip("/")
+                    if prefix_str:
+                        result = temp_dir / prefix_str
+                        print(f"DEBUG _find_install_root: literal: pat={pat}, prefix={prefix_str}")
+                        return result
+                    return temp_dir
         return temp_dir
 
     # ── Extraction ─────────────────────────────────────────────────────
