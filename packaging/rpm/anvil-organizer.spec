@@ -1,5 +1,5 @@
 Name:           anvil-organizer
-Version:        1.4.8
+Version:        1.4.9
 Release:        1%{?dist}
 Summary:        Native Linux Mod Manager inspired by Mod Organizer 2
 
