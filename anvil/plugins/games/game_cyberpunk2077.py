@@ -71,7 +71,6 @@ class Cyberpunk2077Game(BaseGame):
         "redscript",
         "Native Settings UI",
         "mod_settings",
-        "JB Third Person Mod",
         "SPAWN0 - Male and female body correction",
     ]
 
@@ -260,6 +259,14 @@ class Cyberpunk2077Game(BaseGame):
                 description="Einstellungs-Framework fuer RED4ext-Mods",
                 detect_installed=["red4ext/plugins/mod_settings/mod_settings.dll"],
                 nexus_id=4885,
+            ),
+            FrameworkMod(
+                name="JB - TPP MOD WIP third person",
+                pattern=["bin/x64/plugins/cyber_engine_tweaks/mods/jb_third_person_mod/"],
+                target="",
+                description="Third-Person-Perspektive (CET-basiert)",
+                detect_installed=["bin/x64/plugins/cyber_engine_tweaks/mods/jb_third_person_mod/init.lua"],
+                nexus_id=669,
             ),
         ]
 
