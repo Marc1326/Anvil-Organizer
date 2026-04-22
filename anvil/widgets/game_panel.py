@@ -6,6 +6,7 @@ import configparser
 import json
 import os
 import shutil
+import signal
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -1278,13 +1279,14 @@ class GamePanel(QWidget):
                     env=run_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
+                    start_new_session=True,
                 )
                 self._redmod_process = proc
 
                 try:
                     stdout, stderr = proc.communicate(timeout=300)
                 except subprocess.TimeoutExpired:
-                    proc.kill()
+                    self._kill_redmod_process_tree(proc)
                     stdout, stderr = proc.communicate()
 
                 if self._redmod_cancel_requested:
@@ -1369,14 +1371,25 @@ class GamePanel(QWidget):
             if msg.clickedButton() == launch_btn:
                 self._do_launch(plugin, binary, is_steam)
 
+    def _kill_redmod_process_tree(self, proc) -> None:
+        """Kill the redMod.exe deploy subprocess and its Wine/Proton children.
+
+        Uses the process group (set via start_new_session=True on Popen) so
+        wineserver, the steam.exe wrapper and the GameThread child terminate
+        together. Without this, proc.kill() only reaches the direct child and
+        the real redMod.exe keeps running while communicate() blocks forever.
+        """
+        if proc is None:
+            return
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except (OSError, ProcessLookupError):
+            pass
+
     def _on_redmod_cancel(self) -> None:
         """Cancel the running REDmod deploy process."""
         self._redmod_cancel_requested = True
-        if self._redmod_process is not None:
-            try:
-                self._redmod_process.kill()
-            except OSError:
-                pass
+        self._kill_redmod_process_tree(self._redmod_process)
 
     def cancel_redmod_if_running(self) -> None:
         """Cancel any running REDmod deploy process.
@@ -1385,11 +1398,7 @@ class GamePanel(QWidget):
         Called by MainWindow._teardown_current_instance() during game switch.
         """
         self._redmod_cancel_requested = True
-        if self._redmod_process is not None:
-            try:
-                self._redmod_process.kill()
-            except (OSError, ProcessLookupError):
-                pass
+        self._kill_redmod_process_tree(self._redmod_process)
 
     # ── REDmod Overlay ────────────────────────────────────────────────
 
@@ -1558,13 +1567,14 @@ class GamePanel(QWidget):
                     env=run_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
+                    start_new_session=True,
                 )
                 self._redmod_process = proc
 
                 try:
                     stdout, stderr = proc.communicate(timeout=300)
                 except subprocess.TimeoutExpired:
-                    proc.kill()
+                    self._kill_redmod_process_tree(proc)
                     stdout, stderr = proc.communicate()
 
                 if self._redmod_cancel_requested:
