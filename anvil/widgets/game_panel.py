@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from anvil.core.resource_path import get_anvil_base
-from anvil.core.subprocess_env import clean_subprocess_env, clean_env
+from anvil.core.subprocess_env import clean_subprocess_env, clean_env, host_popen
 
 _DEPLOY_LOG = Path("/tmp/anvil-deploy.log")
 
@@ -1273,7 +1273,7 @@ class GamePanel(QWidget):
                     cmd = [str(proton_script), "run", str(game_path / redmod_binary), "deploy", "-root", wine_root]
                     run_env = env
                 print(f"[REDmod] CMD: {' '.join(cmd)}", flush=True)
-                proc = subprocess.Popen(
+                proc = host_popen(
                     cmd,
                     cwd=str(game_path),
                     env=run_env,
@@ -1481,6 +1481,8 @@ class GamePanel(QWidget):
             scripts_dir = mod_dir / "scripts"
             if scripts_dir.is_dir():
                 bak = mod_dir / "_scripts_bak"
+                if bak.exists():
+                    shutil.rmtree(bak, ignore_errors=True)
                 try:
                     scripts_dir.rename(bak)
                     hidden.append((bak, scripts_dir))
@@ -1561,7 +1563,7 @@ class GamePanel(QWidget):
                     cmd = [str(proton_script), "run", str(game_path / redmod_binary), "deploy", "-root", wine_root]
                     run_env = env
                 print(f"[REDmod] CMD: {' '.join(cmd)}", flush=True)
-                proc = subprocess.Popen(
+                proc = host_popen(
                     cmd,
                     cwd=str(game_path),
                     env=run_env,

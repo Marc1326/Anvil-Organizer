@@ -44,10 +44,21 @@ def host_which(binary: str) -> str | None:
 
 
 def host_popen(cmd: list[str], **kwargs) -> "subprocess.Popen":
-    """Popen wrapper that uses flatpak-spawn --host inside Flatpak."""
+    """Popen wrapper that uses flatpak-spawn --host inside Flatpak.
+
+    When inside Flatpak and ``env`` is provided, each variable is forwarded
+    to the host process via ``--env=KEY=VALUE``. Without this, tools like
+    Proton see a minimal host environment and fail with errors like
+    "No compat data path?" because STEAM_COMPAT_* is missing.
+    """
     import subprocess
     if is_flatpak():
-        cmd = ["flatpak-spawn", "--host"] + cmd
+        spawn = ["flatpak-spawn", "--host"]
+        env = kwargs.get("env")
+        if env is not None:
+            for k, v in env.items():
+                spawn.append(f"--env={k}={v}")
+        cmd = spawn + cmd
     return subprocess.Popen(cmd, **kwargs)
 
 
