@@ -25,6 +25,7 @@ from PySide6.QtCore import Qt, QThread, Signal, QProcess, QSettings
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 
 from anvil.core.translator import tr
+from anvil.core.subprocess_env import is_flatpak
 from anvil.core.script_merger.models import (
     MergeStatus,
     MergeInventoryEntry,
@@ -823,7 +824,14 @@ class ScriptMergerDialog(QDialog):
 
         args = files + ["-o", str(output_path)]
         effective_path = resolved or kdiff3_path
-        self._kdiff3_process.start(effective_path, args)
+        if is_flatpak():
+            # Flatpak: KDiff3 ueber flatpak-spawn --host starten,
+            # damit auf Host-Dateisystem zugegriffen werden kann
+            self._kdiff3_process.start(
+                "flatpak-spawn", ["--host", effective_path, *args]
+            )
+        else:
+            self._kdiff3_process.start(effective_path, args)
 
     def _on_kdiff3_finished(self, exit_code: int, exit_status) -> None:
         """Callback wenn KDiff3 beendet wird."""
