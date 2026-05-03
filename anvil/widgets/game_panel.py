@@ -1100,6 +1100,8 @@ class GamePanel(QWidget):
         needs_redmod = self._needs_redmod_deploy(plugin)
         print(f"[START] _needs_redmod_deploy={needs_redmod}, binary={binary}", flush=True)
         if needs_redmod:
+            # Sicherstellen dass /mods/ gefuellt ist bevor redMod.exe darueber laeuft
+            self.silent_deploy()
             self._run_redmod_deploy_then_launch(plugin, binary, is_steam)
             return
 
@@ -1808,7 +1810,7 @@ class GamePanel(QWidget):
             cmd = [str(proton_script), "run", str(exe)]
             if args:
                 cmd.extend(args)
-            proc = subprocess.Popen(
+            proc = host_popen(
                 cmd, cwd=cwd, env=env,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
@@ -2013,8 +2015,8 @@ class GamePanel(QWidget):
                             is_hidden = cp.getboolean("General", "removed", fallback=False)
                             meta_installed = cp.getboolean("General", "installed", fallback=False)
                             meta_install_file = cp.get("General", "installationFile", fallback="")
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            print(f"[META] parse failed: {meta}: {exc}", flush=True)
                     results.append((entry.name, stat.st_size, stat.st_mtime, entry, is_hidden, meta_installed, meta_install_file))
                 except OSError:
                     continue
@@ -2050,8 +2052,8 @@ class GamePanel(QWidget):
                             is_hidden = cp.getboolean("General", "removed", fallback=False)
                             meta_installed = cp.getboolean("General", "installed", fallback=False)
                             meta_install_file = cp.get("General", "installationFile", fallback="")
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            print(f"[META] parse failed: {meta}: {exc}", flush=True)
                     root_archives.append((entry.name, stat.st_size, stat.st_mtime, entry, is_hidden, meta_installed, meta_install_file))
                 except OSError:
                     continue
@@ -2085,8 +2087,8 @@ class GamePanel(QWidget):
                             dn = cp.get("installed", "name", fallback="")
                             if dn.strip():
                                 installed_names.add(dn.strip().lower())
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            print(f"[META] parse failed: {meta_ini}: {exc}", flush=True)
 
         s = QSettings(
             str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf"),
@@ -2417,7 +2419,8 @@ class GamePanel(QWidget):
         try:
             cp.read(str(meta), encoding="utf-8")
             return cp.getboolean("General", "removed", fallback=False)
-        except Exception:
+        except Exception as exc:
+            print(f"[META] parse failed: {meta}: {exc}", flush=True)
             return False
 
     def _set_hidden(self, row: int, hidden: bool) -> None:
@@ -2431,8 +2434,8 @@ class GamePanel(QWidget):
         if meta_path.is_file():
             try:
                 cp.read(str(meta_path), encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as exc:
+                print(f"[META] parse failed: {meta_path}: {exc}", flush=True)
         if not cp.has_section("General"):
             cp.add_section("General")
         cp.set("General", "removed", str(hidden).lower())
