@@ -8,6 +8,21 @@ from pathlib import Path
 # Funktioniert mit allen DEs: KDE/Dolphin, GNOME/Nautilus, Cinnamon/Nemo, XFCE/Thunar
 os.environ.setdefault("QT_QPA_PLATFORMTHEME", "xdgdesktopportal")
 
+# AppImage/PyInstaller bundelt OpenSSL mit einem fest einkompilierten Default-Cert-Pfad,
+# der auf manchen Distros (Void, CachyOS, …) ins Leere zeigt → CERTIFICATE_VERIFY_FAILED.
+# Bekannte System-Bundles abklappern und SSL_CERT_FILE setzen, falls leer.
+if sys.platform.startswith("linux") and "SSL_CERT_FILE" not in os.environ:
+    for _cert in (
+        "/etc/ssl/certs/ca-certificates.crt",       # Debian, Ubuntu, Arch, CachyOS, Void
+        "/etc/pki/tls/certs/ca-bundle.crt",         # Fedora, RHEL, CentOS
+        "/etc/ssl/cert.pem",                        # Alpine
+        "/var/lib/ca-certificates/ca-bundle.pem",   # openSUSE
+    ):
+        if os.path.isfile(_cert):
+            os.environ["SSL_CERT_FILE"] = _cert
+            os.environ.setdefault("REQUESTS_CA_BUNDLE", _cert)
+            break
+
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QLocale, QSettings, QTranslator, QLibraryInfo
 from PySide6.QtGui import QIcon
@@ -16,6 +31,7 @@ from anvil.mainwindow import MainWindow
 from anvil.core.translator import Translator
 from anvil.core.single_instance import SingleInstance
 from anvil.core.nxm_handler import check_cli_for_nxm
+from anvil.core.activity_log import log_action
 from anvil.version import APP_VERSION
 
 
@@ -32,7 +48,17 @@ def _init_translator():
 
 
 def main():
+    log_action("START", f"Anvil v{APP_VERSION}")
+
+    def _excepthook(exc_type, exc_value, exc_tb):
+        import traceback
+        msg = f"{exc_type.__name__}: {exc_value}"
+        log_action("ERROR", msg)
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+    sys.excepthook = _excepthook
+
     app = QApplication(sys.argv)
+    app.aboutToQuit.connect(lambda: log_action("EXIT", ""))
     app.setApplicationName("Anvil Organizer")
     app.setApplicationVersion(APP_VERSION)
     app.setDesktopFileName("com.github.Marc1326.AnvilOrganizer")
