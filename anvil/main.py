@@ -23,6 +23,10 @@ if sys.platform.startswith("linux") and "SSL_CERT_FILE" not in os.environ:
             os.environ.setdefault("REQUESTS_CA_BUNDLE", _cert)
             break
 
+# Daten-Verzeichnis anlegen bevor irgendwas darauf zugreift —
+# sonst scheitert QLocalServer.listen() in single_instance und Anvil exited stumm.
+(Path.home() / ".anvil-organizer").mkdir(parents=True, exist_ok=True)
+
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QLocale, QSettings, QTranslator, QLibraryInfo
 from PySide6.QtGui import QIcon

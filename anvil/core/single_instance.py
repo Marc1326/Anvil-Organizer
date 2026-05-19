@@ -29,6 +29,8 @@ class SingleInstance(QObject):
         Returns True if this is the first instance (server started).
         Returns False if another instance is already running.
         """
+        # Defensiv: parent-dir muss existieren, sonst listen() failt → stummer Exit
+        Path(SERVER_NAME).parent.mkdir(parents=True, exist_ok=True)
         self._server = QLocalServer(self)
         if self._server.listen(SERVER_NAME):
             self._server.newConnection.connect(self._on_new_connection)
