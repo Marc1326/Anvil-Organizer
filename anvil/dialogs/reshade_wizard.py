@@ -26,8 +26,9 @@ from PySide6.QtWidgets import (
     QFrame,
     QMessageBox,
 )
-from PySide6.QtGui import QDesktopServices, QFont
-from PySide6.QtCore import Qt, QUrl, QSettings
+from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, QSettings
+from anvil.core.subprocess_env import host_open_url
 
 from anvil.core.reshade_manager import ReshadeManager, API_DLL_MAP, API_LABELS
 from anvil.core.translator import tr
@@ -166,7 +167,7 @@ class ReshadeWizard(QDialog):
         link_btn.setFlat(True)
         link_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         link_btn.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl("https://reshade.me"))
+            lambda: host_open_url("https://reshade.me")
         )
         lay.addWidget(link_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 

@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from anvil.core.resource_path import get_anvil_base
-from anvil.core.subprocess_env import clean_subprocess_env, clean_env, host_popen
+from anvil.core.subprocess_env import clean_subprocess_env, clean_env, host_popen, host_open_url, host_open_path
 
 _DEPLOY_LOG = Path("/tmp/anvil-deploy.log")
 
@@ -43,7 +43,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
 )
 
-from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont, QDesktopServices
+from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont
 from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl, QMimeData, QSettings
 
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS, ModInstaller
@@ -632,7 +632,7 @@ class GamePanel(QWidget):
         """Open the .mods/ directory in the file manager."""
         mods_path = getattr(self, "_mods_path", None)
         if mods_path and mods_path.is_dir():
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(mods_path)))
+            host_open_path(str(mods_path))
 
     # ── Separator deploy paths ────────────────────────────────────────
 
@@ -1947,7 +1947,7 @@ class GamePanel(QWidget):
         """Open the saves directory in the system file manager."""
         saves_dir = getattr(self, "_current_saves_dir", None)
         if saves_dir and saves_dir.is_dir():
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(saves_dir)))
+            host_open_path(str(saves_dir))
 
     @staticmethod
     def _format_size(size_bytes: int) -> str:
@@ -2531,16 +2531,15 @@ class GamePanel(QWidget):
             self.install_requested.emit(paths)
         elif chosen == act_nexus:
             game = self._current_short_name or "site"
-            QDesktopServices.openUrl(
-                QUrl(f"https://www.nexusmods.com/{game}/mods/{mod_id}"))
+            host_open_url(f"https://www.nexusmods.com/{game}/mods/{mod_id}")
         elif act_query and chosen == act_query:
             self.dl_query_info_requested.emit(first)
         elif chosen == act_open:
-            subprocess.Popen(["xdg-open", first], env=clean_subprocess_env())
+            host_open_path(first)
         elif chosen == act_meta:
-            subprocess.Popen(["xdg-open", str(meta_path)], env=clean_subprocess_env())
+            host_open_path(str(meta_path))
         elif chosen == act_show:
-            subprocess.Popen(["xdg-open", str(Path(first).parent)], env=clean_subprocess_env())
+            host_open_path(str(Path(first).parent))
         elif chosen == act_delete:
             count = len(paths)
             if count == 1:

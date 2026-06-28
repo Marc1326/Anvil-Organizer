@@ -33,10 +33,10 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFrame,
 )
-from PySide6.QtCore import Qt, QModelIndex, QSettings, QTimer, QUrl, QSize
-from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
+from PySide6.QtCore import Qt, QModelIndex, QSettings, QTimer, QSize
+from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence
 
-from anvil.core.subprocess_env import clean_subprocess_env
+from anvil.core.subprocess_env import clean_subprocess_env, host_popen, host_open_url, host_open_path
 from anvil.core.ui_helpers import _center_on_parent, get_text_input
 from anvil.styles.dark_theme import load_theme, default_theme
 from anvil.widgets.toolbar import create_toolbar
@@ -575,7 +575,7 @@ class MainWindow(QMainWindow):
 
         act = hm.addAction(tr("menu.documentation"))
         act.triggered.connect(
-            lambda: QDesktopServices.openUrl(QUrl("https://github.com/Marc1326/Anvil-Organizer/wiki"))
+            lambda: host_open_url("https://github.com/Marc1326/Anvil-Organizer/wiki")
         )
 
         act = hm.addAction(tr("menu.discord"))
@@ -583,7 +583,7 @@ class MainWindow(QMainWindow):
 
         act = hm.addAction(tr("menu.report_issue"))
         act.triggered.connect(
-            lambda: QDesktopServices.openUrl(QUrl("https://github.com/Marc1326/Anvil-Organizer/issues"))
+            lambda: host_open_url("https://github.com/Marc1326/Anvil-Organizer/issues")
         )
 
         tutorials_menu = hm.addMenu("Tutorials")
@@ -649,9 +649,9 @@ class MainWindow(QMainWindow):
         if self._current_plugin:
             nexus_slug = getattr(self._current_plugin, "GameNexusName", "") or getattr(self._current_plugin, "GameShortName", "")
         if nexus_slug:
-            QDesktopServices.openUrl(QUrl(f"https://www.nexusmods.com/{nexus_slug}"))
+            host_open_url(f"https://www.nexusmods.com/{nexus_slug}")
         else:
-            QDesktopServices.openUrl(QUrl("https://www.nexusmods.com"))
+            host_open_url("https://www.nexusmods.com")
 
     def _on_menu_refresh(self) -> None:
         """Ansicht → Neu laden (F5)."""
@@ -832,9 +832,7 @@ class MainWindow(QMainWindow):
 
     def _on_menu_help(self) -> None:
         """Hilfe → Hilfe (Strg+H)."""
-        QDesktopServices.openUrl(
-            QUrl("https://github.com/Marc1326/Anvil-Organizer")
-        )
+        host_open_url("https://github.com/Marc1326/Anvil-Organizer")
 
     def _clear_modindex_cache(self) -> None:
         """Clear the mod file index cache and trigger a full re-scan."""
@@ -3366,14 +3364,14 @@ class MainWindow(QMainWindow):
             return
         path = self._current_instance_path / ".mods"
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
+            host_open_path(str(path))
 
     def _open_game_folder(self) -> None:
         """Open the game installation folder in file manager."""
         if not self._current_game_path:
             return
         if self._current_game_path.is_dir():
-            subprocess.Popen(["xdg-open", str(self._current_game_path)], env=clean_subprocess_env())
+            host_open_path(str(self._current_game_path))
 
     def _open_mygames_folder(self) -> None:
         """Open the My Games folder in file manager."""
@@ -3382,7 +3380,7 @@ class MainWindow(QMainWindow):
         if hasattr(self._current_plugin, "gameDocumentsDirectory"):
             path = self._current_plugin.gameDocumentsDirectory()
             if path and path.is_dir():
-                subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
+                host_open_path(str(path))
 
     def _open_saves_folder(self) -> None:
         """Open the save game directory in file manager."""
@@ -3391,7 +3389,7 @@ class MainWindow(QMainWindow):
         if hasattr(self._current_plugin, "gameSavesDirectory"):
             path = self._current_plugin.gameSavesDirectory()
             if path and path.is_dir():
-                subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
+                host_open_path(str(path))
             else:
                 from PySide6.QtWidgets import QMessageBox
                 QMessageBox.information(
@@ -3406,14 +3404,14 @@ class MainWindow(QMainWindow):
         if hasattr(self._current_plugin, "gameDocumentsDirectory"):
             path = self._current_plugin.gameDocumentsDirectory()
             if path and path.is_dir():
-                subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
+                host_open_path(str(path))
 
     def _open_instance_folder(self) -> None:
         """Open the instance folder in file manager."""
         if not self._current_instance_path:
             return
         if self._current_instance_path.is_dir():
-            subprocess.Popen(["xdg-open", str(self._current_instance_path)], env=clean_subprocess_env())
+            host_open_path(str(self._current_instance_path))
 
     def _open_profile_folder(self) -> None:
         """Open the profile folder in file manager."""
@@ -3422,7 +3420,7 @@ class MainWindow(QMainWindow):
             print("DEBUG _open_profile_folder: No profile path, returning")
             return
         if self._current_profile_path.is_dir():
-            subprocess.Popen(["xdg-open", str(self._current_profile_path)], env=clean_subprocess_env())
+            host_open_path(str(self._current_profile_path))
 
     def _open_downloads_folder(self) -> None:
         """Open the downloads folder in file manager."""
@@ -3430,28 +3428,28 @@ class MainWindow(QMainWindow):
             return
         path = self._current_downloads_path or (self._current_instance_path / ".downloads")
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
+            host_open_path(str(path))
 
     def _open_ao_install_folder(self) -> None:
         """Open the Anvil Organizer installation folder in file manager."""
         from anvil.core.resource_path import get_anvil_base
         path = get_anvil_base().parent
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
+            host_open_path(str(path))
 
     def _open_ao_plugins_folder(self) -> None:
         """Open the Anvil Organizer plugins folder in file manager."""
         from anvil.core.resource_path import get_anvil_base
         path = get_anvil_base() / "plugins"
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
+            host_open_path(str(path))
 
     def _open_ao_styles_folder(self) -> None:
         """Open the Anvil Organizer styles folder in file manager."""
         from anvil.core.resource_path import get_anvil_base
         path = get_anvil_base() / "styles"
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
+            host_open_path(str(path))
 
     def _open_ao_logs_folder(self) -> None:
         """Open the Anvil Organizer logs folder in file manager."""
@@ -3459,7 +3457,7 @@ class MainWindow(QMainWindow):
         if not path.exists():
             path.mkdir(parents=True, exist_ok=True)
         if path.is_dir():
-            subprocess.Popen(["xdg-open", str(path)], env=clean_subprocess_env())
+            host_open_path(str(path))
 
     def _create_backup(self) -> None:
         """Create a ZIP backup of modlist, categories, and all meta.ini files."""
@@ -5237,7 +5235,7 @@ class MainWindow(QMainWindow):
             nexus_slug = "site"
 
         url = f"https://www.nexusmods.com/{nexus_slug}/mods/{entry.nexus_id}"
-        QDesktopServices.openUrl(QUrl(url))
+        host_open_url(url)
 
     def _ctx_rename_mod(self, row: int) -> None:
         """Rename a mod (folder + modlist.txt)."""
@@ -5415,7 +5413,7 @@ class MainWindow(QMainWindow):
             return
         mod_path = self._current_instance_path / ".mods" / entry.name
         if mod_path.is_dir():
-            subprocess.Popen(["xdg-open", str(mod_path)], env=clean_subprocess_env())
+            host_open_path(str(mod_path))
 
     def _ctx_show_info(self, row: int) -> None:
         """Show mod information dialog."""
@@ -6536,7 +6534,7 @@ class MainWindow(QMainWindow):
         elif chosen == act_explorer:
             mods_path = self._bg3_installer._mods_path
             if mods_path and mods_path.is_dir():
-                subprocess.Popen(["xdg-open", str(mods_path)], env=clean_subprocess_env())
+                host_open_path(str(mods_path))
 
     # ── Framework context menu + handlers ──────────────────────────
 
@@ -6633,7 +6631,7 @@ class MainWindow(QMainWindow):
                                 if candidate.is_dir():
                                     target_dir = candidate
                             break
-                subprocess.Popen(["xdg-open", str(target_dir)], env=clean_subprocess_env())
+                host_open_path(str(target_dir))
 
     def _fw_reinstall(self, fw_name: str) -> None:
         """Reinstall a framework from its archive in the downloads directory."""

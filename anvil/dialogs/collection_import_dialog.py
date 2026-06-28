@@ -13,8 +13,8 @@ from PySide6.QtWidgets import (
     QWidget,
     QCheckBox,
 )
-from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import Qt
+from anvil.core.subprocess_env import host_open_url
 
 from anvil.core.translator import tr
 from anvil.core.collection_io import ImportResult
@@ -65,9 +65,7 @@ class _ModCard(QFrame):
                 """
             )
             link_btn.clicked.connect(
-                lambda checked=False, u=nexus_url: QDesktopServices.openUrl(
-                    QUrl(u)
-                )
+                lambda checked=False, u=nexus_url: host_open_url(u)
             )
             layout.addWidget(link_btn)
 

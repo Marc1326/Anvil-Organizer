@@ -9,8 +9,9 @@ from PySide6.QtWidgets import (
     QListView, QLineEdit, QPushButton, QLabel, QWidget, QFrame,
     QAbstractItemView, QMessageBox, QStyle,
 )
-from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon, QDesktopServices
-from PySide6.QtCore import Qt, QSortFilterProxyModel, QSettings, QModelIndex, QUrl, QSize
+from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QSettings, QModelIndex, QSize
+from anvil.core.subprocess_env import host_open_path
 
 from anvil.core.instance_manager import InstanceManager
 from anvil.core.ui_helpers import get_text_input
@@ -461,7 +462,7 @@ class InstanceManagerDialog(QDialog):
             return
 
         if path and path != "\u2014":
-            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+            host_open_path(path)
 
     # ── Geometry Persistence ──────────────────────────────────────────
 
