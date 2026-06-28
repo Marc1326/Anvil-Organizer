@@ -3,13 +3,13 @@
 pkgname=anvil-organizer-git
 pkgver=r0.0000000
 pkgrel=1
-pkgdesc="Native Linux Mod Manager inspired by Mod Organizer 2 (git version)"
+pkgdesc="Native Linux mod manager (git version)"
 arch=('x86_64')
 url="https://github.com/Marc1326/Anvil-Organizer"
 license=('GPL-3.0-or-later')
 depends=(
     'python>=3.11'
-    'python-pyside6'
+    'pyside6'
     'python-lz4'
     'qt6-base'
     'hicolor-icon-theme'
