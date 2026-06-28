@@ -298,8 +298,6 @@ class ModInstaller:
             detect_installed=framework.detect_installed,
             target=framework.target,
         )
-        print(f"DEBUG install_framework: install_root={install_root}")
-
         installed_files: list[str] = []
         for src_item in install_root.rglob("*"):
             rel = src_item.relative_to(install_root)
@@ -318,8 +316,6 @@ class ModInstaller:
                         pass
                 shutil.copy2(src_item, dest)
                 installed_files.append(str(dest.relative_to(game_path)))
-        print(f"DEBUG install_framework: files={installed_files}")
-
         # Clean up temp dir
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -392,8 +388,6 @@ class ModInstaller:
                             if len(rel_parts) > suffix_parts + 1:
                                 prefix = "/".join(rel_parts[:-(suffix_parts + 1)])
                                 result = temp_dir / prefix
-                                print(f"DEBUG _find_install_root: suffix strategy: "
-                                      f"dp={dp}, suffix={suffix}, prefix={prefix}")
                                 return result
                             return temp_dir
 
@@ -419,7 +413,6 @@ class ModInstaller:
                     if len(parts) > pat_depth:
                         prefix = "/".join(parts[:-pat_depth])
                         result = temp_dir / prefix
-                        print(f"DEBUG _find_install_root: wildcard: pat={pat}, rel={rel_str}, prefix={prefix}")
                         return result
                     return temp_dir
                 else:
@@ -431,7 +424,6 @@ class ModInstaller:
                     prefix_str = rel_str[:idx].rstrip("/")
                     if prefix_str:
                         result = temp_dir / prefix_str
-                        print(f"DEBUG _find_install_root: literal: pat={pat}, prefix={prefix_str}")
                         return result
                     return temp_dir
         return temp_dir
