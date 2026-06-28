@@ -72,7 +72,7 @@ from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
 from anvil.version import APP_VERSION
 from anvil.core.update_checker import UpdateChecker
 from anvil.core.nexus_api import NexusAPI
-from anvil.core.nxm_handler import parse_nxm_url, check_cli_for_nxm
+from anvil.core.nxm_handler import parse_nxm_url, is_collection_nxm, get_nxm_arg
 from anvil.core.conflict_scanner import ConflictScanner
 from anvil.core.modindex import ModIndex
 from anvil.core.lspk_parser import LSPKReader
@@ -1006,10 +1006,10 @@ class MainWindow(QMainWindow):
         else:
             self._status_bar.clear_instance()
 
-        # Check for nxm:// URL passed via command line
-        nxm_link = check_cli_for_nxm()
-        if nxm_link:
-            self._handle_nxm_link(nxm_link)
+        # Check for nxm:// URL passed via command line (mod or collection)
+        nxm_raw = get_nxm_arg()
+        if nxm_raw:
+            self.handle_nxm_url(nxm_raw)
 
     def _crash_recovery_purge(self) -> None:
         """Purge stale deploy manifests from all instances.
@@ -5869,6 +5869,11 @@ class MainWindow(QMainWindow):
         Can be called from external IPC when a second instance
         receives an nxm:// link.
         """
+        if is_collection_nxm(url):
+            QMessageBox.information(
+                self, tr("nxm.collection_title"), tr("nxm.collection_message"),
+            )
+            return
         nxm_link = parse_nxm_url(url)
         if nxm_link:
             self._handle_nxm_link(nxm_link)

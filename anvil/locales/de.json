@@ -1171,5 +1171,9 @@
   "common": {
     "yes": "Ja",
     "no": "Nein"
+  },
+  "nxm": {
+    "collection_title": "Collections",
+    "collection_message": "Nexus-Collections werden noch nicht unterstützt. Bitte lade die enthaltenen Mods einzeln herunter."
   }
 }

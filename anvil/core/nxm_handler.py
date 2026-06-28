@@ -80,6 +80,34 @@ def parse_nxm_url(url: str) -> NxmLink | None:
     )
 
 
+def is_collection_nxm(url: str) -> bool:
+    """Return True if the nxm:// URL points to a Nexus collection (not a mod).
+
+    Collection links look like ``nxm://<game>/collections/<slug>/...`` and are
+    NOT handled by :func:`parse_nxm_url` (which only accepts mod download links).
+    """
+    if not url.startswith("nxm://"):
+        return False
+    try:
+        parts = [p for p in urlparse(url).path.split("/") if p]
+    except Exception:
+        return False
+    return bool(parts) and parts[0] == "collections"
+
+
+def get_nxm_arg(argv: list[str] | None = None) -> str | None:
+    """Return the first raw ``nxm://`` argument, or None.
+
+    Unlike :func:`check_cli_for_nxm` this does not parse/validate the link,
+    so collection links are returned as-is instead of being dropped.
+    """
+    args = argv if argv is not None else sys.argv
+    for arg in args[1:]:  # skip script name
+        if arg.startswith("nxm://"):
+            return arg
+    return None
+
+
 def register_nxm_handler() -> bool:
     """Register Anvil Organizer as the nxm:// URL handler on Linux.
 

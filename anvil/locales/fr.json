@@ -1171,5 +1171,9 @@
   "common": {
     "yes": "Oui",
     "no": "Non"
+  },
+  "nxm": {
+    "collection_title": "Collections",
+    "collection_message": "Les collections Nexus ne sont pas encore prises en charge. Téléchargez les mods inclus individuellement."
   }
 }

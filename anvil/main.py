@@ -34,7 +34,7 @@ from PySide6.QtGui import QIcon
 from anvil.mainwindow import MainWindow
 from anvil.core.translator import Translator
 from anvil.core.single_instance import SingleInstance
-from anvil.core.nxm_handler import check_cli_for_nxm
+from anvil.core.nxm_handler import get_nxm_arg
 from anvil.core.activity_log import log_action
 from anvil.version import APP_VERSION
 
@@ -79,15 +79,18 @@ def main():
     # ── Single-instance check ────────────────────────────────
     single = SingleInstance(app)
     if not single.try_lock():
-        # Another instance is running — forward nxm:// URL if present
-        nxm_link = check_cli_for_nxm()
-        if nxm_link:
-            if not SingleInstance.send_message(nxm_link.raw_url):
+        # Another instance is running — forward any nxm:// URL (mod or collection)
+        raw_nxm = get_nxm_arg()
+        if raw_nxm:
+            if not SingleInstance.send_message(raw_nxm):
                 print(
                     "[Anvil] IPC failed: could not forward NXM link to running instance",
                     file=sys.stderr,
                 )
-        sys.exit(0)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        # os._exit vermeidet einen Qt-Teardown-Crash im kurzlebigen Forwarder-Prozess
+        os._exit(0)
 
     # Translator mit gespeicherter Sprache initialisieren
     _init_translator()

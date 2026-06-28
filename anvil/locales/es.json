@@ -1171,5 +1171,9 @@
   "common": {
     "yes": "Sí",
     "no": "No"
+  },
+  "nxm": {
+    "collection_title": "Colecciones",
+    "collection_message": "Las colecciones de Nexus aún no son compatibles. Descarga los mods incluidos de forma individual."
   }
 }
