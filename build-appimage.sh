@@ -99,6 +99,12 @@ rm -f "$APPDIR/usr/bin/_internal"/libreadline.so* \
       "$APPDIR/usr/bin/_internal"/libtinfo.so*
 echo "[OK] Removed libreadline/libtinfo (host-subprocess conflict)"
 
+# Use the host libxkbcommon — the bundled copy segfaults at xkb init/teardown
+# on some distros (openSUSE/CachyOS), see #86 and #90.
+rm -f "$APPDIR/usr/bin/_internal"/libxkbcommon.so* \
+      "$APPDIR/usr/bin/_internal"/libxkbcommon-x11.so*
+echo "[OK] Removed libxkbcommon (use host version)"
+
 echo "[OK] AppDir created"
 
 # ── Download appimagetool if needed ──────────────────────────
