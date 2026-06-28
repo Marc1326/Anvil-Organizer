@@ -48,6 +48,12 @@ jobs:
           cp anvil/resources/logo.png AppDir/anvil-organizer.png
           # Binary
           cp -a dist/anvil-organizer/* AppDir/usr/bin/
+          # Bundled libs that break host subprocesses (libreadline/libtinfo, #82)
+          # or segfault at xkb init/teardown (libxkbcommon, #86/#90) — use host versions
+          rm -f AppDir/usr/bin/_internal/libreadline.so* \
+                AppDir/usr/bin/_internal/libtinfo.so* \
+                AppDir/usr/bin/_internal/libxkbcommon.so* \
+                AppDir/usr/bin/_internal/libxkbcommon-x11.so*
 
       - name: Download appimagetool
         run: |
