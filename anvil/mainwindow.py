@@ -5113,7 +5113,7 @@ class MainWindow(QMainWindow):
             if not idata:
                 return
             from anvil.core.nexus_categories import NexusCategoryCache
-            inst_path = Path(idata.get("path", ""))
+            inst_path = self.instance_manager.instances_path() / _name
             cache = NexusCategoryCache(inst_path)
             if not cache.load():
                 return
@@ -5161,7 +5161,7 @@ class MainWindow(QMainWindow):
         idata = self.instance_manager.load_instance(_name) if _name else None
         if not idata:
             return
-        inst_path = Path(idata.get("path", ""))
+        inst_path = self.instance_manager.instances_path() / _name
         from anvil.core.nexus_categories import NexusCategoryCache, assign_nexus_categories
         cache = NexusCategoryCache(inst_path)
         if not cache.load():
@@ -5193,7 +5193,7 @@ class MainWindow(QMainWindow):
         idata = self.instance_manager.load_instance(_name) if _name else None
         if not idata:
             return
-        inst_path = Path(idata.get("path", ""))
+        inst_path = self.instance_manager.instances_path() / _name
         from anvil.core.nexus_categories import NexusCategoryCache, assign_nexus_categories
         cache = NexusCategoryCache(inst_path)
         if not cache.load():
@@ -5250,7 +5250,7 @@ class MainWindow(QMainWindow):
         new_name, ok = get_text_input(
             self, tr("dialog.rename_mod_title"), tr("dialog.rename_mod_prompt"), text=display,
         )
-        if not ok or not new_name.strip() or new_name.strip() == old_name:
+        if not ok or not new_name.strip() or new_name.strip() == display:
             return
         new_name = new_name.strip()
 
@@ -5275,6 +5275,9 @@ class MainWindow(QMainWindow):
         profiles_dir = self._current_instance_path / ".profiles"
         rename_mod_globally(profiles_dir, old_name, new_name)
         self._update_install_meta_name(old_name, new_name)
+        # Anzeigename (meta.ini "name") nachziehen, sonst zeigt die Liste den alten Namen
+        from anvil.core.mod_metadata import write_meta_ini
+        write_meta_ini(new_path, {"name": new_name})
         # Update mod index cache for the renamed mod
         if self._mod_index is not None:
             self._mod_index.rename(old_name, new_name)
@@ -5678,7 +5681,7 @@ class MainWindow(QMainWindow):
                 _name = self.instance_manager.current_instance()
                 idata = self.instance_manager.load_instance(_name) if _name else None
                 if idata:
-                    inst_path = Path(idata.get("path", ""))
+                    inst_path = self.instance_manager.instances_path() / _name
                     if inst_path.exists():
                         cache = NexusCategoryCache(inst_path)
                         game_slug = tag.split(":", 1)[1]

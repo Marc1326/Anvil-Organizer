@@ -638,7 +638,7 @@ class ModDeployer:
             # Safety: only remove if target points into .mods/
             try:
                 real_target = link_path.resolve()
-                mods_str = str(self._mods_path)
+                mods_str = str(self._mods_path.resolve())
                 if not str(real_target).startswith(mods_str):
                     result.errors.append(
                         f"skip {link_rel}: target {real_target} "
