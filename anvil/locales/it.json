@@ -973,7 +973,9 @@
     "not_usable": "(Non disponibile)",
     "no_description": "Nessuna descrizione disponibile.",
     "no_image": "Nessuna anteprima disponibile",
-    "validation_required": "Effettua una selezione nel gruppo \"{group}\"."
+    "validation_required": "Effettua una selezione nel gruppo \"{group}\".",
+    "script_title": "FOMOD basato su script",
+    "script_message": "Questa mod usa un installer basato su script (C#) che Anvil non può eseguire. Non comparirà alcuna selezione di opzioni: la mod verrà installata completa di tutti i file. Continuare?"
   },
   "plugin_creator": {
     "title": "Crea Plugin di Gioco",

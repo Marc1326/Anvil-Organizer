@@ -973,7 +973,9 @@
     "not_usable": "(Not usable)",
     "no_description": "No description available.",
     "no_image": "No preview available",
-    "validation_required": "Please make a selection in the group \"{group}\"."
+    "validation_required": "Please make a selection in the group \"{group}\".",
+    "script_title": "Script-based FOMOD",
+    "script_message": "This mod uses a script-based (C#) installer that Anvil can't run. No option selection will appear — the mod will be installed in full with all files. Continue?"
   },
   "plugin_creator": {
     "title": "Create Game Plugin",

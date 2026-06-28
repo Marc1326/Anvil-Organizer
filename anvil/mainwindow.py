@@ -56,7 +56,7 @@ from anvil.core.icon_manager import IconManager
 from anvil.core.mod_entry import ModEntry, scan_mods_directory
 from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
 from anvil.core.fomod_parser import (
-    detect_fomod, parse_fomod, parse_fomod_info,
+    detect_fomod, detect_fomod_script, parse_fomod, parse_fomod_info,
     collect_fomod_files, assemble_fomod_files,
     save_fomod_choices, load_fomod_choices,
 )
@@ -2218,6 +2218,17 @@ class MainWindow(QMainWindow):
                     temp_dir = new_temp
                     if "name" in info:
                         fomod_name_override = info["name"]
+            else:
+                # Kein XML-FOMOD — evtl. ein Script-FOMOD (C#), das Anvil nicht ausführen kann
+                if detect_fomod_script(temp_dir) is not None:
+                    reply = QMessageBox.question(
+                        self, tr("fomod.script_title"), tr("fomod.script_message"),
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No,
+                    )
+                    if reply != QMessageBox.StandardButton.Yes:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        continue
 
             # 4. Normal mod installation
             best, variants = installer.suggest_names(archive)

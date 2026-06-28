@@ -324,6 +324,27 @@ def detect_fomod(temp_dir: Path) -> Path | None:
     return None
 
 
+def detect_fomod_script(temp_dir: Path) -> Path | None:
+    """Find a script-based (C#) FOMOD that has no ModuleConfig.xml.
+
+    Installers built on ``fomod/script.cs`` (or a compiled ``script.dll``)
+    can't be executed by Anvil. Returns the script path if such a FOMOD is
+    present *without* an XML config, else *None*.
+    """
+    try:
+        for item in temp_dir.iterdir():
+            if item.is_dir() and item.name.lower() == "fomod":
+                files = [f for f in item.iterdir() if f.is_file()]
+                if any(f.name.lower() == "moduleconfig.xml" for f in files):
+                    return None
+                for f in files:
+                    if f.suffix.lower() == ".cs" or f.name.lower() == "script.dll":
+                        return f
+    except OSError:
+        pass
+    return None
+
+
 def parse_fomod_info(fomod_dir: Path) -> dict[str, str]:
     """Parse ``fomod/info.xml`` for mod metadata (name, author, version).
 

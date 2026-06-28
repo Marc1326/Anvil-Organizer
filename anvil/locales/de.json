@@ -973,7 +973,9 @@
     "not_usable": "(Nicht verwendbar)",
     "no_description": "Keine Beschreibung verfügbar.",
     "no_image": "Keine Vorschau verfügbar",
-    "validation_required": "Bitte eine Auswahl in der Gruppe \"{group}\" treffen."
+    "validation_required": "Bitte eine Auswahl in der Gruppe \"{group}\" treffen.",
+    "script_title": "Script-basiertes FOMOD",
+    "script_message": "Diese Mod nutzt ein Script-basiertes (C#) Installationsprogramm, das Anvil nicht ausführen kann. Es erscheint keine Optionsauswahl — die Mod wird komplett mit allen Dateien installiert. Fortfahren?"
   },
   "plugin_creator": {
     "title": "Game Plugin erstellen",
