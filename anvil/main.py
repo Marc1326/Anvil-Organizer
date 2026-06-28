@@ -108,7 +108,13 @@ def main():
     single.message_received.connect(w.handle_nxm_url)
 
     w.showMaximized()
-    sys.exit(app.exec())
+    exit_code = app.exec()
+    # Auf manchen Distros segfaultet der Qt/xcb-Teardown in libxkbcommon (#90, #86).
+    # closeEvent hat zu diesem Zeitpunkt bereits gepurged und den UI-State gespeichert,
+    # daher den Prozess hart beenden statt den crashenden Python/Qt-Teardown zu durchlaufen.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(exit_code)
 
 
 if __name__ == "__main__":
