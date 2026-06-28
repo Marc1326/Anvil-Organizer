@@ -1866,7 +1866,7 @@ class MainWindow(QMainWindow):
             self._game_panel.silent_deploy()
         success, pid = True, -1
         try:
-            proc = subprocess.Popen(
+            proc = host_popen(
                 [binary_path],
                 cwd=working_dir,
                 env=clean_subprocess_env(),
@@ -1904,6 +1904,7 @@ class MainWindow(QMainWindow):
         """Re-enable the UI after a game has stopped or user clicks Unlock."""
         self._game_running = False
         self._game_panel.silent_purge()
+        self._game_panel.silent_deploy()
         self._lock_overlay.setVisible(False)
         self._splitter.setEnabled(True)
         self._log_container.setEnabled(True)
@@ -2360,8 +2361,8 @@ class MainWindow(QMainWindow):
                         if meta_path.is_file():
                             try:
                                 cp.read(str(meta_path), encoding="utf-8")
-                            except Exception:
-                                pass
+                            except Exception as exc:
+                                print(f"[META] parse failed: {meta_path}: {exc}", flush=True)
                         if not cp.has_section("General"):
                             cp.add_section("General")
                         cp.set("General", "removed", "true")
@@ -2444,8 +2445,8 @@ class MainWindow(QMainWindow):
         if meta_path.is_file():
             try:
                 cp.read(str(meta_path), encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as exc:
+                print(f"[META] parse failed: {meta_path}: {exc}", flush=True)
         if not cp.has_section("General"):
             cp.add_section("General")
         cp.set("General", "installed", "true")
@@ -2491,7 +2492,8 @@ class MainWindow(QMainWindow):
             cp.optionxform = str  # CamelCase-Keys beibehalten
             try:
                 cp.read(str(meta_file), encoding="utf-8")
-            except Exception:
+            except Exception as exc:
+                print(f"[META] parse failed: {meta_file}: {exc}", flush=True)
                 continue
             if cp.get("General", "installationFile", fallback="") == old_name:
                 cp.set("General", "installationFile", new_name)
@@ -5072,8 +5074,8 @@ class MainWindow(QMainWindow):
         if meta_path.is_file():
             try:
                 cp.read(str(meta_path), encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as exc:
+                print(f"[META] parse failed: {meta_path}: {exc}", flush=True)
         if not cp.has_section("General"):
             cp.add_section("General")
         cp.set("General", "modID", str(nexus_data.get("mod_id", 0)))

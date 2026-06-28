@@ -1100,6 +1100,8 @@ class GamePanel(QWidget):
         needs_redmod = self._needs_redmod_deploy(plugin)
         print(f"[START] _needs_redmod_deploy={needs_redmod}, binary={binary}", flush=True)
         if needs_redmod:
+            # Sicherstellen dass /mods/ gefuellt ist bevor redMod.exe darueber laeuft
+            self.silent_deploy()
             self._run_redmod_deploy_then_launch(plugin, binary, is_steam)
             return
 
@@ -1808,7 +1810,7 @@ class GamePanel(QWidget):
             cmd = [str(proton_script), "run", str(exe)]
             if args:
                 cmd.extend(args)
-            proc = subprocess.Popen(
+            proc = host_popen(
                 cmd, cwd=cwd, env=env,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )

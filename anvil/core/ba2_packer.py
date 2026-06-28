@@ -24,7 +24,7 @@ from configparser import ConfigParser
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from anvil.core.subprocess_env import clean_env
+from anvil.core.subprocess_env import clean_env, host_popen
 
 from PySide6.QtCore import QSettings
 
@@ -179,13 +179,20 @@ class BA2Packer:
         Falls back to manual ``Z:`` mapping if winepath fails.
         """
         try:
-            result = subprocess.run(
+            proc = host_popen(
                 ["winepath", "-w", str(linux_path)],
-                capture_output=True, text=True, timeout=5, env=env,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
             )
-            if result.returncode == 0 and result.stdout.strip():
-                return result.stdout.strip()
-        except (subprocess.TimeoutExpired, OSError):
+            try:
+                stdout_b, _ = proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                stdout_b, _ = proc.communicate()
+                stdout_b = None
+            result_stdout = stdout_b.decode("utf-8", errors="replace") if stdout_b else ""
+            if proc.returncode == 0 and result_stdout.strip():
+                return result_stdout.strip()
+        except OSError:
             pass
 
         # Fallback: Z: maps the entire Linux root /
@@ -278,20 +285,25 @@ class BA2Packer:
         print(f"[BA2] Running: {' '.join(cmd)}", flush=True)
 
         try:
-            proc = subprocess.run(
+            proc = host_popen(
                 cmd,
                 env=env,
-                capture_output=True,
-                text=True,
-                timeout=300,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
+            try:
+                stdout_b, stderr_b = proc.communicate(timeout=300)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+                return False, f"BSArch timed out after 300s for {output_ba2.name}"
+            proc_stdout = stdout_b.decode("utf-8", errors="replace") if stdout_b else ""
+            proc_stderr = stderr_b.decode("utf-8", errors="replace") if stderr_b else ""
             if proc.returncode != 0:
-                stderr = proc.stderr.strip() or proc.stdout.strip()
+                stderr = proc_stderr.strip() or proc_stdout.strip()
                 return False, f"BSArch exited with code {proc.returncode}: {stderr}"
             print(f"[BA2] Created: {output_ba2.name}", flush=True)
             return True, ""
-        except subprocess.TimeoutExpired:
-            return False, f"BSArch timed out after 300s for {output_ba2.name}"
         except OSError as exc:
             return False, f"Failed to run BSArch: {exc}"
 
