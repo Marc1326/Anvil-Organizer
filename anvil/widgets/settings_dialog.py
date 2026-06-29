@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QTreeWidget,
     QTreeWidgetItem,
     QSpinBox,
+    QPlainTextEdit,
 )
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtCore import Qt, QSettings
@@ -44,11 +45,13 @@ from anvil.core.translator import Translator, tr
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, plugin_loader: PluginLoader | None = None,
-                 instance_manager=None, on_clear_modindex=None):
+                 instance_manager=None, on_clear_modindex=None,
+                 diagnostics_provider=None):
         super().__init__(parent)
         self._plugin_loader = plugin_loader
         self._instance_manager = instance_manager
         self._on_clear_modindex = on_clear_modindex
+        self._diagnostics_provider = diagnostics_provider
         self.setWindowTitle(tr("dialog.settings_title"))
         self.setMinimumSize(960, 600)
         self.resize(960, 600)
@@ -745,7 +748,7 @@ class SettingsDialog(QDialog):
         wa_layout.addWidget(wa_scroll)
         # self._tabs.addTab(workarounds_tab, tr("settings.tab_workarounds"))
 
-        # Tab Diagnose
+        # Tab Diagnose (#23)
         diagnose_tab = QWidget()
         diag_layout = QVBoxLayout(diagnose_tab)
         diag_scroll = QScrollArea()
@@ -753,28 +756,128 @@ class SettingsDialog(QDialog):
         diag_scroll.setFrameShape(QFrame.Shape.NoFrame)
         diag_content = QWidget()
         diag_content_layout = QVBoxLayout(diag_content)
-        logs_grp = QGroupBox(tr("settings.diag_logs_crashes"))
-        logs_layout = QFormLayout(logs_grp)
-        log_combo = QComboBox()
-        log_combo.addItem(tr("label.log_level_info"))
-        _disabled(log_combo)
-        logs_layout.addRow(tr("settings.diag_log_level"), log_combo)
-        crash_combo = QComboBox()
-        crash_combo.addItem(tr("label.crash_dump_mini"))
-        _disabled(crash_combo)
-        logs_layout.addRow(tr("settings.diag_crash_dump"), crash_combo)
-        crash_spin = QSpinBox()
-        crash_spin.setValue(5)
-        _disabled(crash_spin)
-        logs_layout.addRow(tr("settings.diag_max_crash_dumps"), crash_spin)
-        diag_content_layout.addWidget(logs_grp)
-        diag_hint = QLabel(tr("settings.diag_hint"))
-        diag_hint.setWordWrap(True)
-        diag_content_layout.addWidget(diag_hint)
+
+        # Sektion Systeminfo (read-only)
+        sys_grp = QGroupBox(tr("settings.diag_system_info"))
+        sys_form = QFormLayout(sys_grp)
+        self._diag_sys: dict = {}
+        for key, label in (
+            ("app_version", tr("settings.diag_app_version")),
+            ("os", "OS"),
+            ("distro", tr("settings.diag_distro")),
+            ("kernel", tr("settings.diag_kernel")),
+            ("python", "Python"),
+            ("qt", "Qt"),
+            ("run_mode", tr("settings.diag_run_mode")),
+            ("desktop", tr("settings.diag_desktop")),
+            ("session", tr("settings.diag_session")),
+            ("memory", tr("settings.diag_memory")),
+        ):
+            le = QLineEdit()
+            le.setReadOnly(True)
+            le.setPlaceholderText("—")
+            self._diag_sys[key] = le
+            sys_form.addRow(label + ":", le)
+        diag_content_layout.addWidget(sys_grp)
+
+        # Sektion Pfad-Prüfung
+        path_grp = QGroupBox(tr("settings.diag_path_checks"))
+        path_layout = QVBoxLayout(path_grp)
+        self._diag_path_list = QListWidget()
+        self._diag_path_list.setMinimumHeight(120)
+        path_layout.addWidget(self._diag_path_list)
+        path_btn_row = QHBoxLayout()
+        diag_open_path_btn = QPushButton(tr("settings.diag_open_path"))
+        diag_open_path_btn.clicked.connect(lambda checked=False: self._diag_open_selected_path())
+        path_btn_row.addWidget(diag_open_path_btn)
+        path_btn_row.addStretch()
+        path_layout.addLayout(path_btn_row)
+        diag_content_layout.addWidget(path_grp)
+
+        # Sektion Deploy-Status
+        deploy_grp = QGroupBox(tr("settings.diag_deploy_status"))
+        deploy_layout = QVBoxLayout(deploy_grp)
+        self._diag_deploy_label = QLabel("—")
+        self._diag_deploy_label.setWordWrap(True)
+        deploy_layout.addWidget(self._diag_deploy_label)
+        diag_content_layout.addWidget(deploy_grp)
+
+        # Sektion Erkannte Probleme
+        prob_grp = QGroupBox(tr("settings.diag_problems"))
+        prob_layout = QVBoxLayout(prob_grp)
+        self._diag_problem_list = QListWidget()
+        self._diag_problem_list.setMinimumHeight(100)
+        prob_layout.addWidget(self._diag_problem_list)
+        diag_content_layout.addWidget(prob_grp)
+
+        # Sektion Mod-Konflikte (Scan auf Knopfdruck)
+        conf_grp = QGroupBox(tr("settings.diag_conflicts"))
+        conf_layout = QVBoxLayout(conf_grp)
+        self._diag_conflict_list = QListWidget()
+        self._diag_conflict_list.setMinimumHeight(100)
+        conf_layout.addWidget(self._diag_conflict_list)
+        conf_btn_row = QHBoxLayout()
+        diag_scan_btn = QPushButton(tr("settings.diag_scan_conflicts"))
+        diag_scan_btn.clicked.connect(lambda checked=False: self._diag_scan_conflicts())
+        conf_btn_row.addWidget(diag_scan_btn)
+        conf_btn_row.addStretch()
+        conf_layout.addLayout(conf_btn_row)
+        diag_content_layout.addWidget(conf_grp)
+
+        # Sektion Log-Viewer
+        log_grp = QGroupBox(tr("settings.diag_logs"))
+        log_layout = QVBoxLayout(log_grp)
+        # State vor dem Signal-connect setzen (Robustheit gegen Reihenfolge)
+        self._diag_log_sources: list = []
+        self._diag_log_lines: list = []
+        log_top_row = QHBoxLayout()
+        self._diag_log_combo = QComboBox()
+        self._diag_log_combo.currentIndexChanged.connect(lambda _i: self._diag_load_log())
+        log_top_row.addWidget(self._diag_log_combo, 1)
+        self._diag_log_search = QLineEdit()
+        self._diag_log_search.setPlaceholderText(tr("settings.diag_search"))
+        self._diag_log_search.textChanged.connect(lambda _t: self._diag_filter_log())
+        log_top_row.addWidget(self._diag_log_search, 1)
+        log_layout.addLayout(log_top_row)
+        self._diag_log_view = QPlainTextEdit()
+        self._diag_log_view.setReadOnly(True)
+        self._diag_log_view.setMinimumHeight(160)
+        log_layout.addWidget(self._diag_log_view)
+        log_btn_row = QHBoxLayout()
+        diag_log_refresh = QPushButton(tr("settings.diag_refresh"))
+        diag_log_refresh.clicked.connect(lambda checked=False: self._diag_load_log())
+        diag_log_open = QPushButton(tr("settings.diag_open_file"))
+        diag_log_open.clicked.connect(lambda checked=False: self._diag_open_log())
+        log_btn_row.addWidget(diag_log_refresh)
+        log_btn_row.addWidget(diag_log_open)
+        log_btn_row.addStretch()
+        log_layout.addLayout(log_btn_row)
+        diag_content_layout.addWidget(log_grp)
+
+        # Export-Leiste
+        export_row = QHBoxLayout()
+        diag_refresh_all = QPushButton(tr("settings.diag_refresh"))
+        diag_refresh_all.clicked.connect(lambda checked=False: self._diag_refresh())
+        diag_copy_btn = QPushButton(tr("settings.diag_copy_report"))
+        diag_copy_btn.clicked.connect(lambda checked=False: self._diag_copy_report())
+        diag_export_btn = QPushButton(tr("settings.diag_export_report"))
+        diag_export_btn.clicked.connect(lambda checked=False: self._diag_export())
+        export_row.addWidget(diag_refresh_all)
+        export_row.addStretch()
+        export_row.addWidget(diag_copy_btn)
+        export_row.addWidget(diag_export_btn)
+        diag_content_layout.addLayout(export_row)
+
         diag_content_layout.addStretch()
         diag_scroll.setWidget(diag_content)
         diag_layout.addWidget(diag_scroll)
-        # self._tabs.addTab(diagnose_tab, tr("settings.tab_diagnostics"))
+        self._tabs.addTab(diagnose_tab, tr("settings.tab_diagnostics"))
+
+        # Diagnose-Daten initial laden (günstig; Konflikte nur auf Knopfdruck)
+        self._diag_data: dict = {}
+        self._diag_last_conflicts = None
+        self._diag_refresh()
+        self._diag_populate_log_sources()
 
         # Tab Script Merger
         sm_tab = QWidget()
@@ -999,6 +1102,155 @@ class SettingsDialog(QDialog):
             w.setEnabled(enabled)
 
     # ── Style-Tab helpers ─────────────────────────────────────────────
+
+    # ── Diagnose-Tab (#23) ─────────────────────────────────────────────
+
+    def _diag_refresh(self) -> None:
+        """Systeminfo, Pfad-Checks, Deploy-Status und Probleme neu sammeln."""
+        from anvil.core import diagnostics
+        sysinfo = diagnostics.collect_system_info()
+        path_checks = diagnostics.collect_path_checks(self._idata, self._instance_path)
+        problems = diagnostics.detect_problems(self._idata, sysinfo, path_checks)
+        deploy = diagnostics.collect_deploy_status(self._instance_path)
+        self._diag_data = {
+            "sysinfo": sysinfo, "path_checks": path_checks,
+            "problems": problems, "deploy": deploy,
+        }
+
+        for key, le in self._diag_sys.items():
+            le.setText(sysinfo.get(key, ""))
+
+        label_map = {
+            "game_path": tr("settings.path_managed_game"),
+            "path_mods_directory": tr("settings.path_mods"),
+            "path_downloads_directory": tr("settings.path_downloads"),
+            "path_overwrite_directory": tr("settings.path_overwrite"),
+            "path_profiles_directory": tr("settings.path_profiles"),
+        }
+        self._diag_path_list.clear()
+        for chk in path_checks:
+            if chk["exists"] and chk["writable"]:
+                status, color = tr("label.diag_status_ok"), QColor("#98C379")
+            elif chk["exists"]:
+                status, color = tr("label.diag_status_not_writable"), QColor("#E5C07B")
+            else:
+                status, color = tr("label.diag_status_missing"), QColor("#E06C75")
+            label = label_map.get(chk["key"], chk["key"])
+            item = QListWidgetItem(f"{label}: {chk['path'] or '—'}  [{status}]")
+            item.setForeground(color)
+            item.setData(Qt.ItemDataRole.UserRole, chk["path"])
+            self._diag_path_list.addItem(item)
+
+        if deploy.get("manifest"):
+            self._diag_deploy_label.setText(tr(
+                "label.diag_deploy_summary",
+                total=deploy.get("total", 0),
+                broken=deploy.get("broken", 0),
+                missing=deploy.get("missing", 0),
+            ))
+        else:
+            self._diag_deploy_label.setText(tr("label.diag_deploy_none"))
+
+        self._diag_problem_list.clear()
+        if problems:
+            sev_color = {
+                "error": QColor("#E06C75"),
+                "warning": QColor("#E5C07B"),
+                "info": QColor("#888888"),
+            }
+            for p in problems:
+                item = QListWidgetItem(p["message"])
+                item.setForeground(sev_color.get(p["severity"], QColor("#888888")))
+                self._diag_problem_list.addItem(item)
+        else:
+            self._diag_problem_list.addItem(QListWidgetItem(tr("settings.diag_no_problems")))
+
+    def _diag_open_selected_path(self) -> None:
+        item = self._diag_path_list.currentItem()
+        if item is None:
+            return
+        path = item.data(Qt.ItemDataRole.UserRole)
+        if path:
+            host_open_path(path)
+
+    def _diag_scan_conflicts(self) -> None:
+        self._diag_conflict_list.clear()
+        if self._diagnostics_provider is None:
+            self._diag_conflict_list.addItem(tr("settings.diag_conflicts_unavailable"))
+            self._diag_last_conflicts = None
+            return
+        try:
+            data = self._diagnostics_provider()
+        except Exception:  # noqa: BLE001 — Diagnose darf nie crashen
+            data = {"available": False, "conflicts": []}
+        if not data.get("available"):
+            self._diag_conflict_list.addItem(tr("settings.diag_conflicts_unavailable"))
+            self._diag_last_conflicts = None
+            return
+        conflicts = data.get("conflicts", [])
+        self._diag_last_conflicts = conflicts
+        if not conflicts:
+            self._diag_conflict_list.addItem(tr("settings.diag_no_conflicts"))
+            return
+        for c in conflicts[:500]:
+            self._diag_conflict_list.addItem(f"{c.get('file', '')}  →  {c.get('winner', '')}")
+
+    def _diag_populate_log_sources(self) -> None:
+        from anvil.core import diagnostics
+        self._diag_log_sources = diagnostics.log_sources()
+        self._diag_log_combo.blockSignals(True)
+        self._diag_log_combo.clear()
+        for src in self._diag_log_sources:
+            self._diag_log_combo.addItem(src["label"])
+        self._diag_log_combo.blockSignals(False)
+        if self._diag_log_sources:
+            self._diag_load_log()
+
+    def _diag_load_log(self) -> None:
+        from anvil.core import diagnostics
+        idx = self._diag_log_combo.currentIndex()
+        if idx < 0 or idx >= len(self._diag_log_sources):
+            self._diag_log_lines = []
+            self._diag_log_view.setPlainText("")
+            return
+        self._diag_log_lines = diagnostics.read_log_tail(self._diag_log_sources[idx]["path"])
+        self._diag_filter_log()
+
+    def _diag_filter_log(self) -> None:
+        query = self._diag_log_search.text().strip().lower()
+        if query:
+            lines = [ln for ln in self._diag_log_lines if query in ln.lower()]
+        else:
+            lines = self._diag_log_lines
+        self._diag_log_view.setPlainText("\n".join(lines))
+
+    def _diag_open_log(self) -> None:
+        idx = self._diag_log_combo.currentIndex()
+        if 0 <= idx < len(self._diag_log_sources):
+            host_open_path(self._diag_log_sources[idx]["path"])
+
+    def _diag_build_report(self) -> str:
+        from anvil.core import diagnostics
+        d = self._diag_data or {}
+        return diagnostics.build_report(
+            d.get("sysinfo", {}), d.get("path_checks", []), d.get("problems", []),
+            deploy_status=d.get("deploy"), conflicts=self._diag_last_conflicts,
+        )
+
+    def _diag_export(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, tr("settings.diag_export_report"),
+            "anvil-diagnose.txt", "Text (*.txt)",
+        )
+        if not path:
+            return
+        try:
+            Path(path).write_text(self._diag_build_report(), encoding="utf-8")
+        except OSError:
+            pass
+
+    def _diag_copy_report(self) -> None:
+        QApplication.clipboard().setText(self._diag_build_report())
 
     @staticmethod
     def _settings() -> QSettings:

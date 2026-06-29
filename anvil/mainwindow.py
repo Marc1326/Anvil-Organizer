@@ -759,6 +759,7 @@ class MainWindow(QMainWindow):
             self.plugin_loader,
             self.instance_manager,
             on_clear_modindex=self._clear_modindex_cache,
+            diagnostics_provider=self.collect_diagnostics_conflicts,
         )
         _center_on_parent(dlg)
         accepted = dlg.exec() == SettingsDialog.DialogCode.Accepted
@@ -1743,12 +1744,11 @@ class MainWindow(QMainWindow):
             result[uuid] = normalized
         return result
 
-    def _compute_conflict_data(self) -> dict:
-        """Run ConflictScanner and return per-mod conflict info.
+    def _run_conflict_scan(self) -> dict:
+        """Gemeinsamer roher Konflikt-Scan (BG3 + normale Spiele).
 
-        Returns a dict mapping mod folder name to a conflict info dict:
-        ``{"type": "win"|"lose"|"both", "wins": N, "losses": N,
-           "win_mods": N, "lose_mods": N}``
+        Liefert das rohe ConflictScanner-Ergebnis (``conflicts``/``ignored``)
+        oder ``{}`` wenn nichts zu scannen ist.
         """
         if not self._current_mod_entries:
             return {}
@@ -1763,22 +1763,46 @@ class MainWindow(QMainWindow):
             ]
             if not all_mods:
                 return {}
-            result = ConflictScanner().scan_conflicts(
+            return ConflictScanner().scan_conflicts(
                 all_mods, self._current_plugin, pak_file_lists=pak_file_lists,
             )
-        else:
-            # Regular games: filesystem-based scan
-            if not self._current_instance_path:
-                return {}
-            all_mods = [
-                {"name": e.name, "path": str(self._current_instance_path / ".mods" / e.name)}
-                for e in self._current_mod_entries if e.enabled
-            ]
-            if not all_mods:
-                return {}
-            result = ConflictScanner().scan_conflicts(
-                all_mods, self._current_plugin, mod_index=self._mod_index,
-            )
+
+        # Regular games: filesystem-based scan
+        if not self._current_instance_path:
+            return {}
+        all_mods = [
+            {"name": e.name, "path": str(self._current_instance_path / ".mods" / e.name)}
+            for e in self._current_mod_entries if e.enabled
+        ]
+        if not all_mods:
+            return {}
+        return ConflictScanner().scan_conflicts(
+            all_mods, self._current_plugin, mod_index=self._mod_index,
+        )
+
+    def collect_diagnostics_conflicts(self) -> dict:
+        """Für den Diagnose-Tab: Datei-Konflikte der aktiven Mods (read-only).
+
+        Liefert {available: bool, conflicts: [{file, mods, winner}, ...]}.
+        """
+        if not self._current_mod_entries or self._current_plugin is None:
+            return {"available": False, "conflicts": []}
+        try:
+            result = self._run_conflict_scan()
+        except Exception:  # noqa: BLE001 — Diagnose darf nie crashen
+            return {"available": False, "conflicts": []}
+        return {"available": True, "conflicts": result.get("conflicts", []) if result else []}
+
+    def _compute_conflict_data(self) -> dict:
+        """Run ConflictScanner and return per-mod conflict info.
+
+        Returns a dict mapping mod folder name to a conflict info dict:
+        ``{"type": "win"|"lose"|"both", "wins": N, "losses": N,
+           "win_mods": N, "lose_mods": N}``
+        """
+        result = self._run_conflict_scan()
+        if not result:
+            return {}
 
         # Build per-mod conflict counts
         per_mod: dict[str, dict] = {}
