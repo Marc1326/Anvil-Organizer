@@ -377,7 +377,7 @@
     "base_dir_hint": "Используйте %BASE_DIR% для ссылки на базовый каталог.",
     "writable_dirs_hint": "Все каталоги должны быть доступны для записи.",
     "known_servers": "Известные серверы (обновляются при загрузке)",
-    "preferred_servers": "Предпочтительные серверы (перетаскивание)",
+    "preferred_servers": "Предпочтительный сервер",
     "workarounds_hint": "Это обходные решения для проблем с Anvil Organizer. Обязательно прочитайте подсказки перед изменением настроек.",
     "ini_files_found": "{count} INI-файл(ов) найдено",
     "plugins_count": "{count} плагинов",
@@ -852,7 +852,8 @@
     "diag_refresh": "Обновить",
     "diag_open_file": "Открыть файл",
     "diag_export_report": "Экспорт отчёта",
-    "diag_copy_report": "Копировать отчёт"
+    "diag_copy_report": "Копировать отчёт",
+    "nexus_server_auto": "Автоматически (первый доступный)"
   },
   "mod_detail": {
     "open_in_explorer": "Открыть мод в проводнике",

@@ -377,7 +377,7 @@
     "base_dir_hint": "Verwenden Sie %BASE_DIR%, um auf das Basisverzeichnis zu verweisen.",
     "writable_dirs_hint": "Alle Verzeichnisse müssen beschreibbar sein.",
     "known_servers": "Bekannte Server (aktualisiert bei Download)",
-    "preferred_servers": "Bevorzugte Server (Drag & Drop)",
+    "preferred_servers": "Bevorzugter Server",
     "workarounds_hint": "Dies sind Workarounds für Probleme mit Anvil Organizer. Bitte lesen Sie unbedingt die Hilfetexte bevor Sie hier etwas ändern.",
     "ini_files_found": "{count} INI-Datei(en) gefunden",
     "plugins_count": "{count} Plugins",
@@ -852,7 +852,8 @@
     "diag_refresh": "Aktualisieren",
     "diag_open_file": "Datei öffnen",
     "diag_export_report": "Report exportieren",
-    "diag_copy_report": "Report kopieren"
+    "diag_copy_report": "Report kopieren",
+    "nexus_server_auto": "Automatisch (erster verfügbarer)"
   },
   "mod_detail": {
     "open_in_explorer": "Mod im Explorer öffnen",

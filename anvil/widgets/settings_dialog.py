@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
+    QAbstractItemView,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -522,24 +524,24 @@ class SettingsDialog(QDialog):
         # ── Server ───────────────────────────────────────────────────
         server_grp = QGroupBox(tr("settings.nexus_server"))
         server_layout = QHBoxLayout(server_grp)
+        # Links: bekannte Server (Info, aus Cache — wird bei Downloads aktualisiert)
         known_lbl = QLabel(tr("label.known_servers"))
         server_left = QVBoxLayout()
         server_left.addWidget(known_lbl)
-        known_list = QListWidget()
-        for city in ("Amsterdam", "Prague", "Chicago", "Los Angeles", "Miami", "Dallas"):
-            known_list.addItem(QListWidgetItem(city))
-        _disabled(known_list)
-        server_left.addWidget(known_list)
+        self._nexus_known_list = QListWidget()
+        self._nexus_known_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.NoSelection)
+        server_left.addWidget(self._nexus_known_list)
         server_layout.addLayout(server_left)
+        # Rechts: bevorzugte Region (Single-Select) für Free-Downloads
         pref_lbl = QLabel(tr("label.preferred_servers"))
         server_right = QVBoxLayout()
         server_right.addWidget(pref_lbl)
-        pref_list = QListWidget()
-        pref_list.addItem(QListWidgetItem("Nexus CDN (58.45 MB/s)"))
-        _disabled(pref_list)
-        server_right.addWidget(pref_list)
+        self._nexus_pref_list = QListWidget()
+        server_right.addWidget(self._nexus_pref_list)
         server_layout.addLayout(server_right)
         nx_content_layout.addWidget(server_grp)
+        self._nx_populate_servers()
 
         nx_content_layout.addStretch()
         nx_scroll.setWidget(nx_content)
@@ -1341,6 +1343,10 @@ class SettingsDialog(QDialog):
         settings.setValue("Nexus/tracking_enabled", self._cb_nexus_tracking.isChecked())
         settings.setValue("Nexus/hide_api_counter", self._cb_nexus_hide_api.isChecked())
         settings.setValue("Nexus/category_mapping_enabled", self._cb_nexus_catmap.isChecked())
+        # Bevorzugter Download-Server (leer = automatisch / erster verfügbarer)
+        pref_item = self._nexus_pref_list.currentItem()
+        pref_server = pref_item.data(Qt.ItemDataRole.UserRole) if pref_item else ""
+        settings.setValue("Nexus/preferred_server", pref_server or "")
         # Tab Script Merger
         settings.setValue("ScriptMerger/check_scripts", self._cb_sm_check_scripts.isChecked())
         settings.setValue("ScriptMerger/check_xml", self._cb_sm_check_xml.isChecked())
@@ -1529,6 +1535,45 @@ class SettingsDialog(QDialog):
         self._nx_status_label.setText(tr("status.disconnected"))
         self._nx_status_label.setStyleSheet("")
         self._nx_update_button_states()
+
+    def _nx_load_known_servers(self) -> list:
+        """Lies die gecachte Server-Liste (JSON) aus QSettings. Wirft nie."""
+        raw = self._settings().value("Nexus/known_servers", "", type=str)
+        try:
+            servers = json.loads(raw) if raw else []
+        except (ValueError, TypeError):
+            servers = []
+        if not isinstance(servers, list):
+            return []
+        return [str(s) for s in servers if s]
+
+    def _nx_populate_servers(self) -> None:
+        """Befüllt die Server-Listen aus dem Cache und wählt die Präferenz vor."""
+        servers = self._nx_load_known_servers()
+        pref_saved = self._settings().value("Nexus/preferred_server", "", type=str)
+
+        self._nexus_known_list.clear()
+        for sid in servers:
+            self._nexus_known_list.addItem(QListWidgetItem(sid))
+
+        self._nexus_pref_list.clear()
+        auto = QListWidgetItem(tr("settings.nexus_server_auto"))
+        auto.setData(Qt.ItemDataRole.UserRole, "")
+        self._nexus_pref_list.addItem(auto)
+        selected = auto
+        for sid in servers:
+            item = QListWidgetItem(sid)
+            item.setData(Qt.ItemDataRole.UserRole, sid)
+            self._nexus_pref_list.addItem(item)
+            if sid == pref_saved:
+                selected = item
+        # Gespeicherte Präferenz auch zeigen, wenn sie (noch) nicht im Cache steht
+        if pref_saved and pref_saved not in servers:
+            item = QListWidgetItem(pref_saved)
+            item.setData(Qt.ItemDataRole.UserRole, pref_saved)
+            self._nexus_pref_list.addItem(item)
+            selected = item
+        self._nexus_pref_list.setCurrentItem(selected)
 
     def _nx_on_validated(self, user_info: dict) -> None:
         """Handle successful API key validation."""

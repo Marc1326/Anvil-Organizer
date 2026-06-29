@@ -123,6 +123,26 @@ def _ensure_list(val) -> list:
     return list(val)
 
 
+def _server_id(entry: dict) -> str:
+    """Stabiler Bezeichner für einen Nexus-CDN-Server-Eintrag.
+
+    Bevorzugt short_name/name. Fällt auf den URL-Host zurück (die URI trägt
+    pro Download key/expires-Query, daher nur der Hostname für Stabilität).
+    """
+    if not isinstance(entry, dict):
+        return ""
+    sid = entry.get("short_name") or entry.get("name")
+    if sid:
+        return str(sid)
+    uri = entry.get("URI", "")
+    if uri:
+        from urllib.parse import urlparse
+        host = urlparse(str(uri)).hostname
+        if host:
+            return host
+    return ""
+
+
 class _CenteredClearLineEdit(QLineEdit):
     """QLineEdit that vertically centers the built-in clear button."""
 
@@ -5663,6 +5683,55 @@ class MainWindow(QMainWindow):
             "mod_version": "",
         }
 
+    def _cache_known_servers(self, data: list) -> None:
+        """Merkt die von Nexus gelieferten Server-Bezeichner (für die Settings-Auswahl).
+
+        Defensiv: Caching darf einen Download niemals stören.
+        """
+        try:
+            ids = []
+            for entry in data:
+                sid = _server_id(entry)
+                if sid and sid not in ids:
+                    ids.append(sid)
+            if not ids:
+                return
+            settings = self._settings()
+            raw = settings.value("Nexus/known_servers", "", type=str)
+            try:
+                existing = json.loads(raw) if raw else []
+            except (ValueError, TypeError):
+                existing = []
+            merged = [str(s) for s in existing if s] if isinstance(existing, list) else []
+            for sid in ids:
+                if sid not in merged:
+                    merged.append(sid)
+            merged = merged[-20:]
+            settings.setValue("Nexus/known_servers", json.dumps(merged))
+        except Exception:  # noqa: BLE001 — Caching darf den Download nie killen
+            pass
+
+    def _select_download_server(self, data: list) -> str:
+        """Wählt die Download-URL aus der Server-Liste.
+
+        Premium/Einzel-Server-Antworten nutzen den einzigen Eintrag. Bei mehreren
+        Servern (Free-Accounts) wird der bevorzugte Server gematcht; ohne Treffer
+        oder Präferenz fällt es auf den ersten Eintrag zurück (= bisheriges Verhalten).
+        """
+        if not data:
+            return ""
+        if len(data) <= 1:
+            return data[0].get("URI", "") if isinstance(data[0], dict) else ""
+        pref = self._settings().value("Nexus/preferred_server", "", type=str)
+        if pref:
+            for entry in data:
+                if isinstance(entry, dict) and _server_id(entry) == pref:
+                    uri = entry.get("URI", "")
+                    if uri:
+                        return uri
+        first = data[0]
+        return first.get("URI", "") if isinstance(first, dict) else ""
+
     def _on_nexus_response(self, tag: str, data: object) -> None:
         """Handle Nexus API responses."""
         if tag.startswith("download_link:") and isinstance(data, list) and data:
@@ -5683,8 +5752,10 @@ class MainWindow(QMainWindow):
                 return
             nxm = entry["nxm"]
 
-            # Use first available download URL
-            url = data[0].get("URI", "")
+            # Gelieferte Server für die Settings-Auswahl merken
+            self._cache_known_servers(data)
+            # Bevorzugten Server wählen (Fallback: erster Eintrag)
+            url = self._select_download_server(data)
             if not url:
                 self.statusBar().showMessage(tr("status.nexus_no_link"), 5000)
                 return
