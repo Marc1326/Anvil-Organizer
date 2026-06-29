@@ -583,7 +583,7 @@
     "conflicts_only": "Nur Konflikte",
     "archives": "Archive",
     "hidden_files": "versteckte Dateien",
-    "edit_executables": "<Bearbeiten...>",
+    "edit_executables": "Eigene Programme verwalten...",
     "deploy_redmod": "REDmod manuell deployen",
     "explore_virtual": "Virtuellen Ordner öffnen",
     "skip_redmod": "{name} - REDmod-Deploy überspringen",

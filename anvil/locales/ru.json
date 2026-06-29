@@ -583,7 +583,7 @@
     "conflicts_only": "Только конфликты",
     "archives": "Архивы",
     "hidden_files": "скрытые файлы",
-    "edit_executables": "<Изменить...>",
+    "edit_executables": "Управление своими программами...",
     "deploy_redmod": "Вручную развернуть REDmod",
     "explore_virtual": "Обзор виртуальной папки",
     "skip_redmod": "{name} — пропустить развёртывание REDmod",
