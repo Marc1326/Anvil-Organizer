@@ -13,6 +13,7 @@ from pathlib import Path
 
 from anvil.core.resource_path import get_anvil_base
 from anvil.core.subprocess_env import clean_subprocess_env, clean_env, host_popen, host_open_url, host_open_path
+from anvil.widgets.proton_tools_dialog import load_proton_tools, ProtonToolsDialog
 
 _DEPLOY_LOG = Path("/tmp/anvil-deploy.log")
 
@@ -103,6 +104,7 @@ class _DraggableDownloadTable(QTableWidget):
 class GamePanel(QWidget):
     install_requested = Signal(list)  # list of archive path strings
     start_requested = Signal(str, str)  # (binary_path, working_dir)
+    custom_start_requested = Signal(str, list, str, bool)  # (exe_path, args, working_dir, use_proton)
     game_started = Signal(str, int)  # (game_name, pid) — pid=-1 if unknown
     game_stopped = Signal()           # emitted when the game process ends
 
@@ -147,6 +149,9 @@ class GamePanel(QWidget):
         self._game_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._exe_menu = QMenu(self)
         self._game_btn.setMenu(self._exe_menu)
+        # Menü bei jedem Öffnen frisch aufbauen — so sind eigene Programme nach dem
+        # Editor sofort aktuell, unabhängig von der set_instance_path-Reihenfolge.
+        self._exe_menu.aboutToShow.connect(self._on_exe_menu_about_to_show)
         self._game_btn.setStyleSheet(
             "QToolButton { background: #242424; border: 2px solid #3D3D3D; border-radius: 4px;"
             "             padding: 0; margin: 0; }"
@@ -525,9 +530,10 @@ class GamePanel(QWidget):
         self._executables.clear()
         self._selected_exe_index = 0
 
-        # 1. <Bearbeiten...> — kein Icon, disabled
+        # 1. <Bearbeiten...> — öffnet den Editor für eigene Programme (pro Instanz)
         edit_action = self._exe_menu.addAction(tr("game_panel.edit_executables"))
-        edit_action.setEnabled(False)
+        edit_action.setEnabled(self._instance_path is not None)
+        edit_action.triggered.connect(lambda checked=False: self._on_edit_executables())
         self._exe_menu.addSeparator()
 
         # Cover Art (game_wide.jpg) für Spiel-Einträge, Red Bird (game.png) für REDmod/REDprelauncher
@@ -551,6 +557,34 @@ class GamePanel(QWidget):
                 action = self._exe_menu.addAction(icon, name)
                 action.triggered.connect(lambda checked, i=idx: self._on_exe_selected(i))
                 self._executables.append({"name": name, "binary": binary})
+
+            # Eigene Programme (pro Instanz, aus proton_tools.json)
+            custom_tools = (
+                load_proton_tools(self._instance_path) if self._instance_path else []
+            )
+            if custom_tools:
+                self._exe_menu.addSeparator()
+                title = self._exe_menu.addAction(tr("game_panel.custom_executables"))
+                title.setEnabled(False)
+                tool_icon = self.style().standardIcon(
+                    self.style().StandardPixmap.SP_FileIcon
+                )
+                for tool in custom_tools:
+                    name = tool.get("name") or "?"
+                    idx = len(self._executables)
+                    action = self._exe_menu.addAction(tool_icon, name)
+                    action.triggered.connect(
+                        lambda checked, i=idx: self._on_exe_selected(i)
+                    )
+                    self._executables.append({
+                        "name": name,
+                        "binary": "",
+                        "custom": True,
+                        "exe_path": tool.get("exe_path", ""),
+                        "args": list(tool.get("args", [])),
+                        "working_dir": tool.get("working_dir", ""),
+                        "proton": tool.get("proton", True),
+                    })
 
             # REDmod menu entries (active when NeedsRedmodDeploy is set)
             needs_redmod = getattr(game_plugin, "NeedsRedmodDeploy", False)
@@ -592,6 +626,41 @@ class GamePanel(QWidget):
         if self._executables:
             self._selected_exe_index = 0
             self._start_btn.setToolTip(tr("game_panel.start_with_name", name=self._executables[0]['name']))
+
+    @staticmethod
+    def _exe_identity(exe: dict):
+        """Stable key to restore the selection after a menu rebuild.
+
+        Bewusst ohne Index — so folgt die Auswahl einem Eintrag auch über ein
+        Umsortieren hinweg. Zwei deckungsgleiche Einträge (gleicher Name + Pfad)
+        sind nicht unterscheidbar; dann gewinnt das erste Vorkommen.
+        """
+        if exe.get("custom"):
+            return ("custom", exe.get("exe_path", ""), exe.get("name", ""))
+        return ("plugin", exe.get("binary", ""))
+
+    def _on_exe_menu_about_to_show(self) -> None:
+        """Rebuild the menu on open so custom programs stay current; keep selection."""
+        prev = None
+        if 0 <= self._selected_exe_index < len(self._executables):
+            prev = self._exe_identity(self._executables[self._selected_exe_index])
+        self._rebuild_executables_menu(self._current_plugin)
+        if prev is not None:
+            for i, exe in enumerate(self._executables):
+                if self._exe_identity(exe) == prev:
+                    self._selected_exe_index = i
+                    self._start_btn.setToolTip(
+                        tr("game_panel.start_with_name", name=exe["name"])
+                    )
+                    break
+
+    def _on_edit_executables(self) -> None:
+        """Open the editor for the instance's custom programs."""
+        if not self._instance_path:
+            return
+        dlg = ProtonToolsDialog(self, instance_path=self._instance_path)
+        dlg.exec()
+        # Das Menü lädt die geänderte Liste beim nächsten Öffnen via aboutToShow.
 
     def _get_small_game_icon(self) -> QIcon:
         """Return small (24x24) game banner icon (cover art), or placeholder."""
@@ -1068,6 +1137,8 @@ class GamePanel(QWidget):
 
     def _on_exe_selected(self, index: int) -> None:
         """Handle executable selection from the menu."""
+        if index < 0 or index >= len(self._executables):
+            return
         self._selected_exe_index = index
         name = self._executables[index]["name"]
         self._start_btn.setToolTip(tr("game_panel.start_with_name", name=name))
@@ -1083,6 +1154,18 @@ class GamePanel(QWidget):
             return
 
         exe = self._executables[idx]
+        if exe.get("custom"):
+            exe_path = exe.get("exe_path", "")
+            if not exe_path:
+                return
+            self.custom_start_requested.emit(
+                exe_path,
+                list(exe.get("args", [])),
+                exe.get("working_dir", ""),
+                bool(exe.get("proton", True)),
+            )
+            return
+
         binary = exe.get("binary", "")
         if not binary:
             return

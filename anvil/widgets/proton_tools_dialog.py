@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QLineEdit,
     QPushButton,
+    QCheckBox,
     QLabel,
     QFileDialog,
     QWidget,
@@ -30,9 +32,23 @@ def load_proton_tools(instance_path: Path) -> list[dict]:
     if not fp.is_file():
         return []
     try:
-        return json.loads(fp.read_text(encoding="utf-8"))
+        data = json.loads(fp.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return []
+    # Gegen extern verfälschte JSON absichern: nur Dict-Einträge, args als String-Liste.
+    if not isinstance(data, list):
+        return []
+    tools = []
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        for key in ("name", "exe_path", "working_dir"):
+            if key in entry:
+                entry[key] = str(entry[key])
+        raw_args = entry.get("args", [])
+        entry["args"] = [str(a) for a in raw_args] if isinstance(raw_args, list) else []
+        tools.append(entry)
+    return tools
 
 
 def save_proton_tools(instance_path: Path, tools: list[dict]) -> None:
@@ -72,8 +88,18 @@ class ProtonToolsDialog(QDialog):
         self._remove_btn.setObjectName("protonRemoveBtn")
         self._remove_btn.setToolTip(tr("proton_tools.remove_tooltip"))
         self._remove_btn.clicked.connect(self._on_remove)
+        self._up_btn = QPushButton("▲")
+        self._up_btn.setFixedSize(36, 36)
+        self._up_btn.setToolTip(tr("proton_tools.move_up_tooltip"))
+        self._up_btn.clicked.connect(self._on_move_up)
+        self._down_btn = QPushButton("▼")
+        self._down_btn.setFixedSize(36, 36)
+        self._down_btn.setToolTip(tr("proton_tools.move_down_tooltip"))
+        self._down_btn.clicked.connect(self._on_move_down)
         top_row.addWidget(self._add_btn)
         top_row.addWidget(self._remove_btn)
+        top_row.addWidget(self._up_btn)
+        top_row.addWidget(self._down_btn)
         top_row.addStretch()
         left.addLayout(top_row)
 
@@ -121,6 +147,10 @@ class ProtonToolsDialog(QDialog):
         dir_row.addWidget(dir_browse)
         fl.addRow(tr("proton_tools.dir_label") + ":", dir_row)
 
+        self._proton_check = QCheckBox(tr("proton_tools.run_via_proton"))
+        self._proton_check.toggled.connect(self._on_field_changed)
+        fl.addRow("", self._proton_check)
+
         content.addWidget(form_widget)
         layout.addLayout(content)
 
@@ -152,6 +182,7 @@ class ProtonToolsDialog(QDialog):
         self._exe_edit.setEnabled(has_selection)
         self._args_edit.setEnabled(has_selection)
         self._dir_edit.setEnabled(has_selection)
+        self._proton_check.setEnabled(has_selection)
 
     def _on_selection_changed(self, row: int) -> None:
         self._update_form_enabled()
@@ -161,14 +192,16 @@ class ProtonToolsDialog(QDialog):
             self._exe_edit.clear()
             self._args_edit.clear()
             self._dir_edit.clear()
+            self._proton_check.setChecked(True)
             self._updating = False
             return
         self._updating = True
         tool = self._tools[row]
         self._name_edit.setText(tool.get("name", ""))
         self._exe_edit.setText(tool.get("exe_path", ""))
-        self._args_edit.setText(" ".join(tool.get("args", [])))
+        self._args_edit.setText(shlex.join(tool.get("args", [])))
         self._dir_edit.setText(tool.get("working_dir", ""))
+        self._proton_check.setChecked(tool.get("proton", True))
         self._updating = False
 
     def _on_field_changed(self) -> None:
@@ -181,8 +214,16 @@ class ProtonToolsDialog(QDialog):
         tool["name"] = self._name_edit.text().strip()
         tool["exe_path"] = self._exe_edit.text().strip()
         args_text = self._args_edit.text().strip()
-        tool["args"] = args_text.split() if args_text else []
+        if args_text:
+            try:
+                tool["args"] = shlex.split(args_text)
+            except ValueError:
+                # Unbalancierte Anführungszeichen während des Tippens — simpel trennen
+                tool["args"] = args_text.split()
+        else:
+            tool["args"] = []
         tool["working_dir"] = self._dir_edit.text().strip()
+        tool["proton"] = self._proton_check.isChecked()
         item = self._list.item(row)
         if item:
             item.setText(tool["name"] or "?")
@@ -190,7 +231,7 @@ class ProtonToolsDialog(QDialog):
     def _on_add(self, checked=False) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self, tr("proton_tools.select_exe"), "",
-            "Alle Dateien (*)",
+            tr("proton_tools.all_files"),
         )
         if not path:
             return
@@ -200,6 +241,7 @@ class ProtonToolsDialog(QDialog):
             "exe_path": str(exe),
             "args": [],
             "working_dir": str(exe.parent),
+            "proton": True,
         }
         self._tools.append(new_tool)
         self._list.addItem(QListWidgetItem(new_tool["name"]))
@@ -212,6 +254,26 @@ class ProtonToolsDialog(QDialog):
         self._tools.pop(row)
         self._list.takeItem(row)
         self._update_form_enabled()
+
+    def _on_move_up(self, checked=False) -> None:
+        row = self._list.currentRow()
+        if row <= 0 or row >= len(self._tools):
+            return
+        self._tools.insert(row - 1, self._tools.pop(row))
+        self._refill_list(row - 1)
+
+    def _on_move_down(self, checked=False) -> None:
+        row = self._list.currentRow()
+        if row < 0 or row >= len(self._tools) - 1:
+            return
+        self._tools.insert(row + 1, self._tools.pop(row))
+        self._refill_list(row + 1)
+
+    def _refill_list(self, select_row: int) -> None:
+        self._list.clear()
+        for tool in self._tools:
+            self._list.addItem(QListWidgetItem(tool.get("name", "?")))
+        self._list.setCurrentRow(select_row)
 
     def _on_browse_exe(self) -> None:
         start_dir = ""

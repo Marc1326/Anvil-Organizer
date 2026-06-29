@@ -624,7 +624,8 @@
     "proton_launch_failed": "Запуск через Proton не удался:\n{error}",
     "query_nexus_info": "Запросить информацию Nexus",
     "query_nexus_enter_id": "Введите Nexus Mod-ID (из URL):",
-    "query_nexus_parsed_id": "Определено из имени файла: Mod-ID {id}. Использовать?"
+    "query_nexus_parsed_id": "Определено из имени файла: Mod-ID {id}. Использовать?",
+    "custom_executables": "Свои программы"
   },
   "filter": {
     "delete_all_data": "Все связанные файлы будут удалены из Data/.",
@@ -1167,7 +1168,11 @@
     "exe_not_found": "Ispolnyaemyy fayl ne nayden:\n{path}",
     "proton_not_found": "Proton ne nayden dlya etoy igry.\nUbedites chto igra byla zapushchena khotya by raz cherez Steam.",
     "launch": "Zapustit",
-    "launch_failed": "Ne udalos zapustit instrument:\n{error}"
+    "launch_failed": "Ne udalos zapustit instrument:\n{error}",
+    "run_via_proton": "Запускать через Proton",
+    "move_up_tooltip": "Вверх",
+    "move_down_tooltip": "Вниз",
+    "all_files": "Vse fayly (*)"
   },
   "common": {
     "yes": "Да",

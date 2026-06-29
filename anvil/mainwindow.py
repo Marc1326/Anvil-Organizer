@@ -367,6 +367,7 @@ class MainWindow(QMainWindow):
         self._mod_list_view.fw_active_toggle.connect(self._on_fw_active_toggle)
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
+        self._game_panel.custom_start_requested.connect(self._on_custom_tool_start)
         self._game_panel.game_started.connect(self._on_game_started)
         self._game_panel.game_stopped.connect(self._unlock_ui)
 
@@ -1879,19 +1880,21 @@ class MainWindow(QMainWindow):
         self._install_archives([Path(p) for p in remaining], insert_at=target_row)
         self._game_panel.refresh_downloads()
 
-    def _on_start_game(self, binary_path: str, working_dir: str) -> None:
-        """Launch the selected game executable."""
+    def _predeploy_for_launch(self, reason: str) -> None:
+        """Relock frameworks + full purge/deploy before launching anything."""
         self._redeploy_timer.stop()
-        # Vor dem Spielstart: alle Frameworks dieser Instanz locken
         if self._current_instance_path:
-            self._auto_relock_instance(self._current_instance_path, "game_start")
-        # Full deploy (with BA2) before game start
-        if self._current_instance_path:
+            # Vor dem Start: alle Frameworks dieser Instanz locken
+            self._auto_relock_instance(self._current_instance_path, reason)
             print("[PURGE] Pre-launch purge", flush=True)
             self._game_panel.silent_purge()
             print("[DEPLOY] Pre-launch full deploy (with BA2)", flush=True)
             self._sync_separator_deploy_paths()
             self._game_panel.silent_deploy()
+
+    def _on_start_game(self, binary_path: str, working_dir: str) -> None:
+        """Launch the selected game executable."""
+        self._predeploy_for_launch("game_start")
         success, pid = True, -1
         try:
             proc = host_popen(
@@ -1906,6 +1909,39 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self, tr("error.start_failed_title"),
                 tr("error.start_failed_message", path=binary_path),
+            )
+
+    def _on_custom_tool_start(
+        self, exe_path: str, args: list, working_dir: str, use_proton: bool
+    ) -> None:
+        """Launch a user-defined program — mods are deployed first, like a game start.
+
+        Bewusst KEIN game_started/UI-Lock: eigene Tools (xEdit, BodySlide, LOOT) laufen
+        neben Anvil, man soll währenddessen weiterarbeiten können. Nur das Spiel sperrt
+        die UI.
+        """
+        self._predeploy_for_launch("custom_tool_start")
+        if use_proton:
+            self._game_panel.run_with_proton(exe_path, list(args), working_dir or None)
+            return
+        # Direktstart ohne Proton (native Linux-Tools/Skripte), inklusive Argumente
+        exe = Path(exe_path)
+        if not exe_path or not exe.is_file():
+            QMessageBox.warning(
+                self, tr("error.start_failed_title"),
+                tr("error.start_failed_message", path=exe_path),
+            )
+            return
+        try:
+            host_popen(
+                [exe_path, *args],
+                cwd=working_dir or str(exe.parent),
+                env=clean_subprocess_env(),
+            )
+        except OSError:
+            QMessageBox.warning(
+                self, tr("error.start_failed_title"),
+                tr("error.start_failed_message", path=exe_path),
             )
 
     def _on_game_started(self, game_name: str, pid: int) -> None:

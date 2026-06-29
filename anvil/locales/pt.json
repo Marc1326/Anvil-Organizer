@@ -624,7 +624,8 @@
     "proton_launch_failed": "Falha ao iniciar via Proton:\n{error}",
     "query_nexus_info": "Consultar info do Nexus",
     "query_nexus_enter_id": "Inserir ID do Mod do Nexus (do URL):",
-    "query_nexus_parsed_id": "Detetado do nome do ficheiro: Mod ID {id}. Usar?"
+    "query_nexus_parsed_id": "Detetado do nome do ficheiro: Mod ID {id}. Usar?",
+    "custom_executables": "Programas personalizados"
   },
   "filter": {
     "delete_all_data": "Todos os ficheiros associados serão eliminados de Data/.",
@@ -1167,7 +1168,11 @@
     "exe_not_found": "Executavel nao encontrado:\n{path}",
     "proton_not_found": "Proton nao encontrado para este jogo.\nCertifique-se de ter executado o jogo pelo menos uma vez pelo Steam.",
     "launch": "Iniciar",
-    "launch_failed": "Falha ao iniciar a ferramenta:\n{error}"
+    "launch_failed": "Falha ao iniciar a ferramenta:\n{error}",
+    "run_via_proton": "Executar via Proton",
+    "move_up_tooltip": "Mover para cima",
+    "move_down_tooltip": "Mover para baixo",
+    "all_files": "Todos os arquivos (*)"
   },
   "common": {
     "yes": "Sim",
