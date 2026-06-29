@@ -523,7 +523,8 @@
     "profile_created": "Profile '{name}' created",
     "profile_renamed": "Profile renamed: {old} → {new}",
     "profile_deleted": "Profile '{name}' deleted",
-    "delete_error": "Error deleting: {error}"
+    "delete_error": "Error deleting: {error}",
+    "game_path_missing": "Game path not found — please update it in settings."
   },
   "error": {
     "load_file": "Error loading: {error}",

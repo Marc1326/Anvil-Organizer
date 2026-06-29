@@ -523,7 +523,8 @@
     "profile_created": "Perfil '{name}' creado",
     "profile_renamed": "Perfil renombrado: {old} → {new}",
     "profile_deleted": "Perfil '{name}' eliminado",
-    "delete_error": "Error al eliminar: {error}"
+    "delete_error": "Error al eliminar: {error}",
+    "game_path_missing": "No se encontró la ruta del juego — ajústala en los ajustes."
   },
   "error": {
     "load_file": "Error al cargar: {error}",

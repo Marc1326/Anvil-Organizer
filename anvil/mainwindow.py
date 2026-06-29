@@ -1002,7 +1002,16 @@ class MainWindow(QMainWindow):
         # Load current instance (if any)
         current = self.instance_manager.current_instance()
         if current:
-            self.switch_instance(current)
+            try:
+                self.switch_instance(current)
+            except Exception as e:  # noqa: BLE001 — Start darf nie blockiert werden
+                # Eine kaputte Instanz (z. B. fehlendes Laufwerk) darf den Start
+                # nicht verhindern. Sauberer "Kein Spiel"-Zustand + Hinweis.
+                self._log_panel.add_log(
+                    "error",
+                    f"Instanz '{current}' konnte nicht geladen werden: {e}",
+                )
+                self._status_bar.clear_instance()
         else:
             self._status_bar.clear_instance()
 
@@ -1113,8 +1122,10 @@ class MainWindow(QMainWindow):
             instance_name: Name of the instance to switch to.
         """
         self._teardown_current_instance()
-        self.instance_manager.set_current_instance(instance_name)
         self._apply_instance(instance_name)
+        # Erst nach erfolgreichem Laden persistieren — sonst zeigt .current bei
+        # einem Fehler auf eine kaputte Instanz und die App startet nicht mehr.
+        self.instance_manager.set_current_instance(instance_name)
 
     def _apply_instance(self, instance_name: str) -> None:
         """Load instance data and update all widgets.
@@ -1175,6 +1186,12 @@ class MainWindow(QMainWindow):
 
         # ReShade menu item: enable when game path is available
         self._act_reshade.setEnabled(game_path is not None)
+
+        # Spielpfad war konfiguriert, ist aber aktuell nicht verfügbar (Laufwerk
+        # nicht gemountet / Spiel deinstalliert). Instanz lädt trotzdem, damit der
+        # Pfad in den Einstellungen korrigiert werden kann.
+        if game_path is None and game_path_str:
+            Toast(self, tr("toast.game_path_missing"))
 
         # 1. Title
         self.setWindowTitle(f"{game_name} \u2013 Anvil Organizer v{APP_VERSION}")

@@ -523,7 +523,8 @@
     "profile_created": "Profilo '{name}' creato",
     "profile_renamed": "Profilo rinominato: {old} → {new}",
     "profile_deleted": "Profilo '{name}' eliminato",
-    "delete_error": "Errore durante l'eliminazione: {error}"
+    "delete_error": "Errore durante l'eliminazione: {error}",
+    "game_path_missing": "Percorso del gioco non trovato — modificalo nelle impostazioni."
   },
   "error": {
     "load_file": "Errore durante il caricamento: {error}",

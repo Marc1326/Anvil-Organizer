@@ -523,7 +523,8 @@
     "profile_created": "Profil '{name}' créé",
     "profile_renamed": "Profil renommé : {old} → {new}",
     "profile_deleted": "Profil '{name}' supprimé",
-    "delete_error": "Erreur lors de la suppression : {error}"
+    "delete_error": "Erreur lors de la suppression : {error}",
+    "game_path_missing": "Chemin du jeu introuvable — modifiez-le dans les paramètres."
   },
   "error": {
     "load_file": "Erreur lors du chargement : {error}",

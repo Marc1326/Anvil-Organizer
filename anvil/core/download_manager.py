@@ -153,7 +153,13 @@ class DownloadManager(QObject):
     def set_downloads_dir(self, path: Path) -> None:
         """Set the target directory for downloads."""
         self._downloads_dir = path
-        path.mkdir(parents=True, exist_ok=True)
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            # Pfad kann auf einem nicht gemounteten/fehlenden Laufwerk liegen.
+            # Pfad trotzdem merken (in den Einstellungen korrigierbar) statt den
+            # ganzen Instanzwechsel mit einer Exception abzubrechen.
+            print(f"[DownloadManager] Downloads-Verzeichnis nicht verfügbar: {path} ({e})")
 
     def downloads_dir(self) -> Path | None:
         """Return the current downloads directory."""

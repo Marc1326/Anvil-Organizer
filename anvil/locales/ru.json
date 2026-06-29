@@ -523,7 +523,8 @@
     "profile_created": "Профиль '{name}' создан",
     "profile_renamed": "Профиль переименован: {old} → {new}",
     "profile_deleted": "Профиль '{name}' удалён",
-    "delete_error": "Ошибка при удалении: {error}"
+    "delete_error": "Ошибка при удалении: {error}",
+    "game_path_missing": "Путь к игре не найден — измените его в настройках."
   },
   "error": {
     "load_file": "Ошибка при загрузке: {error}",
