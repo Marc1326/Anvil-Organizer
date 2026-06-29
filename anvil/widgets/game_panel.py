@@ -52,7 +52,7 @@ from anvil.core.mod_deployer import ModDeployer
 from anvil.core.download_manager import DownloadManager
 from anvil.core.persistent_header import PersistentHeader
 from anvil.core.plugins_txt_writer import PluginsTxtWriter
-from anvil.core import _todo
+from anvil.core.desktop_shortcut import create_game_shortcut
 from anvil.core.translator import tr
 
 
@@ -133,7 +133,7 @@ class GamePanel(QWidget):
         link_btn.setIconSize(QSize(20, 20))
         link_btn.setToolTip(tr("tooltip.link"))
         link_btn.setFixedWidth(32)
-        link_btn.clicked.connect(_todo("Verknüpfung"))
+        link_btn.clicked.connect(lambda checked=False: self._on_create_shortcut())
         link_btn_row = QHBoxLayout()
         link_btn_row.addStretch()
         link_btn_row.addWidget(link_btn)
@@ -661,6 +661,43 @@ class GamePanel(QWidget):
         dlg = ProtonToolsDialog(self, instance_path=self._instance_path)
         dlg.exec()
         # Das Menü lädt die geänderte Liste beim nächsten Öffnen via aboutToShow.
+
+    def _on_create_shortcut(self) -> None:
+        """Erzeugt eine .desktop-Verknüpfung für das aktuelle Spiel (#24)."""
+        if self._instance_path is None or self._current_plugin is None:
+            QMessageBox.warning(self, tr("tooltip.link"), tr("shortcut.no_game"))
+            return
+        instance_name = self._instance_path.name
+        display_name = self._game_label.text() or instance_name
+        icon = self._save_shortcut_icon()
+        path = create_game_shortcut(instance_name, display_name, icon)
+        if path:
+            QMessageBox.information(
+                self, tr("tooltip.link"), tr("shortcut.created", path=str(path))
+            )
+        else:
+            QMessageBox.warning(self, tr("tooltip.link"), tr("shortcut.failed"))
+
+    def _save_shortcut_icon(self) -> str:
+        """Speichert das Spiel-Icon als PNG für die Verknüpfung; sonst App-Icon."""
+        if self._icon_manager and self._current_short_name:
+            pix = self._icon_manager.get_game_icon(self._current_short_name)
+            if pix is None:
+                pix = self._icon_manager.get_game_banner(self._current_short_name)
+            if pix is not None and not pix.isNull():
+                icon_dir = Path.home() / ".local" / "share" / "icons" / "anvil"
+                try:
+                    icon_dir.mkdir(parents=True, exist_ok=True)
+                    icon_path = icon_dir / f"{self._current_short_name}.png"
+                    if pix.save(str(icon_path), "PNG"):
+                        return str(icon_path)
+                except OSError:
+                    pass
+        return "anvil-organizer"
+
+    def start_selected(self) -> None:
+        """Startet das aktuell gewählte Executable (z. B. von einer Verknüpfung aus)."""
+        self._on_start_clicked()
 
     def _get_small_game_icon(self) -> QIcon:
         """Return small (24x24) game banner icon (cover art), or placeholder."""

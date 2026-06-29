@@ -153,6 +153,15 @@ NoDisplay=true
     return True
 
 
+def build_exec_command() -> str | None:
+    """Public wrapper around the Exec-command builder.
+
+    Used by the game-shortcut generator so it does not duplicate the
+    Flatpak/AppImage/PyInstaller/dev detection.
+    """
+    return _build_exec_command()
+
+
 def _build_exec_command() -> str | None:
     """Build the Exec command for the .desktop file.
 

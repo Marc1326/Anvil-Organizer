@@ -73,6 +73,7 @@ from anvil.version import APP_VERSION
 from anvil.core.update_checker import UpdateChecker
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nxm_handler import parse_nxm_url, is_collection_nxm, get_nxm_arg
+from anvil.core.desktop_shortcut import get_launch_instance_arg
 from anvil.core.conflict_scanner import ConflictScanner
 from anvil.core.modindex import ModIndex
 from anvil.core.lspk_parser import LSPKReader
@@ -1011,6 +1012,11 @@ class MainWindow(QMainWindow):
         nxm_raw = get_nxm_arg()
         if nxm_raw:
             self.handle_nxm_url(nxm_raw)
+
+        # Check for --launch-instance passed via command line (Shortcut-Button, #24)
+        launch_inst = get_launch_instance_arg()
+        if launch_inst:
+            QTimer.singleShot(0, lambda n=launch_inst: self.launch_instance_shortcut(n))
 
     def _crash_recovery_purge(self) -> None:
         """Purge stale deploy manifests from all instances.
@@ -5941,6 +5947,44 @@ class MainWindow(QMainWindow):
         nxm_link = parse_nxm_url(url)
         if nxm_link:
             self._handle_nxm_link(nxm_link)
+
+    def handle_ipc_message(self, message: str) -> None:
+        """Dispatch an IPC message from a second instance.
+
+        ``anvil-launch:<Instanz>`` stammt von einer Spiel-Verknüpfung (#24),
+        alles andere wird als nxm:// behandelt.
+        """
+        prefix = "anvil-launch:"
+        if message.startswith(prefix):
+            self.launch_instance_shortcut(message[len(prefix):])
+        else:
+            self.handle_nxm_url(message)
+
+    def launch_instance_shortcut(self, name: str) -> None:
+        """Zur Instanz wechseln; Spiel starten, falls der globale Schalter es erlaubt.
+
+        Aufgerufen über eine .desktop-Verknüpfung (#24) — beim eigenen Start
+        (``--launch-instance``) oder per IPC von einer zweiten Instanz weitergereicht.
+        """
+        name = (name or "").strip()
+        if not name:
+            return
+        # list_instances() liefert dicts mit Key "name" — gegen die Namen prüfen
+        names = [d.get("name", "") for d in self.instance_manager.list_instances()]
+        if name not in names:
+            self._log_panel.add_log(
+                "error", f"Verknüpfung: Instanz '{name}' nicht gefunden"
+            )
+            return
+        # Fenster nach vorn holen (Doppelklick auf die Verknüpfung)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        if self.instance_manager.current_instance() != name:
+            self.switch_instance(name)
+        # Globaler Schalter: Spiel starten oder nur Anvil öffnen
+        if self._settings().value("Interface/shortcut_launch_game", True, type=bool):
+            QTimer.singleShot(0, self._game_panel.start_selected)
 
     # ── UI state persistence ───────────────────────────────────────
 

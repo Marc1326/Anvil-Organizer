@@ -166,6 +166,10 @@ class SettingsDialog(QDialog):
         cb_preview.setChecked(True)
         _disabled(cb_preview)
         misc_layout.addWidget(cb_preview)
+        self._cb_shortcut_launch_game = QCheckBox(tr("settings.shortcut_launch_game"))
+        self._cb_shortcut_launch_game.setChecked(
+            settings.value("Interface/shortcut_launch_game", True, type=bool))
+        misc_layout.addWidget(self._cb_shortcut_launch_game)
         scroll_layout.addWidget(misc_grp)
 
         misc_btn_row = QHBoxLayout()
@@ -1060,6 +1064,7 @@ class SettingsDialog(QDialog):
         settings.setValue("Interface/center_dialogs", self._cb_center_dialogs.isChecked())
         settings.setValue("Interface/confirm_instance_change", self._cb_confirm_instance.isChecked())
         settings.setValue("Interface/show_menubar_on_alt", self._cb_alt_menubar.isChecked())
+        settings.setValue("Interface/shortcut_launch_game", self._cb_shortcut_launch_game.isChecked())
         settings.setValue("Interface/show_meta_info", self._cb_show_meta.isChecked())
         settings.setValue("Interface/compact_list", self._cb_compact_list.isChecked())
         settings.setValue("Interface/hide_downloads_after_install", self._cb_hide_downloads.isChecked())

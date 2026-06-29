@@ -817,7 +817,8 @@
     "sm_review_in_kdiff3": "Jeden erfolgreichen Merge in KDiff3 reviewen",
     "sm_automation_group": "Automatisierung",
     "sm_auto_delete_stale": "Veraltete Merges automatisch löschen",
-    "sm_auto_overwrite": "Alte Merges automatisch überschreiben"
+    "sm_auto_overwrite": "Alte Merges automatisch überschreiben",
+    "shortcut_launch_game": "Verknüpfung startet das Spiel"
   },
   "mod_detail": {
     "open_in_explorer": "Mod im Explorer öffnen",
@@ -1181,5 +1182,10 @@
   "nxm": {
     "collection_title": "Collections",
     "collection_message": "Nexus-Collections werden noch nicht unterstützt. Bitte lade die enthaltenen Mods einzeln herunter."
+  },
+  "shortcut": {
+    "created": "Verknüpfung erstellt: {path}",
+    "failed": "Verknüpfung konnte nicht erstellt werden",
+    "no_game": "Kein Spiel ausgewählt"
   }
 }

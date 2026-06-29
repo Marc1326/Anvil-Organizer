@@ -817,7 +817,8 @@
     "sm_review_in_kdiff3": "Revisar cada merge bem-sucedido no KDiff3",
     "sm_automation_group": "Automação",
     "sm_auto_delete_stale": "Excluir merges obsoletos automaticamente",
-    "sm_auto_overwrite": "Sobrescrever merges antigos automaticamente"
+    "sm_auto_overwrite": "Sobrescrever merges antigos automaticamente",
+    "shortcut_launch_game": "O atalho inicia o jogo"
   },
   "mod_detail": {
     "open_in_explorer": "Abrir Mod no explorador",
@@ -1181,5 +1182,10 @@
   "nxm": {
     "collection_title": "Coleções",
     "collection_message": "As coleções do Nexus ainda não são suportadas. Baixe os mods incluídos individualmente."
+  },
+  "shortcut": {
+    "created": "Atalho criado: {path}",
+    "failed": "Não foi possível criar o atalho",
+    "no_game": "Nenhum jogo selecionado"
   }
 }

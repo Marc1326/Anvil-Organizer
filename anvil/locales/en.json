@@ -817,7 +817,8 @@
     "sm_review_in_kdiff3": "Review each successful merge in KDiff3",
     "sm_automation_group": "Automation",
     "sm_auto_delete_stale": "Automatically delete stale merges",
-    "sm_auto_overwrite": "Automatically overwrite old merges"
+    "sm_auto_overwrite": "Automatically overwrite old merges",
+    "shortcut_launch_game": "Shortcut starts the game"
   },
   "mod_detail": {
     "open_in_explorer": "Open Mod in Explorer",
@@ -1181,5 +1182,10 @@
   "nxm": {
     "collection_title": "Collections",
     "collection_message": "Nexus collections aren't supported yet. Please download the contained mods individually."
+  },
+  "shortcut": {
+    "created": "Shortcut created: {path}",
+    "failed": "Could not create shortcut",
+    "no_game": "No game selected"
   }
 }

@@ -817,7 +817,8 @@
     "sm_review_in_kdiff3": "Revisar cada merge exitoso en KDiff3",
     "sm_automation_group": "Automatización",
     "sm_auto_delete_stale": "Eliminar merges obsoletos automáticamente",
-    "sm_auto_overwrite": "Sobrescribir merges antiguos automáticamente"
+    "sm_auto_overwrite": "Sobrescribir merges antiguos automáticamente",
+    "shortcut_launch_game": "El acceso directo inicia el juego"
   },
   "mod_detail": {
     "open_in_explorer": "Abrir Mod en el explorador",
@@ -1181,5 +1182,10 @@
   "nxm": {
     "collection_title": "Colecciones",
     "collection_message": "Las colecciones de Nexus aún no son compatibles. Descarga los mods incluidos de forma individual."
+  },
+  "shortcut": {
+    "created": "Acceso directo creado: {path}",
+    "failed": "No se pudo crear el acceso directo",
+    "no_game": "Ningún juego seleccionado"
   }
 }

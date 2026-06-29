@@ -35,6 +35,7 @@ from anvil.mainwindow import MainWindow
 from anvil.core.translator import Translator
 from anvil.core.single_instance import SingleInstance
 from anvil.core.nxm_handler import get_nxm_arg
+from anvil.core.desktop_shortcut import get_launch_instance_arg
 from anvil.core.activity_log import log_action
 from anvil.version import APP_VERSION
 
@@ -79,12 +80,19 @@ def main():
     # ── Single-instance check ────────────────────────────────
     single = SingleInstance(app)
     if not single.try_lock():
-        # Another instance is running — forward any nxm:// URL (mod or collection)
+        # Another instance is running — forward nxm:// URL or shortcut launch request
         raw_nxm = get_nxm_arg()
+        launch_inst = get_launch_instance_arg()
         if raw_nxm:
             if not SingleInstance.send_message(raw_nxm):
                 print(
                     "[Anvil] IPC failed: could not forward NXM link to running instance",
+                    file=sys.stderr,
+                )
+        elif launch_inst:
+            if not SingleInstance.send_message(f"anvil-launch:{launch_inst}"):
+                print(
+                    "[Anvil] IPC failed: could not forward launch request to running instance",
                     file=sys.stderr,
                 )
         sys.stdout.flush()
@@ -104,8 +112,8 @@ def main():
 
     w = MainWindow()
 
-    # Connect IPC → MainWindow for nxm:// forwarding
-    single.message_received.connect(w.handle_nxm_url)
+    # Connect IPC → MainWindow (nxm:// forwarding + shortcut launch requests)
+    single.message_received.connect(w.handle_ipc_message)
 
     w.showMaximized()
     exit_code = app.exec()
