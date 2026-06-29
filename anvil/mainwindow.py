@@ -999,19 +999,10 @@ class MainWindow(QMainWindow):
                 self.switch_instance(wizard.created_instance)
                 return
 
-        # Load current instance (if any)
+        # Load current instance (if any) — switch_instance kapselt Fehler selbst ab
         current = self.instance_manager.current_instance()
         if current:
-            try:
-                self.switch_instance(current)
-            except Exception as e:  # noqa: BLE001 — Start darf nie blockiert werden
-                # Eine kaputte Instanz (z. B. fehlendes Laufwerk) darf den Start
-                # nicht verhindern. Sauberer "Kein Spiel"-Zustand + Hinweis.
-                self._log_panel.add_log(
-                    "error",
-                    f"Instanz '{current}' konnte nicht geladen werden: {e}",
-                )
-                self._status_bar.clear_instance()
+            self.switch_instance(current)
         else:
             self._status_bar.clear_instance()
 
@@ -1122,7 +1113,24 @@ class MainWindow(QMainWindow):
             instance_name: Name of the instance to switch to.
         """
         self._teardown_current_instance()
-        self._apply_instance(instance_name)
+        try:
+            self._apply_instance(instance_name)
+        except Exception as e:  # noqa: BLE001 — kaputte Instanz darf die App nicht abschießen
+            import traceback
+            self._log_panel.add_log(
+                "error",
+                f"Instanz '{instance_name}' konnte nicht geladen werden: {e}",
+            )
+            print(
+                f"[MainWindow] Instanz-Load fehlgeschlagen ({instance_name}):\n"
+                f"{traceback.format_exc()}"
+            )
+            # Vollständiger "Kein Spiel"-Reset, damit kein halb-geladener UI-Zustand bleibt.
+            try:
+                self._apply_instance("")
+            except Exception:  # noqa: BLE001
+                self._status_bar.clear_instance()
+            return
         # Erst nach erfolgreichem Laden persistieren — sonst zeigt .current bei
         # einem Fehler auf eine kaputte Instanz und die App startet nicht mehr.
         self.instance_manager.set_current_instance(instance_name)
@@ -1146,6 +1154,9 @@ class MainWindow(QMainWindow):
             self._current_profile_path = None
             self._current_instance_path = None
             self._current_downloads_path = None
+            self._current_plugin = None
+            self._current_game_path = None
+            self._mod_index = None
             self._bg3_installer = None
             self._mod_list_view.set_extra_drop_extensions(set())
             self._toolbar.deploy_sep.setVisible(False)
