@@ -71,6 +71,7 @@ from anvil.core.mod_list_io import (
 from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
 from anvil.version import APP_VERSION
 from anvil.core.update_checker import UpdateChecker
+from anvil.core.notification_center import NotificationCenter
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nxm_handler import parse_nxm_url, is_collection_nxm, get_nxm_arg
 from anvil.core.desktop_shortcut import get_launch_instance_arg
@@ -421,6 +422,14 @@ class MainWindow(QMainWindow):
 
         # App-weiter Event-Filter für ContextMenu-Events (Wayland-Kompatibilität)
         QApplication.instance().installEventFilter(self)
+
+        # ── Benachrichtigungen (Glocken-Button) ─────────────────────
+        self._notification_center = NotificationCenter(self)
+        self._notification_center.changed.connect(self._on_notifications_changed)
+        # Download-Ereignisse als Quellen anbinden (zusätzlich zur game_panel-Logik)
+        dm = self._game_panel.download_manager()
+        dm.download_finished.connect(self._on_notify_download_finished)
+        dm.download_error.connect(self._on_notify_download_error)
 
         # ── Update-Check (im Hintergrund, 3s nach Start) ────────────
         self._update_checker = UpdateChecker(self)
@@ -7343,10 +7352,29 @@ class MainWindow(QMainWindow):
 
     # ── Self-Update (Git-basiert) ──────────────────────────────────
 
+    # ── Benachrichtigungen (Glocken-Button) ──────────────────────────
+    def _on_notifications_changed(self) -> None:
+        """Aktualisiert den Zähler-Badge am Glocken-Button."""
+        btn = getattr(self._toolbar, "notifications_btn", None)
+        if btn is not None:
+            btn.set_count(self._notification_center.unread_count())
+
+    def _on_notify_download_finished(self, download_id: int, save_path: str) -> None:
+        name = Path(save_path).name if save_path else ""
+        self._notification_center.add(
+            "info", tr("notifications.download_done"), name)
+
+    def _on_notify_download_error(self, download_id: int, message: str) -> None:
+        self._notification_center.add(
+            "error", tr("notifications.download_error"), str(message))
+
     def _on_update_available(self, count: int, changelog: str):
         """Show clickable toast when new commits are available."""
         self._pending_count = count
         self._pending_changelog = changelog
+        self._notification_center.add(
+            "info", tr("notifications.update_available"),
+            tr("update.commits_available", count=count))
         toast = Toast(
             self,
             tr("update.commits_available", count=count),

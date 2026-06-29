@@ -1231,5 +1231,14 @@
     "created": "Atalho criado: {path}",
     "failed": "Não foi possível criar o atalho",
     "no_game": "Nenhum jogo selecionado"
+  },
+  "notifications": {
+    "title": "Notificações",
+    "empty": "Nenhuma notificação nova",
+    "mark_all_read": "Marcar tudo como lido",
+    "clear": "Limpar",
+    "update_available": "Atualização disponível",
+    "download_done": "Download concluído",
+    "download_error": "Falha no download"
   }
 }

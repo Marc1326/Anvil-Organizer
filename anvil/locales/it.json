@@ -1231,5 +1231,14 @@
     "created": "Collegamento creato: {path}",
     "failed": "Impossibile creare il collegamento",
     "no_game": "Nessun gioco selezionato"
+  },
+  "notifications": {
+    "title": "Notifiche",
+    "empty": "Nessuna nuova notifica",
+    "mark_all_read": "Segna tutto come letto",
+    "clear": "Svuota",
+    "update_available": "Aggiornamento disponibile",
+    "download_done": "Download completato",
+    "download_error": "Download non riuscito"
   }
 }

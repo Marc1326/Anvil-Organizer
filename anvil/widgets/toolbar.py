@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, QSize
 from anvil.widgets.instance_manager_dialog import InstanceManagerDialog
 from anvil.widgets.executables_dialog import ExecutablesDialog
 from anvil.widgets.donate_dialog import DonateDialog
+from anvil.widgets.notification_panel import NotificationButton, NotificationPanel
 from anvil.core.translator import tr
 from anvil.core.resource_path import get_anvil_base
 
@@ -218,8 +219,21 @@ def create_toolbar(parent=None):
     donate_btn = _add_btn("endorse.svg", "Support / Donate")
     donate_btn.clicked.connect(lambda: DonateDialog(bar.window()).exec())
 
-    notifications_btn = _add_btn("problems.svg", "Benachrichtigungen")
-    notifications_btn.setEnabled(False)
+    notifications_btn = NotificationButton(bar)
+    notifications_btn.setIcon(_icon("problems.svg"))
+    notifications_btn.setToolTip(tr("status.notifications"))
+    notifications_btn.setText(tr("status.notifications"))
+    bar.addWidget(notifications_btn)
+
+    def _on_notifications_clicked(checked=False):
+        win = bar.window()
+        if win and hasattr(win, "_notification_center"):
+            panel = NotificationPanel(win._notification_center, win)
+            panel.show_under(notifications_btn)
+
+    notifications_btn.clicked.connect(_on_notifications_clicked)
+    bar.notifications_btn = notifications_btn
+
     update_btn = _add_btn("update.svg", "Update")
     def _on_update_check():
         win = bar.window()

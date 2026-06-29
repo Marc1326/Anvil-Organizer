@@ -1231,5 +1231,14 @@
     "created": "Acceso directo creado: {path}",
     "failed": "No se pudo crear el acceso directo",
     "no_game": "Ningún juego seleccionado"
+  },
+  "notifications": {
+    "title": "Notificaciones",
+    "empty": "Sin notificaciones nuevas",
+    "mark_all_read": "Marcar todo como leído",
+    "clear": "Vaciar",
+    "update_available": "Actualización disponible",
+    "download_done": "Descarga completada",
+    "download_error": "Error de descarga"
   }
 }

@@ -1231,5 +1231,14 @@
     "created": "Raccourci créé : {path}",
     "failed": "Impossible de créer le raccourci",
     "no_game": "Aucun jeu sélectionné"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "Aucune nouvelle notification",
+    "mark_all_read": "Tout marquer comme lu",
+    "clear": "Vider",
+    "update_available": "Mise à jour disponible",
+    "download_done": "Téléchargement terminé",
+    "download_error": "Échec du téléchargement"
   }
 }
