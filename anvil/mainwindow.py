@@ -38,7 +38,7 @@ from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence
 
 from anvil.core.subprocess_env import clean_subprocess_env, host_popen, host_open_url, host_open_path
 from anvil.core.ui_helpers import _center_on_parent, get_text_input
-from anvil.styles.dark_theme import load_theme, default_theme
+from anvil.styles.dark_theme import apply_theme, load_overrides, default_theme
 from anvil.widgets.toolbar import create_toolbar
 from anvil.widgets.profile_bar import ProfileBar
 from anvil.widgets.mod_list import ModListView
@@ -167,7 +167,8 @@ class MainWindow(QMainWindow):
         self.resize(1200, 750)
         # Theme aus QSettings laden
         saved_theme = self._settings().value("style/theme", default_theme())
-        self.setStyleSheet(load_theme(saved_theme))
+        overrides = load_overrides(self._settings(), saved_theme)
+        apply_theme(self, saved_theme, overrides)
 
         # ── Plugin-System ─────────────────────────────────────────────
         self.plugin_loader = PluginLoader()
@@ -792,6 +793,10 @@ class MainWindow(QMainWindow):
             self._nexus_api.set_api_key("")
             self._status_bar.update_api_status(logged_in=False)
         if accepted:
+            # Theme + Farben final aufs Fenster anwenden — Preview lief nur auf der
+            # QApplication; so bleiben Fenster- und App-Stylesheet konsistent.
+            saved_theme = self._settings().value("style/theme", default_theme())
+            apply_theme(self, saved_theme, load_overrides(self._settings(), saved_theme))
             # Apply API counter visibility immediately
             hidden = self._settings().value("Nexus/hide_api_counter", False, type=bool)
             self._status_bar.set_api_counter_visible(not hidden)

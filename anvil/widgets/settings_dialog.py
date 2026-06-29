@@ -36,11 +36,14 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QPlainTextEdit,
 )
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor, QFont, QPixmap
 from PySide6.QtCore import Qt, QSettings
 
 from anvil.plugins.plugin_loader import PluginLoader, ensure_user_plugin_dir
-from anvil.styles.dark_theme import list_themes, load_theme, get_styles_dir, default_theme
+from anvil.styles.dark_theme import (
+    list_themes, get_styles_dir, default_theme,
+    apply_theme, default_palette, load_overrides, save_overrides, COLOR_ROLES,
+)
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nexus_sso import NexusSSOLogin
 from anvil.core.translator import Translator, tr
@@ -211,6 +214,16 @@ class SettingsDialog(QDialog):
         erkunden_btn.clicked.connect(self._open_styles_folder)
         stil_layout.addWidget(erkunden_btn)
         style_layout.addWidget(stil_grp)
+
+        # ── Theme-Farben (anpassbare Rollenfarben) ───────────────────
+        self._color_overrides = load_overrides(self._settings(), self._previous_theme)
+        self._color_swatches: dict = {}
+        self._preview_dirty = False
+        self._theme_colors_grp = QGroupBox(tr("settings.theme_colors"))
+        self._theme_colors_layout = QVBoxLayout(self._theme_colors_grp)
+        self._rebuild_color_rows()
+        style_layout.addWidget(self._theme_colors_grp)
+
         farben_grp = QGroupBox(tr("settings.colors"))
         farben_layout = QVBoxLayout(farben_grp)
         color_table = QTableWidget(6, 4)
@@ -240,7 +253,9 @@ class SettingsDialog(QDialog):
         style_layout.addWidget(farben_grp)
         reset_row = QHBoxLayout()
         reset_row.addStretch()
-        reset_row.addWidget(_disabled(QPushButton(tr("settings.reset_colors"))))
+        reset_btn = QPushButton(tr("settings.reset_colors"))
+        reset_btn.clicked.connect(lambda checked=False: self._on_reset_colors())
+        reset_row.addWidget(reset_btn)
         reset_row.addStretch()
         style_layout.addLayout(reset_row)
         self._tabs.addTab(style_tab, tr("settings.tab_style"))
@@ -1277,11 +1292,97 @@ class SettingsDialog(QDialog):
         delete_api_key()
 
     def _on_theme_changed(self, theme_name: str):
-        """Apply selected theme live as preview."""
-        qss = load_theme(theme_name)
+        """Apply selected theme live as preview (mit Theme-eigenen Farben)."""
+        # Jedes Theme behält seine eigenen gespeicherten Farben.
+        self._color_overrides = load_overrides(self._settings(), theme_name)
+        self._rebuild_color_rows()
+        self._preview_theme()
+
+    # ── Theme-Farben (anpassbare Rollenfarben) ───────────────────────
+    def _current_theme_name(self) -> str:
+        return self._stil_combo.currentText()
+
+    def _effective_color(self, role: str) -> str:
+        """Aktuell wirksame Farbe einer Rolle (Override oder Theme-Default)."""
+        override = self._color_overrides.get(role)
+        if override:
+            return override
+        return default_palette(self._current_theme_name()).get(role, "#000000")
+
+    def _make_swatch(self, hex_color: str) -> QLabel:
+        # Farbfläche als gefülltes Pixmap in einem QLabel — KEIN setStyleSheet.
+        # Pixmap-Inhalt liegt über dem Hintergrund und bleibt vom Theme-QSS
+        # (* { background }) unberührt; QPalette würde davon überschrieben.
+        swatch = QLabel()
+        swatch.setFixedSize(56, 20)
+        swatch.setFrameShape(QFrame.Shape.Box)
+        swatch.setScaledContents(True)
+        self._set_swatch_color(swatch, hex_color)
+        return swatch
+
+    def _set_swatch_color(self, swatch: QLabel, hex_color: str) -> None:
+        pix = QPixmap(56, 20)
+        pix.fill(QColor(hex_color))
+        swatch.setPixmap(pix)
+
+    def _rebuild_color_rows(self) -> None:
+        """Baut die Farbzeilen für das aktuell gewählte Theme neu auf."""
+        layout = self._theme_colors_layout
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        self._color_swatches = {}
+        palette = default_palette(self._current_theme_name())
+        role_labels = {
+            "background": tr("settings.color_role_background"),
+            "text": tr("settings.color_role_text"),
+            "accent": tr("settings.color_role_accent"),
+            "list_background": tr("settings.color_role_list_background"),
+            "hover": tr("settings.color_role_hover"),
+            "disabled_text": tr("settings.color_role_disabled_text"),
+        }
+        for role in COLOR_ROLES:
+            if role not in palette:
+                continue
+            row = QHBoxLayout()
+            row.addWidget(QLabel(role_labels.get(role, role)))
+            row.addStretch()
+            swatch = self._make_swatch(self._effective_color(role))
+            self._color_swatches[role] = swatch
+            row.addWidget(swatch)
+            change_btn = QPushButton(tr("settings.color_change"))
+            change_btn.clicked.connect(
+                lambda checked=False, r=role: self._on_pick_color(r))
+            row.addWidget(change_btn)
+            container = QWidget()
+            container.setLayout(row)
+            layout.addWidget(container)
+
+    def _on_pick_color(self, role: str) -> None:
+        from PySide6.QtWidgets import QColorDialog
+        current = QColor(self._effective_color(role))
+        chosen = QColorDialog.getColor(current, self, tr("settings.color_pick_title"))
+        if not chosen.isValid():
+            return
+        hex_value = chosen.name()
+        self._color_overrides[role] = hex_value
+        swatch = self._color_swatches.get(role)
+        if swatch is not None:
+            self._set_swatch_color(swatch, hex_value)
+        self._preview_theme()
+
+    def _preview_theme(self) -> None:
         app = QApplication.instance()
         if app:
-            app.setStyleSheet(qss)
+            apply_theme(app, self._current_theme_name(), self._color_overrides)
+            self._preview_dirty = True
+
+    def _on_reset_colors(self) -> None:
+        self._color_overrides = {}
+        self._rebuild_color_rows()
+        self._preview_theme()
 
     def _reset_dialog_options(self):
         """Reset all 'don't show again' dialog choices."""
@@ -1309,6 +1410,8 @@ class SettingsDialog(QDialog):
         """Save all settings, then close."""
         settings = self._settings()
         settings.setValue("style/theme", self._stil_combo.currentText())
+        # Theme-Farben pro Theme speichern
+        save_overrides(settings, self._stil_combo.currentText(), self._color_overrides)
         # Sprache speichern
         lang_idx = self._lang_combo.currentIndex()
         new_lang = self._lang_codes[lang_idx] if 0 <= lang_idx < len(self._lang_codes) else self._initial_lang
@@ -1409,12 +1512,12 @@ class SettingsDialog(QDialog):
                 return
 
     def reject(self):
-        """Revert theme to previous selection and close."""
-        if self._stil_combo.currentText() != self._previous_theme:
-            qss = load_theme(self._previous_theme)
+        """Revert theme + colors to the previous saved state and close."""
+        if self._preview_dirty:
             app = QApplication.instance()
             if app:
-                app.setStyleSheet(qss)
+                apply_theme(app, self._previous_theme,
+                            load_overrides(self._settings(), self._previous_theme))
         # Tab-Index merken auch bei Abbrechen
         s = self._settings()
         s.setValue("SettingsDialog/tab_index", self._tabs.currentIndex())

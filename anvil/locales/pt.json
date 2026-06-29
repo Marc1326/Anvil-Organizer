@@ -853,7 +853,16 @@
     "diag_open_file": "Abrir ficheiro",
     "diag_export_report": "Exportar relatório",
     "diag_copy_report": "Copiar relatório",
-    "nexus_server_auto": "Automático (primeiro disponível)"
+    "nexus_server_auto": "Automático (primeiro disponível)",
+    "theme_colors": "Cores do tema",
+    "color_role_background": "Fundo",
+    "color_role_text": "Texto",
+    "color_role_accent": "Destaque",
+    "color_role_list_background": "Fundo da lista",
+    "color_role_hover": "Foco",
+    "color_role_disabled_text": "Texto desativado",
+    "color_change": "Alterar…",
+    "color_pick_title": "Escolher cor"
   },
   "mod_detail": {
     "open_in_explorer": "Abrir Mod no explorador",

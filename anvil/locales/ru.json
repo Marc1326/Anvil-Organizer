@@ -853,7 +853,16 @@
     "diag_open_file": "Открыть файл",
     "diag_export_report": "Экспорт отчёта",
     "diag_copy_report": "Копировать отчёт",
-    "nexus_server_auto": "Автоматически (первый доступный)"
+    "nexus_server_auto": "Автоматически (первый доступный)",
+    "theme_colors": "Цвета темы",
+    "color_role_background": "Фон",
+    "color_role_text": "Текст",
+    "color_role_accent": "Акцент",
+    "color_role_list_background": "Фон списка",
+    "color_role_hover": "Наведение",
+    "color_role_disabled_text": "Неактивный текст",
+    "color_change": "Изменить…",
+    "color_pick_title": "Выбор цвета"
   },
   "mod_detail": {
     "open_in_explorer": "Открыть мод в проводнике",

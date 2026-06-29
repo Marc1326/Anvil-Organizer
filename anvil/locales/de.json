@@ -853,7 +853,16 @@
     "diag_open_file": "Datei öffnen",
     "diag_export_report": "Report exportieren",
     "diag_copy_report": "Report kopieren",
-    "nexus_server_auto": "Automatisch (erster verfügbarer)"
+    "nexus_server_auto": "Automatisch (erster verfügbarer)",
+    "theme_colors": "Theme-Farben",
+    "color_role_background": "Hintergrund",
+    "color_role_text": "Text",
+    "color_role_accent": "Akzent",
+    "color_role_list_background": "Listen-Hintergrund",
+    "color_role_hover": "Hover",
+    "color_role_disabled_text": "Deaktivierter Text",
+    "color_change": "Ändern…",
+    "color_pick_title": "Farbe wählen"
   },
   "mod_detail": {
     "open_in_explorer": "Mod im Explorer öffnen",
