@@ -19,8 +19,18 @@ from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
 from anvil.core.translator import tr
 from anvil.core.persistent_header import PersistentHeader
+from anvil.styles.dark_theme import theme_color
 from anvil.widgets.collapsible_bar import CollapsibleSectionBar
-from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME, ROLE_SEP_COLOR, ROLE_IS_DATA_OVERRIDE, ROLE_GROUP_NAME, ROLE_IS_GROUP_HEAD
+from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, COL_CONFLICTS, COL_CATEGORY, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME, ROLE_SEP_COLOR, ROLE_IS_DATA_OVERRIDE, ROLE_GROUP_NAME, ROLE_IS_GROUP_HEAD, ROLE_CONFLICT_TYPE
+
+
+def _modern_active() -> bool:
+    """True wenn ein modernes Theme (Anvil Dunkel/Hell) geladen ist."""
+    return bool(theme_color("panel2", ""))
+
+
+# Standard-Balkenfarbe für Separatoren ohne eigene Farbe (Handoff: Violett)
+_SEP_BAR_DEFAULT = "#6f63b8"
 
 
 class SeparatorMarkingScrollBar(QScrollBar):
@@ -121,12 +131,24 @@ class SeparatorMarkingScrollBar(QScrollBar):
 
 
 class CheckboxDelegate(QStyledItemDelegate):
-    """Custom delegate for COL_CHECK: green circle+check (enabled), gray circle (disabled).
-    Separators get a collapse/expand triangle (▾/▸) instead."""
+    """Delegate für COL_CHECK: Schiebeschalter (an/aus) + optionaler Drag-Griff ⠿.
+    Separators get a collapse/expand triangle (▾/▸) instead.
 
-    _COLOR_ON = QColor("#4CAF50")
+    Maße laut Handoff: Track 34×18 (r=9), Knopf 14×14 weiß, AN = Akzent-Track
+    mit Knopf rechts, AUS = Rahmenfarben-Track mit Knopf links.
+    """
+
+    _COLOR_ON = QColor("#4CAF50")    # Fallback klassische Themes ohne Akzent
     _COLOR_OFF = QColor("#666666")
     _COLOR_SEP = QColor("#D3D3D3")
+
+    _TRACK_W = 34
+    _TRACK_H = 18
+    _KNOB = 14
+
+    def __init__(self, parent=None, show_grip: bool = True):
+        super().__init__(parent)
+        self._show_grip = show_grip
 
     def paint(self, painter: QPainter, option, index):
         # Draw background (selection, alternating rows)
@@ -153,7 +175,7 @@ class CheckboxDelegate(QStyledItemDelegate):
             cy = option.rect.y() + option.rect.height() // 2
 
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(self._COLOR_SEP))
+            painter.setBrush(QBrush(QColor(theme_color("txt2", "#D3D3D3"))))
 
             from PySide6.QtGui import QPolygonF
             from PySide6.QtCore import QPointF
@@ -173,7 +195,7 @@ class CheckboxDelegate(QStyledItemDelegate):
                 ])
             painter.drawPolygon(tri)
         else:
-            # Normal mod: circle + check
+            # Normal mod: Schiebeschalter (+ Drag-Griff links)
             # Prefer option.checkState (set by initStyleOption from the model)
             # over index.data(CheckStateRole) — the latter returns None for
             # QTreeWidget in some Qt versions while option.checkState is always
@@ -186,27 +208,50 @@ class CheckboxDelegate(QStyledItemDelegate):
             except (TypeError, ValueError):
                 enabled = cs == Qt.CheckState.Checked
 
-            size = 16
-            x = option.rect.x() + (option.rect.width() - size) // 2
-            y = option.rect.y() + (option.rect.height() - size) // 2
-            rect = QRect(x, y, size, size)
+            rect = option.rect
+            cy = rect.y() + rect.height() // 2
+
+            grip_w = 0
+            if self._show_grip:
+                # Drag-Griff ⠿: 2×3 Punkte in txt3
+                grip_w = 12
+                dot_color = QColor(theme_color("txt3", "#666d78"))
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(dot_color))
+                gx = rect.x() + 6
+                for col in (0, 1):
+                    for row in (-1, 0, 1):
+                        painter.drawEllipse(
+                            gx + col * 5, cy + row * 5 - 1, 2, 2)
+
+            # Schalter-Track
+            tx = rect.x() + grip_w + 8
+            ty = cy - self._TRACK_H // 2
+            track = QRect(tx, ty, self._TRACK_W, self._TRACK_H)
 
             if enabled:
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.setBrush(QBrush(self._COLOR_ON))
-                painter.drawEllipse(rect)
-                painter.setPen(QPen(QColor("#FFFFFF"), 2.0))
-                painter.drawLine(x + 3, y + 8, x + 6, y + 12)
-                painter.drawLine(x + 6, y + 12, x + 12, y + 4)
+                track_color = QColor(theme_color("accent", "#4CAF50"))
             else:
-                painter.setPen(QPen(self._COLOR_OFF, 1.5))
-                painter.setBrush(Qt.BrushStyle.NoBrush)
-                painter.drawEllipse(rect)
+                track_color = QColor(theme_color("line", "#666666"))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(track_color))
+            painter.drawRoundedRect(track, self._TRACK_H / 2, self._TRACK_H / 2)
+
+            # Knopf (immer weiß, Handoff)
+            kx = tx + (self._TRACK_W - self._KNOB - 2) if enabled else tx + 2
+            ky = ty + (self._TRACK_H - self._KNOB) // 2
+            painter.setBrush(QBrush(QColor("#FFFFFF")))
+            painter.drawEllipse(QRect(kx, ky, self._KNOB, self._KNOB))
 
         painter.restore()
 
     def sizeHint(self, option, index):
-        return QSize(36, 28)
+        w = 62 if self._show_grip else 46
+        try:
+            h = int(theme_color("row_height", "28"))
+        except ValueError:
+            h = 28
+        return QSize(w, h)
 
     def editorEvent(self, event, model, option, index):
         is_sep = index.data(ROLE_IS_SEPARATOR)
@@ -265,6 +310,11 @@ class GroupNameDelegate(QStyledItemDelegate):
         is_head = index.data(ROLE_IS_GROUP_HEAD)
         is_sep = index.data(ROLE_IS_SEPARATOR)
 
+        if is_sep and _modern_active():
+            # Moderner Separator: Farbbalken (3×14, r=2) + linksbündiger Name
+            self._paint_separator_modern(painter, option, index)
+            return
+
         if is_sep or not group_name:
             # Normal separator or non-grouped mod — default painting
             super().paint(painter, option, index)
@@ -306,7 +356,7 @@ class GroupNameDelegate(QStyledItemDelegate):
             tri_size = 8
 
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(QColor("#D3D3D3")))
+            painter.setBrush(QBrush(QColor(theme_color("txt2", "#D3D3D3"))))
 
             from PySide6.QtGui import QPolygonF
             from PySide6.QtCore import QPointF
@@ -354,9 +404,130 @@ class GroupNameDelegate(QStyledItemDelegate):
 
         painter.restore()
 
+    def _paint_separator_modern(self, painter: QPainter, option, index):
+        """Handoff-Optik: panel2-Zeile, Farbbalken 3×14 r=2, Name links fett."""
+        self.initStyleOption(option, index)
+        style = option.widget.style() if option.widget else None
+        if style:
+            style.drawPrimitive(style.PrimitiveElement.PE_PanelItemViewItem, option, painter, option.widget)
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = option.rect
+        bar_color = QColor(index.data(ROLE_SEP_COLOR) or _SEP_BAR_DEFAULT)
+        if not bar_color.isValid():
+            bar_color = QColor(_SEP_BAR_DEFAULT)
+        bar = QRect(rect.x() + 6, rect.y() + (rect.height() - 14) // 2, 3, 14)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(bar_color))
+        painter.drawRoundedRect(bar, 2, 2)
+
+        font = painter.font()
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QPen(QColor(theme_color("txt", "#e7e9ed"))))
+        text_rect = QRect(rect.x() + 16, rect.y(), rect.width() - 18, rect.height())
+        text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
+        painter.restore()
+
     def sizeHint(self, option, index):
         hint = super().sizeHint(option, index)
         return QSize(hint.width(), max(hint.height(), 28))
+
+
+class ConflictBadgeDelegate(QStyledItemDelegate):
+    """COL_CONFLICTS: Badge „△ gewinnt" (ok) / „△ verliert" (warn) im modernen
+    Theme; klassische Themes behalten die bisherigen Icons (Default-Painting)."""
+
+    def paint(self, painter: QPainter, option, index):
+        ctype = index.data(ROLE_CONFLICT_TYPE) or ""
+        if not _modern_active() or index.data(ROLE_IS_SEPARATOR) or not ctype:
+            super().paint(painter, option, index)
+            return
+
+        self.initStyleOption(option, index)
+        style = option.widget.style() if option.widget else None
+        if style:
+            style.drawPrimitive(style.PrimitiveElement.PE_PanelItemViewItem, option, painter, option.widget)
+
+        if ctype == "win":
+            color = QColor(theme_color("ok", "#4cae7d"))
+            label = "△ " + tr("label.badge_wins")
+        elif ctype == "lose":
+            color = QColor(theme_color("warn", "#b8923f"))
+            label = "△ " + tr("label.badge_loses")
+        else:  # both
+            color = QColor(theme_color("warn", "#b8923f"))
+            label = "△ " + tr("label.badge_both")
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        font = painter.font()
+        font.setPointSizeF(max(7.0, font.pointSizeF() - 1))
+        painter.setFont(font)
+
+        metrics = painter.fontMetrics()
+        text_w = metrics.horizontalAdvance(label)
+        badge_h = min(18, option.rect.height() - 6)
+        badge_w = min(text_w + 14, option.rect.width() - 4)
+        bx = option.rect.x() + 4
+        by = option.rect.y() + (option.rect.height() - badge_h) // 2
+
+        bg = QColor(color)
+        bg.setAlpha(38)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(bg))
+        painter.drawRoundedRect(QRect(bx, by, badge_w, badge_h), 9, 9)
+
+        painter.setPen(QPen(color))
+        painter.drawText(
+            QRect(bx + 7, by, badge_w - 10, badge_h),
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            metrics.elidedText(label, Qt.TextElideMode.ElideRight, badge_w - 12),
+        )
+        painter.restore()
+
+
+class CategoryPillDelegate(QStyledItemDelegate):
+    """COL_CATEGORY: Kategorie als Pill (panel2, r=10, txt2) im modernen Theme."""
+
+    def paint(self, painter: QPainter, option, index):
+        text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+        if not _modern_active() or index.data(ROLE_IS_SEPARATOR) or not text:
+            super().paint(painter, option, index)
+            return
+
+        self.initStyleOption(option, index)
+        style = option.widget.style() if option.widget else None
+        if style:
+            style.drawPrimitive(style.PrimitiveElement.PE_PanelItemViewItem, option, painter, option.widget)
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        font = painter.font()
+        font.setPointSizeF(max(7.0, font.pointSizeF() - 1))
+        painter.setFont(font)
+
+        metrics = painter.fontMetrics()
+        text_w = metrics.horizontalAdvance(text)
+        pill_h = min(18, option.rect.height() - 6)
+        pill_w = min(text_w + 14, option.rect.width() - 4)
+        px = option.rect.x() + 4
+        py = option.rect.y() + (option.rect.height() - pill_h) // 2
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(QColor(theme_color("panel2", "#20242a"))))
+        painter.drawRoundedRect(QRect(px, py, pill_w, pill_h), 10, 10)
+
+        painter.setPen(QPen(QColor(theme_color("txt2", "#9aa1ac"))))
+        painter.drawText(
+            QRect(px + 7, py, pill_w - 10, pill_h),
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            metrics.elidedText(text, Qt.TextElideMode.ElideRight, pill_w - 12),
+        )
+        painter.restore()
 
 
 class ModListProxyModel(QSortFilterProxyModel):
@@ -1071,12 +1242,17 @@ class ModListView(QWidget):
         self._source_model.modelReset.connect(self._update_scrollbar_markings)
         self._source_model.rowsMoved.connect(self._update_scrollbar_markings)
 
-        # Custom delegate for checkbox column
-        self._check_delegate = CheckboxDelegate(self._tree)
+        # Custom delegate for checkbox column (Schalter + Drag-Griff)
+        self._check_delegate = CheckboxDelegate(self._tree, show_grip=True)
         self._tree.setItemDelegateForColumn(COL_CHECK, self._check_delegate)
         # Custom delegate for name column (group indentation + color bar)
         self._name_delegate = GroupNameDelegate(self._tree)
         self._tree.setItemDelegateForColumn(COL_NAME, self._name_delegate)
+        # Konflikt-Badges + Kategorie-Pills (modernes Theme)
+        self._conflict_delegate = ConflictBadgeDelegate(self._tree)
+        self._tree.setItemDelegateForColumn(COL_CONFLICTS, self._conflict_delegate)
+        self._category_delegate = CategoryPillDelegate(self._tree)
+        self._tree.setItemDelegateForColumn(COL_CATEGORY, self._category_delegate)
         # Column widths — all Interactive (resizable by mouse)
         header = self._tree.header()
         header.setStretchLastSection(False)
@@ -1084,7 +1260,7 @@ class ModListView(QWidget):
         header.setMinimumSectionSize(30)
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(COL_CHECK, QHeaderView.ResizeMode.Fixed)
-        self._tree.setColumnWidth(COL_CHECK, 36)
+        self._tree.setColumnWidth(COL_CHECK, 62)
         self._tree.setColumnWidth(COL_NAME, 300)
         self._tree.setColumnWidth(2, 80)
         self._tree.setColumnWidth(3, 80)
@@ -1105,8 +1281,7 @@ class ModListView(QWidget):
 
         self._fw_label = CollapsibleSectionBar(
             tr("label.type_framework") + "s", "frameworks", self._fw_tree,
-            style="QLabel { font-weight: bold; padding: 4px 6px; "
-                  "background: #1a2a3a; border-bottom: 1px solid #333; }",
+            style="",  # Optik kommt aus dem Theme-QSS (#sectionBar)
             container=fw_container,
             default_collapsed=True,
         )
@@ -1118,7 +1293,8 @@ class ModListView(QWidget):
             tr("label.header_description"),
             tr("label.header_version"),
         ])
-        self._fw_tree.setItemDelegateForColumn(0, self._check_delegate)
+        self._fw_check_delegate = CheckboxDelegate(self._fw_tree, show_grip=False)
+        self._fw_tree.setItemDelegateForColumn(0, self._fw_check_delegate)
         self._fw_tree.itemChanged.connect(self._on_fw_item_changed)
         self._fw_tree.setRootIsDecorated(False)
         self._fw_tree.setIndentation(0)
@@ -1136,7 +1312,7 @@ class ModListView(QWidget):
         fw_hdr.setMinimumSectionSize(30)
         fw_hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         fw_hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        self._fw_tree.setColumnWidth(0, 36)
+        self._fw_tree.setColumnWidth(0, 46)
         self._fw_tree.setColumnWidth(1, 220)
         self._fw_tree.setColumnWidth(2, 300)
         self._fw_tree.setColumnWidth(3, 90)
@@ -1209,6 +1385,8 @@ class ModListView(QWidget):
     def restore_column_widths(self) -> None:
         """Restore saved column widths (call after data is populated)."""
         self._persistent_header.restore()
+        # Fixe Schalter-Spalte immer erzwingen — alte Configs haben noch 36px
+        self._tree.setColumnWidth(COL_CHECK, 62)
 
     def flush_column_widths(self) -> None:
         """Flush any pending debounced column-width write."""
@@ -1244,7 +1422,7 @@ class ModListView(QWidget):
                 item.setText(1, ("\U0001F512 " if locked else "") + name)
                 item.setText(2, fw.get("description", ""))
                 item.setText(3, fw.get("version", ""))
-                item.setForeground(3, QBrush(QColor("#BDBDBD")))
+                item.setForeground(3, QBrush(QColor(theme_color("txt3", "#BDBDBD"))))
 
                 flags = item.flags() | Qt.ItemFlag.ItemIsUserCheckable
                 if not installed:
@@ -1263,8 +1441,8 @@ class ModListView(QWidget):
     def restore_framework_widths(self) -> None:
         """Restore saved column widths for the frameworks tree."""
         self._ph_frameworks.restore()
-        # Col 0 is the fixed check column — always force to 36px regardless of saved state
-        self._fw_tree.setColumnWidth(0, 36)
+        # Col 0 is the fixed check column — always force width regardless of saved state
+        self._fw_tree.setColumnWidth(0, 46)
 
     def _on_fw_context_menu(self, pos) -> None:
         """Forward framework context menu request with item data."""

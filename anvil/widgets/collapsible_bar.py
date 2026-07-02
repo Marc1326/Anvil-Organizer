@@ -49,13 +49,17 @@ class CollapsibleSectionBar(QWidget):
         hlayout.setSpacing(0)
 
         self._label = QLabel()
-        self._label.setStyleSheet(style)
+        # Leerer Style = Optik kommt aus dem Theme-QSS über objectName
+        self.setObjectName("sectionBar")
+        self._label.setObjectName("sectionBarLabel")
+        if style:
+            self._label.setStyleSheet(style)
+            self.setStyleSheet(style)
         self._label.setCursor(Qt.CursorShape.PointingHandCursor)
         hlayout.addWidget(self._label, 1)
 
         self._action_btn: QPushButton | None = None
 
-        self.setStyleSheet(style)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         # Restore persisted state (falls back to default_collapsed)

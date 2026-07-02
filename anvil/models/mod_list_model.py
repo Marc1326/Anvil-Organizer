@@ -8,6 +8,18 @@ from PySide6.QtGui import QColor, QBrush, QFont, QIcon
 from anvil.core.mod_entry import ModEntry
 from anvil.core.translator import tr
 from anvil.core.resource_path import get_anvil_base
+from anvil.styles.dark_theme import theme_color
+
+
+def _is_modern() -> bool:
+    """True wenn ein modernes Theme (Anvil Dunkel/Hell) aktiv ist."""
+    return bool(theme_color("panel2", ""))
+
+
+def _tinted(hex_color: str, alpha: int) -> QBrush:
+    c = QColor(hex_color)
+    c.setAlpha(alpha)
+    return QBrush(c)
 
 # Conflict icon paths (resolved once)
 _ICON_DIR = str(get_anvil_base() / "styles" / "icons" / "conflicts")
@@ -40,6 +52,7 @@ ROLE_SEP_COLOR = Qt.ItemDataRole.UserRole + 4     # Separator color string (hex,
 ROLE_IS_DATA_OVERRIDE = Qt.ItemDataRole.UserRole + 5  # True for BG3 data-override mods (always active)
 ROLE_GROUP_NAME = Qt.ItemDataRole.UserRole + 6    # Group name this mod belongs to (str)
 ROLE_IS_GROUP_HEAD = Qt.ItemDataRole.UserRole + 7 # True if mod is the first member of its group
+ROLE_CONFLICT_TYPE = Qt.ItemDataRole.UserRole + 8 # 'win' | 'lose' | 'both' | '' (für Badge-Delegate)
 
 
 class ModRow:
@@ -325,7 +338,12 @@ class ModListModel(QAbstractItemModel):
                     if self._any_child_has_version(row_idx):
                         return QIcon.fromTheme("software-update-available")
         if role == Qt.ItemDataRole.SizeHintRole:
-            return QSize(0, 28)
+            # Zeilendichte aus dem Theme (Kompakt 26 / Komfortabel 32)
+            try:
+                h = int(theme_color("row_height", "28"))
+            except ValueError:
+                h = 28
+            return QSize(0, h)
         if role == Qt.ItemDataRole.CheckStateRole and c == COL_CHECK:
             if r.is_separator:
                 return None  # No checkbox for separators
@@ -339,8 +357,13 @@ class ModListModel(QAbstractItemModel):
             if r.is_separator and c == COL_NAME:
                 font = QFont()
                 font.setBold(True)
-                font.setItalic(True)
+                # Modern: kein Kursiv — Handoff zeigt aufrechte Separator-Namen
+                font.setItalic(not _is_modern())
                 return font
+        if role == Qt.ItemDataRole.ForegroundRole:
+            # Deaktivierte Mods gedämpft (Handoff: txt3)
+            if _is_modern() and c == COL_NAME and not r.is_separator and not r.enabled:
+                return QBrush(QColor(theme_color("txt3", "#666d78")))
         if role == Qt.ItemDataRole.ToolTipRole:
             if c == COL_CONFLICTS:
                 # Setting 5: Tooltip for separator showing aggregated conflict count
@@ -368,24 +391,38 @@ class ModListModel(QAbstractItemModel):
                 return f"Deploy \u2192 {r.deploy_path}"
         if role == Qt.ItemDataRole.BackgroundRole:
             row_idx = index.row()
+            modern = _is_modern()
             # Conflict highlighting (highest priority for temp highlights)
-            # Lose (rot) hat Vorrang vor Win (grün) — Warnung > Erfolg
+            # Lose (rot/warn) hat Vorrang vor Win (grün/ok) — Warnung > Erfolg
             if row_idx in self._conflict_lose_rows:
+                if modern:
+                    return _tinted(theme_color("warn", "#b8923f"), 50)
                 return QBrush(self._conflict_lose_color)
             if row_idx in self._conflict_win_rows:
+                if modern:
+                    return _tinted(theme_color("ok", "#4cae7d"), 45)
                 return QBrush(self._conflict_win_color)
             # Setting 6: Highlight mods that conflict with selected separator's children
             if row_idx in self._highlighted_rows:
+                if modern:
+                    return _tinted(theme_color("warn", "#b8923f"), 32)
                 return QBrush(self._highlight_color)
-            # Separator custom background color (from meta.ini, dampened with alpha ~80)
-            if r.is_separator and r.color:
-                c = QColor(r.color)
-                if c.isValid():
-                    c.setAlpha(80)
-                    return QBrush(c)
+            # Separator: neutrale panel2-Zeile (modern) bzw. gedämpfte Custom-Farbe
+            if r.is_separator:
+                if r.color:
+                    c = QColor(r.color)
+                    if c.isValid():
+                        c.setAlpha(60 if modern else 80)
+                        return QBrush(c)
+                if modern:
+                    return QBrush(QColor(theme_color("panel2", "#20242a")))
             if r.is_error:
+                if modern:
+                    return _tinted(theme_color("warn", "#b8923f"), 60)
                 return QBrush(QColor("#3a1414"))
             if r.is_framework:
+                if modern:
+                    return _tinted(theme_color("ok", "#4cae7d"), 28)
                 return QBrush(QColor("#143a14"))
         if role == ROLE_IS_SEPARATOR:
             return r.is_separator
@@ -399,6 +436,10 @@ class ModListModel(QAbstractItemModel):
             return r.group_name
         if role == ROLE_IS_GROUP_HEAD:
             return r.is_group_head
+        if role == ROLE_CONFLICT_TYPE:
+            if isinstance(r.conflicts, dict):
+                return r.conflicts.get("type", "")
+            return ""
         return None
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
@@ -729,6 +770,9 @@ class ModListModel(QAbstractItemModel):
             tr("label.header_priority"),
         ]
         if 0 <= section < len(headers):
+            # Modern: Spaltenköpfe in VERSALIEN (Handoff-Typografie)
+            if _is_modern():
+                return headers[section].upper()
             return headers[section]
         return None
 
