@@ -33,6 +33,13 @@ def _modern_active() -> bool:
 _SEP_BAR_DEFAULT = "#6f63b8"
 
 
+def _check_col_width(with_grip: bool = True) -> int:
+    """Breite der Schalter-Spalte: modern (Schalter+Griff) vs. klassisch (Kreis)."""
+    if _modern_active():
+        return 62 if with_grip else 46
+    return 36
+
+
 class SeparatorMarkingScrollBar(QScrollBar):
     """Custom vertical scrollbar that draws colored markers at separator positions.
 
@@ -161,6 +168,9 @@ class CheckboxDelegate(QStyledItemDelegate):
 
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # Delegates werden von Qt NICHT auf ihre Zelle geclippt — ohne das
+        # ragt der Schalter bei zu schmaler Spalte in die Nachbarspalte
+        painter.setClipRect(option.rect)
 
         if is_sep:
             # Draw collapse/expand triangle for separators
@@ -195,7 +205,6 @@ class CheckboxDelegate(QStyledItemDelegate):
                 ])
             painter.drawPolygon(tri)
         else:
-            # Normal mod: Schiebeschalter (+ Drag-Griff links)
             # Prefer option.checkState (set by initStyleOption from the model)
             # over index.data(CheckStateRole) — the latter returns None for
             # QTreeWidget in some Qt versions while option.checkState is always
@@ -208,45 +217,73 @@ class CheckboxDelegate(QStyledItemDelegate):
             except (TypeError, ValueError):
                 enabled = cs == Qt.CheckState.Checked
 
-            rect = option.rect
-            cy = rect.y() + rect.height() // 2
-
-            grip_w = 0
-            if self._show_grip:
-                # Drag-Griff ⠿: 2×3 Punkte in txt3
-                grip_w = 12
-                dot_color = QColor(theme_color("txt3", "#666d78"))
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.setBrush(QBrush(dot_color))
-                gx = rect.x() + 6
-                for col in (0, 1):
-                    for row in (-1, 0, 1):
-                        painter.drawEllipse(
-                            gx + col * 5, cy + row * 5 - 1, 2, 2)
-
-            # Schalter-Track
-            tx = rect.x() + grip_w + 8
-            ty = cy - self._TRACK_H // 2
-            track = QRect(tx, ty, self._TRACK_W, self._TRACK_H)
-
-            if enabled:
-                track_color = QColor(theme_color("accent", "#4CAF50"))
+            if _modern_active():
+                self._paint_switch(painter, option, enabled)
             else:
-                track_color = QColor(theme_color("line", "#666666"))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(track_color))
-            painter.drawRoundedRect(track, self._TRACK_H / 2, self._TRACK_H / 2)
-
-            # Knopf (immer weiß, Handoff)
-            kx = tx + (self._TRACK_W - self._KNOB - 2) if enabled else tx + 2
-            ky = ty + (self._TRACK_H - self._KNOB) // 2
-            painter.setBrush(QBrush(QColor("#FFFFFF")))
-            painter.drawEllipse(QRect(kx, ky, self._KNOB, self._KNOB))
+                self._paint_circle(painter, option, enabled)
 
         painter.restore()
 
+    def _paint_switch(self, painter: QPainter, option, enabled: bool) -> None:
+        """Modernes Theme: Schiebeschalter (+ Drag-Griff links)."""
+        rect = option.rect
+        cy = rect.y() + rect.height() // 2
+
+        grip_w = 0
+        if self._show_grip:
+            # Drag-Griff ⠿: 2×3 Punkte in txt3
+            grip_w = 12
+            dot_color = QColor(theme_color("txt3", "#666d78"))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(dot_color))
+            gx = rect.x() + 6
+            for col in (0, 1):
+                for row in (-1, 0, 1):
+                    painter.drawEllipse(gx + col * 5, cy + row * 5 - 1, 2, 2)
+
+        # Schalter-Track
+        tx = rect.x() + grip_w + 8
+        ty = cy - self._TRACK_H // 2
+        track = QRect(tx, ty, self._TRACK_W, self._TRACK_H)
+
+        if enabled:
+            track_color = QColor(theme_color("accent", "#4CAF50"))
+        else:
+            track_color = QColor(theme_color("line", "#666666"))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(track_color))
+        painter.drawRoundedRect(track, self._TRACK_H / 2, self._TRACK_H / 2)
+
+        # Knopf (immer weiß, Handoff)
+        kx = tx + (self._TRACK_W - self._KNOB - 2) if enabled else tx + 2
+        ky = ty + (self._TRACK_H - self._KNOB) // 2
+        painter.setBrush(QBrush(QColor("#FFFFFF")))
+        painter.drawEllipse(QRect(kx, ky, self._KNOB, self._KNOB))
+
+    def _paint_circle(self, painter: QPainter, option, enabled: bool) -> None:
+        """Klassische Themes: grüner Kreis mit Haken / grauer Kreis (alte Optik)."""
+        size = 16
+        x = option.rect.x() + (option.rect.width() - size) // 2
+        y = option.rect.y() + (option.rect.height() - size) // 2
+        rect = QRect(x, y, size, size)
+
+        if enabled:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(self._COLOR_ON))
+            painter.drawEllipse(rect)
+            painter.setPen(QPen(QColor("#FFFFFF"), 2.0))
+            painter.drawLine(x + 3, y + 8, x + 6, y + 12)
+            painter.drawLine(x + 6, y + 12, x + 12, y + 4)
+        else:
+            painter.setPen(QPen(self._COLOR_OFF, 1.5))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(rect)
+
     def sizeHint(self, option, index):
-        w = 62 if self._show_grip else 46
+        if _modern_active():
+            w = 62 if self._show_grip else 46
+        else:
+            w = 36
         try:
             h = int(theme_color("row_height", "28"))
         except ValueError:
@@ -434,7 +471,11 @@ class GroupNameDelegate(QStyledItemDelegate):
 
     def sizeHint(self, option, index):
         hint = super().sizeHint(option, index)
-        return QSize(hint.width(), max(hint.height(), 28))
+        try:
+            min_h = int(theme_color("row_height", "28"))
+        except ValueError:
+            min_h = 28
+        return QSize(hint.width(), max(hint.height(), min_h))
 
 
 class ConflictBadgeDelegate(QStyledItemDelegate):
@@ -1260,7 +1301,7 @@ class ModListView(QWidget):
         header.setMinimumSectionSize(30)
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(COL_CHECK, QHeaderView.ResizeMode.Fixed)
-        self._tree.setColumnWidth(COL_CHECK, 62)
+        self._tree.setColumnWidth(COL_CHECK, _check_col_width())
         self._tree.setColumnWidth(COL_NAME, 300)
         self._tree.setColumnWidth(2, 80)
         self._tree.setColumnWidth(3, 80)
@@ -1279,9 +1320,11 @@ class ModListView(QWidget):
 
         self._fw_tree = _DropFrameworkTree()
 
+        # Klassik-Style mitgeben — die Bar wählt selbst je nach aktivem Theme
         self._fw_label = CollapsibleSectionBar(
             tr("label.type_framework") + "s", "frameworks", self._fw_tree,
-            style="",  # Optik kommt aus dem Theme-QSS (#sectionBar)
+            style="QLabel { font-weight: bold; padding: 4px 6px; "
+                  "background: #1a2a3a; border-bottom: 1px solid #333; }",
             container=fw_container,
             default_collapsed=True,
         )
@@ -1312,7 +1355,7 @@ class ModListView(QWidget):
         fw_hdr.setMinimumSectionSize(30)
         fw_hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         fw_hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        self._fw_tree.setColumnWidth(0, 46)
+        self._fw_tree.setColumnWidth(0, _check_col_width(with_grip=False))
         self._fw_tree.setColumnWidth(1, 220)
         self._fw_tree.setColumnWidth(2, 300)
         self._fw_tree.setColumnWidth(3, 90)
@@ -1385,8 +1428,14 @@ class ModListView(QWidget):
     def restore_column_widths(self) -> None:
         """Restore saved column widths (call after data is populated)."""
         self._persistent_header.restore()
-        # Fixe Schalter-Spalte immer erzwingen — alte Configs haben noch 36px
-        self._tree.setColumnWidth(COL_CHECK, 62)
+        # Fixe Schalter-Spalte immer erzwingen (theme-abhängige Breite)
+        self._tree.setColumnWidth(COL_CHECK, _check_col_width())
+
+    def apply_theme_metrics(self) -> None:
+        """Theme-abhängige Maße nachziehen (Live-Theme-Wechsel):
+        Schalter-Spalte braucht 62 px, Kreis-Spalte nur 36 px."""
+        self._tree.setColumnWidth(COL_CHECK, _check_col_width())
+        self._fw_tree.setColumnWidth(0, _check_col_width(with_grip=False))
 
     def flush_column_widths(self) -> None:
         """Flush any pending debounced column-width write."""
@@ -1442,7 +1491,7 @@ class ModListView(QWidget):
         """Restore saved column widths for the frameworks tree."""
         self._ph_frameworks.restore()
         # Col 0 is the fixed check column — always force width regardless of saved state
-        self._fw_tree.setColumnWidth(0, 46)
+        self._fw_tree.setColumnWidth(0, _check_col_width(with_grip=False))
 
     def _on_fw_context_menu(self, pos) -> None:
         """Forward framework context menu request with item data."""

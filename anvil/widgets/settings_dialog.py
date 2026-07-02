@@ -213,6 +213,11 @@ class SettingsDialog(QDialog):
         self._previous_density = saved_density
         self._selected_accent = saved_accent
         self._selected_density = saved_density
+        # Gewähltes Design als eigene Variable — NIE aus den Button-Zuständen
+        # ableiten: checkbare Buttons togglen sich beim Klick selbst, bevor
+        # der Handler läuft, und verfälschen jede Vorher/Nachher-Prüfung.
+        self._selected_design = (
+            saved_theme if self._modern_active else MODERN_THEME_DARK)
 
         # ── Design (Anvil Dunkel/Hell, Akzentfarbe, Zeilendichte) ────
         design_grp = QGroupBox(tr("settings.design"))
@@ -1386,21 +1391,28 @@ class SettingsDialog(QDialog):
 
     # ── Modern-Design (Anvil Dunkel/Hell) ─────────────────────────────
     def _selected_modern_theme(self) -> str:
-        if self._btn_design_light.isChecked():
-            return MODERN_THEME_LIGHT
-        return MODERN_THEME_DARK
+        return self._selected_design or MODERN_THEME_DARK
+
+    def _schedule_preview(self) -> None:
+        """Preview gebündelt starten: schnelle Klicks fallen zu EINEM
+        Restyling zusammen, und der Button-Zustand malt sich zuerst."""
+        if not hasattr(self, "_preview_timer"):
+            self._preview_timer = QTimer(self)
+            self._preview_timer.setSingleShot(True)
+            self._preview_timer.setInterval(60)
+            self._preview_timer.timeout.connect(self._preview_theme)
+        self._preview_timer.start()
 
     def _on_design_clicked(self, theme_name: str) -> None:
-        # Button-Zustand sofort setzen; das teure App-Restyling einen Tick
-        # später (singleShot), damit der Klick nicht träge wirkt.
         changed = (not self._modern_active
-                   or self._selected_modern_theme() != theme_name)
+                   or self._selected_design != theme_name)
         self._modern_active = True
+        self._selected_design = theme_name
         self._btn_design_dark.setChecked(theme_name == MODERN_THEME_DARK)
         self._btn_design_light.setChecked(theme_name == MODERN_THEME_LIGHT)
         self._update_style_states()
         if changed:
-            QTimer.singleShot(0, self._preview_theme)
+            self._schedule_preview()
 
     def _on_accent_clicked(self, accent_key: str) -> None:
         changed = accent_key != self._selected_accent
@@ -1408,7 +1420,7 @@ class SettingsDialog(QDialog):
         for key, btn in self._accent_buttons.items():
             btn.setChecked(key == accent_key)
         if changed and self._modern_active:
-            QTimer.singleShot(0, self._preview_theme)
+            self._schedule_preview()
 
     def _on_density_clicked(self, density_key: str) -> None:
         changed = density_key != self._selected_density
@@ -1416,7 +1428,7 @@ class SettingsDialog(QDialog):
         for key, btn in self._density_buttons.items():
             btn.setChecked(key == density_key)
         if changed and self._modern_active:
-            QTimer.singleShot(0, self._preview_theme)
+            self._schedule_preview()
 
     def _update_style_states(self) -> None:
         """Modern aktiv → klassischer Farbeditor aus (und umgekehrt)."""
@@ -1519,6 +1531,20 @@ class SettingsDialog(QDialog):
                         density=self._selected_density)
         else:
             apply_theme(app, self._current_theme_name(), self._color_overrides)
+        # Bäume cachen Zeilenhöhen — NUR bei geänderter Dichte relayouten,
+        # sonst wird jeder Farbwechsel unnötig teuer
+        last = getattr(self, "_last_preview_density", None)
+        if self._modern_active and self._selected_density != last:
+            from PySide6.QtWidgets import QTreeView
+            for w in app.allWidgets():
+                if isinstance(w, QTreeView):
+                    w.doItemsLayout()
+        self._last_preview_density = self._selected_density if self._modern_active else None
+        # Theme-abhängige Widget-Details nachziehen (Schalter-Spaltenbreite,
+        # Profilleisten-Farben, …) — billig im Vergleich zum App-Restyling
+        for w in app.allWidgets():
+            if hasattr(w, "apply_theme_metrics"):
+                w.apply_theme_metrics()
         self._preview_dirty = True
 
     def _on_reset_colors(self) -> None:
@@ -1668,6 +1694,13 @@ class SettingsDialog(QDialog):
                             load_overrides(self._settings(), self._previous_theme),
                             accent=self._previous_accent,
                             density=self._previous_density)
+                # Spaltenbreiten + Zeilenhöhen an das zurückgesetzte Theme anpassen
+                from PySide6.QtWidgets import QTreeView
+                for w in app.allWidgets():
+                    if hasattr(w, "apply_theme_metrics"):
+                        w.apply_theme_metrics()
+                    if isinstance(w, QTreeView):
+                        w.doItemsLayout()
         # Tab-Index merken auch bei Abbrechen
         s = self._settings()
         s.setValue("SettingsDialog/tab_index", self._tabs.currentIndex())

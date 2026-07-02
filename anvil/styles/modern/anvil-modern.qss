@@ -110,6 +110,11 @@ QPushButton, QToolButton {
     border-color: {{accent}}; }
   QPushButton:pressed, QToolButton:pressed {
     background: {{accent_soft}}; }
+  QPushButton:checked, QToolButton:checked {
+    background: {{accent_soft}};
+    color: {{accent}};
+    border: 1px solid {{accent}};
+    font-weight: 600; }
   QPushButton:disabled, QToolButton:disabled {
     background: transparent;
     border: 1px solid {{line}}; }

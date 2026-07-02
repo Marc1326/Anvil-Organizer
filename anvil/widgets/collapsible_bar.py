@@ -49,12 +49,11 @@ class CollapsibleSectionBar(QWidget):
         hlayout.setSpacing(0)
 
         self._label = QLabel()
-        # Leerer Style = Optik kommt aus dem Theme-QSS über objectName
+        # Modern: Optik aus Theme-QSS über objectName; klassisch: Inline-Style
         self.setObjectName("sectionBar")
         self._label.setObjectName("sectionBarLabel")
-        if style:
-            self._label.setStyleSheet(style)
-            self.setStyleSheet(style)
+        self._classic_style = style
+        self.apply_theme_metrics()
         self._label.setCursor(Qt.CursorShape.PointingHandCursor)
         hlayout.addWidget(self._label, 1)
 
@@ -69,6 +68,17 @@ class CollapsibleSectionBar(QWidget):
         self._apply_state()
 
     # ── Public API ─────────────────────────────────────────────────
+
+    def apply_theme_metrics(self) -> None:
+        """Leisten-Optik an das aktive Theme anpassen (Live-Theme-Wechsel)."""
+        from anvil.styles.dark_theme import theme_color
+        if theme_color("panel2", ""):
+            # Modernes Theme: Inline-Style entfernen, #sectionBar-QSS greift
+            self._label.setStyleSheet("")
+            self.setStyleSheet("")
+        elif self._classic_style:
+            self._label.setStyleSheet(self._classic_style)
+            self.setStyleSheet(self._classic_style)
 
     def add_action_button(self, text: str, tooltip: str = "") -> QPushButton:
         """Add a small action button on the right side of the header bar.

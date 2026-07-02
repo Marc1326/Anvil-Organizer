@@ -22,11 +22,39 @@ from PySide6.QtCore import QSize, Signal, Qt, QTimer, QPoint, QEvent
 from anvil.core import _todo
 from anvil.core.translator import tr
 from anvil.core.resource_path import get_anvil_base
+from anvil.styles.dark_theme import theme_color
 
 ICON_DIR = str(get_anvil_base() / "styles" / "icons" / "files")
 
 
-BUTTON_STYLE = """
+# Styles als Funktionen: modernes Theme baut aus der Palette,
+# klassische Themes behalten EXAKT die alte dunkle Optik.
+def _modern() -> bool:
+    return bool(theme_color("panel2", ""))
+
+
+def _button_style() -> str:
+    if _modern():
+        return f"""
+    QToolButton {{
+        background: {theme_color('panel2', '#2a2a2a')};
+        border: 1px solid {theme_color('line', '#3D3D3D')};
+        border-radius: 7px;
+        color: {theme_color('txt2', '#D3D3D3')};
+        font-size: 16px;
+        font-weight: bold;
+        padding: 2px 6px;
+    }}
+    QToolButton:hover {{
+        border-color: {theme_color('accent', '#33b3a8')};
+        color: {theme_color('txt', '#D3D3D3')};
+    }}
+    QToolButton::menu-indicator {{
+        subcontrol-position: right center;
+        width: 12px;
+    }}
+"""
+    return """
     QToolButton {
         background: #2a2a2a;
         border: 1px solid #3D3D3D;
@@ -45,7 +73,25 @@ BUTTON_STYLE = """
     }
 """
 
-TAB_STYLE_NORMAL = """
+
+def _tab_style_normal() -> str:
+    if _modern():
+        return f"""
+    QPushButton#profileTab {{
+        background: transparent;
+        color: {theme_color('txt2', '#888888')};
+        border: none;
+        border-radius: 6px;
+        padding: 6px 16px;
+        font-size: 13px;
+        font-weight: normal;
+    }}
+    QPushButton#profileTab:hover {{
+        background: {theme_color('hov', 'rgba(255, 255, 255, 0.05)')};
+        color: {theme_color('txt', '#D3D3D3')};
+    }}
+"""
+    return """
     QPushButton#profileTab {
         background: transparent;
         color: #888888;
@@ -60,7 +106,21 @@ TAB_STYLE_NORMAL = """
     }
 """
 
-TAB_STYLE_SELECTED = """
+
+def _tab_style_selected() -> str:
+    if _modern():
+        return f"""
+    QPushButton#profileTab {{
+        background: {theme_color('accent', '#006868')};
+        color: {theme_color('accent_text', '#FFFFFF')};
+        border: none;
+        border-radius: 6px;
+        padding: 6px 16px;
+        font-size: 13px;
+        font-weight: 600;
+    }}
+"""
+    return """
     QPushButton#profileTab {
         background: #006868;
         color: #FFFFFF;
@@ -72,7 +132,21 @@ TAB_STYLE_SELECTED = """
     }
 """
 
-TAB_STYLE_DEFAULT_SELECTED = """
+
+def _tab_style_default_selected() -> str:
+    if _modern():
+        return f"""
+    QPushButton#profileTab {{
+        background: {theme_color('accent_pressed', '#004d4d')};
+        color: {theme_color('accent_text', '#FFFFFF')};
+        border: none;
+        border-radius: 6px;
+        padding: 6px 16px;
+        font-size: 13px;
+        font-weight: 600;
+    }}
+"""
+    return """
     QPushButton#profileTab {
         background: #004d4d;
         color: #FFFFFF;
@@ -84,7 +158,26 @@ TAB_STYLE_DEFAULT_SELECTED = """
     }
 """
 
-ADD_BUTTON_STYLE = """
+
+def _add_button_style() -> str:
+    if _modern():
+        return f"""
+    #profileAddButton {{
+        background: {theme_color('panel2', '#242424')};
+        color: {theme_color('txt2', '#888888')};
+        border: 1px solid {theme_color('line', '#3D3D3D')};
+        border-radius: 6px;
+        font-size: 22px;
+        font-weight: 300;
+        font-family: "Noto Sans", "Arial", sans-serif;
+    }}
+    #profileAddButton:hover {{
+        background: {theme_color('accent', '#006868')};
+        border-color: {theme_color('accent', '#006868')};
+        color: {theme_color('accent_text', '#FFFFFF')};
+    }}
+"""
+    return """
     #profileAddButton {
         background: #242424;
         color: #888888;
@@ -102,6 +195,42 @@ ADD_BUTTON_STYLE = """
 """
 
 
+def _tab_container_style() -> str:
+    if _modern():
+        return (f"QFrame {{ background: {theme_color('panel2', '#141414')}; "
+                f"border-radius: 8px; }}")
+    return """
+            QFrame {
+                background: #141414;
+                border-radius: 8px;
+            }
+        """
+
+
+def _inline_input_style() -> str:
+    if _modern():
+        return f"""
+            QLineEdit#profileInlineInput {{
+                background: {theme_color('panel2', '#141414')};
+                border: 1px solid {theme_color('accent', '#006868')};
+                border-radius: 6px;
+                color: {theme_color('txt', '#D3D3D3')};
+                padding: 6px 12px;
+                font-size: 13px;
+            }}
+        """
+    return """
+            QLineEdit#profileInlineInput {
+                background: #141414;
+                border: 1px solid #006868;
+                border-radius: 6px;
+                color: #D3D3D3;
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+        """
+
+
 class FadeEdge(QWidget):
     """Gradient fade overlay for scroll indication."""
 
@@ -116,7 +245,7 @@ class FadeEdge(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         gradient = QLinearGradient(0, 0, self.width(), 0)
-        base_color = QColor("#141414")
+        base_color = QColor(theme_color("panel2", "#141414"))
 
         if self._direction == "left":
             gradient.setColorAt(0.0, base_color)
@@ -207,12 +336,7 @@ class ProfileBar(QWidget):
 
         # ── Tab Container ─────────────────────────────────────────────
         self._tab_container = QFrame()
-        self._tab_container.setStyleSheet("""
-            QFrame {
-                background: #141414;
-                border-radius: 8px;
-            }
-        """)
+        self._tab_container.setStyleSheet(_tab_container_style())
         self._tab_container.setFixedHeight(36)
 
         container_layout = QHBoxLayout(self._tab_container)
@@ -259,7 +383,7 @@ class ProfileBar(QWidget):
         if os.path.exists(_plus_path):
             self._btn_add.setIcon(QIcon(_plus_path))
             self._btn_add.setIconSize(QSize(20, 20))
-        self._btn_add.setStyleSheet(ADD_BUTTON_STYLE)
+        self._btn_add.setStyleSheet(_add_button_style())
         self._btn_add.setToolTip(tr("tooltip.new_profile"))
         self._btn_add.clicked.connect(self._start_inline_create)
         layout.addWidget(self._btn_add)
@@ -331,8 +455,9 @@ class ProfileBar(QWidget):
         btn_backup.setFixedSize(36, 32)
         btn_backup.clicked.connect(lambda: self.backup_requested.emit())
 
-        for btn in [btn_menu, btn_view, btn_restore, btn_backup]:
-            btn.setStyleSheet(BUTTON_STYLE)
+        self._action_btns = [btn_menu, btn_view, btn_restore, btn_backup]
+        for btn in self._action_btns:
+            btn.setStyleSheet(_button_style())
             layout.addWidget(btn)
 
         # ── Active Badge ──────────────────────────────────────────────
@@ -397,7 +522,7 @@ class ProfileBar(QWidget):
             tab.setObjectName("profileTab")
             tab.setCheckable(True)
             tab.setCursor(Qt.CursorShape.PointingHandCursor)
-            tab.setStyleSheet(TAB_STYLE_NORMAL)
+            tab.setStyleSheet(_tab_style_normal())
             tab.clicked.connect(lambda checked, p=profile: self._on_tab_clicked(p))
             tab.mouseDoubleClickEvent = lambda event, t=tab: self._start_inline_rename(t)
             tab.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -457,13 +582,29 @@ class ProfileBar(QWidget):
                 tab.setChecked(True)
                 # Default-Profil bekommt dunkleres Teal
                 if profile_name == "Default":
-                    tab.setStyleSheet(TAB_STYLE_DEFAULT_SELECTED)
+                    tab.setStyleSheet(_tab_style_default_selected())
                 else:
-                    tab.setStyleSheet(TAB_STYLE_SELECTED)
+                    tab.setStyleSheet(_tab_style_selected())
                 self._scroll_to_tab(tab)
             else:
                 tab.setChecked(False)
-                tab.setStyleSheet(TAB_STYLE_NORMAL)
+                tab.setStyleSheet(_tab_style_normal())
+
+    def apply_theme_metrics(self) -> None:
+        """Farben an das aktive Theme anpassen (Live-Theme-Wechsel)."""
+        self._tab_container.setStyleSheet(_tab_container_style())
+        self._btn_add.setStyleSheet(_add_button_style())
+        for btn in self._action_btns:
+            btn.setStyleSheet(_button_style())
+        for tab in self._tabs:
+            if tab.text() == self._active_profile:
+                tab.setStyleSheet(
+                    _tab_style_default_selected() if tab.text() == "Default"
+                    else _tab_style_selected())
+            else:
+                tab.setStyleSheet(_tab_style_normal())
+        self._fade_left.update()
+        self._fade_right.update()
 
     def _scroll_to_tab(self, tab: QPushButton):
         """Ensure tab is visible in scroll area."""
@@ -491,16 +632,7 @@ class ProfileBar(QWidget):
         edit.setObjectName("profileInlineInput")
         edit.setPlaceholderText(tr("placeholder.profile_name"))
         edit.setFixedWidth(140)
-        edit.setStyleSheet("""
-            QLineEdit#profileInlineInput {
-                background: #141414;
-                border: 1px solid #006868;
-                border-radius: 6px;
-                color: #D3D3D3;
-                padding: 6px 12px;
-                font-size: 13px;
-            }
-        """)
+        edit.setStyleSheet(_inline_input_style())
 
         # Insert before the stretch (last item)
         stretch_index = self._tabs_layout.count() - 1
@@ -568,16 +700,7 @@ class ProfileBar(QWidget):
         edit.setObjectName("profileInlineInput")
         edit.setText(old_name)
         edit.setFixedWidth(max(140, tab.width()))
-        edit.setStyleSheet("""
-            QLineEdit#profileInlineInput {
-                background: #141414;
-                border: 1px solid #006868;
-                border-radius: 6px;
-                color: #D3D3D3;
-                padding: 6px 12px;
-                font-size: 13px;
-            }
-        """)
+        edit.setStyleSheet(_inline_input_style())
 
         # Insert at the tab's position
         self._tabs_layout.insertWidget(tab_index, edit)
@@ -770,9 +893,9 @@ class ProfileBar(QWidget):
             # Style zurücksetzen
             is_active = self._drag_tab.text() == self._active_profile
             if is_active:
-                style = TAB_STYLE_DEFAULT_SELECTED if self._drag_tab.text() == "Default" else TAB_STYLE_SELECTED
+                style = _tab_style_default_selected() if self._drag_tab.text() == "Default" else _tab_style_selected()
             else:
-                style = TAB_STYLE_NORMAL
+                style = _tab_style_normal()
             self._drag_tab.setStyleSheet(style)
             self._drag_tab.setCursor(Qt.CursorShape.PointingHandCursor)
 

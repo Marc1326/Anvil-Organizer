@@ -314,6 +314,7 @@ class MainWindow(QMainWindow):
         self._log_panel = LogPanel()
         self._log_panel.setMaximumHeight(204)
 
+        # Klassik-Style mitgeben — die Bar wählt selbst je nach aktivem Theme
         self._log_bar = CollapsibleSectionBar(
             "Log",
             "log",
