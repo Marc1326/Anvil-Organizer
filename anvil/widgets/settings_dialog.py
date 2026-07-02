@@ -36,13 +36,15 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QPlainTextEdit,
 )
-from PySide6.QtGui import QColor, QFont, QPixmap
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtGui import QColor, QFont, QIcon, QPixmap
+from PySide6.QtCore import Qt, QSettings, QTimer
 
 from anvil.plugins.plugin_loader import PluginLoader, ensure_user_plugin_dir
 from anvil.styles.dark_theme import (
     list_themes, get_styles_dir, default_theme,
     apply_theme, default_palette, load_overrides, save_overrides, COLOR_ROLES,
+    is_modern_theme, style_prefs, MODERN_THEME_DARK, MODERN_THEME_LIGHT,
+    MODERN_ACCENTS,
 )
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nexus_sso import NexusSSOLogin
@@ -193,21 +195,97 @@ class SettingsDialog(QDialog):
         ag_layout.addWidget(scroll)
         self._tabs.addTab(allgemein, tr("settings.tab_general"))
 
-        # Tab Style
+        # Tab Style — Inhalt in Scroll-Area (wie Allgemein-Tab), sonst wird
+        # der Inhalt bei kleiner Dialoghöhe zusammengequetscht
         style_tab = QWidget()
-        style_layout = QVBoxLayout(style_tab)
-        stil_grp = QGroupBox(tr("settings.style"))
+        style_tab_layout = QVBoxLayout(style_tab)
+        style_scroll = QScrollArea()
+        style_scroll.setWidgetResizable(True)
+        style_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        style_content = QWidget()
+        style_layout = QVBoxLayout(style_content)
+
+        saved_theme = settings.value("style/theme", default_theme())
+        saved_accent, saved_density = style_prefs(settings)
+        self._modern_active = is_modern_theme(saved_theme)
+        self._previous_theme = saved_theme
+        self._previous_accent = saved_accent
+        self._previous_density = saved_density
+        self._selected_accent = saved_accent
+        self._selected_density = saved_density
+
+        # ── Design (Anvil Dunkel/Hell, Akzentfarbe, Zeilendichte) ────
+        design_grp = QGroupBox(tr("settings.design"))
+        design_layout = QVBoxLayout(design_grp)
+
+        variant_row = QHBoxLayout()
+        self._btn_design_dark = QPushButton(tr("settings.design_dark"))
+        self._btn_design_light = QPushButton(tr("settings.design_light"))
+        for btn, name in ((self._btn_design_dark, MODERN_THEME_DARK),
+                          (self._btn_design_light, MODERN_THEME_LIGHT)):
+            btn.setCheckable(True)
+            btn.setMinimumSize(120, 36)
+            btn.clicked.connect(
+                lambda checked=False, n=name: self._on_design_clicked(n))
+            variant_row.addWidget(btn)
+        variant_row.addStretch()
+        design_layout.addLayout(variant_row)
+
+        accent_row = QHBoxLayout()
+        accent_row.addWidget(QLabel(tr("settings.accent_color")))
+        self._accent_buttons: dict = {}
+        accent_labels = {
+            "teal": tr("settings.accent_teal"),
+            "violet": tr("settings.accent_violet"),
+            "blue": tr("settings.accent_blue"),
+        }
+        for key in MODERN_ACCENTS:
+            btn = QPushButton(accent_labels.get(key, key))
+            btn.setCheckable(True)
+            btn.clicked.connect(
+                lambda checked=False, k=key: self._on_accent_clicked(k))
+            self._accent_buttons[key] = btn
+            accent_row.addWidget(btn)
+        accent_row.addStretch()
+        design_layout.addLayout(accent_row)
+
+        density_row = QHBoxLayout()
+        density_row.addWidget(QLabel(tr("settings.row_density")))
+        self._density_buttons: dict = {}
+        density_labels = {
+            "compact": tr("settings.density_compact"),
+            "comfy": tr("settings.density_comfy"),
+        }
+        for key, label in density_labels.items():
+            btn = QPushButton(label)
+            btn.setCheckable(True)
+            btn.clicked.connect(
+                lambda checked=False, k=key: self._on_density_clicked(k))
+            self._density_buttons[key] = btn
+            density_row.addWidget(btn)
+        density_row.addStretch()
+        design_layout.addLayout(density_row)
+        style_layout.addWidget(design_grp)
+
+        if self._modern_active:
+            self._btn_design_dark.setChecked(saved_theme == MODERN_THEME_DARK)
+            self._btn_design_light.setChecked(saved_theme == MODERN_THEME_LIGHT)
+        for k, btn in self._accent_buttons.items():
+            btn.setChecked(k == saved_accent)
+        for k, btn in self._density_buttons.items():
+            btn.setChecked(k == saved_density)
+
+        # ── Klassische Themes (QSS-Dateien) ──────────────────────────
+        stil_grp = QGroupBox(tr("settings.classic_themes"))
         stil_layout = QHBoxLayout(stil_grp)
         self._stil_combo = QComboBox()
         # Available themes from anvil/styles/*.qss
         themes = list_themes()
         self._stil_combo.addItems(themes)
-        # Load saved theme from QSettings
-        saved = settings.value("style/theme", default_theme())
-        idx = self._stil_combo.findText(saved)
+        # Gespeichertes klassisches Theme vorauswählen (modern steht nicht im Combo)
+        idx = self._stil_combo.findText(saved_theme)
         if idx >= 0:
             self._stil_combo.setCurrentIndex(idx)
-        self._previous_theme = self._stil_combo.currentText()
         self._stil_combo.currentTextChanged.connect(self._on_theme_changed)
         stil_layout.addWidget(self._stil_combo)
         erkunden_btn = QPushButton(tr("settings.explore"))
@@ -215,8 +293,9 @@ class SettingsDialog(QDialog):
         stil_layout.addWidget(erkunden_btn)
         style_layout.addWidget(stil_grp)
 
-        # ── Theme-Farben (anpassbare Rollenfarben) ───────────────────
-        self._color_overrides = load_overrides(self._settings(), self._previous_theme)
+        # ── Theme-Farben (anpassbare Rollenfarben, nur klassische Themes) ──
+        self._color_overrides = load_overrides(
+            self._settings(), self._stil_combo.currentText())
         self._color_swatches: dict = {}
         self._preview_dirty = False
         self._theme_colors_grp = QGroupBox(tr("settings.theme_colors"))
@@ -258,6 +337,10 @@ class SettingsDialog(QDialog):
         reset_row.addWidget(reset_btn)
         reset_row.addStretch()
         style_layout.addLayout(reset_row)
+        style_layout.addStretch()
+        style_scroll.setWidget(style_content)
+        style_tab_layout.addWidget(style_scroll)
+        self._update_style_states()
         self._tabs.addTab(style_tab, tr("settings.tab_style"))
 
         # Tab Mod Liste
@@ -1293,10 +1376,63 @@ class SettingsDialog(QDialog):
 
     def _on_theme_changed(self, theme_name: str):
         """Apply selected theme live as preview (mit Theme-eigenen Farben)."""
+        # Klassisches Theme gewählt → Modern-Design deaktivieren
+        self._modern_active = False
+        self._update_style_states()
         # Jedes Theme behält seine eigenen gespeicherten Farben.
         self._color_overrides = load_overrides(self._settings(), theme_name)
         self._rebuild_color_rows()
         self._preview_theme()
+
+    # ── Modern-Design (Anvil Dunkel/Hell) ─────────────────────────────
+    def _selected_modern_theme(self) -> str:
+        if self._btn_design_light.isChecked():
+            return MODERN_THEME_LIGHT
+        return MODERN_THEME_DARK
+
+    def _on_design_clicked(self, theme_name: str) -> None:
+        # Button-Zustand sofort setzen; das teure App-Restyling einen Tick
+        # später (singleShot), damit der Klick nicht träge wirkt.
+        changed = (not self._modern_active
+                   or self._selected_modern_theme() != theme_name)
+        self._modern_active = True
+        self._btn_design_dark.setChecked(theme_name == MODERN_THEME_DARK)
+        self._btn_design_light.setChecked(theme_name == MODERN_THEME_LIGHT)
+        self._update_style_states()
+        if changed:
+            QTimer.singleShot(0, self._preview_theme)
+
+    def _on_accent_clicked(self, accent_key: str) -> None:
+        changed = accent_key != self._selected_accent
+        self._selected_accent = accent_key
+        for key, btn in self._accent_buttons.items():
+            btn.setChecked(key == accent_key)
+        if changed and self._modern_active:
+            QTimer.singleShot(0, self._preview_theme)
+
+    def _on_density_clicked(self, density_key: str) -> None:
+        changed = density_key != self._selected_density
+        self._selected_density = density_key
+        for key, btn in self._density_buttons.items():
+            btn.setChecked(key == density_key)
+        if changed and self._modern_active:
+            QTimer.singleShot(0, self._preview_theme)
+
+    def _update_style_states(self) -> None:
+        """Modern aktiv → klassischer Farbeditor aus (und umgekehrt)."""
+        self._theme_colors_grp.setEnabled(not self._modern_active)
+        if not self._modern_active:
+            self._btn_design_dark.setChecked(False)
+            self._btn_design_light.setChecked(False)
+        self._update_accent_icons()
+
+    def _update_accent_icons(self) -> None:
+        """Farb-Punkte der Akzent-Buttons passend zur gewählten Variante."""
+        theme = self._selected_modern_theme()
+        for key, btn in self._accent_buttons.items():
+            pix = QPixmap(14, 14)
+            pix.fill(QColor(MODERN_ACCENTS[key][theme][0]))
+            btn.setIcon(QIcon(pix))
 
     # ── Theme-Farben (anpassbare Rollenfarben) ───────────────────────
     def _current_theme_name(self) -> str:
@@ -1375,9 +1511,15 @@ class SettingsDialog(QDialog):
 
     def _preview_theme(self) -> None:
         app = QApplication.instance()
-        if app:
+        if not app:
+            return
+        if self._modern_active:
+            apply_theme(app, self._selected_modern_theme(), None,
+                        accent=self._selected_accent,
+                        density=self._selected_density)
+        else:
             apply_theme(app, self._current_theme_name(), self._color_overrides)
-            self._preview_dirty = True
+        self._preview_dirty = True
 
     def _on_reset_colors(self) -> None:
         self._color_overrides = {}
@@ -1409,9 +1551,15 @@ class SettingsDialog(QDialog):
     def accept(self):
         """Save all settings, then close."""
         settings = self._settings()
-        settings.setValue("style/theme", self._stil_combo.currentText())
-        # Theme-Farben pro Theme speichern
-        save_overrides(settings, self._stil_combo.currentText(), self._color_overrides)
+        if self._modern_active:
+            settings.setValue("style/theme", self._selected_modern_theme())
+        else:
+            settings.setValue("style/theme", self._stil_combo.currentText())
+            # Theme-Farben pro klassischem Theme speichern
+            save_overrides(settings, self._stil_combo.currentText(),
+                           self._color_overrides)
+        settings.setValue("style/accent", self._selected_accent)
+        settings.setValue("style/density", self._selected_density)
         # Sprache speichern
         lang_idx = self._lang_combo.currentIndex()
         new_lang = self._lang_codes[lang_idx] if 0 <= lang_idx < len(self._lang_codes) else self._initial_lang
@@ -1517,7 +1665,9 @@ class SettingsDialog(QDialog):
             app = QApplication.instance()
             if app:
                 apply_theme(app, self._previous_theme,
-                            load_overrides(self._settings(), self._previous_theme))
+                            load_overrides(self._settings(), self._previous_theme),
+                            accent=self._previous_accent,
+                            density=self._previous_density)
         # Tab-Index merken auch bei Abbrechen
         s = self._settings()
         s.setValue("SettingsDialog/tab_index", self._tabs.currentIndex())

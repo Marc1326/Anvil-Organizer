@@ -9,7 +9,8 @@ from pathlib import Path
 from anvil.core.resource_path import get_anvil_base
 
 _STYLES_DIR = get_anvil_base() / "styles"
-_DEFAULT_THEME = "Paper Dark"
+_DEFAULT_THEME = "Anvil Dunkel"
+_FALLBACK_CLASSIC_THEME = "Paper Dark"
 
 # Vom Benutzer anpassbare Farbrollen (Reihenfolge = Anzeige im Style-Tab).
 COLOR_ROLES = [
@@ -64,6 +65,127 @@ THEME_PALETTES: dict[str, dict[str, str]] = {
         "list_background": "#073642", "hover": "#0A4A5A", "disabled_text": "#586E75",
     },
 }
+
+# ── Moderne Themes (GUI v2) ─────────────────────────────────────────────
+# Token-basierte Themes nach dem Design-Handoff (_dev/design_handoff/README.md).
+# Farbwerte stammen EXAKT aus den Token-Tabellen dort — nie aus Screenshots.
+MODERN_THEME_DARK = "Anvil Dunkel"
+MODERN_THEME_LIGHT = "Anvil Hell"
+MODERN_THEMES = [MODERN_THEME_DARK, MODERN_THEME_LIGHT]
+MODERN_DEFAULT_ACCENT = "teal"
+MODERN_DEFAULT_DENSITY = "compact"
+
+# Basis-Tokens je Theme (ohne Akzent — der kommt aus MODERN_ACCENTS).
+MODERN_BASE: dict[str, dict[str, str]] = {
+    MODERN_THEME_DARK: {
+        "bg": "#131519", "panel": "#1a1d22", "panel2": "#20242a",
+        "line": "#2a2e35", "txt": "#e7e9ed", "txt2": "#9aa1ac",
+        "txt3": "#666d78", "hov": "rgba(255,255,255,0.05)",
+        "ok": "#4cae7d", "warn": "#b8923f", "accent_text": "#0d1113",
+    },
+    MODERN_THEME_LIGHT: {
+        "bg": "#f2f3f5", "panel": "#ffffff", "panel2": "#e9ebee",
+        "line": "#d9dce1", "txt": "#20242c", "txt2": "#5b6170",
+        "txt3": "#9096a1", "hov": "rgba(20,30,50,0.05)",
+        "ok": "#2e8757", "warn": "#9a7526", "accent_text": "#0d1113",
+    },
+}
+
+# Akzentfarben: {accent_key: {theme: (accent, accent_soft)}}
+MODERN_ACCENTS: dict[str, dict[str, tuple[str, str]]] = {
+    "teal": {
+        MODERN_THEME_DARK: ("#33b3a8", "rgba(51,179,168,0.16)"),
+        MODERN_THEME_LIGHT: ("#0e8a80", "rgba(14,138,128,0.13)"),
+    },
+    "violet": {
+        MODERN_THEME_DARK: ("#8b7cf6", "rgba(139,124,246,0.16)"),
+        MODERN_THEME_LIGHT: ("#6a58e6", "rgba(106,88,230,0.12)"),
+    },
+    "blue": {
+        MODERN_THEME_DARK: ("#6f92e8", "rgba(111,146,232,0.16)"),
+        MODERN_THEME_LIGHT: ("#3f63c7", "rgba(63,99,199,0.12)"),
+    },
+}
+
+# Zeilendichte der Mod-Liste (Handoff: Kompakt 26 px, Komfortabel 32 px).
+MODERN_ROW_HEIGHTS: dict[str, str] = {"compact": "26", "comfy": "32"}
+
+# Zur Laufzeit aktive Palette — für Delegates/Paint-Code, der nicht über QSS
+# gestylt werden kann. Wird bei jedem load_theme() aktualisiert.
+_current_palette: dict[str, str] = {}
+
+
+def is_modern_theme(name: str) -> bool:
+    return name in MODERN_THEMES
+
+
+def current_palette() -> dict[str, str]:
+    """Aktive Farb-Tokens des zuletzt geladenen Themes (Kopie)."""
+    return dict(_current_palette)
+
+
+def theme_color(role: str, fallback: str = "#000000") -> str:
+    """Einzelnen Farb-Token der aktiven Palette abfragen."""
+    return _current_palette.get(role, fallback)
+
+
+def _shade(hex_color: str, factor: float) -> str:
+    """Hellt (factor>0) bzw. dunkelt (factor<0) eine #RRGGBB-Farbe ab."""
+    h = hex_color.lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    if factor >= 0:
+        r, g, b = (round(c + (255 - c) * factor) for c in (r, g, b))
+    else:
+        r, g, b = (round(c * (1 + factor)) for c in (r, g, b))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def modern_palette(name: str, accent: str | None = None) -> dict[str, str]:
+    """Vollständige Token-Palette eines modernen Themes inkl. Akzent."""
+    base = dict(MODERN_BASE[name])
+    acc_map = MODERN_ACCENTS.get(accent or "", MODERN_ACCENTS[MODERN_DEFAULT_ACCENT])
+    accent_hex, accent_soft = acc_map[name]
+    base["accent"] = accent_hex
+    base["accent_soft"] = accent_soft
+    # Hover-/Pressed-Varianten des Akzents (im Handoff nicht definiert — abgeleitet)
+    lighten = name == MODERN_THEME_DARK
+    base["accent_hover"] = _shade(accent_hex, 0.12 if lighten else -0.12)
+    base["accent_pressed"] = _shade(accent_hex, -0.15 if lighten else -0.25)
+    return base
+
+
+def style_prefs(settings) -> tuple[str, str]:
+    """Liest (accent, density) aus QSettings — mit Defaults."""
+    accent = settings.value("style/accent", MODERN_DEFAULT_ACCENT, type=str)
+    if accent not in MODERN_ACCENTS:
+        accent = MODERN_DEFAULT_ACCENT
+    density = settings.value("style/density", MODERN_DEFAULT_DENSITY, type=str)
+    if density not in MODERN_ROW_HEIGHTS:
+        density = MODERN_DEFAULT_DENSITY
+    return accent, density
+
+
+def _load_modern_theme(name: str, accent: str | None, density: str | None) -> str:
+    """Lädt das Modern-Template und ersetzt alle {{token}}-Platzhalter."""
+    global _current_palette
+    template = _STYLES_DIR / "modern" / "anvil-modern.qss"
+    if not template.is_file():
+        return ""
+    palette = modern_palette(name, accent)
+    icons_dir = _STYLES_DIR / "modern" / (
+        "dark" if name == MODERN_THEME_DARK else "light")
+    tokens = dict(palette)
+    tokens["row_height"] = MODERN_ROW_HEIGHTS.get(
+        density or "", MODERN_ROW_HEIGHTS[MODERN_DEFAULT_DENSITY])
+    tokens["icons"] = icons_dir.as_posix()
+    content = template.read_text(encoding="utf-8")
+    for key, value in tokens.items():
+        content = content.replace("{{" + key + "}}", value)
+    # row_height mit in die Laufzeit-Palette — Delegates brauchen die Dichte
+    _current_palette = dict(palette)
+    _current_palette["row_height"] = tokens["row_height"]
+    return content
+
 
 _HEX_RE = re.compile(r"^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$")
 
@@ -124,19 +246,27 @@ def _apply_overrides(content: str, name: str, overrides: dict[str, str]) -> str:
                   flags=re.IGNORECASE)
 
 
-def load_theme(name: str, overrides: dict[str, str] | None = None) -> str:
+def load_theme(name: str, overrides: dict[str, str] | None = None,
+               accent: str | None = None, density: str | None = None) -> str:
     """Load a theme by name. Returns the QSS content string.
 
     Relative url() paths (e.g. ./Paper/Dark/) are resolved to absolute
     paths so Qt can find SVG assets regardless of the CWD.
 
     Mit ``overrides`` (``{role: '#RRGGBB'}``) werden die Default-Rollenfarben
-    des Themes ersetzt. Ohne Overrides identisch zum bisherigen Verhalten.
+    klassischer Themes ersetzt. ``accent``/``density`` gelten nur für die
+    modernen Themes (Anvil Dunkel/Hell) und werden sonst ignoriert.
     """
+    global _current_palette
+    if is_modern_theme(name):
+        content = _load_modern_theme(name, accent, density)
+        if content:
+            return content
+        name = _FALLBACK_CLASSIC_THEME  # Template fehlt — klassischer Fallback
     qss_file = _STYLES_DIR / f"{name}.qss"
     if not qss_file.is_file():
-        qss_file = _STYLES_DIR / f"{_DEFAULT_THEME}.qss"
-        name = _DEFAULT_THEME
+        qss_file = _STYLES_DIR / f"{_FALLBACK_CLASSIC_THEME}.qss"
+        name = _FALLBACK_CLASSIC_THEME
     if not qss_file.is_file():
         return ""
     content = qss_file.read_text(encoding="utf-8")
@@ -145,16 +275,22 @@ def load_theme(name: str, overrides: dict[str, str] | None = None) -> str:
     content = content.replace('url("./', f'url("{abs_prefix}/')
     if overrides:
         content = _apply_overrides(content, name, overrides)
+    # Laufzeit-Palette auch für klassische Themes bereitstellen (6 Rollen)
+    palette = dict(THEME_PALETTES.get(name, {}))
+    if overrides:
+        palette.update({r: v for r, v in overrides.items() if _is_hex(v)})
+    _current_palette = palette
     return content
 
 
-def apply_theme(target, theme_name: str, overrides: dict[str, str] | None = None) -> str:
+def apply_theme(target, theme_name: str, overrides: dict[str, str] | None = None,
+                accent: str | None = None, density: str | None = None) -> str:
     """Lädt das Theme (mit optionalen Overrides) und setzt es zentral auf ``target``.
 
     ``target`` ist die QApplication ODER das MainWindow — beide haben setStyleSheet.
     Gibt das gesetzte QSS zurück.
     """
-    qss = load_theme(theme_name, overrides)
+    qss = load_theme(theme_name, overrides, accent=accent, density=density)
     target.setStyleSheet(qss)
     return qss
 

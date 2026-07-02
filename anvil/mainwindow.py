@@ -38,7 +38,7 @@ from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence
 
 from anvil.core.subprocess_env import clean_subprocess_env, host_popen, host_open_url, host_open_path
 from anvil.core.ui_helpers import _center_on_parent, get_text_input
-from anvil.styles.dark_theme import apply_theme, load_overrides, default_theme
+from anvil.styles.dark_theme import apply_theme, load_overrides, default_theme, style_prefs
 from anvil.widgets.toolbar import create_toolbar
 from anvil.widgets.profile_bar import ProfileBar
 from anvil.widgets.mod_list import ModListView
@@ -166,10 +166,13 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon(str(logo_path)))
         self.setMinimumSize(1000, 650)
         self.resize(1200, 750)
-        # Theme aus QSettings laden
+        # Theme aus QSettings laden — auf QApplication-Ebene, NICHT aufs Fenster:
+        # ein Fenster-Stylesheet würde die Live-Vorschau (App-Ebene) überdecken.
         saved_theme = self._settings().value("style/theme", default_theme())
         overrides = load_overrides(self._settings(), saved_theme)
-        apply_theme(self, saved_theme, overrides)
+        accent, density = style_prefs(self._settings())
+        apply_theme(QApplication.instance(), saved_theme, overrides,
+                    accent=accent, density=density)
 
         # ── Plugin-System ─────────────────────────────────────────────
         self.plugin_loader = PluginLoader()
@@ -802,10 +805,15 @@ class MainWindow(QMainWindow):
             self._nexus_api.set_api_key("")
             self._status_bar.update_api_status(logged_in=False)
         if accepted:
-            # Theme + Farben final aufs Fenster anwenden — Preview lief nur auf der
-            # QApplication; so bleiben Fenster- und App-Stylesheet konsistent.
+            # Theme + Farben final anwenden — konsequent auf App-Ebene,
+            # damit Vorschau und finaler Zustand identisch wirken.
             saved_theme = self._settings().value("style/theme", default_theme())
-            apply_theme(self, saved_theme, load_overrides(self._settings(), saved_theme))
+            accent, density = style_prefs(self._settings())
+            apply_theme(QApplication.instance(), saved_theme,
+                        load_overrides(self._settings(), saved_theme),
+                        accent=accent, density=density)
+            # Altes Fenster-Stylesheet entfernen — es würde das App-QSS überdecken
+            self.setStyleSheet("")
             # Apply API counter visibility immediately
             hidden = self._settings().value("Nexus/hide_api_counter", False, type=bool)
             self._status_bar.set_api_counter_visible(not hidden)
@@ -6359,10 +6367,12 @@ class MainWindow(QMainWindow):
 
     def _bg3_mark_dirty(self) -> None:
         """Show and highlight the Deploy button (unsaved changes)."""
+        from anvil.styles.dark_theme import theme_color
         self._toolbar.deploy_sep.setVisible(True)
         self._toolbar.deploy_action.setVisible(True)
         self._toolbar.deploy_btn.setStyleSheet(
-            "QToolButton { color: #4DE0D0; font-weight: bold; }"
+            "QToolButton { color: %s; font-weight: bold; }"
+            % theme_color("accent", "#4DE0D0")
         )
 
     def _bg3_mark_clean(self) -> None:
