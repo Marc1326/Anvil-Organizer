@@ -215,6 +215,16 @@ def create_toolbar(parent=None):
     spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
     bar.addWidget(spacer)
 
+    # „＋ Mod installieren" — prominenter Akzent-Button (immer Text)
+    install_btn = QToolButton(bar)
+    install_btn.setObjectName("installModBtn")
+    install_btn.setText("＋ " + tr("menu.install_mod").rstrip("."))
+    install_btn.setToolTip(tr("menu.install_mod"))
+    install_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+    install_btn.clicked.connect(lambda checked=False: _call_win("_on_install_mod"))
+    bar.addWidget(install_btn)
+    bar.install_btn = install_btn
+
     # Rechts: 4 Status-Icons
     donate_btn = _add_btn("endorse.svg", "Support / Donate")
     donate_btn.clicked.connect(lambda: DonateDialog(bar.window()).exec())

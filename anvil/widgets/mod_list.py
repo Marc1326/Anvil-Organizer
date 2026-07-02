@@ -1378,6 +1378,9 @@ class ModListView(QWidget):
         self._fw_container = fw_container
         layout.addWidget(self._splitter)
 
+        # Theme-abhängige Maße (Spaltenbreite/-dehnung) initial anwenden
+        self.apply_theme_metrics()
+
     def _on_fw_item_changed(self, item, column: int) -> None:
         """Handle CheckState toggle in the framework tree (col 0)."""
         if column != 0:
@@ -1433,9 +1436,26 @@ class ModListView(QWidget):
 
     def apply_theme_metrics(self) -> None:
         """Theme-abhängige Maße nachziehen (Live-Theme-Wechsel):
-        Schalter-Spalte braucht 62 px, Kreis-Spalte nur 36 px."""
+        Schalter-Spalte 62/36 px, Name-Spalte füllt modern die Restbreite."""
         self._tree.setColumnWidth(COL_CHECK, _check_col_width())
         self._fw_tree.setColumnWidth(0, _check_col_width(with_grip=False))
+        # Modern: ALLE Spalten verriegelt (nicht ziehbar), Name- bzw.
+        # Beschreibungs-Spalte dehnt sich als Füller bis zur Panelkante
+        # (Vorlage: Name = 1fr). Klassisch: alles frei wie bisher.
+        header = self._tree.header()
+        fw_hdr = self._fw_tree.header()
+        if _modern_active():
+            for col in range(header.count()):
+                header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(COL_NAME, QHeaderView.ResizeMode.Stretch)
+            for col in range(fw_hdr.count()):
+                fw_hdr.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
+            fw_hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        else:
+            header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+            header.setSectionResizeMode(COL_CHECK, QHeaderView.ResizeMode.Fixed)
+            fw_hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+            fw_hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
 
     def flush_column_widths(self) -> None:
         """Flush any pending debounced column-width write."""
@@ -1458,6 +1478,18 @@ class ModListView(QWidget):
 
         self._fw_container.setVisible(True)
         self._fw_label.set_count(len(frameworks))
+        # Status-Text wie in der Vorlage („alle installiert" / „x von n") —
+        # nur im modernen Design, Klassik bleibt unverändert
+        if _modern_active():
+            installed = sum(1 for fw in frameworks if fw.get("installed"))
+            if installed == len(frameworks):
+                self._fw_label.set_status(tr("label.fw_all_installed"))
+            else:
+                self._fw_label.set_status(tr(
+                    "label.fw_installed_count",
+                    x=installed, n=len(frameworks)))
+        else:
+            self._fw_label.set_status("")
 
         self._fw_tree.blockSignals(True)
         try:

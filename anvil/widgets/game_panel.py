@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem,
     QMessageBox,
     QAbstractItemView,
+    QSizePolicy,
 )
 
 from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont
@@ -54,6 +55,7 @@ from anvil.core.persistent_header import PersistentHeader
 from anvil.core.plugins_txt_writer import PluginsTxtWriter
 from anvil.core.desktop_shortcut import create_game_shortcut
 from anvil.core.translator import tr
+from anvil.styles.dark_theme import theme_color
 
 
 class _NumericSortItem(QTableWidgetItem):
@@ -101,6 +103,31 @@ class _DraggableDownloadTable(QTableWidget):
         return mime
 
 
+def _game_btn_style() -> str:
+    """Cover-Button: modern aus der Palette, klassisch alte Optik."""
+    if theme_color("panel2", ""):
+        return (
+            f"QToolButton {{ background: {theme_color('panel2', '#242424')};"
+            f" border: 1px solid {theme_color('line', '#3D3D3D')};"
+            f" border-radius: 9px; padding: 0; margin: 0; }}"
+            f" QToolButton:hover {{ border-color: {theme_color('accent', '#33b3a8')}; }}"
+            " QToolButton::menu-indicator { image: none; width: 0; height: 0; }"
+        )
+    return (
+        "QToolButton { background: #242424; border: 2px solid #3D3D3D; border-radius: 4px;"
+        "             padding: 0; margin: 0; }"
+        "QToolButton:hover { background: #2a2a2a; }"
+        "QToolButton::menu-indicator { image: none; width: 0; height: 0; }"
+    )
+
+
+def _cover_size() -> QSize:
+    """Cover-Maße: modern 120×160 hochkant (Handoff), klassisch 140×140."""
+    if theme_color("panel2", ""):
+        return QSize(120, 160)
+    return QSize(140, 140)
+
+
 class GamePanel(QWidget):
     install_requested = Signal(list)  # list of archive path strings
     start_requested = Signal(str, str)  # (binary_path, working_dir)
@@ -139,25 +166,21 @@ class GamePanel(QWidget):
         link_btn_row.addWidget(link_btn)
         top_layout.addLayout(link_btn_row)
 
-        # Game-Icon (Banner) — Klick öffnet Executable-Menü
-        pix = QPixmap(140, 140)
-        pix.fill(QColor("#242424"))
+        # Game-Icon (Banner/Cover) — Klick öffnet Executable-Menü
+        cover = _cover_size()
+        pix = QPixmap(cover)
+        pix.fill(QColor(theme_color("panel2", "#242424")))
         self._game_btn = QToolButton(self)
         self._game_btn.setIcon(QIcon(pix))
-        self._game_btn.setIconSize(QSize(140, 140))
-        self._game_btn.setFixedSize(140, 140)
+        self._game_btn.setIconSize(cover)
+        self._game_btn.setFixedSize(cover)
         self._game_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._exe_menu = QMenu(self)
         self._game_btn.setMenu(self._exe_menu)
         # Menü bei jedem Öffnen frisch aufbauen — so sind eigene Programme nach dem
         # Editor sofort aktuell, unabhängig von der set_instance_path-Reihenfolge.
         self._exe_menu.aboutToShow.connect(self._on_exe_menu_about_to_show)
-        self._game_btn.setStyleSheet(
-            "QToolButton { background: #242424; border: 2px solid #3D3D3D; border-radius: 4px;"
-            "             padding: 0; margin: 0; }"
-            "QToolButton:hover { background: #2a2a2a; }"
-            "QToolButton::menu-indicator { image: none; width: 0; height: 0; }"
-        )
+        self._game_btn.setStyleSheet(_game_btn_style())
         # ▾ Dropdown-Pfeil unten rechts als Overlay
         arrow_label = QLabel("▾", self._game_btn)
         arrow_label.setStyleSheet(
@@ -165,7 +188,8 @@ class GamePanel(QWidget):
             "padding: 1px 4px; border-radius: 3px; border: none;"
         )
         arrow_label.adjustSize()
-        arrow_label.move(140 - arrow_label.width() - 4, 140 - arrow_label.height() - 4)
+        self._cover_arrow = arrow_label
+        self._position_cover_arrow()
         arrow_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         top_layout.addWidget(self._game_btn, 0, Qt.AlignmentFlag.AlignHCenter)
 
@@ -180,11 +204,20 @@ class GamePanel(QWidget):
         if os.path.exists(_play_icon):
             self._start_btn.setIcon(QIcon(_play_icon))
             self._start_btn.setIconSize(QSize(24, 24))
-        self._start_btn.setMinimumWidth(140)
         self._start_btn.setFixedHeight(36)
         self._start_btn.setToolTip(tr("game_panel.start"))
         self._start_btn.clicked.connect(self._on_start_clicked)
         top_layout.addWidget(self._start_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        self._top_layout = top_layout
+        self._apply_start_btn_mode()
+        self._apply_panel_width()
+
+        # Exe-Hinweis unter dem Start-Button (nur modernes Design)
+        self._exe_hint = QLabel("")
+        self._exe_hint.setObjectName("exeHint")
+        self._exe_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._exe_hint.setVisible(False)
+        top_layout.addWidget(self._exe_hint)
 
 
         # (Deploy-UI entfernt — Deploy/Purge läuft jetzt automatisch)
@@ -192,6 +225,7 @@ class GamePanel(QWidget):
         # Executables data: list of {"name", "binary"} dicts
         self._executables: list[dict[str, str]] = []
         self._selected_exe_index: int = 0
+        self._last_game_name: str = ""
 
         layout.addWidget(top_frame)
 
@@ -494,7 +528,8 @@ class GamePanel(QWidget):
 
     def _update_game_button_icon(self, game_name: str) -> None:
         """Set the game button to the cached banner or a placeholder."""
-        size = 140
+        self._last_game_name = game_name
+        size = _cover_size()
         banner = None
         if self._icon_manager and self._current_short_name:
             banner = self._icon_manager.get_game_banner(self._current_short_name)
@@ -502,27 +537,39 @@ class GamePanel(QWidget):
                 banner = self._icon_manager.get_game_icon(self._current_short_name)
 
         if banner is not None:
-            scaled = banner.scaled(
-                QSize(size, size),
-                Qt.AspectRatioMode.IgnoreAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
+            if size.width() != size.height():
+                # Hochkant-Cover: füllend skalieren und mittig beschneiden,
+                # damit quadratische Bilder nicht verzerrt werden
+                scaled = banner.scaled(
+                    size,
+                    Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+                x = max(0, (scaled.width() - size.width()) // 2)
+                y = max(0, (scaled.height() - size.height()) // 2)
+                scaled = scaled.copy(x, y, size.width(), size.height())
+            else:
+                scaled = banner.scaled(
+                    size,
+                    Qt.AspectRatioMode.IgnoreAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
             self._game_btn.setIcon(QIcon(scaled))
-            self._game_btn.setIconSize(QSize(size, size))
+            self._game_btn.setIconSize(size)
         else:
             # Placeholder: grey box with game name
-            pix = QPixmap(size, size)
-            pix.fill(QColor("#242424"))
+            pix = QPixmap(size)
+            pix.fill(QColor(theme_color("panel2", "#242424")))
             if game_name:
                 p = QPainter(pix)
-                p.setPen(QColor("#808080"))
+                p.setPen(QColor(theme_color("txt3", "#808080")))
                 f = QFont()
                 f.setPixelSize(14)
                 p.setFont(f)
                 p.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, game_name)
                 p.end()
             self._game_btn.setIcon(QIcon(pix))
-            self._game_btn.setIconSize(QSize(size, size))
+            self._game_btn.setIconSize(size)
 
     def _rebuild_executables_menu(self, game_plugin) -> None:
         """Rebuild the executable menu in the game button."""
@@ -626,6 +673,7 @@ class GamePanel(QWidget):
         if self._executables:
             self._selected_exe_index = 0
             self._start_btn.setToolTip(tr("game_panel.start_with_name", name=self._executables[0]['name']))
+        self._update_exe_hint()
 
     @staticmethod
     def _exe_identity(exe: dict):
@@ -653,6 +701,7 @@ class GamePanel(QWidget):
                         tr("game_panel.start_with_name", name=exe["name"])
                     )
                     break
+        self._update_exe_hint()
 
     def _on_edit_executables(self) -> None:
         """Open the editor for the instance's custom programs."""
@@ -731,8 +780,64 @@ class GamePanel(QWidget):
     def _placeholder_icon() -> QIcon:
         """Small grey placeholder icon."""
         pix = QPixmap(24, 24)
-        pix.fill(QColor("#3D3D3D"))
+        pix.fill(QColor(theme_color("panel2", "#3D3D3D")))
         return QIcon(pix)
+
+    def _position_cover_arrow(self) -> None:
+        """▾-Overlay unten rechts am Cover-Button positionieren."""
+        a = self._cover_arrow
+        a.move(self._game_btn.width() - a.width() - 4,
+               self._game_btn.height() - a.height() - 4)
+
+    def _apply_panel_width(self) -> None:
+        """Modern: feste Breite — etwas breiter als das Prototyp-Maß (296),
+        damit die deutschen Button-Texte (Neu laden / Dateimanager öffnen)
+        nicht abgeschnitten werden; klassisch: frei per Splitter."""
+        if theme_color("panel2", ""):
+            self.setMinimumWidth(340)
+            self.setMaximumWidth(340)
+        else:
+            self.setMinimumWidth(0)
+            self.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
+
+    def _apply_start_btn_mode(self) -> None:
+        """Modern: voll breiter „Starten"-Button mit Text; klassisch: kompakt."""
+        if theme_color("panel2", ""):
+            self._start_btn.setText(tr("game_panel.start"))
+            self._start_btn.setMinimumWidth(0)
+            self._start_btn.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                          QSizePolicy.Policy.Fixed)
+            self._top_layout.setAlignment(self._start_btn, Qt.Alignment())
+        else:
+            self._start_btn.setText("")
+            self._start_btn.setMinimumWidth(140)
+            self._start_btn.setSizePolicy(QSizePolicy.Policy.Minimum,
+                                          QSizePolicy.Policy.Fixed)
+            self._top_layout.setAlignment(self._start_btn,
+                                          Qt.AlignmentFlag.AlignHCenter)
+
+    def _update_exe_hint(self) -> None:
+        """Gewählte Exe unter dem Start-Button anzeigen (nur modern)."""
+        if not theme_color("panel2", ""):
+            self._exe_hint.setVisible(False)
+            return
+        name = ""
+        if 0 <= self._selected_exe_index < len(self._executables):
+            name = self._executables[self._selected_exe_index].get("name", "")
+        self._exe_hint.setText(name)
+        self._exe_hint.setVisible(bool(name))
+
+    def apply_theme_metrics(self) -> None:
+        """Cover-Button-Optik an das aktive Theme anpassen (Live-Wechsel)."""
+        self._game_btn.setStyleSheet(_game_btn_style())
+        cover = _cover_size()
+        self._game_btn.setFixedSize(cover)
+        self._game_btn.setIconSize(cover)
+        self._position_cover_arrow()
+        self._apply_start_btn_mode()
+        self._apply_panel_width()
+        self._update_game_button_icon(self._last_game_name)
+        self._update_exe_hint()
 
     def _on_explore_virtual_folder(self) -> None:
         """Open the .mods/ directory in the file manager."""
@@ -1161,7 +1266,7 @@ class GamePanel(QWidget):
                 font = item.font(0)
                 font.setItalic(True)
                 item.setFont(0, font)
-                item.setForeground(0, QColor("#808080"))
+                item.setForeground(0, QColor(theme_color("txt3", "#808080")))
 
             # Column 1: Type
             type_label = ext.lstrip(".").upper()
@@ -1179,6 +1284,7 @@ class GamePanel(QWidget):
         self._selected_exe_index = index
         name = self._executables[index]["name"]
         self._start_btn.setToolTip(tr("game_panel.start_with_name", name=name))
+        self._update_exe_hint()
 
     def _on_start_clicked(self) -> None:
         """Start the currently selected executable (deploy already happened).
@@ -2250,7 +2356,7 @@ class GamePanel(QWidget):
             status_text = tr("game_panel.installed") if is_installed else tr("game_panel.not_installed")
             item_status = QTableWidgetItem(status_text)
             if is_installed:
-                item_status.setForeground(QColor("#4CAF50"))
+                item_status.setForeground(QColor(theme_color("ok", "#4CAF50")))
             self._dl_table.setItem(row_idx, 2, item_status)
 
             # Auto-hide installed
@@ -2265,7 +2371,7 @@ class GamePanel(QWidget):
 
             # Hidden: grey text + hide row
             if is_hidden:
-                grey = QColor("#808080")
+                grey = QColor(theme_color("txt3", "#808080"))
                 for col in range(4):
                     ci = self._dl_table.item(row_idx, col)
                     if ci:
@@ -2294,8 +2400,8 @@ class GamePanel(QWidget):
             sep_item.setData(Qt.ItemDataRole.UserRole + 2, True)  # Separator-Marker
             sep_item.setData(Qt.ItemDataRole.UserRole + 3, folder_name)  # Ordnername für Collapse
             sep_item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # Klickbar aber nicht selektierbar/editierbar
-            sep_item.setBackground(QColor("#1a2a3a"))
-            sep_item.setForeground(QColor("#FFFFFF"))
+            sep_item.setBackground(QColor(theme_color("panel2", "#1a2a3a")))
+            sep_item.setForeground(QColor(theme_color("txt", "#FFFFFF")))
             font = sep_item.font()
             font.setBold(True)
             sep_item.setFont(font)
@@ -2304,7 +2410,7 @@ class GamePanel(QWidget):
             for col in range(1, 4):
                 empty = QTableWidgetItem()
                 empty.setFlags(Qt.ItemFlag.NoItemFlags)
-                empty.setBackground(QColor("#1a2a3a"))
+                empty.setBackground(QColor(theme_color("panel2", "#1a2a3a")))
                 self._dl_table.setItem(row, col, empty)
             self._dl_table.setSpan(row, 0, 1, 4)
             row += 1
@@ -2733,7 +2839,7 @@ class GamePanel(QWidget):
         self._dl_table.setItem(row, 1, item_size)
 
         item_status = QTableWidgetItem(tr("game_panel.downloading"))
-        item_status.setForeground(QColor("#42A5F5"))
+        item_status.setForeground(QColor(theme_color("accent", "#42A5F5")))
         self._dl_table.setItem(row, 2, item_status)
 
         self._dl_table.setItem(row, 3, QTableWidgetItem("—"))

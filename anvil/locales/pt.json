@@ -326,6 +326,8 @@
     "header_description": "Descrição",
     "header_plugin": "Plugin",
     "header_version": "Versão",
+    "fw_all_installed": "todos instalados",
+    "fw_installed_count": "{x} de {n} instalados",
     "badge_wins": "vence",
     "badge_loses": "perde",
     "badge_both": "ambos",
@@ -451,6 +453,7 @@
     "disconnected": "Desligado.",
     "not_connected": "Não ligado.",
     "not_installed": "Não instalado",
+    "deploy_auto": "Deploy: automático",
     "api_not_logged_in": "API: não ligado",
     "game_started": "Jogo iniciado: {name}",
     "game_lock": {

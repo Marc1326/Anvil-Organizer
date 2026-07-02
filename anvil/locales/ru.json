@@ -326,6 +326,8 @@
     "header_description": "Описание",
     "header_plugin": "Плагин",
     "header_version": "Версия",
+    "fw_all_installed": "все установлены",
+    "fw_installed_count": "{x} из {n} установлено",
     "badge_wins": "побеждает",
     "badge_loses": "проигрывает",
     "badge_both": "оба",
@@ -451,6 +453,7 @@
     "disconnected": "Отключено.",
     "not_connected": "Не подключено.",
     "not_installed": "Не установлено",
+    "deploy_auto": "Развёртывание: автоматически",
     "api_not_logged_in": "API: не авторизован",
     "game_started": "Игра запущена: {name}",
     "game_lock": {

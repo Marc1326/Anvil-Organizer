@@ -42,6 +42,7 @@ class CollapsibleSectionBar(QWidget):
         self._container = container
         self._max_expanded_height = max_expanded_height
         self._count: int | None = None
+        self._status: str = ""
 
         # Layout: [label .................. action_button]
         hlayout = QHBoxLayout(self)
@@ -49,7 +50,10 @@ class CollapsibleSectionBar(QWidget):
         hlayout.setSpacing(0)
 
         self._label = QLabel()
-        # Modern: Optik aus Theme-QSS über objectName; klassisch: Inline-Style
+        # Modern: Optik aus Theme-QSS über objectName; klassisch: Inline-Style.
+        # Ohne WA_StyledBackground malt Qt background/border aus dem QSS
+        # auf eigenen QWidget-Subklassen nicht.
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setObjectName("sectionBar")
         self._label.setObjectName("sectionBarLabel")
         self._classic_style = style
@@ -103,6 +107,11 @@ class CollapsibleSectionBar(QWidget):
         self._count = count
         self._update_text()
 
+    def set_status(self, status: str) -> None:
+        """Status-Text hinter dem Zähler (z.B. „alle installiert")."""
+        self._status = status
+        self._update_text()
+
     def set_title(self, title: str) -> None:
         """Change the base title."""
         self._title = title
@@ -150,10 +159,12 @@ class CollapsibleSectionBar(QWidget):
 
     def _update_text(self) -> None:
         arrow = "▶" if self._collapsed else "▼"
+        text = f"{arrow} {self._title}"
         if self._count is not None:
-            self._label.setText(f"{arrow} {self._title} ({self._count})")
-        else:
-            self._label.setText(f"{arrow} {self._title}")
+            text += f" ({self._count})"
+        if self._status:
+            text += f" — {self._status}"
+        self._label.setText(text)
 
     def _persist(self) -> None:
         settings = QSettings()

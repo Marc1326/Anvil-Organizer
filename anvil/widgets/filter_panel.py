@@ -85,6 +85,7 @@ class FilterPanel(QWidget):
         content_layout = QVBoxLayout(self._content_widget)
         content_layout.setContentsMargins(4, 4, 4, 4)
         content_layout.setSpacing(4)
+        self._content_layout = content_layout
 
         # ── Scrollable chip area ──────────────────────────────────
         self._scroll_area = QScrollArea()
@@ -443,25 +444,55 @@ class FilterPanel(QWidget):
         self._apply_state()
         self.panel_toggled.emit(new_state)
 
+    def apply_theme_metrics(self) -> None:
+        """Breiten-Regeln an das aktive Theme anpassen (Live-Theme-Wechsel)."""
+        self._apply_state()
+
     def _apply_state(self):
         """Show/hide content, update toggle bar arrow, sync splitter sizes."""
+        from anvil.styles.dark_theme import theme_color
+        modern = bool(theme_color("panel2", ""))
         bar_w = FilterToggleBar._WIDTH
         self._content_widget.setVisible(self._open)
+        # Klappleiste nur im klassischen Design — die Vorlage kennt sie nicht;
+        # modern läuft das Ein-/Ausblenden über Ansicht → Filter Panel
+        self._toggle_bar.setVisible(not modern)
         self._toggle_bar.set_open(self._open)
         if self._open:
-            self.setMinimumWidth(180)
-            self.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
-            if self._splitter and self._saved_sizes:
-                self._splitter.setSizes(self._saved_sizes)
+            if modern:
+                # Fest 224 px (Prototyp-Maß: 200 Inhalt + 2×12 Rand)
+                self._content_layout.setContentsMargins(12, 12, 12, 12)
+                self.setMinimumWidth(224)
+                self.setMaximumWidth(224)
+                # Splitter-Stand hart angleichen — ein alter Stand (>224)
+                # bleibt sonst als unsichtbare Lücke neben dem Panel stehen
+                if self._splitter:
+                    total = sum(self._splitter.sizes())
+                    if total > 224:
+                        self._splitter.setSizes([224, total - 224])
+            else:
+                self._content_layout.setContentsMargins(4, 4, 4, 4)
+                self.setMinimumWidth(180)
+                self.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
+                if self._splitter and self._saved_sizes:
+                    self._splitter.setSizes(self._saved_sizes)
         else:
             if self._splitter:
                 self._saved_sizes = self._splitter.sizes()
             # Constraints first, then splitter sizes
-            self.setMinimumWidth(bar_w)
-            self.setMaximumWidth(bar_w)
-            if self._splitter:
-                total = sum(self._splitter.sizes())
-                self._splitter.setSizes([bar_w, total - bar_w])
+            if modern:
+                # Ohne Klappleiste komplett ausblenden
+                self.setMinimumWidth(0)
+                self.setMaximumWidth(0)
+                if self._splitter:
+                    total = sum(self._splitter.sizes())
+                    self._splitter.setSizes([0, total])
+            else:
+                self.setMinimumWidth(bar_w)
+                self.setMaximumWidth(bar_w)
+                if self._splitter:
+                    total = sum(self._splitter.sizes())
+                    self._splitter.setSizes([bar_w, total - bar_w])
 
 
 class FilterToggleBar(QWidget):

@@ -23,7 +23,7 @@ QAbstractItemView {
   background: {{bg}};
   alternate-background-color: {{panel}};
   show-decoration-selected: 1;
-  border-radius: 6px; }
+  border-radius: 0; }
   QAbstractItemView::item {
     min-height: {{row_height}}px; }
   QAbstractItemView::branch:hover, QAbstractItemView::item:hover {
@@ -33,7 +33,7 @@ QAbstractItemView {
     color: {{txt}}; }
 
 QTreeView, QListView {
-  border-radius: 6px; }
+  border-radius: 0; }
 
 QHeaderView::up-arrow, QHeaderView::down-arrow {
   height: 10px;
@@ -180,6 +180,18 @@ QToolBar {
       background: {{hov}};
       color: {{txt}}; }
 
+#installModBtn {
+  background: {{accent_soft}};
+  color: {{accent}};
+  font-weight: 600;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 7px;
+  margin: 2px 4px 0 4px; }
+  #installModBtn:hover {
+    background: {{accent}};
+    color: {{accent_text}}; }
+
 /* ── Eingabefelder ─────────────────────────────────────────── */
 
 QLineEdit {
@@ -303,11 +315,15 @@ QProgressBar {
     background: {{accent}};
     border-radius: 6px; }
 
-QSplitter {
-  width: 5px; }
-QSplitter::handle {
+/* Horizontale Trenner = 1-px-Linie wie in der Vorlage (Panels sind fix);
+   vertikale Trenner (Frameworks/Log) bleiben greifbar */
+QSplitter::handle:horizontal {
+  width: 1px;
+  background: {{line}}; }
+QSplitter::handle:vertical {
+  height: 6px;
   background: {{bg}}; }
-  QSplitter::handle:hover {
+  QSplitter::handle:vertical:hover {
     background: {{accent_soft}}; }
 
 /* ── Tabs als Pills ────────────────────────────────────────── */
@@ -389,20 +405,26 @@ QToolTip {
   border-bottom: 1px solid {{line}}; }
 
 #gamePanel {
-  background: {{panel}};
-  border-left: 1px solid {{line}}; }
+  background: {{panel}}; }
 
 #startButton {
   background: {{accent}};
   color: {{accent_text}};
   padding: 8px 16px;
   font-weight: 600;
+  font-size: 13px;
   border: 0;
   border-radius: 7px; }
   #startButton:hover {
     background: {{accent_hover}}; }
   #startButton:pressed {
     background: {{accent_pressed}}; }
+
+#exeHint {
+  color: {{txt3}};
+  font-size: 10px;
+  background: transparent;
+  padding: 0 0 4px 0; }
 
 #InfoDialog {
   min-width: 750px;
@@ -442,7 +464,6 @@ QMessageBox QPushButton {
 
 #filterPanel {
   background: {{panel}};
-  border-right: 1px solid {{line}};
   border-radius: 0; }
 
 #filterChip {

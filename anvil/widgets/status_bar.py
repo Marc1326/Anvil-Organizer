@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QStatusBar, QLabel
 
 from anvil.core.translator import tr
+from anvil.styles.dark_theme import theme_color
 
 
 class StatusBarWidget(QStatusBar):
@@ -12,6 +13,11 @@ class StatusBarWidget(QStatusBar):
         super().__init__(parent)
         self._left_label = QLabel("")
         self.addWidget(self._left_label, 1)
+
+        # „● Deploy: automatisch" — sichtbar sobald eine Instanz geladen ist
+        self._deploy_label = QLabel("")
+        self._deploy_label.setVisible(False)
+        self.addPermanentWidget(self._deploy_label)
 
         self._notifications_label = QLabel(tr("status.notifications"))
         self.addPermanentWidget(self._notifications_label)
@@ -33,10 +39,16 @@ class StatusBarWidget(QStatusBar):
         self._left_label.setText(
             tr("status.instance_info", game=game_name, plugin=short_name, store=store_text)
         )
+        ok = theme_color("ok", "#4CAF50")
+        self._deploy_label.setText("● " + tr("status.deploy_auto"))
+        self._deploy_label.setStyleSheet(
+            f"QLabel {{ color: {ok}; padding: 2px 6px; }}")
+        self._deploy_label.setVisible(True)
 
     def clear_instance(self) -> None:
         """Clear the instance info."""
         self._left_label.setText(tr("status.no_instance"))
+        self._deploy_label.setVisible(False)
 
     def update_api_status(
         self,

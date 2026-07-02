@@ -734,6 +734,16 @@ class MainWindow(QMainWindow):
         size = self._ICON_SIZES[idx]
         self._toolbar.setIconSize(size)
 
+    @staticmethod
+    def _toolbar_style_key_and_default() -> tuple:
+        """Settings-Schlüssel + Default für den Toolbar-Stil der aktiven Welt."""
+        from anvil.styles.dark_theme import theme_color
+        if theme_color("panel2", ""):  # modernes Theme
+            return ("view/toolbar_button_style_v2",
+                    Qt.ToolButtonStyle.ToolButtonTextOnly)
+        return ("view/toolbar_button_style",
+                Qt.ToolButtonStyle.ToolButtonIconOnly)
+
     def _set_toolbar_button_style(self, style: Qt.ToolButtonStyle) -> None:
         """Set toolbar button style."""
         self._toolbar.setToolButtonStyle(style)
@@ -815,6 +825,9 @@ class MainWindow(QMainWindow):
                         accent=accent, density=density)
             # Altes Fenster-Stylesheet entfernen — es würde das App-QSS überdecken
             self.setStyleSheet("")
+            # Ansichts-Einstellungen der (evtl. gewechselten) Welt anwenden,
+            # z.B. Toolbar-Stil modern=Text / klassisch=Icons
+            self._restore_view_settings()
             # Apply API counter visibility immediately
             hidden = self._settings().value("Nexus/hide_api_counter", False, type=bool)
             self._status_bar.set_api_counter_visible(not hidden)
@@ -899,9 +912,14 @@ class MainWindow(QMainWindow):
         else:
             self._toolbar.setIconSize(self._ICON_SIZES[1])
 
-        # Button style (default: ToolButtonIconOnly = 0)
-        style_val = int(s.value("view/toolbar_button_style", 0))
-        self._toolbar.setToolButtonStyle(Qt.ToolButtonStyle(style_val))
+        # Button style — getrennte Merker pro Welt: modern = Textbuttons
+        # (Handoff-Default), klassisch = Icons. User-Wahl gilt je Welt.
+        key, default_style = self._toolbar_style_key_and_default()
+        raw_style = s.value(key)
+        if raw_style is None:
+            self._toolbar.setToolButtonStyle(default_style)
+        else:
+            self._toolbar.setToolButtonStyle(Qt.ToolButtonStyle(int(raw_style)))
 
         # Visibility (default: all visible except log)
         if s.value("view/menubar_visible") is not None:
@@ -927,6 +945,43 @@ class MainWindow(QMainWindow):
 
         # Log: CollapsibleSectionBar restores its own state; sync menu check
         self._act_log.setChecked(not self._log_bar.collapsed)
+
+        # Modern: Seiten-Splitter verriegeln — Panelbreiten sind fest
+        self._apply_splitter_locks()
+
+    def _apply_splitter_locks(self) -> None:
+        """Modern: Filter-/Game-Panel-Schieber nicht ziehbar (feste Breiten),
+        Griff = 1-px-Trennlinie; klassisch: frei ziehbar in Standard-Breite."""
+        from anvil.styles.dark_theme import theme_color
+        locked = bool(theme_color("panel2", ""))
+        if not hasattr(self, "_default_handle_width"):
+            self._default_handle_width = self._splitter.handleWidth()
+        for sp in (self._filter_splitter, self._splitter):
+            sp.setHandleWidth(1 if locked else self._default_handle_width)
+            for i in range(1, sp.count()):
+                h = sp.handle(i)
+                if h is not None:
+                    h.setEnabled(not locked)
+        # Modern: kein Abstand zwischen Splittern und Log-Leiste —
+        # die 1-px-Linien enden direkt an der Leiste (wie in der Vorlage)
+        lay = self.centralWidget().layout()
+        if not hasattr(self, "_default_layout_spacing"):
+            self._default_layout_spacing = lay.spacing()
+        lay.setSpacing(0 if locked else self._default_layout_spacing)
+        if not locked:
+            return
+        # Restaurierte Splitter-Stände an die festen Breiten angleichen —
+        # der Splitter klemmt das Panel zwar auf min/max, positioniert den
+        # Nachbarn aber nach dem alten Stand: die Differenz bleibt als
+        # unsichtbare Lücke stehen (gleiche Hintergrundfarbe).
+        fp_w = self._filter_panel.maximumWidth()
+        total = sum(self._filter_splitter.sizes())
+        if total > fp_w:
+            self._filter_splitter.setSizes([fp_w, total - fp_w])
+        gp_w = self._game_panel.maximumWidth()
+        total = sum(self._splitter.sizes())
+        if total > gp_w:
+            self._splitter.setSizes([total - gp_w, gp_w])
 
     # ── Mod-Liste Settings (Backend-Logik) ──────────────────────────
 
@@ -6171,7 +6226,8 @@ class MainWindow(QMainWindow):
                 size_idx = i
                 break
         s.setValue("view/toolbar_icon_size", size_idx)
-        s.setValue("view/toolbar_button_style", self._toolbar.toolButtonStyle().value)
+        style_key, _ = self._toolbar_style_key_and_default()
+        s.setValue(style_key, self._toolbar.toolButtonStyle().value)
         s.sync()
 
     def _restore_ui_state(self) -> None:
@@ -6185,6 +6241,9 @@ class MainWindow(QMainWindow):
         val = s.value("splitter/state")
         if val:
             self._splitter.restoreState(val)
+        # Modern: feste Panelbreiten erzwingen — ein alter Stand darf
+        # keine Lücke neben Mod-Liste/Game-Panel hinterlassen
+        self._apply_splitter_locks()
 
         # Standard mod list — always visible
         self._mod_list_view.restore_column_widths()
