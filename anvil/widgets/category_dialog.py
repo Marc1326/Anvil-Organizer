@@ -19,6 +19,9 @@ from anvil.core.ui_helpers import get_text_input
 from anvil.core.mod_entry import ModEntry
 from anvil.core.mod_metadata import write_meta_ini
 from anvil.core.translator import tr
+from anvil.widgets.modal_shell import (
+    is_modern_theme_active, wrap_modal, exec_with_backdrop,
+)
 
 
 class CategoryDialog(QDialog):
@@ -38,6 +41,7 @@ class CategoryDialog(QDialog):
         parent=None,
     ):
         super().__init__(parent)
+        self._modern = is_modern_theme_active()
         self.setWindowTitle(tr("dialog.categories_title"))
         self.setMinimumSize(1380, 800)
         self.resize(1380, 800)
@@ -47,7 +51,16 @@ class CategoryDialog(QDialog):
         self._was_shown = False
 
         # ── Layout ─────────────────────────────────────────────────
-        outer = QVBoxLayout(self)
+        btn_close = QPushButton(tr("button.close"))
+        btn_close.setDefault(True)
+        btn_close.clicked.connect(self.accept)
+        if self._modern:
+            btn_close.setObjectName("setOkBtn")
+            outer = wrap_modal(
+                self, tr("dialog.categories_title"),
+                [btn_close], close_slot=self.accept)
+        else:
+            outer = QVBoxLayout(self)
 
         body = QHBoxLayout()
 
@@ -86,19 +99,17 @@ class CategoryDialog(QDialog):
 
         outer.addLayout(body, 1)
 
-        # Bottom: close button
-        btn_close = QPushButton(tr("button.close"))
-        btn_close.setDefault(True)
-        close_row = QHBoxLayout()
-        close_row.addStretch(1)
-        close_row.addWidget(btn_close)
-        outer.addLayout(close_row)
+        if not self._modern:
+            # Bottom: close button (klassisch)
+            close_row = QHBoxLayout()
+            close_row.addStretch(1)
+            close_row.addWidget(btn_close)
+            outer.addLayout(close_row)
 
         # ── Connections ────────────────────────────────────────────
         btn_new.clicked.connect(self._on_new)
         btn_rename.clicked.connect(self._on_rename)
         btn_delete.clicked.connect(self._on_delete)
-        btn_close.clicked.connect(self.accept)
 
         # Initial fill
         self._refresh_table()
@@ -108,6 +119,9 @@ class CategoryDialog(QDialog):
 
         # Sort by name initially
         self._tree.sortByColumn(1, Qt.SortOrder.AscendingOrder)
+
+    def exec(self):  # noqa: A003
+        return exec_with_backdrop(self, self._modern)
 
     # ── Overrides ─────────────────────────────────────────────────
 
@@ -257,8 +271,8 @@ class CategoryNameDialog(QDialog):
         initial_text: str = "",
     ):
         super().__init__(parent)
+        self._modern = is_modern_theme_active()
         self.setWindowTitle(title)
-        self.setMinimumWidth(300)
         self.setModal(True)
 
         self._existing_names = existing_names or set()
@@ -266,7 +280,20 @@ class CategoryNameDialog(QDialog):
 
         from PySide6.QtWidgets import QLabel, QLineEdit
 
-        layout = QVBoxLayout(self)
+        self._cancel_btn = QPushButton(tr("button.cancel"))
+        self._cancel_btn.clicked.connect(self.reject)
+        self._ok_btn = QPushButton(tr("button.ok"))
+        self._ok_btn.setDefault(True)
+        self._ok_btn.clicked.connect(self.accept)
+
+        if self._modern:
+            self.setFixedWidth(525)
+            self._ok_btn.setObjectName("setOkBtn")
+            self._cancel_btn.setObjectName("setCancelBtn")
+            layout = wrap_modal(self, title, [self._cancel_btn, self._ok_btn])
+        else:
+            self.setMinimumWidth(300)
+            layout = QVBoxLayout(self)
 
         # Label
         lbl = QLabel(label_text)
@@ -284,19 +311,13 @@ class CategoryNameDialog(QDialog):
         self._hint_label.setVisible(False)
         layout.addWidget(self._hint_label)
 
-        # Buttons
+        # Buttons (klassisch unten; modern in der Fußleiste)
         btn_layout = QHBoxLayout()
-        btn_layout.addStretch(1)
-
-        self._cancel_btn = QPushButton(tr("button.cancel"))
-        self._cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(self._cancel_btn)
-
-        self._ok_btn = QPushButton(tr("button.ok"))
-        self._ok_btn.setObjectName("createBtn")  # Teal-Farbe aus QSS
-        self._ok_btn.setDefault(True)
-        self._ok_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(self._ok_btn)
+        if not self._modern:
+            self._ok_btn.setObjectName("createBtn")  # Teal-Farbe aus QSS
+            btn_layout.addStretch(1)
+            btn_layout.addWidget(self._cancel_btn)
+            btn_layout.addWidget(self._ok_btn)
 
         layout.addLayout(btn_layout)
 

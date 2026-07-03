@@ -1146,3 +1146,27 @@ QFileDialog QToolButton {
 
 #wizardDlg #setOkBtn, #wizardDlg #setCancelBtn, #wizardDlg #wizCancelBtn {
   font-size: 14px; }
+
+/* Konflikte-Tab: Gewinner/Verlierer-Karten (Vorlage) */
+#conflictWinHeader {
+  color: {{ok}};
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px 12px;
+  border: 1px solid {{line}};
+  border-radius: 8px;
+  background: {{panel}}; }
+
+#conflictLossHeader {
+  color: {{warn}};
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px 12px;
+  border: 1px solid {{line}};
+  border-radius: 8px;
+  background: {{panel}}; }
+
+#profileBarLabel {
+  color: {{txt3}};
+  font-size: 12px;
+  background: transparent; }

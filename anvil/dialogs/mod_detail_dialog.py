@@ -1181,8 +1181,17 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
         return page
 
     # --- Gewinnt Konflikte (oben) ---
-    win_label = QLabel(tr("mod_detail.wins_conflicts", count=len(wins)))
-    win_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 12px;")
+    from anvil.styles.dark_theme import theme_color as _tc
+    _modern = bool(_tc("panel2", ""))
+    if _modern:
+        # Vorlage: Gewinner-Karte (ok-Farbe, VERSALIEN)
+        win_label = QLabel(
+            "↑ " + tr("mod_detail.wins_conflicts", count=len(wins)).upper())
+        win_label.setObjectName("conflictWinHeader")
+    else:
+        win_label = QLabel(tr("mod_detail.wins_conflicts", count=len(wins)))
+        win_label.setStyleSheet(
+            "color: #4CAF50; font-weight: bold; font-size: 12px;")
     layout.addWidget(win_label)
 
     win_tree = QTreeWidget()
@@ -1204,8 +1213,17 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
     layout.addWidget(win_tree, 1)
 
     # --- Verliert Konflikte (unten) ---
-    lose_label = QLabel(tr("mod_detail.loses_conflicts", count=len(losses)))
-    lose_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12px;")
+    if _modern:
+        # Vorlage: Verlierer-Karte (warn-Farbe, VERSALIEN)
+        lose_label = QLabel(
+            "↓ " + tr("mod_detail.loses_conflicts",
+                      count=len(losses)).upper())
+        lose_label.setObjectName("conflictLossHeader")
+    else:
+        lose_label = QLabel(
+            tr("mod_detail.loses_conflicts", count=len(losses)))
+        lose_label.setStyleSheet(
+            "color: #F44336; font-weight: bold; font-size: 12px;")
     layout.addWidget(lose_label)
 
     lose_tree = QTreeWidget()

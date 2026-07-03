@@ -1285,5 +1285,10 @@
     "category": "Categoria:",
     "no_category": "Senza categoria",
     "deploy_hint": "La mod viene distribuita automaticamente dopo l'installazione."
+  },
+  "profile": {
+    "name_label": "Nome profilo:",
+    "new_hint": "Il profilo adotta la selezione di mod attuale e può poi essere cambiato in modo indipendente. I profili valgono solo per questa istanza.",
+    "bar_label": "Profilo"
   }
 }

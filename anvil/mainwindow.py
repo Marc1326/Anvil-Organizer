@@ -577,10 +577,6 @@ class MainWindow(QMainWindow):
         # ════════════════════════════════════════════════════════════════
         tm = menubar.addMenu(tr("menu.tools"))
 
-        act = tm.addAction(tr("menu.profiles"))
-        act.setShortcut(QKeySequence("Ctrl+P"))
-        act.triggered.connect(self._on_menu_profiles)
-
         act = tm.addAction(tr("menu.executables"))
         act.setShortcut(QKeySequence("Ctrl+E"))
         act.triggered.connect(self._on_menu_executables)
@@ -834,25 +830,6 @@ class MainWindow(QMainWindow):
         """Forward to super (Alt handling moved to eventFilter)."""
         super().keyPressEvent(event)
 
-    def _on_menu_profiles(self) -> None:
-        """Werkzeuge → Profile... (Strg+P)."""
-        from anvil.widgets.profile_dialog import ProfileDialog
-        dlg = ProfileDialog(
-            self,
-            instance_path=self._current_instance_path,
-            active_profile=self._profile_bar.current_profile(),
-        )
-        dlg.profile_created.connect(self._on_profile_created)
-        dlg.profile_renamed.connect(self._on_profile_renamed)
-        dlg.profile_deleted.connect(self._on_profile_deleted)
-        dlg.profile_selected.connect(self._on_dialog_profile_selected)
-        _center_on_parent(dlg)
-        dlg.exec()
-        # ProfileBar aktualisieren
-        self._profile_bar.set_profiles(
-            self._get_profile_list(),
-            active=self._profile_bar.current_profile(),
-        )
 
     def _on_menu_executables(self) -> None:
         """Werkzeuge → Executables... (Strg+E)."""

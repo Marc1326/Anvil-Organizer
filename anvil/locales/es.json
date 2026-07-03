@@ -1285,5 +1285,10 @@
     "category": "Categoría:",
     "no_category": "Sin categoría",
     "deploy_hint": "El mod se despliega automáticamente tras la instalación."
+  },
+  "profile": {
+    "name_label": "Nombre del perfil:",
+    "new_hint": "El perfil adopta la selección de mods actual y luego puede cambiarse de forma independiente. Los perfiles solo se aplican a esta instancia.",
+    "bar_label": "Perfil"
   }
 }

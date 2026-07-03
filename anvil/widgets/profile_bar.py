@@ -2,7 +2,7 @@
 
 import os
 
-from PySide6.QtGui import QIcon, QAction, QPainter, QLinearGradient, QColor
+from PySide6.QtGui import (QIcon, QAction, QPainter, QLinearGradient, QColor, QPixmap, QPen)
 from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
@@ -163,18 +163,16 @@ def _add_button_style() -> str:
     if _modern():
         return f"""
     #profileAddButton {{
-        background: {theme_color('panel2', '#242424')};
-        color: {theme_color('txt2', '#888888')};
-        border: 1px solid {theme_color('line', '#3D3D3D')};
+        background: transparent;
+        color: {theme_color('txt3', '#888888')};
+        border: none;
         border-radius: 6px;
-        font-size: 22px;
-        font-weight: 300;
-        font-family: "Noto Sans", "Arial", sans-serif;
+        font-size: 17px;
+        font-weight: 700;
     }}
     #profileAddButton:hover {{
-        background: {theme_color('accent', '#006868')};
-        border-color: {theme_color('accent', '#006868')};
-        color: {theme_color('accent_text', '#FFFFFF')};
+        background: {theme_color('hov', 'rgba(255,255,255,0.05)')};
+        color: {theme_color('txt', '#E8E8E8')};
     }}
 """
     return """
@@ -330,9 +328,19 @@ class ProfileBar(QWidget):
         self._drag_timer.timeout.connect(self._on_drag_timer_timeout)
         self._drag_ready = False  # Timer abgelaufen, bereit zum Drag
 
+        from anvil.widgets.modal_shell import is_modern_theme_active
+        # Vorlage: Pill-Gruppe nur so breit wie ihr Inhalt, "+" wandert mit
+        self._plus_inline = is_modern_theme_active()
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(8, 4, 8, 4)
         layout.setSpacing(6)
+
+        if self._plus_inline:
+            # Vorlage: graues "Profil"-Label vor der Pill-Gruppe
+            bar_label = QLabel(tr("profile.bar_label"))
+            bar_label.setObjectName("profileBarLabel")
+            layout.addWidget(bar_label)
 
         # ── Tab Container ─────────────────────────────────────────────
         self._tab_container = QFrame()
@@ -373,20 +381,39 @@ class ProfileBar(QWidget):
         self._fade_right.hide()
 
         layout.addWidget(self._tab_container, 1)
+        if self._plus_inline:
+            # Gruppe wächst bis zur Inhaltsbreite (max), Rest nimmt der Stretch
+            layout.addStretch(1)
 
         # ── Add Profile Button ────────────────────────────────────────
         self._btn_add = QPushButton()
         self._btn_add.setObjectName("profileAddButton")
         self._btn_add.setFixedSize(30, 30)
         self._btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
-        _plus_path = os.path.join(ICON_DIR, "plus.png")
-        if os.path.exists(_plus_path):
-            self._btn_add.setIcon(QIcon(_plus_path))
-            self._btn_add.setIconSize(QSize(20, 20))
+        if self._plus_inline:
+            # Gezeichnetes Plus (Font-Zeichen wirkt wie ein dünnes Kreuz)
+            pix = QPixmap(18, 18)
+            pix.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pix)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            pen = QPen(QColor(theme_color("txt3", "#888888")), 2.4)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen)
+            painter.drawLine(9, 5, 9, 13)
+            painter.drawLine(5, 9, 13, 9)
+            painter.end()
+            self._btn_add.setIcon(QIcon(pix))
+            self._btn_add.setIconSize(QSize(18, 18))
+        else:
+            _plus_path = os.path.join(ICON_DIR, "plus.png")
+            if os.path.exists(_plus_path):
+                self._btn_add.setIcon(QIcon(_plus_path))
+                self._btn_add.setIconSize(QSize(20, 20))
         self._btn_add.setStyleSheet(_add_button_style())
         self._btn_add.setToolTip(tr("tooltip.new_profile"))
         self._btn_add.clicked.connect(self._start_inline_create)
-        layout.addWidget(self._btn_add)
+        if not self._plus_inline:
+            layout.addWidget(self._btn_add)
 
         # ── Action Buttons ────────────────────────────────────────────
         def _set_icon(btn, filename):
@@ -534,6 +561,8 @@ class ProfileBar(QWidget):
             self._tabs_layout.addWidget(tab)
             self._tabs.append(tab)
 
+        if self._plus_inline:
+            self._tabs_layout.addWidget(self._btn_add)
         self._tabs_layout.addStretch()
 
         # Select active profile AFTER layout is computed
@@ -543,6 +572,7 @@ class ProfileBar(QWidget):
             elif profiles:
                 self._select_profile(profiles[0], animate=False)
             self._update_fade_visibility()
+            self._update_container_width()
 
         QTimer.singleShot(100, _delayed_select)
 
@@ -621,6 +651,14 @@ class ProfileBar(QWidget):
         """Return the currently selected profile name."""
         return self._active_profile
 
+    def _update_container_width(self) -> None:
+        """Vorlage: Pill-Gruppe nur so breit wie ihr Inhalt."""
+        if not self._plus_inline:
+            return
+        self._tabs_widget.adjustSize()
+        w = self._tabs_widget.sizeHint().width() + 8  # Container-Padding
+        self._tab_container.setMaximumWidth(max(60, w))
+
     def _start_inline_create(self):
         """Show inline input for new profile name."""
         if self._inline_input is not None:
@@ -634,9 +672,13 @@ class ProfileBar(QWidget):
         edit.setFixedWidth(140)
         edit.setStyleSheet(_inline_input_style())
 
-        # Insert before the stretch (last item)
-        stretch_index = self._tabs_layout.count() - 1
-        self._tabs_layout.insertWidget(stretch_index, edit)
+        # Vor dem "+" einfügen (modern) bzw. vor dem Stretch (klassisch)
+        if self._plus_inline:
+            insert_index = self._tabs_layout.indexOf(self._btn_add)
+        else:
+            insert_index = self._tabs_layout.count() - 1
+        self._tabs_layout.insertWidget(insert_index, edit)
+        self._update_container_width()
 
         edit.setFocus()
         edit.returnPressed.connect(lambda: self._finish_inline_create(edit))
@@ -657,6 +699,7 @@ class ProfileBar(QWidget):
         edit.setParent(None)
         edit.deleteLater()
         self._inline_input = None
+        self._update_container_width()
 
         # Add new profile tab
         current_profiles = [tab.text() for tab in self._tabs]
@@ -676,6 +719,7 @@ class ProfileBar(QWidget):
         edit.setParent(None)
         edit.deleteLater()
         self._inline_input = None
+        self._update_container_width()
 
     def _start_inline_rename(self, tab: QPushButton):
         """Show inline input for renaming a profile."""
@@ -877,7 +921,11 @@ class ProfileBar(QWidget):
             # Tabs in neuer Reihenfolge einfügen
             for t in self._tabs:
                 self._tabs_layout.addWidget(t)
+            if self._plus_inline:
+                self._tabs_layout.addWidget(self._btn_add)
             self._tabs_layout.addStretch()
+
+            self._update_container_width()
 
             # Signal mit neuer Reihenfolge emittieren
             new_order = [t.text() for t in self._tabs]

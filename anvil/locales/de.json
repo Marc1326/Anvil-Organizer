@@ -1285,5 +1285,10 @@
     "category": "Kategorie:",
     "no_category": "Ohne Kategorie",
     "deploy_hint": "Nach der Installation wird der Mod automatisch deployt."
+  },
+  "profile": {
+    "name_label": "Profilname:",
+    "new_hint": "Das Profil übernimmt die aktuelle Mod-Auswahl und kann danach unabhängig geschaltet werden. Profile gelten nur für diese Instanz.",
+    "bar_label": "Profil"
   }
 }

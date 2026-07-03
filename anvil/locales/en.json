@@ -1285,5 +1285,10 @@
     "category": "Category:",
     "no_category": "No category",
     "deploy_hint": "The mod is deployed automatically after installation."
+  },
+  "profile": {
+    "name_label": "Profile name:",
+    "new_hint": "The profile takes over the current mod selection and can be switched independently afterwards. Profiles only apply to this instance.",
+    "bar_label": "Profile"
   }
 }

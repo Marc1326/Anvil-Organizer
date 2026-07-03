@@ -87,15 +87,6 @@ def create_toolbar(parent=None):
 
     bar.addSeparator()
 
-    profile_btn = _add_btn("profiles.svg", "Profiles")
-    def _open_profiles():
-        win = bar.window()
-        if win and hasattr(win, "_on_menu_profiles"):
-            win._on_menu_profiles()
-    profile_btn.clicked.connect(_open_profiles)
-
-    bar.addSeparator()
-
     refresh_btn = _add_btn("refresh.svg", tr("menu.reload"))
     def _on_refresh():
         win = bar.window()
