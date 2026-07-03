@@ -2871,6 +2871,15 @@ class MainWindow(QMainWindow):
 
         menu = QMenu(self)
 
+        # Vorlage: Mod-Name als Kopfzeile (nur modern, bei Einzelauswahl)
+        from anvil.styles.dark_theme import theme_color as _ctx_tc
+        if single and bool(_ctx_tc("panel2", "")):
+            _hdr_name = self._mod_list_view.get_current_mod_name()
+            if _hdr_name:
+                _hdr = menu.addAction(_hdr_name)
+                _hdr.setEnabled(False)
+                menu.addSeparator()
+
         # ── Alle Mods (Submenu) ────────────────────────────────────
         all_mods_menu = menu.addMenu(tr("context.all_mods"))
         act_install_mod = all_mods_menu.addAction(tr("context.install_mod"))
