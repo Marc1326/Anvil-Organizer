@@ -35,20 +35,43 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem,
     QSpinBox,
     QPlainTextEdit,
+    QToolButton,
 )
-from PySide6.QtGui import QColor, QFont, QIcon, QPixmap
-from PySide6.QtCore import Qt, QSettings, QTimer
+from PySide6.QtGui import QColor, QFont, QIcon, QPixmap, QPainter
+from PySide6.QtCore import Qt, QSettings, QTimer, QSize
 
 from anvil.plugins.plugin_loader import PluginLoader, ensure_user_plugin_dir
 from anvil.styles.dark_theme import (
     list_themes, get_styles_dir, default_theme,
     apply_theme, default_palette, load_overrides, save_overrides, COLOR_ROLES,
     is_modern_theme, style_prefs, MODERN_THEME_DARK, MODERN_THEME_LIGHT,
-    MODERN_ACCENTS,
+    MODERN_ACCENTS, theme_color,
 )
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nexus_sso import NexusSSOLogin
 from anvil.core.translator import Translator, tr
+
+def _design_preview_pixmap(dark: bool) -> QPixmap:
+    """Skeleton-Miniatur für die Design-Karten (Vorlage-Optik)."""
+    from PySide6.QtGui import QPainterPath
+    w, h = 222, 67
+    pix = QPixmap(w, h)
+    pix.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    bg, bar = ("#16181d", "#2a2e35") if dark else ("#f2f3f5", "#d9dce1")
+    path = QPainterPath()
+    path.addRoundedRect(0.5, 0.5, w - 1, h - 1, 6, 6)
+    p.fillPath(path, QColor(bg))
+    p.setPen(QColor(bar))
+    p.drawPath(path)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor(bar))
+    p.drawRoundedRect(10, 13, int(w * 0.6), 7, 3, 3)
+    p.drawRoundedRect(10, 28, int(w * 0.4), 7, 3, 3)
+    p.end()
+    return pix
+
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, plugin_loader: PluginLoader | None = None,
@@ -60,15 +83,58 @@ class SettingsDialog(QDialog):
         self._on_clear_modindex = on_clear_modindex
         self._diagnostics_provider = diagnostics_provider
         self.setWindowTitle(tr("dialog.settings_title"))
-        self.setMinimumSize(960, 600)
-        self.resize(960, 600)
+        # Modern: feste Vorlage-Größe, rahmenlos mit eigener Titelleiste,
+        # Radius 12 + 1px-Rahmen (Fensterecken transparent)
+        self._modern = bool(theme_color("panel2", ""))
+        self._backdrop = None
+        if self._modern:
+            self.setObjectName("settingsDlg")
+            self.setFixedSize(976, 726)
+            self.setWindowFlags(
+                Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        else:
+            self.setMinimumSize(960, 600)
+            self.resize(960, 600)
 
-        layout = QVBoxLayout(self)
-        layout.setSpacing(10)
-        layout.setContentsMargins(12, 12, 12, 12)
+        if self._modern:
+            outer = QVBoxLayout(self)
+            outer.setSpacing(0)
+            outer.setContentsMargins(0, 0, 0, 0)
+            frame = QWidget()
+            frame.setObjectName("modalFrame")
+            frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            outer.addWidget(frame)
+            layout = QVBoxLayout(frame)
+        else:
+            layout = QVBoxLayout(self)
+        if self._modern:
+            layout.setSpacing(0)
+            layout.setContentsMargins(1, 1, 1, 1)
+            title_bar = QWidget()
+            title_bar.setObjectName("instTitleBar")
+            title_bar.setAttribute(
+                Qt.WidgetAttribute.WA_StyledBackground, True)
+            title_bar.setFixedHeight(52)
+            tb = QHBoxLayout(title_bar)
+            tb.setContentsMargins(16, 0, 16, 0)
+            t_lbl = QLabel(tr("dialog.settings_title"))
+            t_lbl.setObjectName("instTitleLabel")
+            tb.addWidget(t_lbl)
+            tb.addStretch()
+            x_btn = QPushButton("✕")
+            x_btn.setObjectName("instCloseBtn")
+            x_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            x_btn.clicked.connect(self.reject)
+            tb.addWidget(x_btn)
+            layout.addWidget(title_bar)
+        else:
+            layout.setSpacing(10)
+            layout.setContentsMargins(12, 12, 12, 12)
 
         settings = self._settings()
         self._tabs = QTabWidget()
+        if self._modern:
+            self._tabs.setObjectName("settingsTabs")
 
         # Load instance data (used by multiple tabs)
         self._idata = {}
@@ -122,15 +188,15 @@ class SettingsDialog(QDialog):
         self._cb_show_meta = QCheckBox(tr("settings.show_meta_info"))
         self._cb_show_meta.setChecked(
             settings.value("Interface/show_meta_info", False, type=bool))
-        dl_layout.addWidget(self._cb_show_meta)
+        dl_layout.addWidget(self._setting_row(self._cb_show_meta))
         self._cb_compact_list = QCheckBox(tr("settings.compact_list"))
         self._cb_compact_list.setChecked(
             settings.value("Interface/compact_list", False, type=bool))
-        dl_layout.addWidget(self._cb_compact_list)
+        dl_layout.addWidget(self._setting_row(self._cb_compact_list))
         self._cb_hide_downloads = QCheckBox(tr("settings.hide_downloads_after_install"))
         self._cb_hide_downloads.setChecked(
             settings.value("Interface/hide_downloads_after_install", False, type=bool))
-        dl_layout.addWidget(self._cb_hide_downloads)
+        dl_layout.addWidget(self._setting_row(self._cb_hide_downloads))
 
         scroll_layout.addWidget(dl_grp)
 
@@ -140,7 +206,7 @@ class SettingsDialog(QDialog):
         self._cb_check_updates = QCheckBox(tr("settings.check_for_updates"))
         self._cb_check_updates.setChecked(
             settings.value("General/check_for_updates", True, type=bool))
-        up_layout.addWidget(self._cb_check_updates)
+        up_layout.addWidget(self._setting_row(self._cb_check_updates))
         scroll_layout.addWidget(up_grp)
 
         # Gruppe Profil-Standardeinstellungen
@@ -149,12 +215,12 @@ class SettingsDialog(QDialog):
         self._cb_local_inis = QCheckBox(tr("settings.local_inis"))
         self._cb_local_inis.setChecked(
             str(self._idata.get("local_inis", "true")).lower() in ("true", "1"))
-        prof_layout.addWidget(self._cb_local_inis)
+        prof_layout.addWidget(self._setting_row(self._cb_local_inis))
         self._cb_local_saves = QCheckBox(tr("settings.local_saves"))
         self._cb_local_saves.setChecked(
             str(self._idata.get("local_saves", "false")).lower() in ("true", "1"))
-        prof_layout.addWidget(self._cb_local_saves)
-        prof_layout.addWidget(_disabled(QCheckBox(tr("settings.auto_archive_invalidation"))))
+        prof_layout.addWidget(self._setting_row(self._cb_local_saves))
+        prof_layout.addWidget(self._setting_row(_disabled(QCheckBox(tr("settings.auto_archive_invalidation")))))
         scroll_layout.addWidget(prof_grp)
 
         # Gruppe Sonstiges
@@ -163,23 +229,23 @@ class SettingsDialog(QDialog):
         self._cb_center_dialogs = QCheckBox(tr("settings.center_dialogs"))
         self._cb_center_dialogs.setChecked(
             settings.value("Interface/center_dialogs", False, type=bool))
-        misc_layout.addWidget(self._cb_center_dialogs)
+        misc_layout.addWidget(self._setting_row(self._cb_center_dialogs))
         self._cb_confirm_instance = QCheckBox(tr("settings.confirm_instance_change"))
         self._cb_confirm_instance.setChecked(
             settings.value("Interface/confirm_instance_change", True, type=bool))
-        misc_layout.addWidget(self._cb_confirm_instance)
+        misc_layout.addWidget(self._setting_row(self._cb_confirm_instance))
         self._cb_alt_menubar = QCheckBox(tr("settings.alt_shows_menubar"))
         self._cb_alt_menubar.setChecked(
             settings.value("Interface/show_menubar_on_alt", True, type=bool))
-        misc_layout.addWidget(self._cb_alt_menubar)
+        misc_layout.addWidget(self._setting_row(self._cb_alt_menubar))
         cb_preview = QCheckBox(tr("settings.open_preview_dblclick"))
         cb_preview.setChecked(True)
         _disabled(cb_preview)
-        misc_layout.addWidget(cb_preview)
+        misc_layout.addWidget(self._setting_row(cb_preview))
         self._cb_shortcut_launch_game = QCheckBox(tr("settings.shortcut_launch_game"))
         self._cb_shortcut_launch_game.setChecked(
             settings.value("Interface/shortcut_launch_game", True, type=bool))
-        misc_layout.addWidget(self._cb_shortcut_launch_game)
+        misc_layout.addWidget(self._setting_row(self._cb_shortcut_launch_game))
         scroll_layout.addWidget(misc_grp)
 
         misc_btn_row = QHBoxLayout()
@@ -224,12 +290,30 @@ class SettingsDialog(QDialog):
         design_layout = QVBoxLayout(design_grp)
 
         variant_row = QHBoxLayout()
-        self._btn_design_dark = QPushButton(tr("settings.design_dark"))
-        self._btn_design_light = QPushButton(tr("settings.design_light"))
+        variant_row.setSpacing(10)
+        if self._modern:
+            # Vorlage: Preview-Karten (Skeleton-Miniatur, Label darunter)
+            self._btn_design_dark = QToolButton()
+            self._btn_design_dark.setText(tr("settings.design_dark"))
+            self._btn_design_light = QToolButton()
+            self._btn_design_light.setText(tr("settings.design_light"))
+            for btn, dark in ((self._btn_design_dark, True),
+                              (self._btn_design_light, False)):
+                btn.setObjectName("designCard")
+                btn.setToolButtonStyle(
+                    Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+                btn.setIcon(QIcon(_design_preview_pixmap(dark)))
+                btn.setIconSize(QSize(222, 67))
+                btn.setFixedSize(252, 126)
+                btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self._btn_design_dark = QPushButton(tr("settings.design_dark"))
+            self._btn_design_light = QPushButton(tr("settings.design_light"))
         for btn, name in ((self._btn_design_dark, MODERN_THEME_DARK),
                           (self._btn_design_light, MODERN_THEME_LIGHT)):
             btn.setCheckable(True)
-            btn.setMinimumSize(120, 36)
+            if not self._modern:
+                btn.setMinimumSize(120, 36)
             btn.clicked.connect(
                 lambda checked=False, n=name: self._on_design_clicked(n))
             variant_row.addWidget(btn)
@@ -237,7 +321,14 @@ class SettingsDialog(QDialog):
         design_layout.addLayout(variant_row)
 
         accent_row = QHBoxLayout()
-        accent_row.addWidget(QLabel(tr("settings.accent_color")))
+        accent_row.setSpacing(10)
+        if self._modern:
+            hdr = QLabel(tr("settings.accent_color").upper())
+            hdr.setObjectName("sectionMiniHeader")
+            design_layout.addSpacing(6)
+            design_layout.addWidget(hdr)
+        else:
+            accent_row.addWidget(QLabel(tr("settings.accent_color")))
         self._accent_buttons: dict = {}
         accent_labels = {
             "teal": tr("settings.accent_teal"),
@@ -245,8 +336,15 @@ class SettingsDialog(QDialog):
             "blue": tr("settings.accent_blue"),
         }
         for key in MODERN_ACCENTS:
-            btn = QPushButton(accent_labels.get(key, key))
+            label_txt = accent_labels.get(key, key)
+            btn = QPushButton(
+                " " + label_txt if self._modern else label_txt)
             btn.setCheckable(True)
+            if self._modern:
+                # Vorlage: Farbkreis 22px + Name (Icon malt _update_accent_icons)
+                btn.setObjectName("accentCard")
+                btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                btn.setIconSize(QSize(27, 27))
             btn.clicked.connect(
                 lambda checked=False, k=key: self._on_accent_clicked(k))
             self._accent_buttons[key] = btn
@@ -255,19 +353,38 @@ class SettingsDialog(QDialog):
         design_layout.addLayout(accent_row)
 
         density_row = QHBoxLayout()
-        density_row.addWidget(QLabel(tr("settings.row_density")))
+        if self._modern:
+            hdr = QLabel(tr("settings.row_density").upper())
+            hdr.setObjectName("sectionMiniHeader")
+            design_layout.addSpacing(6)
+            design_layout.addWidget(hdr)
+        else:
+            density_row.addWidget(QLabel(tr("settings.row_density")))
         self._density_buttons: dict = {}
         density_labels = {
             "compact": tr("settings.density_compact"),
             "comfy": tr("settings.density_comfy"),
         }
+        seg_layout = density_row
+        if self._modern:
+            # Vorlage: Segment-Schalter in panel2-Container
+            seg = QWidget()
+            seg.setObjectName("densSegment")
+            seg.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            seg_layout = QHBoxLayout(seg)
+            seg_layout.setContentsMargins(3, 3, 3, 3)
+            seg_layout.setSpacing(4)
+            density_row.addWidget(seg)
         for key, label in density_labels.items():
             btn = QPushButton(label)
             btn.setCheckable(True)
+            if self._modern:
+                btn.setObjectName("densBtn")
+                btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(
                 lambda checked=False, k=key: self._on_density_clicked(k))
             self._density_buttons[key] = btn
-            density_row.addWidget(btn)
+            seg_layout.addWidget(btn)
         density_row.addStretch()
         design_layout.addLayout(density_row)
         style_layout.addWidget(design_grp)
@@ -354,23 +471,23 @@ class SettingsDialog(QDialog):
         self._cb_separator_colors = QCheckBox(tr("settings.show_separator_colors"))
         self._cb_separator_colors.setChecked(
             settings.value("ModList/show_separator_colors", True, type=bool))
-        ml_layout.addWidget(self._cb_separator_colors)
+        ml_layout.addWidget(self._setting_row(self._cb_separator_colors))
         self._cb_external_mods = QCheckBox(tr("settings.show_external_mods"))
         self._cb_external_mods.setChecked(
             settings.value("ModList/show_external_mods", True, type=bool))
-        ml_layout.addWidget(self._cb_external_mods)
+        ml_layout.addWidget(self._setting_row(self._cb_external_mods))
         self._cb_remember_filters = QCheckBox(tr("settings.remember_filters"))
         self._cb_remember_filters.setChecked(
             settings.value("ModList/remember_filters", False, type=bool))
-        ml_layout.addWidget(self._cb_remember_filters)
+        ml_layout.addWidget(self._setting_row(self._cb_remember_filters))
         self._cb_check_updates_install = QCheckBox(tr("settings.check_updates_after_install"))
         self._cb_check_updates_install.setChecked(
             settings.value("ModList/check_updates_after_install", True, type=bool))
-        ml_layout.addWidget(self._cb_check_updates_install)
+        ml_layout.addWidget(self._setting_row(self._cb_check_updates_install))
         self._cb_auto_collapse_drag = QCheckBox(tr("settings.auto_collapse_on_drag"))
         self._cb_auto_collapse_drag.setChecked(
             settings.value("ModList/auto_collapse_on_drag", False, type=bool))
-        ml_layout.addWidget(self._cb_auto_collapse_drag)
+        ml_layout.addWidget(self._setting_row(self._cb_auto_collapse_drag))
         sep_grp = QGroupBox(tr("settings.collapsible_separators"))
         sep_layout = QVBoxLayout(sep_grp)
         sort_row = QHBoxLayout()
@@ -1109,22 +1226,96 @@ class SettingsDialog(QDialog):
         loot_tab_layout.addStretch()
         self._tabs.addTab(loot_tab, tr("settings.tab_loot"))
 
-        layout.addWidget(self._tabs)
+        if self._modern:
+            tabs_wrap = QWidget()
+            tw = QVBoxLayout(tabs_wrap)
+            tw.setContentsMargins(20, 14, 20, 0)
+            tw.setSpacing(0)
+            tw.addWidget(self._tabs)
+            layout.addWidget(tabs_wrap, 1)
+        else:
+            layout.addWidget(self._tabs)
 
         # Letzten Tab-Index wiederherstellen
         saved_tab = settings.value("SettingsDialog/tab_index", 0, type=int)
         self._tabs.setCurrentIndex(saved_tab)
 
-        # Unten rechts: OK, Abbrechen
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
+        # Unten: OK, Abbrechen (modern: Fußleiste wie Vorlage)
         ok_btn = QPushButton(tr("button.ok"))
         ok_btn.clicked.connect(self.accept)
         cancel_btn = QPushButton(tr("button.cancel"))
         cancel_btn.clicked.connect(self.reject)
-        btn_row.addWidget(ok_btn)
-        btn_row.addWidget(cancel_btn)
-        layout.addLayout(btn_row)
+        if self._modern:
+            footer = QWidget()
+            footer.setObjectName("instFooter")
+            footer.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            footer.setFixedHeight(60)
+            fr = QHBoxLayout(footer)
+            fr.setContentsMargins(16, 0, 16, 0)
+            fr.setSpacing(8)
+            fr.addStretch()
+            ok_btn.setObjectName("setOkBtn")
+            ok_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            cancel_btn.setObjectName("setCancelBtn")
+            cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            fr.addWidget(ok_btn)
+            fr.addWidget(cancel_btn)
+            layout.addWidget(footer)
+
+            # Sektions-Überschriften wie Vorlage: VERSALIEN
+            for grp in self.findChildren(QGroupBox):
+                grp.setTitle(grp.title().upper())
+        else:
+            btn_row = QHBoxLayout()
+            btn_row.addStretch()
+            btn_row.addWidget(ok_btn)
+            btn_row.addWidget(cancel_btn)
+            layout.addLayout(btn_row)
+
+        # Scroll-Schutz: Rad über Combo/Spinbox verstellt sonst Werte
+        for w in self.findChildren(QComboBox) + self.findChildren(QSpinBox):
+            w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            w.installEventFilter(self)
+
+    def eventFilter(self, obj, event):  # noqa: N802
+        """Mausrad über Combos/Spinboxen nur mit Fokus — sonst verstellt
+        das Scrollen der Seite versehentlich Werte (Theme-Live-Preview!)."""
+        from PySide6.QtCore import QEvent
+        if event.type() == QEvent.Type.Wheel and not obj.hasFocus():
+            return True
+        return super().eventFilter(obj, event)
+
+    def exec(self):  # noqa: A003
+        """Modern: Hauptfenster abdunkeln, solange der Dialog offen ist."""
+        if self._modern and self.parent() is not None:
+            from anvil.widgets.modal_backdrop import ModalBackdrop
+            backdrop = ModalBackdrop(self.parent().window())
+            try:
+                return super().exec()
+            finally:
+                backdrop.dismiss()
+        return super().exec()
+
+    def _setting_row(self, cb: QCheckBox) -> QWidget:
+        """Modern: Checkbox als Vorlage-Zeile (Text links, Schalter rechts,
+        umrandete Karte). Klassisch: Checkbox unverändert."""
+        if not self._modern:
+            return cb
+        row = QWidget()
+        row.setObjectName("settingRow")
+        row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        h = QHBoxLayout(row)
+        h.setContentsMargins(15, 11, 15, 11)
+        h.setSpacing(10)
+        lbl = QLabel(cb.text())
+        lbl.setObjectName("settingRowLabel")
+        cb.setText("")
+        if cb.toolTip():
+            row.setToolTip(cb.toolTip())
+            lbl.setToolTip(cb.toolTip())
+        h.addWidget(lbl, 1)
+        h.addWidget(cb)
+        return row
 
     # ── Plugin-Tab helpers ────────────────────────────────────────────
 
@@ -1442,8 +1633,19 @@ class SettingsDialog(QDialog):
         """Farb-Punkte der Akzent-Buttons passend zur gewählten Variante."""
         theme = self._selected_modern_theme()
         for key, btn in self._accent_buttons.items():
-            pix = QPixmap(14, 14)
-            pix.fill(QColor(MODERN_ACCENTS[key][theme][0]))
+            if self._modern:
+                # Vorlage: 22px-Farbkreis
+                pix = QPixmap(27, 27)
+                pix.fill(Qt.GlobalColor.transparent)
+                p = QPainter(pix)
+                p.setRenderHint(QPainter.RenderHint.Antialiasing)
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(QColor(MODERN_ACCENTS[key][theme][0]))
+                p.drawEllipse(0, 0, 27, 27)
+                p.end()
+            else:
+                pix = QPixmap(14, 14)
+                pix.fill(QColor(MODERN_ACCENTS[key][theme][0]))
             btn.setIcon(QIcon(pix))
 
     # ── Theme-Farben (anpassbare Rollenfarben) ───────────────────────

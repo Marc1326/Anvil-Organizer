@@ -828,3 +828,218 @@ QFileDialog QToolButton {
   icon-size: 22px;
   min-width: 28px;
   min-height: 28px; }
+
+/* ── Einstellungen-Dialog (Vorlage Screen 6/7) ─────────────── */
+
+#settingsTabs::tab-bar {
+  alignment: left; }
+
+#settingsTabs QTabBar::tab {
+  padding: 7px 15px;
+  border-radius: 7px;
+  margin: 0 3px 6px 0;
+  font-size: 12px; }
+
+#settingsTabs QGroupBox {
+  border: 0;
+  border-radius: 0;
+  padding: 20px 0 0 0;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: {{txt3}}; }
+  #settingsTabs QGroupBox::title {
+    subcontrol-origin: padding;
+    subcontrol-position: top left;
+    padding: 0; }
+
+#settingRow {
+  background: {{panel}};
+  border: 1px solid {{line}};
+  border-radius: 8px; }
+
+#settingRowLabel {
+  font-size: 12px;
+  background: transparent; }
+
+/* Felder im Einstellungen-Dialog: Vorlage-Höhen (~35px) */
+#settingsTabs QComboBox {
+  min-height: 17px;
+  padding: 8px 11px; }
+
+#settingsTabs QLineEdit {
+  min-height: 19px;
+  padding: 6px 11px; }
+
+/* 34×18-Schiebeschalter wie Vorlage (Knopf als SVG, Track per QSS) */
+#settingRow QCheckBox::indicator {
+  width: 34px;
+  height: 18px;
+  border: 0;
+  border-radius: 9px;
+  background: {{line}};
+  image: url("{{icons}}/switch-off.svg"); }
+  #settingRow QCheckBox::indicator:checked {
+    background: {{accent}};
+    image: url("{{icons}}/switch-on.svg"); }
+  #settingRow QCheckBox::indicator:disabled {
+    background: {{panel2}}; }
+
+#setOkBtn {
+  background: {{accent}};
+  color: #0d1113;
+  font-weight: 700;
+  font-size: 12px;
+  border: none;
+  border-radius: 7px;
+  min-height: 19px;
+  margin: 0;
+  padding: 8px 18px; }
+  #setOkBtn:hover {
+    background: {{accent_hover}}; }
+
+#setCancelBtn {
+  background: {{panel2}};
+  border: 1px solid {{line}};
+  border-radius: 7px;
+  color: {{txt}};
+  font-weight: 600;
+  font-size: 12px;
+  min-height: 17px;
+  margin: 0;
+  padding: 8px 18px; }
+  #setCancelBtn:hover {
+    background: {{hov}}; }
+
+#designCard {
+  background: {{panel}};
+  border: 2px solid {{line}};
+  border-radius: 9px;
+  padding: 10px;
+  color: {{txt}};
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 178px;
+  min-height: 77px;
+  margin: 0; }
+  #designCard:hover {
+    background: {{hov}};
+    border: 2px solid {{line}}; }
+  #designCard:checked {
+    background: {{panel}};
+    color: {{txt}};
+    border: 2px solid {{accent}}; }
+
+#accentCard {
+  background: {{panel}};
+  border: 2px solid {{line}};
+  border-radius: 9px;
+  padding: 7px 13px;
+  color: {{txt}};
+  font-size: 11px;
+  min-height: 22px;
+  margin: 0; }
+  #accentCard:hover {
+    background: {{hov}};
+    border: 2px solid {{line}}; }
+  #accentCard:checked {
+    background: {{panel}};
+    color: {{txt}};
+    font-weight: 600;
+    border: 2px solid {{accent}}; }
+
+#densSegment {
+  background: {{panel2}};
+  border-radius: 8px; }
+
+#densBtn {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: {{txt2}};
+  font-size: 11px;
+  padding: 5px 16px;
+  min-height: 16px;
+  margin: 0; }
+  #densBtn:checked {
+    background: {{accent}};
+    color: #0f1113;
+    font-weight: 700;
+    border: none; }
+
+#sectionMiniHeader {
+  font-size: 11px;
+  font-weight: 700;
+  color: {{txt3}};
+  background: transparent; }
+
+/* ── Modal-Rahmen: Radius 12 + 1px-Rahmen + Backdrop ───────── */
+
+#modalFrame {
+  background: {{bg}};
+  border: 1px solid {{line}}; }
+
+#modalBackdrop {
+  background: rgba(8, 10, 12, 0.55); }
+
+/* ── Einstellungen: Skalierung ×1,25 (größer als Handoff) ──── */
+
+#settingsDlg #instTitleLabel {
+  font-size: 15px; }
+
+#settingsDlg #instCloseBtn {
+  font-size: 16px; }
+
+#settingsDlg QTabBar::tab {
+  padding: 9px 19px;
+  border-radius: 8px;
+  margin: 0 4px 8px 0;
+  font-size: 13px; }
+
+#settingsDlg QGroupBox {
+  padding-top: 24px;
+  font-size: 12px; }
+
+#settingsDlg #settingRowLabel {
+  font-size: 13px; }
+
+#settingsDlg #settingRow QCheckBox::indicator {
+  width: 42px;
+  height: 22px;
+  border-radius: 11px;
+  image: url("{{icons}}/switch-off-lg.svg"); }
+  #settingsDlg #settingRow QCheckBox::indicator:checked {
+    image: url("{{icons}}/switch-on-lg.svg"); }
+
+#settingsDlg QComboBox {
+  min-height: 21px;
+  padding: 10px 14px;
+  font-size: 13px; }
+
+#settingsDlg QLineEdit {
+  min-height: 23px;
+  padding: 8px 14px;
+  font-size: 13px; }
+
+#settingsDlg #setOkBtn, #settingsDlg #setCancelBtn {
+  padding: 10px 22px;
+  font-size: 13px; }
+
+#settingsDlg #designCard {
+  min-width: 222px;
+  min-height: 96px;
+  padding: 13px;
+  font-size: 13px; }
+
+#settingsDlg #accentCard {
+  padding: 9px 16px;
+  min-height: 27px;
+  font-size: 13px; }
+
+#settingsDlg #densBtn {
+  padding: 7px 20px;
+  min-height: 20px;
+  font-size: 13px; }
+
+#settingsDlg #sectionMiniHeader {
+  font-size: 12px; }
