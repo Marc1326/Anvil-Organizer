@@ -1098,3 +1098,51 @@ QFileDialog QToolButton {
   font-size: 11px;
   border-radius: 12px;
   padding: 3px 10px; }
+
+/* ── Instanz-Assistent ─────────────────────────────────────── */
+
+#wizStepLabel {
+  font-size: 12px;
+  color: {{txt3}};
+  background: transparent; }
+
+#wizSubtitle {
+  font-size: 12px;
+  color: {{txt2}};
+  background: transparent; }
+
+#wizGameGrid {
+  background: transparent;
+  border: 0; }
+  #wizGameGrid::item {
+    background: transparent; }
+  #wizGameGrid::item:selected {
+    background: transparent; }
+  #wizGameGrid::item:hover {
+    background: transparent; }
+
+/* Assistent: größere Schrift, eigene Feldhöhen */
+#wizardDlg QLabel {
+  font-size: 14px; }
+
+#wizardDlg #instTitleLabel {
+  font-size: 16px; }
+
+#wizardDlg #instCloseBtn {
+  font-size: 17px; }
+
+#wizardDlg QLineEdit {
+  min-height: 24px;
+  padding: 8px 14px;
+  font-size: 14px; }
+
+#wizardDlg QComboBox {
+  min-height: 22px;
+  padding: 10px 14px;
+  font-size: 14px; }
+
+#wizardDlg QCheckBox, #wizardDlg QRadioButton {
+  font-size: 14px; }
+
+#wizardDlg #setOkBtn, #wizardDlg #setCancelBtn, #wizardDlg #wizCancelBtn {
+  font-size: 14px; }

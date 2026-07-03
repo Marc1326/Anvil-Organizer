@@ -1028,7 +1028,8 @@
     "no_games": "Aucun jeu pris en charge trouve.",
     "not_detected": "non detecte",
     "create_error": "Impossible de creer l'instance:\n{error}",
-    "browse_folder_title": "Sélectionner le dossier"
+    "browse_folder_title": "Sélectionner le dossier",
+    "step_label": "Étape {current} sur {total} — {title}"
   },
   "update": {
     "commits_available": "{count} nouveaux commits disponibles",

@@ -8,15 +8,121 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QStackedWidget,
     QLabel, QLineEdit, QListView, QCheckBox, QRadioButton,
     QPushButton, QWidget, QFrame, QButtonGroup, QAbstractItemView,
-    QFileDialog, QStyle,
+    QFileDialog, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
 )
-from PySide6.QtGui import QFont, QIcon, QStandardItemModel, QStandardItem
-from PySide6.QtCore import Qt, QSortFilterProxyModel, QSettings, QSize
+from PySide6.QtGui import (
+    QFont, QIcon, QStandardItemModel, QStandardItem,
+    QPainter, QPainterPath, QColor,
+)
+from PySide6.QtCore import (
+    Qt, QSortFilterProxyModel, QSettings, QSize, QModelIndex, QRect,
+)
 
 from anvil.core.instance_manager import InstanceManager
 from anvil.core.icon_manager import IconManager, placeholder_game_icon
 from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.translator import tr
+from anvil.styles.dark_theme import theme_color
+
+
+def _wiz_color(role: str, fallback: str) -> QColor:
+    val = (theme_color(role, fallback) or fallback).strip()
+    if val.startswith("rgb"):
+        inner = val[val.index("(") + 1:val.index(")")]
+        parts = [x.strip() for x in inner.split(",")]
+        r, g, b = (int(float(parts[i])) for i in range(3))
+        a = int(float(parts[3]) * 255) if len(parts) > 3 else 255
+        return QColor(r, g, b, a)
+    return QColor(val)
+
+
+class _GameTileDelegate(QStyledItemDelegate):
+    """Vorlage-Kachel: 30px-Icon-Chip + Spielname + Store-Untertitel,
+    Auswahl mit Akzent-Rahmen. 2-Spalten-Grid via IconMode."""
+
+    TILE_H = 68
+
+    def __init__(self, view):
+        super().__init__(view)
+        self._view = view
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem,
+              index: QModelIndex) -> None:  # noqa: N802
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        rect = option.rect.adjusted(3, 3, -3, -3)
+
+        selected = bool(option.state & QStyle.StateFlag.State_Selected)
+        path = QPainterPath()
+        path.addRoundedRect(
+            rect.x() + 1, rect.y() + 1,
+            rect.width() - 2, rect.height() - 2, 11, 11)
+        painter.fillPath(path, _wiz_color("panel", "#1a1d22"))
+        pen_color = (_wiz_color("accent", "#33b3a8") if selected
+                     else _wiz_color("line", "#2a2e35"))
+        pen = painter.pen()
+        pen.setColor(pen_color)
+        pen.setWidthF(2)
+        painter.setPen(pen)
+        painter.drawPath(path)
+
+        short = index.data(Qt.ItemDataRole.UserRole)
+        if not short:
+            # „Keine Spiele gefunden"-Zeile
+            painter.setPen(_wiz_color("txt3", "#666d78"))
+            painter.drawText(
+                rect, Qt.AlignmentFlag.AlignCenter,
+                str(index.data(Qt.ItemDataRole.DisplayRole) or ""))
+            painter.restore()
+            return
+
+        # Icon-Chip 30×30 (abgerundet)
+        icon = index.data(Qt.ItemDataRole.DecorationRole)
+        cx = rect.x() + 14
+        cy = rect.y() + (rect.height() - 36) // 2
+        if isinstance(icon, QIcon) and not icon.isNull():
+            clip = QPainterPath()
+            clip.addRoundedRect(cx, cy, 36, 36, 7, 7)
+            painter.setClipPath(clip)
+            painter.drawPixmap(cx, cy, icon.pixmap(36, 36).scaled(
+                36, 36,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation))
+            painter.setClipping(False)
+
+        # Name + Untertitel
+        name = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
+        sub = str(index.data(Qt.ItemDataRole.UserRole + 2) or "")
+        tx = cx + 36 + 12
+        tw = rect.right() - tx - 10
+        nf = QFont()
+        nf.setPixelSize(14)
+        nf.setWeight(QFont.Weight.DemiBold)
+        painter.setFont(nf)
+        painter.setPen(_wiz_color("txt", "#e7e9ed"))
+        fm_n = painter.fontMetrics()
+        name_el = fm_n.elidedText(name, Qt.TextElideMode.ElideRight, tw)
+        painter.drawText(
+            QRect(tx, rect.y() + 14, tw, 17),
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            name_el)
+        sf = QFont()
+        sf.setPixelSize(13)
+        painter.setFont(sf)
+        painter.setPen(_wiz_color("txt3", "#666d78"))
+        fm_s = painter.fontMetrics()
+        sub_el = fm_s.elidedText(sub, Qt.TextElideMode.ElideRight, tw)
+        painter.drawText(
+            QRect(tx, rect.y() + 35, tw, 15),
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            sub_el)
+        painter.restore()
+
+    def sizeHint(self, option: QStyleOptionViewItem,
+                 index: QModelIndex) -> QSize:  # noqa: N802
+        width = self._view.viewport().width() if self._view else 300
+        # Platz für Scrollbar + Spacing lassen, sonst bricht das 2er-Grid um
+        return QSize(max(100, width // 2 - 12), self.TILE_H)
 
 # ── Style ─────────────────────────────────────────────────────────────
 
@@ -122,8 +228,15 @@ class CreateInstanceWizard(QDialog):
         self.created_instance = None
 
         self.setWindowTitle(tr("wizard.title"))
-        self.setMinimumSize(700, 550)
-        self.setStyleSheet(_WIZARD_STYLE)
+        self._modern = bool(theme_color("panel2", ""))
+        if self._modern:
+            self.setObjectName("wizardDlg")
+            self.setFixedSize(800, 520)
+            self.setWindowFlags(
+                Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        else:
+            self.setMinimumSize(700, 550)
+            self.setStyleSheet(_WIZARD_STYLE)
 
         self._current_page = PAGE_INTRO
         self._skip_intro = False
@@ -134,9 +247,43 @@ class CreateInstanceWizard(QDialog):
 
     def _setup_ui(self) -> None:
         """Build the wizard UI."""
-        layout = QVBoxLayout(self)
-        layout.setSpacing(0)
-        layout.setContentsMargins(0, 0, 0, 0)
+        if self._modern:
+            outer = QVBoxLayout(self)
+            outer.setSpacing(0)
+            outer.setContentsMargins(0, 0, 0, 0)
+            frame = QWidget()
+            frame.setObjectName("modalFrame")
+            frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            outer.addWidget(frame)
+            layout = QVBoxLayout(frame)
+            layout.setSpacing(0)
+            layout.setContentsMargins(1, 1, 1, 1)
+
+            title_bar = QWidget()
+            title_bar.setObjectName("instTitleBar")
+            title_bar.setAttribute(
+                Qt.WidgetAttribute.WA_StyledBackground, True)
+            title_bar.setFixedHeight(52)
+            tb = QHBoxLayout(title_bar)
+            tb.setContentsMargins(16, 0, 16, 0)
+            tb.setSpacing(10)
+            t_lbl = QLabel(tr("wizard.title"))
+            t_lbl.setObjectName("instTitleLabel")
+            tb.addWidget(t_lbl)
+            self._step_label = QLabel()
+            self._step_label.setObjectName("wizStepLabel")
+            tb.addWidget(self._step_label, 0, Qt.AlignmentFlag.AlignVCenter)
+            tb.addStretch()
+            x_btn = QPushButton("✕")
+            x_btn.setObjectName("instCloseBtn")
+            x_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            x_btn.clicked.connect(self.reject)
+            tb.addWidget(x_btn)
+            layout.addWidget(title_bar)
+        else:
+            layout = QVBoxLayout(self)
+            layout.setSpacing(0)
+            layout.setContentsMargins(0, 0, 0, 0)
 
         # Page title bar
         self._title_frame = QFrame()
@@ -145,11 +292,16 @@ class CreateInstanceWizard(QDialog):
         title_layout.setContentsMargins(16, 12, 16, 12)
 
         self._page_title = QLabel()
-        self._page_title.setStyleSheet("font-size: 16px; font-weight: bold;")
-        title_layout.addWidget(self._page_title)
-
         self._page_subtitle = QLabel()
-        self._page_subtitle.setStyleSheet("font-size: 12px; color: #808080;")
+        if self._modern:
+            self._page_title.setVisible(False)
+            self._page_subtitle.setObjectName("wizSubtitle")
+        else:
+            self._page_title.setStyleSheet(
+                "font-size: 16px; font-weight: bold;")
+            self._page_subtitle.setStyleSheet(
+                "font-size: 12px; color: #808080;")
+        title_layout.addWidget(self._page_title)
         self._page_subtitle.setWordWrap(True)
         title_layout.addWidget(self._page_subtitle)
 
@@ -169,37 +321,65 @@ class CreateInstanceWizard(QDialog):
         self._create_paths_page()
         self._create_confirm_page()
 
-        # Navigation bar
+        # Navigation bar (modern: Vorlage-Fußleiste)
         self._nav_frame = QFrame()
-        self._nav_frame.setObjectName("navBar")
+        self._nav_frame.setObjectName(
+            "instFooter" if self._modern else "navBar")
+        if self._modern:
+            self._nav_frame.setAttribute(
+                Qt.WidgetAttribute.WA_StyledBackground, True)
+            self._nav_frame.setFixedHeight(60)
         nav_layout = QHBoxLayout(self._nav_frame)
-        nav_layout.setContentsMargins(16, 12, 16, 12)
+        nav_layout.setContentsMargins(
+            *((16, 0, 16, 0) if self._modern else (16, 12, 16, 12)))
         nav_layout.setSpacing(8)
 
         self._back_btn = QPushButton(tr("wizard.btn_back"))
         self._back_btn.clicked.connect(self._on_back)
-        nav_layout.addWidget(self._back_btn)
-
-        nav_layout.addStretch()
-
         self._cancel_btn = QPushButton(tr("button.cancel"))
         self._cancel_btn.clicked.connect(self.reject)
-        nav_layout.addWidget(self._cancel_btn)
-
         self._next_btn = QPushButton(tr("wizard.btn_next"))
-        self._next_btn.setObjectName("createBtn")
         self._next_btn.clicked.connect(self._on_next)
-        nav_layout.addWidget(self._next_btn)
-
         self._create_btn = QPushButton(tr("wizard.btn_create"))
-        self._create_btn.setObjectName("createBtn")
         self._create_btn.clicked.connect(self._on_create)
-        nav_layout.addWidget(self._create_btn)
+
+        if self._modern:
+            self._cancel_btn.setObjectName("wizCancelBtn")
+            self._back_btn.setObjectName("setCancelBtn")
+            self._next_btn.setObjectName("setOkBtn")
+            self._create_btn.setObjectName("setOkBtn")
+            for b in (self._cancel_btn, self._back_btn,
+                      self._next_btn, self._create_btn):
+                b.setCursor(Qt.CursorShape.PointingHandCursor)
+            nav_layout.addWidget(self._cancel_btn)
+            nav_layout.addStretch()
+            nav_layout.addWidget(self._back_btn)
+            nav_layout.addWidget(self._next_btn)
+            nav_layout.addWidget(self._create_btn)
+        else:
+            self._next_btn.setObjectName("createBtn")
+            self._create_btn.setObjectName("createBtn")
+            nav_layout.addWidget(self._back_btn)
+            nav_layout.addStretch()
+            nav_layout.addWidget(self._cancel_btn)
+            nav_layout.addWidget(self._next_btn)
+            nav_layout.addWidget(self._create_btn)
 
         layout.addWidget(self._nav_frame)
 
         # Initialize first page
         self._show_page(PAGE_INTRO)
+
+    def exec(self):  # noqa: A003
+        """Modern: Hauptfenster abdunkeln, solange der Dialog offen ist."""
+        if self._modern and self.parent() is not None:
+            from anvil.widgets.modal_backdrop import ModalBackdrop
+            backdrop = ModalBackdrop(self.parent().window())
+            try:
+                return super().exec()
+            finally:
+                backdrop.dismiss()
+        return super().exec()
 
     # ── Page Creation ─────────────────────────────────────────────────
 
@@ -266,6 +446,9 @@ class CreateInstanceWizard(QDialog):
 
         hint = QLabel(tr("wizard.game_hint"))
         hint.setWordWrap(True)
+        if self._modern:
+            # Untertitel in der Titelzeile sagt es schon
+            hint.setVisible(False)
         layout.addWidget(hint)
 
         self._game_filter = QLineEdit()
@@ -283,6 +466,19 @@ class CreateInstanceWizard(QDialog):
         self._game_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._game_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._game_list.doubleClicked.connect(self._on_next)
+        if self._modern:
+            # Vorlage: 2-Spalten-Kachelgrid statt Liste
+            self._game_list.setObjectName("wizGameGrid")
+            self._game_list.setViewMode(QListView.ViewMode.IconMode)
+            self._game_list.setFlow(QListView.Flow.LeftToRight)
+            self._game_list.setWrapping(True)
+            self._game_list.setResizeMode(QListView.ResizeMode.Adjust)
+            self._game_list.setUniformItemSizes(True)
+            self._game_list.setSpacing(2)
+            self._game_list.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self._game_list.setItemDelegate(
+                _GameTileDelegate(self._game_list))
         layout.addWidget(self._game_list, 1)
 
         self._stack.addWidget(page)
@@ -510,6 +706,11 @@ class CreateInstanceWizard(QDialog):
         title, subtitle = titles.get(page_idx, ("", ""))
         self._page_title.setText(title)
         self._page_subtitle.setText(subtitle)
+        if self._modern:
+            self._step_label.setText(tr(
+                "wizard.step_label",
+                current=page_idx + 1, total=self._stack.count(),
+                title=title))
 
         # Initialize page-specific content
         if page_idx == PAGE_GAME:
@@ -700,10 +901,14 @@ class CreateInstanceWizard(QDialog):
             store = plugin.detectedStore() or ""
             detail = f"{store}  \u2014  {gd}" if gd else store
             beta = " [Beta]" if not getattr(plugin, "Tested", True) else ""
-            text = f"{plugin.GameName}{beta}  \u2014  {detail}"
+            if self._modern:
+                text = f"{plugin.GameName}{beta}"
+            else:
+                text = f"{plugin.GameName}{beta}  \u2014  {detail}"
 
             item = QStandardItem(text)
             item.setData(plugin.GameShortName, Qt.ItemDataRole.UserRole)
+            item.setData(detail or "\u2014", Qt.ItemDataRole.UserRole + 2)
             item.setIcon(self._game_icon(plugin.GameShortName))
             self._game_model.appendRow(item)
 

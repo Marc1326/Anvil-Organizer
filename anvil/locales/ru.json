@@ -1028,7 +1028,8 @@
     "no_games": "Поддерживаемые игры не найдены.",
     "not_detected": "не обнаружено",
     "create_error": "Не удалось создать экземпляр:\n{error}",
-    "browse_folder_title": "Выбрать папку"
+    "browse_folder_title": "Выбрать папку",
+    "step_label": "Шаг {current} из {total} — {title}"
   },
   "update": {
     "commits_available": "{count} новых коммитов доступно",

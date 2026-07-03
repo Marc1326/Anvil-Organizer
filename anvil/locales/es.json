@@ -1028,7 +1028,8 @@
     "no_games": "No se encontraron juegos compatibles.",
     "not_detected": "no detectado",
     "create_error": "No se pudo crear la instancia:\n{error}",
-    "browse_folder_title": "Seleccionar carpeta"
+    "browse_folder_title": "Seleccionar carpeta",
+    "step_label": "Paso {current} de {total} — {title}"
   },
   "update": {
     "commits_available": "{count} nuevos commits disponibles",

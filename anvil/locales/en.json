@@ -1028,7 +1028,8 @@
     "no_games": "No supported games found.",
     "not_detected": "not detected",
     "create_error": "Failed to create instance:\n{error}",
-    "browse_folder_title": "Select Folder"
+    "browse_folder_title": "Select Folder",
+    "step_label": "Step {current} of {total} — {title}"
   },
   "update": {
     "commits_available": "{count} new commits available",

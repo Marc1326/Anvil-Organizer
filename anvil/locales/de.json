@@ -1028,7 +1028,8 @@
     "no_games": "Keine unterstützten Spiele gefunden.",
     "not_detected": "nicht erkannt",
     "create_error": "Instanz konnte nicht erstellt werden:\n{error}",
-    "browse_folder_title": "Ordner wählen"
+    "browse_folder_title": "Ordner wählen",
+    "step_label": "Schritt {current} von {total} — {title}"
   },
   "update": {
     "commits_available": "{count} neue Commits verfügbar",
