@@ -312,13 +312,12 @@ class GamePanel(QWidget):
         saves_reload_btn.clicked.connect(self._on_reload_saves)
         saves_btn_bar.addWidget(saves_reload_btn)
         saves_open_btn = QPushButton(tr("game_panel.saves_open_folder"))
+        saves_open_btn.setToolTip(tr("game_panel.saves_open_folder_tip"))
         saves_open_btn.setIcon(self.style().standardIcon(self.style().StandardPixmap.SP_DirOpenIcon))
         saves_open_btn.setIconSize(QSize(20, 20))
         saves_open_btn.clicked.connect(self._on_open_saves_folder)
         saves_btn_bar.addWidget(saves_open_btn)
         saves_btn_bar.addStretch()
-        self._saves_count_label = QLabel()
-        saves_btn_bar.addWidget(self._saves_count_label)
         saves_layout.addLayout(saves_btn_bar)
 
         self._saves_tree = QTreeWidget()
@@ -337,6 +336,10 @@ class GamePanel(QWidget):
         self._saves_tree.setColumnWidth(2, 90)
         self._ph_saves = PersistentHeader(saves_header, "saves")
         saves_layout.addWidget(self._saves_tree)
+        self._saves_count_label = QLabel()
+        self._saves_count_label.setObjectName("savesCount")
+        self._saves_count_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        saves_layout.addWidget(self._saves_count_label)
         tabs.addTab(saves, tr("game_panel.saves_tab"))
 
         # ── Downloads-Tab ─────────────────────────────────────────────

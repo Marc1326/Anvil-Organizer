@@ -426,6 +426,10 @@ QToolTip {
   background: transparent;
   padding: 0 0 4px 0; }
 
+#savesCount {
+  color: {{txt3}};
+  background: transparent; }
+
 #InfoDialog {
   min-width: 750px;
   min-height: 600px; }
