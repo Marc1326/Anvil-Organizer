@@ -924,7 +924,8 @@
     "nexus_game": "Игра:",
     "nexus_category": "Категория:",
     "nexus_last_query": "Последний запрос:",
-    "nexus_description": "Описание:"
+    "nexus_description": "Описание:",
+    "error_loading": "Ошибка загрузки: {error}"
   },
   "filetree": {
     "name": "Имя",

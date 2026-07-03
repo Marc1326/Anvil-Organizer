@@ -1526,13 +1526,62 @@ class ModDetailDialog(QDialog):
         super().__init__(parent)
         self._all_mods = all_mods or []
         self.setWindowTitle(mod_name or tr("dialog.mod_details"))
+        from anvil.styles.dark_theme import theme_color
+        self._modern = bool(theme_color("panel2", ""))
         self.setMinimumSize(1280, 720)
         self.resize(1300, 750)
-        self.setStyleSheet(_MOD_DETAIL_DIALOG_STYLE)
+        if self._modern:
+            # Vorlage-Modal: rahmenlos, eigene Titelleiste; erbt App-QSS
+            self.setWindowFlags(
+                Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        else:
+            self.setStyleSheet(_MOD_DETAIL_DIALOG_STYLE)
 
-        layout = QVBoxLayout(self)
-        layout.setSpacing(0)
-        layout.setContentsMargins(12, 12, 12, 12)
+        if self._modern:
+            outer = QVBoxLayout(self)
+            outer.setSpacing(0)
+            outer.setContentsMargins(0, 0, 0, 0)
+            frame = QWidget()
+            frame.setObjectName("modalFrame")
+            frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            outer.addWidget(frame)
+            shell = QVBoxLayout(frame)
+            shell.setSpacing(0)
+            shell.setContentsMargins(1, 1, 1, 1)
+
+            title_bar = QWidget()
+            title_bar.setObjectName("instTitleBar")
+            title_bar.setAttribute(
+                Qt.WidgetAttribute.WA_StyledBackground, True)
+            title_bar.setFixedHeight(52)
+            tb = QHBoxLayout(title_bar)
+            tb.setContentsMargins(16, 0, 16, 0)
+            tb.setSpacing(10)
+            t_lbl = QLabel(mod_name or tr("dialog.mod_details"))
+            t_lbl.setObjectName("instTitleLabel")
+            tb.addWidget(t_lbl)
+            version = getattr(mod_entry, "version", "") if mod_entry else ""
+            if version:
+                v_badge = QLabel(f"v{version}" if version[:1].isdigit()
+                                 else version)
+                v_badge.setObjectName("modVersionBadge")
+                tb.addWidget(v_badge, 0, Qt.AlignmentFlag.AlignVCenter)
+            tb.addStretch()
+            x_btn = QPushButton("✕")
+            x_btn.setObjectName("instCloseBtn")
+            x_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            x_btn.clicked.connect(self.accept)
+            tb.addWidget(x_btn)
+            shell.addWidget(title_bar)
+
+            body = QWidget()
+            layout = QVBoxLayout(body)
+            layout.setSpacing(0)
+            layout.setContentsMargins(20, 12, 20, 12)
+        else:
+            layout = QVBoxLayout(self)
+            layout.setSpacing(0)
+            layout.setContentsMargins(12, 12, 12, 12)
 
         self.tab_widget = QTabWidget()
 
@@ -1570,29 +1619,65 @@ class ModDetailDialog(QDialog):
         tab_bar.setParent(None)
 
         tab_bar_container = QHBoxLayout()
-        tab_bar_container.addStretch(1)
+        if not self._modern:
+            # Klassisch: Tab-Leiste mittig; modern linksbündig (Vorlage)
+            tab_bar_container.addStretch(1)
         tab_bar_container.addWidget(tab_bar)
         tab_bar_container.addStretch(1)
         tab_bar_container.setContentsMargins(0, 0, 0, 0)
         tab_bar_container.setSpacing(0)
 
         layout.addLayout(tab_bar_container)
+        if self._modern:
+            layout.addSpacing(8)
         layout.addWidget(self.tab_widget)
-        layout.addSpacing(10)
 
         # Unten: Zurück/Weiter links, Schliessen rechts
-        btn_row = QHBoxLayout()
         btn_back = QPushButton(tr("button.back"))
         btn_back.clicked.connect(lambda checked=False: self.done(self.RESULT_PREV))
         btn_next = QPushButton(tr("button.next"))
         btn_next.clicked.connect(lambda checked=False: self.done(self.RESULT_NEXT))
-        btn_row.addWidget(btn_back)
-        btn_row.addWidget(btn_next)
-        btn_row.addStretch()
         btn_close = QPushButton(tr("button.close"))
         btn_close.clicked.connect(self.accept)
-        btn_row.addWidget(btn_close)
-        layout.addLayout(btn_row)
+
+        if self._modern:
+            shell.addWidget(body, 1)
+            footer = QWidget()
+            footer.setObjectName("instFooter")
+            footer.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            footer.setFixedHeight(60)
+            fr = QHBoxLayout(footer)
+            fr.setContentsMargins(16, 0, 16, 0)
+            fr.setSpacing(8)
+            btn_back.setObjectName("setCancelBtn")
+            btn_next.setObjectName("setCancelBtn")
+            btn_close.setObjectName("setOkBtn")
+            for b in (btn_back, btn_next, btn_close):
+                b.setCursor(Qt.CursorShape.PointingHandCursor)
+            fr.addWidget(btn_back)
+            fr.addWidget(btn_next)
+            fr.addStretch()
+            fr.addWidget(btn_close)
+            shell.addWidget(footer)
+        else:
+            layout.addSpacing(10)
+            btn_row = QHBoxLayout()
+            btn_row.addWidget(btn_back)
+            btn_row.addWidget(btn_next)
+            btn_row.addStretch()
+            btn_row.addWidget(btn_close)
+            layout.addLayout(btn_row)
+
+    def exec(self):  # noqa: A003
+        """Modern: Hauptfenster abdunkeln, solange der Dialog offen ist."""
+        if self._modern and self.parent() is not None:
+            from anvil.widgets.modal_backdrop import ModalBackdrop
+            backdrop = ModalBackdrop(self.parent().window())
+            try:
+                return super().exec()
+            finally:
+                backdrop.dismiss()
+        return super().exec()
 
     def _on_tab_changed(self, index: int):
         """Layout-Update wenn Kategorien-Tab sichtbar wird."""

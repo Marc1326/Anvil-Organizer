@@ -924,7 +924,8 @@
     "nexus_game": "Jeu :",
     "nexus_category": "Catégorie :",
     "nexus_last_query": "Dernière requête :",
-    "nexus_description": "Description :"
+    "nexus_description": "Description :",
+    "error_loading": "Erreur de chargement : {error}"
   },
   "filetree": {
     "name": "Nom",
