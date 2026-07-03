@@ -1,17 +1,20 @@
-"""Instanz Manager Dialog mit QSplitter."""
+"""Instanz-Manager-Dialog (feste Größe, rahmenlos, Design-Handoff)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter,
-    QListView, QLineEdit, QPushButton, QLabel, QWidget, QFrame,
-    QAbstractItemView, QFileDialog, QMessageBox, QStyle,
+    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QListView, QLineEdit, QPushButton, QLabel, QWidget,
+    QAbstractItemView, QFileDialog, QMessageBox,
+    QStyledItemDelegate, QStyle, QStyleOptionViewItem,
 )
-from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon, QColor, QPixmap
-from PySide6.QtCore import Qt, QSortFilterProxyModel, QSettings, QModelIndex, QSize
-from anvil.core.subprocess_env import host_open_path
+from PySide6.QtGui import (
+    QStandardItemModel, QStandardItem, QIcon, QColor, QPixmap,
+    QPainter, QPainterPath, QFont, QFontMetrics, QPen,
+)
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect
 
 from anvil.core.instance_manager import InstanceManager
 from anvil.core.ui_helpers import get_text_input
@@ -20,12 +23,113 @@ from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.translator import tr
 from anvil.core.resource_path import get_anvil_base
 from anvil.styles.dark_theme import theme_color
-from anvil.widgets.instance_dropdown import instance_chip
+from anvil.widgets.instance_dropdown import (
+    instance_chip, _CHIP_COLORS, _chip_label_text,
+)
 
 # Platzhalterfarben aus dem Design-Handoff (Icon & Bild)
-_COVER_COLORS = ["#3d4a52", "#4a4238", "#3a3f4a", "#443c4a", "#464040", "#3c4644"]
+_COVER_COLORS = ["#3d4a52", "#4a4238", "#443c4a", "#3c4644", "#37455a", "#52505e"]
 
 _ICONS_DIR = get_anvil_base() / "styles" / "icons"
+
+
+def _theme_qcolor(role: str, fallback: str) -> QColor:
+    """Farb-Token als QColor — versteht #hex und rgba()/rgb()-Notation."""
+    val = (theme_color(role, fallback) or fallback).strip()
+    if val.startswith("rgb"):
+        inner = val[val.index("(") + 1:val.index(")")]
+        parts = [p.strip() for p in inner.split(",")]
+        r, g, b = (int(float(parts[i])) for i in range(3))
+        a = int(float(parts[3]) * 255) if len(parts) > 3 else 255
+        return QColor(r, g, b, a)
+    return QColor(val)
+
+
+class _InstanceListDelegate(QStyledItemDelegate):
+    """Zeichnet jede Instanz-Zeile selbst: weicher Auswahl-Balken, Farbchip
+    mit Kürzel, Name und Aktiv-Marker. Kein QSS-Icon — auf Wayland zeichnen
+    Delegate-Chips zuverlässiger als ``QStandardItem.setIcon()``.
+
+    Rollen: UserRole+1 = Chip-Farbe (hex), UserRole+2 = Marker ("●"/""),
+    UserRole+3 = Kürzel, DisplayRole = Name (ohne Marker).
+    """
+
+    def __init__(self, view):
+        super().__init__(view)
+        self._view = view
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem,
+              index: QModelIndex) -> None:  # noqa: N802
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        rect = option.rect
+
+        # Auswahl-Highlight (weicher Akzent, 8px eingerückt wie Vorlage)
+        if option.state & QStyle.StateFlag.State_Selected:
+            hl = QPainterPath()
+            hl.addRoundedRect(
+                rect.x() + 8, rect.y() + 1,
+                rect.width() - 16, rect.height() - 2, 7, 7)
+            painter.fillPath(
+                hl, _theme_qcolor("accent_soft", "rgba(51,179,168,0.16)"))
+
+        # Chip 26×26: fertiges Pixmap (Cover/Spiel-Icon) — sonst Farbe+Kürzel
+        chip = 26
+        cx = rect.x() + 18
+        cy = rect.y() + (rect.height() - chip) // 2
+        pix = index.data(Qt.ItemDataRole.UserRole + 4)
+        if isinstance(pix, QPixmap) and not pix.isNull():
+            painter.drawPixmap(cx, cy, pix)
+        else:
+            color = index.data(Qt.ItemDataRole.UserRole + 1) or "#3d4a52"
+            cp = QPainterPath()
+            cp.addRoundedRect(cx, cy, chip, chip, 5, 5)
+            painter.fillPath(cp, QColor(str(color)))
+
+            initials = str(index.data(Qt.ItemDataRole.UserRole + 3) or "")
+            cf = QFont()
+            cf.setPixelSize(9)
+            cf.setBold(True)
+            painter.setFont(cf)
+            painter.setPen(QColor(255, 255, 255, 217))
+            painter.drawText(
+                QRect(cx, cy, chip, chip),
+                Qt.AlignmentFlag.AlignCenter, initials)
+
+        # Aktiv-Marker "●" rechts (Akzent, 9px)
+        mark = str(index.data(Qt.ItemDataRole.UserRole + 2) or "")
+        mark_w = 0
+        if mark:
+            mf = QFont()
+            mf.setPixelSize(9)
+            painter.setFont(mf)
+            painter.setPen(_theme_qcolor("accent", "#33b3a8"))
+            painter.drawText(
+                QRect(rect.x(), rect.y(), rect.width() - 18, rect.height()),
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                mark)
+            mark_w = QFontMetrics(mf).horizontalAdvance(mark) + 8
+
+        # Name (12px, medium)
+        name = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
+        nf = QFont()
+        nf.setPixelSize(12)
+        nf.setWeight(QFont.Weight.Medium)
+        painter.setFont(nf)
+        painter.setPen(_theme_qcolor("txt", "#e7e9ed"))
+        nx = cx + chip + 10
+        nright = rect.right() - 18 - mark_w
+        painter.drawText(
+            QRect(nx, rect.y(), max(0, nright - nx), rect.height()),
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, name)
+
+        painter.restore()
+
+    def sizeHint(self, option: QStyleOptionViewItem,
+                 index: QModelIndex) -> QSize:  # noqa: N802
+        width = self._view.viewport().width() if self._view else option.rect.width()
+        return QSize(width, 42)
+
 
 _DIALOG_STYLE = """
 QDialog { background: #1C1C1C; }
@@ -93,214 +197,266 @@ class InstanceManagerDialog(QDialog):
         self.switched_to = None
 
         self.setWindowTitle(tr("instance.manager_title"))
-        self.setMinimumSize(860, 560)
+        self.setFixedSize(860, 560)
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+
         self._modern = bool(theme_color("panel2", ""))
         if not self._modern:
             # Klassisch: alte Dialog-Optik; modern erbt das App-QSS
             self.setStyleSheet(_DIALOG_STYLE)
 
         self._setup_ui()
-        self._restore_geometry()
         self._refresh_list()
 
     def _setup_ui(self) -> None:
-        """Build the dialog UI."""
-        layout = QVBoxLayout(self)
-        layout.setSpacing(10)
-        layout.setContentsMargins(12, 12, 12, 12)
+        root = QVBoxLayout(self)
+        root.setSpacing(0)
+        root.setContentsMargins(0, 0, 0, 0)
 
-        # Welcome hint
-        if self._welcome:
-            self._welcome_label = QLabel(tr("instance.welcome_hint"))
-            self._welcome_label.setObjectName("welcomeHint")
-            if not self._modern:
-                self._welcome_label.setStyleSheet(
-                    "color: #4FC3F7; font-size: 13px; padding: 6px 0;")
-            self._welcome_label.setWordWrap(True)
-            layout.addWidget(self._welcome_label)
+        # ── Titelleiste (44px) ───────────────────────────────────────
+        title_bar = QWidget()
+        title_bar.setObjectName("instTitleBar")
+        title_bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        title_bar.setFixedHeight(44)
+        tb = QHBoxLayout(title_bar)
+        tb.setContentsMargins(16, 0, 16, 0)
+        tb.setSpacing(0)
+        lbl = QLabel(tr("instance.manager_title"))
+        lbl.setObjectName("instTitleLabel")
+        tb.addWidget(lbl)
+        tb.addStretch()
+        close_btn = QPushButton("✕")
+        close_btn.setObjectName("instCloseBtn")
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.clicked.connect(self.reject)
+        tb.addWidget(close_btn)
+        root.addWidget(title_bar)
 
-        # Main splitter
-        self._splitter = QSplitter(Qt.Orientation.Horizontal)
+        # ── Body (linke Spalte 300px · rechte Spalte flex) ──────────
+        body = QWidget()
+        body_l = QHBoxLayout(body)
+        body_l.setSpacing(0)
+        body_l.setContentsMargins(0, 0, 0, 0)
 
-        # Left panel: New-Instance button + List + Filter (wie im Handoff)
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(6)
+        # Linke Spalte
+        left_panel = QWidget()
+        left_panel.setObjectName("instLeftPanel")
+        left_panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        left_panel.setFixedWidth(300)
+        lp = QVBoxLayout(left_panel)
+        lp.setSpacing(0)
+        lp.setContentsMargins(0, 0, 0, 0)
 
-        self._new_btn = QPushButton("+ " + tr("instance.btn_new"))
+        # Neue-Instanz-Button mit 12px Rand ringsum
+        new_container = QWidget()
+        nc = QVBoxLayout(new_container)
+        nc.setContentsMargins(12, 12, 12, 12)
+        nc.setSpacing(0)
+        self._new_btn = QPushButton("＋ " + tr("instance.btn_new"))
         self._new_btn.setObjectName("createBtn")
+        self._new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._new_btn.clicked.connect(self._on_new_instance)
-        left_layout.addWidget(self._new_btn)
+        nc.addWidget(self._new_btn)
+        lp.addWidget(new_container)
 
+        # Instanzliste
         self._model = QStandardItemModel()
         self._proxy_model = QSortFilterProxyModel()
         self._proxy_model.setSourceModel(self._model)
-        self._proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._proxy_model.setFilterCaseSensitivity(
+            Qt.CaseSensitivity.CaseInsensitive)
 
         self._list_view = QListView()
         self._list_view.setObjectName("instanceList")
-        self._list_view.setIconSize(QSize(26, 26))
+        self._list_view.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._list_view.setItemDelegate(_InstanceListDelegate(self._list_view))
         self._list_view.setModel(self._proxy_model)
-        self._list_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._list_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self._list_view.selectionModel().currentChanged.connect(self._on_selection_changed)
+        self._list_view.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._list_view.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection)
+        self._list_view.selectionModel().currentChanged.connect(
+            self._on_selection_changed)
         self._list_view.doubleClicked.connect(self._on_switch)
-        left_layout.addWidget(self._list_view)
+        lp.addWidget(self._list_view, 1)
 
-        # Filter field (below list)
+        # Filterfeld unten (border-top)
+        filter_container = QWidget()
+        filter_container.setObjectName("instFilterBox")
+        filter_container.setAttribute(
+            Qt.WidgetAttribute.WA_StyledBackground, True)
+        fc = QVBoxLayout(filter_container)
+        fc.setContentsMargins(12, 10, 12, 10)
+        fc.setSpacing(0)
         self._filter_edit = QLineEdit()
+        self._filter_edit.setObjectName("instFilter")
         self._filter_edit.setPlaceholderText(tr("instance.filter_placeholder"))
         self._filter_edit.textChanged.connect(self._on_filter_changed)
-        left_layout.addWidget(self._filter_edit)
+        fc.addWidget(self._filter_edit)
+        lp.addWidget(filter_container)
 
-        self._splitter.addWidget(left_widget)
+        body_l.addWidget(left_panel)
 
-        # Right panel: Details
-        right_widget = QFrame()
-        right_widget.setFrameShape(QFrame.Shape.NoFrame)
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(12, 0, 0, 0)
+        # Rechte Spalte: Details
+        right_panel = QWidget()
+        right_panel.setObjectName("instRightPanel")
+        rp = QVBoxLayout(right_panel)
+        rp.setContentsMargins(24, 20, 24, 20)
+        rp.setSpacing(14)
 
         self._details_label = QLabel(tr("instance.details_header"))
         self._details_label.setObjectName("detailsHeader")
-        if not self._modern:
-            self._details_label.setStyleSheet(
-                "font-weight: bold; font-size: 14px; margin-bottom: 8px;")
-        right_layout.addWidget(self._details_label)
+        rp.addWidget(self._details_label)
 
         form = QGridLayout()
-        form.setSpacing(8)
-        form.setColumnStretch(1, 1)  # Spalte 1 (LineEdits) stretcht
+        form.setSpacing(10)
+        form.setColumnMinimumWidth(0, 130)
+        form.setColumnStretch(1, 1)
 
-        # Zeile 0: Name
+        # Zeile 0: Name + Umbenennen
         name_label = QLabel(tr("instance.label_name"))
-        form.addWidget(name_label, 0, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        name_label.setObjectName("instFormLabel")
+        form.addWidget(
+            name_label, 0, 0,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        name_row = QHBoxLayout()
+        name_row.setContentsMargins(0, 0, 0, 0)
+        name_row.setSpacing(8)
         self._name_edit = QLineEdit()
         self._name_edit.setReadOnly(True)
-        form.addWidget(self._name_edit, 0, 1)
+        name_row.addWidget(self._name_edit, 1)
         self._rename_btn = QPushButton(tr("instance.btn_rename"))
+        self._rename_btn.setObjectName("instActionBtn")
+        self._rename_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._rename_btn.clicked.connect(self._on_rename)
-        form.addWidget(self._rename_btn, 0, 2)
+        name_row.addWidget(self._rename_btn)
+        form.addLayout(name_row, 0, 1)
 
         # Zeile 1: Speicherort
         loc_label = QLabel(tr("instance.label_location"))
-        form.addWidget(loc_label, 1, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        loc_label.setObjectName("instFormLabel")
+        form.addWidget(
+            loc_label, 1, 0,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._location_edit = QLineEdit()
         self._location_edit.setReadOnly(True)
         form.addWidget(self._location_edit, 1, 1)
-        self._location_btn = QPushButton()
-        self._location_btn.setIcon(QIcon("anvil/assets/icons/ui/ordner.png"))
-        self._location_btn.setIconSize(QSize(24, 24))
-        self._location_btn.setObjectName("exploreBtn")
-        self._location_btn.setToolTip(tr("instance.explore_location"))
-        self._location_btn.clicked.connect(lambda: self._on_explore("location"))
-        form.addWidget(self._location_btn, 1, 2)
 
         # Zeile 2: Basisverzeichnis
         base_label = QLabel(tr("instance.label_base"))
-        form.addWidget(base_label, 2, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        base_label.setObjectName("instFormLabel")
+        form.addWidget(
+            base_label, 2, 0,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._base_edit = QLineEdit()
         self._base_edit.setReadOnly(True)
         form.addWidget(self._base_edit, 2, 1)
-        self._base_btn = QPushButton()
-        self._base_btn.setIcon(QIcon("anvil/assets/icons/ui/ordner.png"))
-        self._base_btn.setIconSize(QSize(24, 24))
-        self._base_btn.setObjectName("exploreBtn")
-        self._base_btn.setToolTip(tr("instance.explore_base"))
-        self._base_btn.clicked.connect(lambda: self._on_explore("base"))
-        form.addWidget(self._base_btn, 2, 2)
 
         # Zeile 3: Spielpfad
         game_label = QLabel(tr("instance.label_game_path"))
-        form.addWidget(game_label, 3, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        game_label.setObjectName("instFormLabel")
+        form.addWidget(
+            game_label, 3, 0,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._game_path_edit = QLineEdit()
         self._game_path_edit.setReadOnly(True)
         form.addWidget(self._game_path_edit, 3, 1)
-        self._game_path_btn = QPushButton()
-        self._game_path_btn.setIcon(QIcon("anvil/assets/icons/ui/ordner.png"))
-        self._game_path_btn.setIconSize(QSize(24, 24))
-        self._game_path_btn.setObjectName("exploreBtn")
-        self._game_path_btn.setToolTip(tr("instance.explore_game"))
-        self._game_path_btn.clicked.connect(lambda: self._on_explore("game"))
-        form.addWidget(self._game_path_btn, 3, 2)
 
-        # Zeile 4: Icon & Bild (Cover pro Instanz \u2014 Bild oder Farbe)
+        # Zeile 4: Icon & Bild (Cover pro Instanz — Bild oder Farbe)
         cover_label = QLabel(tr("instance.label_icon"))
-        form.addWidget(cover_label, 4, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        cover_label.setObjectName("instFormLabel")
+        form.addWidget(
+            cover_label, 4, 0,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         cover_row = QHBoxLayout()
-        cover_row.setSpacing(8)
+        cover_row.setContentsMargins(0, 0, 0, 0)
+        cover_row.setSpacing(6)
+
         self._cover_preview = QLabel()
+        self._cover_preview.setObjectName("instCoverPreview")
         self._cover_preview.setFixedSize(40, 54)
         cover_row.addWidget(self._cover_preview)
-        self._pick_image_btn = QPushButton(tr("instance.pick_image"))
+
+        # Zweizeilig wie in der Vorlage — sonst passt die Zeile nicht
+        self._pick_image_btn = QPushButton(
+            tr("instance.pick_image").replace(" ", "\n", 1))
+        self._pick_image_btn.setObjectName("instActionBtn")
+        self._pick_image_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._pick_image_btn.clicked.connect(self._on_pick_image)
         cover_row.addWidget(self._pick_image_btn)
+
+        swatches_row = QHBoxLayout()
+        swatches_row.setContentsMargins(0, 0, 0, 0)
+        swatches_row.setSpacing(6)
         self._swatch_btns = []
-        for color in _COVER_COLORS:
+        self._swatch_colors = list(_COVER_COLORS)
+        for color in self._swatch_colors:
             sw = QPushButton()
             sw.setObjectName("coverSwatch")
+            sw.setCursor(Qt.CursorShape.PointingHandCursor)
             sw.setFixedSize(22, 22)
-            pix = QPixmap(16, 16)
-            pix.fill(QColor(color))
-            sw.setIcon(QIcon(pix))
+            sw.setIcon(QIcon(self._swatch_pixmap(color, False)))
+            sw.setIconSize(QSize(22, 22))
             sw.setToolTip(color)
             sw.clicked.connect(
                 lambda checked=False, c=color: self._on_pick_color(c))
-            cover_row.addWidget(sw)
+            swatches_row.addWidget(sw)
             self._swatch_btns.append(sw)
+        cover_row.addLayout(swatches_row)
+
         self._reset_cover_btn = QPushButton(tr("instance.reset_cover"))
+        self._reset_cover_btn.setObjectName("instResetBtn")
+        self._reset_cover_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._reset_cover_btn.clicked.connect(self._on_reset_cover)
         cover_row.addWidget(self._reset_cover_btn)
         cover_row.addStretch()
-        form.addLayout(cover_row, 4, 1, 1, 2)
+        form.addLayout(cover_row, 4, 1)
 
-        right_layout.addLayout(form)
+        rp.addLayout(form)
 
-        # Delete button at bottom of details section
-        actions_row = QHBoxLayout()
-        self._delete_btn = QPushButton("\u2715 " + tr("instance.btn_delete"))
+        # Löschen (nur Rahmen + Warnfarbe, links ausgerichtet)
+        self._delete_btn = QPushButton("✕ " + tr("instance.btn_delete"))
         self._delete_btn.setObjectName("deleteInstance")
+        self._delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._delete_btn.clicked.connect(self._on_delete)
-        actions_row.addWidget(self._delete_btn)
-        actions_row.addStretch()
-        right_layout.addLayout(actions_row)
+        rp.addWidget(self._delete_btn, 0, Qt.AlignmentFlag.AlignLeft)
 
-        right_layout.addStretch()
+        rp.addStretch()
 
-        # Hinweistext wie im Handoff
-        switch_note = QLabel(tr("instance.switch_note"))
-        switch_note.setObjectName("switchNote")
-        switch_note.setWordWrap(True)
-        right_layout.addWidget(switch_note)
+        # Hinweistext
+        self._switch_note = QLabel(tr("instance.switch_note"))
+        self._switch_note.setObjectName("switchNote")
+        self._switch_note.setWordWrap(True)
+        rp.addWidget(self._switch_note)
 
-        self._splitter.addWidget(right_widget)
-        self._splitter.setStretchFactor(0, 1)
-        self._splitter.setStretchFactor(1, 2)
+        body_l.addWidget(right_panel, 1)
 
-        layout.addWidget(self._splitter, 1)
+        root.addWidget(body, 1)
 
-        # Bottom buttons
-        btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(8)
-
-        btn_layout.addStretch()
+        # ── Fußleiste (52px, Panel-BG, border-top) ──────────────────
+        footer = QWidget()
+        footer.setObjectName("instFooter")
+        footer.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        footer.setFixedHeight(52)
+        ft = QHBoxLayout(footer)
+        ft.setContentsMargins(16, 0, 16, 0)
+        ft.setSpacing(8)
+        ft.addStretch()
 
         self._switch_btn = QPushButton(tr("instance.btn_switch"))
         self._switch_btn.setObjectName("switchBtn")
-        self._switch_btn.setMinimumHeight(32)
-        self._switch_btn.setMinimumWidth(100)
+        self._switch_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._switch_btn.clicked.connect(self._on_switch)
-        btn_layout.addWidget(self._switch_btn)
+        ft.addWidget(self._switch_btn)
 
         self._ok_btn = QPushButton(tr("button.ok"))
-        self._ok_btn.setObjectName("createBtn")
-        self._ok_btn.setMinimumHeight(32)
-        self._ok_btn.setMinimumWidth(80)
+        self._ok_btn.setObjectName("okBtn")
+        self._ok_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._ok_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(self._ok_btn)
+        ft.addWidget(self._ok_btn)
 
-        layout.addLayout(btn_layout)
+        root.addWidget(footer)
 
     # ── List Management ───────────────────────────────────────────────
 
@@ -314,13 +470,24 @@ class InstanceManagerDialog(QDialog):
 
         for inst in self._im.list_instances():
             name = inst["name"]
-            label = f"\u25CF {name}" if name == current else name
 
-            item = QStandardItem(label)
+            # DisplayRole = nur der Name (Marker zeichnet der Delegate)
+            item = QStandardItem(name)
             item.setData(name, Qt.ItemDataRole.UserRole)
-            # Chip: Instanz-Cover \u2192 Spiel-Icon \u2192 Farbe+K\u00FCrzel
-            item.setIcon(QIcon(instance_chip(
-                inst, self._im.instances_path(), self._icons)))
+
+            # Chip-Farbe: eigenes Cover-Color → sonst Spielfarbe aus Namens-Hash
+            game = inst.get("game_name", inst.get("name", "?"))
+            color = inst.get("cover_color", "") or \
+                _CHIP_COLORS[hash(game) % len(_CHIP_COLORS)]
+            item.setData(color, Qt.ItemDataRole.UserRole + 1)
+            item.setData(
+                "●" if name == current else "", Qt.ItemDataRole.UserRole + 2)
+            item.setData(_chip_label_text(game), Qt.ItemDataRole.UserRole + 3)
+            # Fertiger Chip wie im Dropdown: Cover → Spiel-Icon → Farbe+Kürzel
+            item.setData(
+                instance_chip(inst, self._im.instances_path(),
+                              self._icons, 26, 26),
+                Qt.ItemDataRole.UserRole + 4)
 
             self._model.appendRow(item)
 
@@ -388,20 +555,48 @@ class InstanceManagerDialog(QDialog):
 
         self._location_edit.setText(str(self._im.instances_path() / name))
         self._base_edit.setText(str(self._im.instances_path() / name))
-        self._game_path_edit.setText(data.get("game_path", "") or "\u2014")
+        self._game_path_edit.setText(data.get("game_path", "") or "—")
+        # Lange Pfade: Anfang zeigen statt Ende
+        for edit in (self._location_edit, self._base_edit,
+                     self._game_path_edit):
+            edit.setCursorPosition(0)
         self._update_cover_preview(name)
 
+    @staticmethod
+    def _swatch_pixmap(color: str, selected: bool) -> QPixmap:
+        """Farbfeld 22×22 (volle Farbfläche); gewählt = Akzent-Rahmen."""
+        pix = QPixmap(22, 22)
+        pix.fill(Qt.GlobalColor.transparent)
+        p = QPainter(pix)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        path = QPainterPath()
+        path.addRoundedRect(0.5, 0.5, 21, 21, 5, 5)
+        p.fillPath(path, QColor(color))
+        if selected:
+            p.setPen(QPen(_theme_qcolor("accent", "#33b3a8"), 2))
+            p.drawRoundedRect(1, 1, 20, 20, 5, 5)
+        p.end()
+        return pix
+
+    def _update_swatch_selection(self, cover_color: str) -> None:
+        """Gewähltes Farbfeld mit Akzent-Rahmen markieren."""
+        cur = (cover_color or "").lower()
+        for sw, col in zip(self._swatch_btns, self._swatch_colors):
+            sw.setIcon(QIcon(self._swatch_pixmap(col, col.lower() == cur)))
+
     def _update_cover_preview(self, name: str) -> None:
-        """Cover-Vorschau (40\u00d754) f\u00fcr die gew\u00e4hlte Instanz aktualisieren."""
+        """Cover-Vorschau (40×54) für die gewählte Instanz aktualisieren."""
         inst = next(
             (i for i in self._im.list_instances() if i.get("name") == name),
             None,
         ) if self._im else None
         if inst is None:
             self._cover_preview.clear()
+            self._update_swatch_selection("")
             return
         self._cover_preview.setPixmap(instance_chip(
             inst, self._im.instances_path(), self._icons, w=40, h=54))
+        self._update_swatch_selection(inst.get("cover_color", ""))
 
     def _clear_details(self) -> None:
         """Clear the details panel."""
@@ -410,6 +605,7 @@ class InstanceManagerDialog(QDialog):
         self._base_edit.clear()
         self._game_path_edit.clear()
         self._cover_preview.clear()
+        self._update_swatch_selection("")
 
     def _on_new_instance(self) -> None:
         """Stub: Opens CreateInstanceWizard. Backend-Dev fills."""
@@ -548,36 +744,3 @@ class InstanceManagerDialog(QDialog):
             return
         self.switched_to = name
         self.accept()
-
-    def _on_explore(self, path_type: str) -> None:
-        """Opens folder in file manager."""
-        if path_type == "location":
-            path = self._location_edit.text()
-        elif path_type == "base":
-            path = self._base_edit.text()
-        elif path_type == "game":
-            path = self._game_path_edit.text()
-        else:
-            return
-
-        if path and path != "\u2014":
-            host_open_path(path)
-
-    # ── Geometry Persistence ──────────────────────────────────────────
-
-    def _restore_geometry(self) -> None:
-        """Restore dialog geometry and splitter state."""
-        settings = QSettings("AnvilOrganizer", "InstanceManager")
-        geometry = settings.value("geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
-        splitter_state = settings.value("splitter_state")
-        if splitter_state:
-            self._splitter.restoreState(splitter_state)
-
-    def closeEvent(self, event) -> None:
-        """Save geometry on close."""
-        settings = QSettings("AnvilOrganizer", "InstanceManager")
-        settings.setValue("geometry", self.saveGeometry())
-        settings.setValue("splitter_state", self._splitter.saveState())
-        super().closeEvent(event)

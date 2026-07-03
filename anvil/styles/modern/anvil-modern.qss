@@ -493,25 +493,21 @@ QToolTip {
 
 /* ── Instanz-Manager-Dialog ────────────────────────────────── */
 
-#createBtn, #switchBtn {
+#createBtn {
   background: {{accent}};
   color: #0f1113;
   font-weight: 600;
+  min-height: 29px;
+  margin: 0;
   border: none; }
-  #createBtn:hover, #switchBtn:hover {
+  #createBtn:hover {
     background: {{accent_hover}}; }
-  #createBtn:pressed, #switchBtn:pressed {
+  #createBtn:pressed {
     background: {{accent_pressed}}; }
-  #createBtn:disabled, #switchBtn:disabled {
+  #createBtn:disabled {
     background: {{panel2}};
     color: {{txt3}}; }
 
-#deleteInstance {
-  background: transparent;
-  color: {{warn}};
-  border: 1px solid {{warn}}; }
-  #deleteInstance:hover {
-    background: {{hov}}; }
   #deleteInstance:disabled {
     color: {{txt3}};
     border-color: {{line}}; }
@@ -525,11 +521,57 @@ QToolTip {
 
 #coverSwatch {
   background: transparent;
-  border: 1px solid {{line}};
-  border-radius: 5px;
-  padding: 1px; }
+  border: none;
+  min-height: 22px;
+  padding: 0;
+  margin: 0; }
   #coverSwatch:hover {
-    border-color: {{accent}}; }
+    background: {{hov}};
+    border-radius: 5px; }
+
+#deleteInstance {
+  background: transparent;
+  border: 1px solid {{line}};
+  border-radius: 6px;
+  color: {{warn}};
+  font-size: 12px;
+  min-height: 19px;
+  margin: 0;
+  padding: 6px 14px; }
+  #deleteInstance:hover {
+    background: {{hov}}; }
+  #deleteInstance:disabled {
+    color: {{txt3}}; }
+
+#instActionBtn {
+  padding: 6px 10px;
+  border: 1px solid {{line}};
+  border-radius: 6px;
+  background: transparent;
+  color: {{txt2}};
+  min-height: 19px;
+  margin: 0;
+  font-size: 12px; }
+  #instActionBtn:hover {
+    background: {{hov}}; }
+  #instActionBtn:disabled {
+    color: {{txt3}};
+    border-color: {{line}}; }
+
+#instResetBtn {
+  background: transparent;
+  border: none;
+  color: {{txt3}};
+  font-size: 11px;
+  margin: 0;
+  padding: 0; }
+  #instResetBtn:hover {
+    color: {{txt2}}; }
+
+#instRightPanel QLineEdit {
+  padding: 6px 11px;
+  min-height: 19px;
+  font-size: 12px; }
 
 #welcomeHint {
   color: {{accent}};
@@ -546,9 +588,95 @@ QToolTip {
   font-size: 11px;
   background: transparent; }
 
+/* Zeilen zeichnet der Delegate selbst (Chip + Kürzel + Marker) —
+   deshalb hier kein Padding/Background, sonst verrutscht der Chip. */
 #instanceList::item {
-  min-height: 34px;
-  padding: 2px 6px; }
+  border-radius: 0px; }
+  #instanceList::item:selected {
+    background: transparent; }
+
+/* ── Instanz-Manager-Dialog ────────────────────────────────── */
+
+#instTitleBar {
+  background: {{panel}};
+  border-bottom: 1px solid {{line}}; }
+
+#instTitleLabel {
+  font-weight: 600;
+  font-size: 13px;
+  background: transparent; }
+
+#instCloseBtn {
+  background: transparent;
+  border: none;
+  color: {{txt3}};
+  font-size: 14px;
+  padding: 4px 10px;
+  border-radius: 6px; }
+  #instCloseBtn:hover {
+    background: {{hov}};
+    color: {{txt}}; }
+
+#instLeftPanel {
+  background: {{panel}};
+  border-right: 1px solid {{line}}; }
+
+#instFilterBox {
+  border-top: 1px solid {{line}};
+  background: {{panel}}; }
+
+#instFilter {
+  background: {{panel2}};
+  border: 1px solid {{line}};
+  border-radius: 6px;
+  color: {{txt}};
+  font-size: 11px;
+  min-height: 16px;
+  padding: 6px 10px; }
+
+#instRightPanel {
+  background: {{bg}}; }
+
+/* Formular-Labels (Name:, Speicherort: …) — Header/Hinweis behalten
+   ihren eigenen Stil. Qt-QSS kennt kein :not(#id), daher gezielte ID. */
+#instRightPanel QLabel#instFormLabel {
+  font-size: 12px;
+  color: {{txt2}};
+  background: transparent; }
+
+#instFooter {
+  background: {{panel}};
+  border-top: 1px solid {{line}}; }
+
+#okBtn {
+  background: {{panel2}};
+  border: 1px solid {{line}};
+  border-radius: 7px;
+  color: {{txt}};
+  font-weight: 600;
+  font-size: 12px;
+  min-height: 17px;
+  margin: 0;
+  padding: 8px 18px; }
+  #okBtn:hover {
+    background: {{hov}}; }
+
+#switchBtn {
+  background: {{accent}};
+  color: #0d1113;
+  font-weight: 700;
+  font-size: 12px;
+  border: none;
+  border-radius: 7px;
+  min-height: 19px;
+  margin: 0;
+  padding: 8px 18px; }
+  #switchBtn:hover {
+    background: {{accent_hover}}; }
+  #switchBtn:disabled {
+    background: {{panel2}};
+    border: 1px solid {{line}};
+    color: {{txt3}}; }
 
 /* ── Instanzwechsel-Overlay ────────────────────────────────── */
 

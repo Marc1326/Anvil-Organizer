@@ -26,9 +26,23 @@ from anvil.styles.dark_theme import theme_color
 # Platzhalterfarben aus dem Design-Handoff (Spiele ohne Icon)
 _CHIP_COLORS = ["#3d4a52", "#4a4238", "#3a3f4a", "#443c4a", "#464040", "#3c4644"]
 
+# Kürzel bekannter Spiele (Design-Handoff); Rest wird generisch abgeleitet
+_CHIP_LABELS = {
+    "Cyberpunk 2077": "CP77",
+    "Baldur's Gate 3": "BG3",
+    "Skyrim Special Edition": "SSE",
+    "The Witcher 3: Wild Hunt": "W3",
+    "Red Dead Redemption 2": "RDR2",
+    "Fallout 4": "FO4",
+    "Starfield": "SF",
+}
+
 
 def _chip_label_text(game_name: str) -> str:
     """Kurzkürzel wie „BG3"/„SSE" aus dem Spielnamen ableiten."""
+    known = _CHIP_LABELS.get(game_name)
+    if known:
+        return known
     words = [w for w in game_name.replace(":", " ").split() if w]
     label = "".join(w[0] for w in words if w[0].isalnum()).upper()
     return label[:4] or "?"

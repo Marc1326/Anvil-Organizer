@@ -671,11 +671,15 @@ class MainWindow(QMainWindow):
         )
         _center_on_parent(dlg)
         dlg.exec()
+        self.update()
         if dlg.switched_to:
             self.switch_instance(dlg.switched_to)
         elif hasattr(self, "_instance_dropdown"):
-            # Cover könnte geändert worden sein — Chip aktualisieren
+            # Cover könnte geändert worden sein — Chip und GamePanel aktualisieren
             self._instance_dropdown.refresh_current()
+            if hasattr(self, "_game_panel"):
+                self._game_panel._update_game_button_icon(
+                    self._game_panel._last_game_name)
 
     def _switch_instance_with_overlay(self, name: str) -> None:
         """Instanzwechsel aus dem Dropdown: Overlay-Sequenz um das
@@ -1381,7 +1385,13 @@ class MainWindow(QMainWindow):
         self._log_panel.add_log("info", f"Instanz geladen: {game_name}")
 
         # 2. Game panel — real directory contents + executables + icons
-        self._game_panel.update_game(game_name, game_path, plugin, self.icon_manager, short_name)
+        inst_dir = self.instance_manager.instances_path() / instance_name
+        self._game_panel.update_game(
+            game_name, game_path, plugin, self.icon_manager, short_name,
+            instance_dir=inst_dir,
+            instance_cover_image=data.get("cover_image", ""),
+            instance_cover_color=data.get("cover_color", ""),
+        )
 
         # 3. Instance path
         self._current_instance_path = self.instance_manager.instances_path() / instance_name

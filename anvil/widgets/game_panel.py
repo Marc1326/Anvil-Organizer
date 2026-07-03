@@ -423,6 +423,9 @@ class GamePanel(QWidget):
         self._downloads_path: Path | None = None
         self._mods_path: Path | None = None
         self._instance_path: Path | None = None
+        self._instance_dir: Path | None = None
+        self._instance_cover_image: str = ""
+        self._instance_cover_color: str = ""
         self._current_profile_name: str = "Default"
         self._deployer: ModDeployer | None = None
         self._separator_deploy_paths: dict[str, str] = {}
@@ -486,6 +489,9 @@ class GamePanel(QWidget):
         game_plugin=None,
         icon_manager=None,
         game_short_name: str = "",
+        instance_dir: Path | None = None,
+        instance_cover_image: str = "",
+        instance_cover_color: str = "",
     ) -> None:
         """Update the panel to reflect the active game instance.
 
@@ -501,6 +507,9 @@ class GamePanel(QWidget):
         self._current_short_name = game_short_name
         self._current_plugin = game_plugin
         self._icon_manager = icon_manager
+        self._instance_dir = instance_dir
+        self._instance_cover_image = instance_cover_image
+        self._instance_cover_color = instance_cover_color
 
         # Re-init deployer if instance_path already set
         direct_patterns = getattr(game_plugin, "GameDirectInstallMods", []) if game_plugin else []
@@ -557,6 +566,28 @@ class GamePanel(QWidget):
         """Set the game button to the cached banner or a placeholder."""
         self._last_game_name = game_name
         size = _cover_size()
+
+        # 1. Eigenes Instanz-Bild hat Vorrang
+        if self._instance_cover_image and self._instance_dir:
+            cover_path = self._instance_dir / self._instance_cover_image
+            if cover_path.is_file():
+                loaded = QPixmap(str(cover_path))
+                if not loaded.isNull():
+                    scaled = loaded.scaled(
+                        size,
+                        Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    x = max(0, (scaled.width() - size.width()) // 2)
+                    y = max(0, (scaled.height() - size.height()) // 2)
+                    scaled = scaled.copy(x, y, size.width(), size.height())
+                    self._game_btn.setIcon(QIcon(scaled))
+                    self._game_btn.setIconSize(size)
+                    return
+
+        # 2. Spiel-Banner aus Icon-Manager — Cover-Farbe verdrängt das
+        #    echte Artwork NICHT, sie gilt nur als Fallback (Chips nutzen
+        #    die Farbe weiterhin)
         banner = None
         if self._icon_manager and self._current_short_name:
             banner = self._icon_manager.get_game_banner(self._current_short_name)
@@ -583,8 +614,24 @@ class GamePanel(QWidget):
                 )
             self._game_btn.setIcon(QIcon(scaled))
             self._game_btn.setIconSize(size)
+        elif self._instance_cover_color:
+            # 3. Cover-Farbe mit Initialen (nur wenn kein Artwork existiert)
+            pix = QPixmap(size)
+            pix.fill(QColor(self._instance_cover_color))
+            if game_name:
+                p = QPainter(pix)
+                p.setPen(QColor("#FFFFFF"))
+                f = QFont()
+                f.setPixelSize(28)
+                f.setBold(True)
+                p.setFont(f)
+                p.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter,
+                           game_name[:2].upper())
+                p.end()
+            self._game_btn.setIcon(QIcon(pix))
+            self._game_btn.setIconSize(size)
         else:
-            # Placeholder: grey box with game name
+            # 4. Platzhalter: graue Fläche mit Spielname
             pix = QPixmap(size)
             pix.fill(QColor(theme_color("panel2", "#242424")))
             if game_name:
