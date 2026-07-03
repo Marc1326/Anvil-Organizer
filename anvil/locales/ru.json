@@ -1274,5 +1274,14 @@
     "update_available": "Доступно обновление",
     "download_done": "Загрузка завершена",
     "download_error": "Ошибка загрузки"
+  },
+  "install": {
+    "title": "Установить мод",
+    "fomod_badge": "Обнаружен FOMOD",
+    "archive": "Архив:",
+    "mod_name": "Имя мода:",
+    "category": "Категория:",
+    "no_category": "Без категории",
+    "deploy_hint": "Мод автоматически развёртывается после установки."
   }
 }

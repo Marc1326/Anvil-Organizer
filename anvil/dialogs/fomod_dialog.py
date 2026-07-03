@@ -67,18 +67,66 @@ class FomodDialog(QDialog):
 
         title = config.module_name or "FOMOD"
         self.setWindowTitle(f"{tr('fomod.title')} -- {title}")
-        self.setMinimumSize(750, 500)
-        self.resize(850, 580)
-        self.setWindowFlags(
-            self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint
-        )
+        from anvil.styles.dark_theme import theme_color
+        self._modern = bool(theme_color("panel2", ""))
+        if self._modern:
+            # Vorlage-Modal: rahmenlos, eigene Titelleiste + Fußleiste
+            self.setFixedSize(1060, 726)
+            self.setWindowFlags(
+                Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        else:
+            self.setMinimumSize(750, 500)
+            self.resize(850, 580)
+            self.setWindowFlags(
+                self.windowFlags()
+                & ~Qt.WindowType.WindowContextHelpButtonHint
+            )
         # M1 fix: use objectName for QSS styling instead of setStyleSheet
         self.setObjectName("fomodDialog")
 
         # -- Layout --------------------------------------------------------
-        main = QVBoxLayout(self)
-        main.setContentsMargins(10, 10, 10, 10)
-        main.setSpacing(8)
+        if self._modern:
+            outer = QVBoxLayout(self)
+            outer.setSpacing(0)
+            outer.setContentsMargins(0, 0, 0, 0)
+            frame = QWidget()
+            frame.setObjectName("modalFrame")
+            frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            outer.addWidget(frame)
+            shell = QVBoxLayout(frame)
+            shell.setSpacing(0)
+            shell.setContentsMargins(1, 1, 1, 1)
+
+            title_bar = QWidget()
+            title_bar.setObjectName("instTitleBar")
+            title_bar.setAttribute(
+                Qt.WidgetAttribute.WA_StyledBackground, True)
+            title_bar.setFixedHeight(52)
+            tb = QHBoxLayout(title_bar)
+            tb.setContentsMargins(16, 0, 16, 0)
+            tb.setSpacing(10)
+            t_lbl = QLabel(tr("install.title"))
+            t_lbl.setObjectName("instTitleLabel")
+            tb.addWidget(t_lbl)
+            badge = QLabel(tr("install.fomod_badge"))
+            badge.setObjectName("fomodBadge")
+            tb.addWidget(badge, 0, Qt.AlignmentFlag.AlignVCenter)
+            tb.addStretch()
+            x_btn = QPushButton("✕")
+            x_btn.setObjectName("instCloseBtn")
+            x_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            x_btn.clicked.connect(self.reject)
+            tb.addWidget(x_btn)
+            shell.addWidget(title_bar)
+
+            body = QWidget()
+            main = QVBoxLayout(body)
+            main.setContentsMargins(20, 14, 20, 14)
+            main.setSpacing(8)
+        else:
+            main = QVBoxLayout(self)
+            main.setContentsMargins(10, 10, 10, 10)
+            main.setSpacing(8)
 
         # Step label
         self._step_label = QLabel()
@@ -121,31 +169,59 @@ class FomodDialog(QDialog):
         main.addWidget(splitter, 1)
 
         # Bottom buttons
-        btn_row = QHBoxLayout()
-        btn_row.setContentsMargins(0, 8, 0, 0)
-
         self._btn_back = QPushButton(tr("fomod.back"))
         self._btn_back.clicked.connect(lambda checked=False: self._go_back())
-        btn_row.addWidget(self._btn_back)
-
-        btn_row.addStretch()
-
         self._btn_next = QPushButton(tr("fomod.next"))
         self._btn_next.setDefault(True)
         self._btn_next.clicked.connect(lambda checked=False: self._go_next())
-        btn_row.addWidget(self._btn_next)
-
         self._btn_cancel = QPushButton(tr("fomod.cancel"))
         self._btn_cancel.clicked.connect(self.reject)
-        btn_row.addWidget(self._btn_cancel)
 
-        main.addLayout(btn_row)
+        if self._modern:
+            # Vorlage-Fußleiste: Abbrechen links · Zurück + Weiter rechts
+            shell.addWidget(body, 1)
+            footer = QWidget()
+            footer.setObjectName("instFooter")
+            footer.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            footer.setFixedHeight(60)
+            fr = QHBoxLayout(footer)
+            fr.setContentsMargins(16, 0, 16, 0)
+            fr.setSpacing(8)
+            self._btn_cancel.setObjectName("wizCancelBtn")
+            self._btn_back.setObjectName("setCancelBtn")
+            self._btn_next.setObjectName("setOkBtn")
+            for b in (self._btn_cancel, self._btn_back, self._btn_next):
+                b.setCursor(Qt.CursorShape.PointingHandCursor)
+            fr.addWidget(self._btn_cancel)
+            fr.addStretch()
+            fr.addWidget(self._btn_back)
+            fr.addWidget(self._btn_next)
+            shell.addWidget(footer)
+        else:
+            btn_row = QHBoxLayout()
+            btn_row.setContentsMargins(0, 8, 0, 0)
+            btn_row.addWidget(self._btn_back)
+            btn_row.addStretch()
+            btn_row.addWidget(self._btn_next)
+            btn_row.addWidget(self._btn_cancel)
+            main.addLayout(btn_row)
 
         # -- Initialise ----------------------------------------------------
         self._update_visible_steps()
         if self._visible_steps:
             self._show_step(0)
         self._update_buttons()
+
+    def exec(self):  # noqa: A003
+        """Modern: Hauptfenster abdunkeln, solange der Dialog offen ist."""
+        if self._modern and self.parent() is not None:
+            from anvil.widgets.modal_backdrop import ModalBackdrop
+            backdrop = ModalBackdrop(self.parent().window())
+            try:
+                return super().exec()
+            finally:
+                backdrop.dismiss()
+        return super().exec()
 
     # -- Public result API -------------------------------------------------
 

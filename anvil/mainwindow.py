@@ -2507,15 +2507,34 @@ class MainWindow(QMainWindow):
             mod_name = best
             dest = installer.mods_path / mod_name
 
-            # Nur bei Duplikat: Dialog zeigen
-            if dest.exists():
+            # Modern (Vorlage): Dialog bei JEDER Installation — Name +
+            # Kategorie bestätigen. Klassisch: nur bei Namens-Duplikat.
+            from anvil.styles.dark_theme import theme_color as _tc
+            modern_install = bool(_tc("panel2", ""))
+            install_category_id = 0
+            if modern_install or dest.exists():
+                try:
+                    archive_size = Path(archive).stat().st_size
+                except OSError:
+                    archive_size = 0
+                cats = [
+                    (c["id"], c["name"])
+                    for c in self._category_manager.all_categories()
+                ] if modern_install else []
                 while True:
-                    dlg = QuickInstallDialog(variants, mod_name, self)
+                    dlg = QuickInstallDialog(
+                        variants, mod_name, self,
+                        archive_name=Path(archive).name,
+                        archive_size=archive_size,
+                        fomod=fomod_xml is not None,
+                        categories=cats,
+                    )
                     _center_on_parent(dlg)
                     if dlg.exec() != QDialog.DialogCode.Accepted:
                         mod_name = None
                         break
                     mod_name = dlg.mod_name()
+                    install_category_id = dlg.category_id()
                     if not mod_name:
                         continue  # empty name → show dialog again
                     dest = installer.mods_path / mod_name
@@ -2542,6 +2561,12 @@ class MainWindow(QMainWindow):
             # Install from extracted temp dir
             mod_path = installer.install_from_extracted(temp_dir, mod_name)
             if mod_path:
+                # Kategorie aus dem Install-Dialog übernehmen
+                if install_category_id:
+                    from anvil.core.mod_metadata import write_meta_ini
+                    write_meta_ini(
+                        mod_path, {"category": str(install_category_id)})
+
                 # FOMOD Selection Memory: save choices after installation
                 if fomod_config_for_save and fomod_selections_for_save is not None:
                     save_fomod_choices(

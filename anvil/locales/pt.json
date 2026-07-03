@@ -1274,5 +1274,14 @@
     "update_available": "Atualização disponível",
     "download_done": "Download concluído",
     "download_error": "Falha no download"
+  },
+  "install": {
+    "title": "Instalar mod",
+    "fomod_badge": "FOMOD detetado",
+    "archive": "Arquivo:",
+    "mod_name": "Nome do mod:",
+    "category": "Categoria:",
+    "no_category": "Sem categoria",
+    "deploy_hint": "O mod é implantado automaticamente após a instalação."
   }
 }

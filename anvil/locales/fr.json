@@ -1274,5 +1274,14 @@
     "update_available": "Mise à jour disponible",
     "download_done": "Téléchargement terminé",
     "download_error": "Échec du téléchargement"
+  },
+  "install": {
+    "title": "Installer le mod",
+    "fomod_badge": "FOMOD détecté",
+    "archive": "Archive :",
+    "mod_name": "Nom du mod :",
+    "category": "Catégorie :",
+    "no_category": "Sans catégorie",
+    "deploy_hint": "Le mod est déployé automatiquement après l'installation."
   }
 }
