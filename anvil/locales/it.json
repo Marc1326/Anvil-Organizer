@@ -129,7 +129,8 @@
     "fw_activate": "Attiva",
     "fw_deactivate": "Disattiva",
     "fw_lock": "Blocca framework",
-    "fw_unlock": "Sblocca framework"
+    "fw_unlock": "Sblocca framework",
+    "properties": "Proprietà"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -266,7 +267,13 @@
     "rename_group_title": "Rinomina gruppo",
     "rename_group_prompt": "Nuovo nome:",
     "group_already_member": "'{mod}' è già nel gruppo '{group}'.",
-    "fw_update_title": "Aggiornamento framework"
+    "fw_update_title": "Aggiornamento framework",
+    "add_property_title": "Aggiungi proprietà",
+    "add_property_label": "Nome della proprietà:",
+    "rename_property_title": "Rinomina proprietà",
+    "rename_property_label": "Nuovo nome:",
+    "delete_property_title": "Elimina proprietà",
+    "delete_property_confirm": "Eliminare la proprietà \"{name}\"?\n\nLa proprietà verrà rimossa da tutte le mod."
   },
   "button": {
     "cancel": "Annulla",
@@ -669,7 +676,8 @@
     "prop_conflict_win": "Conflitti (vincitore)",
     "prop_conflict_lose": "Conflitti (perdente)",
     "nexus_categories": "Categorie Nexus",
-    "nexus_load": "Carica"
+    "nexus_load": "Carica",
+    "edit_categories": "Modifica"
   },
   "category": {
     "animations": "Animazioni",

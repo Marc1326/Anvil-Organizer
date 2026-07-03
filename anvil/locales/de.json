@@ -129,7 +129,8 @@
     "fw_activate": "Aktivieren",
     "fw_deactivate": "Deaktivieren",
     "fw_lock": "Framework sperren",
-    "fw_unlock": "Framework entsperren"
+    "fw_unlock": "Framework entsperren",
+    "properties": "Eigenschaften"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -266,7 +267,13 @@
     "rename_group_title": "Gruppe umbenennen",
     "rename_group_prompt": "Neuer Name:",
     "group_already_member": "'{mod}' ist bereits in Gruppe '{group}'.",
-    "fw_update_title": "Framework-Update"
+    "fw_update_title": "Framework-Update",
+    "add_property_title": "Eigenschaft hinzufügen",
+    "add_property_label": "Name der Eigenschaft:",
+    "rename_property_title": "Eigenschaft umbenennen",
+    "rename_property_label": "Neuer Name:",
+    "delete_property_title": "Eigenschaft löschen",
+    "delete_property_confirm": "Eigenschaft \"{name}\" wirklich löschen?\n\nDie Eigenschaft wird von allen Mods entfernt."
   },
   "button": {
     "cancel": "Abbrechen",
@@ -669,7 +676,8 @@
     "prop_conflict_win": "Konflikte (Gewinner)",
     "prop_conflict_lose": "Konflikte (Verlierer)",
     "nexus_categories": "Nexus-Kategorien",
-    "nexus_load": "Laden"
+    "nexus_load": "Laden",
+    "edit_categories": "Bearbeiten"
   },
   "category": {
     "animations": "Animationen",

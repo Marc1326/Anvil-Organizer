@@ -69,6 +69,8 @@ class NotificationPanel(QWidget):
 
     def __init__(self, center, parent=None):
         super().__init__(parent, Qt.WindowType.Popup)
+        self.setObjectName("notifPanel")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self._center = center
 

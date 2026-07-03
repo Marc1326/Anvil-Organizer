@@ -165,7 +165,7 @@ QMenuBar {
     background: {{hov}};
     color: {{txt}}; }
 
-#titleNotifBtn {
+#titleNotifBtn, #titleThemeBtn {
   font-size: 12px;
   padding: 4px 14px; }
 
@@ -1174,6 +1174,22 @@ QFileDialog QToolButton {
   color: {{txt3}};
   font-size: 12px;
   background: transparent; }
+
+/* Benachrichtigungen-Popup: Panel mit sichtbarem Rand */
+#notifPanel {
+  background: {{panel}};
+  border: 1px solid {{line}};
+  border-radius: 10px; }
+
+/* Filter-Panel: „Bearbeiten"-Link im Kategorien-Header (Vorlage) */
+#catEditLink {
+  color: {{accent}};
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  font-size: 12px; }
+  #catEditLink:hover {
+    color: {{accent_hover}}; }
 
 /* Werkzeug-Zeile: Mod-Zähler rechts (Vorlage) */
 #toolbarActiveLabel {

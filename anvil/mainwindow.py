@@ -342,6 +342,9 @@ class MainWindow(QMainWindow):
         # ── Category manager ────────────────────────────────────────────
         self._category_manager = CategoryManager()
         self._filter_panel.set_category_manager(self._category_manager)
+        from anvil.core.properties import PropertyManager
+        self._property_manager = PropertyManager()
+        self._filter_panel.set_property_manager(self._property_manager)
 
         # ── Group manager ──────────────────────────────────────────────
         self._group_manager = GroupManager()
@@ -648,8 +651,16 @@ class MainWindow(QMainWindow):
         self._title_notif_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._title_notif_btn.clicked.connect(
             self._on_title_notifications_clicked)
+        self._title_theme_btn = QToolButton()
+        self._title_theme_btn.setObjectName("titleThemeBtn")
+        self._title_theme_btn.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self._title_theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._title_theme_btn.clicked.connect(self._on_title_theme_toggle)
+        self._update_title_theme_btn()
         self._title_span = TitleBarSpan(
-            menubar, self._instance_dropdown, self._title_notif_btn)
+            menubar, self._instance_dropdown, self._title_notif_btn,
+            self._title_theme_btn)
         self._switch_overlay = SwitchOverlay(self)
 
     # ── Icon size constants ─────────────────────────────────────────
@@ -1439,8 +1450,12 @@ class MainWindow(QMainWindow):
         self._mod_list_view.source_model().set_category_manager(self._category_manager)
         self._mod_list_view._proxy_model.set_category_manager(self._category_manager)
 
+        # Eigene Eigenschaften der Instanz laden
+        self._property_manager.load(instance_path)
+
         # Populate FilterPanel with categories
         self._filter_panel.set_categories(self._category_manager.all_categories())
+        self._filter_panel.set_properties(self._property_manager.all_properties())
         self._filter_panel.reset_all()
 
         # Load Nexus categories cache (lazy API call if expired)
@@ -3030,6 +3045,22 @@ class MainWindow(QMainWindow):
         else:
             andere_kat_menu.setEnabled(False)
             primaere_kat_menu.setEnabled(False)
+
+        # ── Eigene Eigenschaften (Submenu, nur wenn welche angelegt) ──
+        _all_props = self._property_manager.all_properties()
+        if _all_props:
+            props_menu = menu.addMenu(tr("context.properties"))
+            if single and _ctx_entry:
+                _assigned_props = set(_ctx_entry.property_ids)
+                for prop in _all_props:
+                    act_p = props_menu.addAction(prop["name"])
+                    act_p.setCheckable(True)
+                    act_p.setChecked(prop["id"] in _assigned_props)
+                    act_p.triggered.connect(
+                        lambda checked, pid=prop["id"], r=selected_rows[0]:
+                        self._toggle_property(r, pid))
+            else:
+                props_menu.setEnabled(False)
         menu.addSeparator()
 
         # ── Updates / Aktivieren ──────────────────────────────────
@@ -3356,7 +3387,10 @@ class MainWindow(QMainWindow):
         if not initial.isValid():
             initial = QColor(Qt.GlobalColor.white)
 
-        color = QColorDialog.getColor(initial, self, tr("context.select_color"))
+        # Qt-eigener Dialog — der native GTK-Portal-Dialog ist unzuverlässig
+        color = QColorDialog.getColor(
+            initial, self, tr("context.select_color"),
+            QColorDialog.ColorDialogOption.DontUseNativeDialog)
         if not color.isValid():
             return  # User cancelled
 
@@ -3590,7 +3624,9 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QColorDialog
 
         current = QColor(self._group_manager.get_group_color(group_name))
-        color = QColorDialog.getColor(current, self, tr("context.group_color"))
+        color = QColorDialog.getColor(
+            current, self, tr("context.group_color"),
+            QColorDialog.ColorDialogOption.DontUseNativeDialog)
         if color.isValid():
             self._group_manager.set_color(group_name, color.name())
             self._reload_mod_list()
@@ -4774,6 +4810,27 @@ class MainWindow(QMainWindow):
         name = self._category_manager.get_name(cat_id) or str(cat_id)
         msg = tr("status.category_added", name=name) if cat_id in ordered else tr("status.category_removed", name=name)
         self.statusBar().showMessage(msg, 3000)
+
+    def _toggle_property(self, row: int, prop_id: int) -> None:
+        """Eigene Eigenschaft für einen Mod an-/abwählen (meta.ini)."""
+        from anvil.core.mod_metadata import write_meta_ini
+
+        entry = self._entry_for_row(row)
+        if not entry:
+            return
+        current_ids = list(entry.property_ids)
+        if prop_id in current_ids:
+            current_ids.remove(prop_id)
+        else:
+            current_ids.append(prop_id)
+
+        entry.property_ids = current_ids
+        if entry.install_path:
+            write_meta_ini(entry.install_path, {
+                "properties": ",".join(str(i) for i in current_ids)})
+
+        # Aktiver Eigenschafts-Filter ggf. neu anwenden
+        self._on_filter_changed()
 
     def _set_primary_category(self, row: int, cat_id: int) -> None:
         """Set a category as primary for a mod."""
@@ -7512,6 +7569,47 @@ class MainWindow(QMainWindow):
         """Benachrichtigungen-Button in der Titelzeile (modernes Design)."""
         panel = NotificationPanel(self._notification_center, self)
         panel.show_under(self._title_notif_btn)
+
+    # ── Hell/Dunkel-Umschalter (Titelzeile) ──────────────────────────
+    def _update_title_theme_btn(self) -> None:
+        """Button zeigt das ZIEL-Design: dunkel aktiv → „Hell" und umgekehrt."""
+        if not hasattr(self, "_title_theme_btn"):
+            return
+        from anvil.styles.dark_theme import MODERN_THEME_DARK, is_modern_theme
+        cur = self._settings().value("style/theme", default_theme())
+        self._title_theme_btn.setVisible(is_modern_theme(cur))
+        if cur == MODERN_THEME_DARK:
+            self._title_theme_btn.setText(tr("settings.design_light"))
+        else:
+            self._title_theme_btn.setText(tr("settings.design_dark"))
+
+    def _on_title_theme_toggle(self, checked: bool = False) -> None:
+        """Wechselt zwischen Anvil Dunkel und Anvil Hell (wie Settings-Accept)."""
+        from anvil.styles.dark_theme import (
+            MODERN_THEME_DARK, MODERN_THEME_LIGHT, is_modern_theme)
+        s = self._settings()
+        cur = s.value("style/theme", default_theme())
+        if not is_modern_theme(cur):
+            return
+        new = (MODERN_THEME_LIGHT if cur == MODERN_THEME_DARK
+               else MODERN_THEME_DARK)
+        s.setValue("style/theme", new)
+        s.sync()
+        accent, density = style_prefs(s)
+        apply_theme(QApplication.instance(), new,
+                    load_overrides(s, new), accent=accent, density=density)
+        self.setStyleSheet("")
+        self._restore_view_settings()
+        from PySide6.QtWidgets import QTreeView
+        app = QApplication.instance()
+        for w in app.allWidgets():
+            if hasattr(w, "apply_theme_metrics"):
+                w.apply_theme_metrics()
+            if isinstance(w, QTreeView):
+                w.doItemsLayout()
+        if self.instance_manager.current_instance():
+            self.switch_instance(self.instance_manager.current_instance())
+        self._update_title_theme_btn()
 
     def _on_notify_download_finished(self, download_id: int, save_path: str) -> None:
         name = Path(save_path).name if save_path else ""

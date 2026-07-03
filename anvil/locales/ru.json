@@ -129,7 +129,8 @@
     "fw_activate": "Включить",
     "fw_deactivate": "Отключить",
     "fw_lock": "Заблокировать фреймворк",
-    "fw_unlock": "Разблокировать фреймворк"
+    "fw_unlock": "Разблокировать фреймворк",
+    "properties": "Свойства"
   },
   "toolbar": {
     "deploy": "Развернуть",
@@ -266,7 +267,13 @@
     "rename_group_title": "Переименовать группу",
     "rename_group_prompt": "Новое имя:",
     "group_already_member": "'{mod}' уже в группе '{group}'.",
-    "fw_update_title": "Обновление фреймворка"
+    "fw_update_title": "Обновление фреймворка",
+    "add_property_title": "Добавить свойство",
+    "add_property_label": "Название свойства:",
+    "rename_property_title": "Переименовать свойство",
+    "rename_property_label": "Новое имя:",
+    "delete_property_title": "Удалить свойство",
+    "delete_property_confirm": "Удалить свойство «{name}»?\n\nСвойство будет удалено у всех модов."
   },
   "button": {
     "cancel": "Отмена",
@@ -669,7 +676,8 @@
     "prop_conflict_win": "Конфликты (победитель)",
     "prop_conflict_lose": "Конфликты (проигравший)",
     "nexus_categories": "Категории Nexus",
-    "nexus_load": "Загрузить"
+    "nexus_load": "Загрузить",
+    "edit_categories": "Изменить"
   },
   "category": {
     "animations": "Анимации",

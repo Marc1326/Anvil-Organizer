@@ -155,9 +155,10 @@ class GamePanel(QWidget):
         # Verknüpfung-Button oben rechts
         link_btn = QPushButton()
         link_btn.setObjectName("linkButton")
+        from anvil.styles.dark_theme import themed_icon
         _exec_icon = str(get_anvil_base() / "styles" / "icons" / "executables.svg")
         if os.path.exists(_exec_icon):
-            link_btn.setIcon(QIcon(_exec_icon))
+            link_btn.setIcon(themed_icon(_exec_icon))
         link_btn.setIconSize(QSize(20, 20))
         link_btn.setToolTip(tr("tooltip.link"))
         link_btn.setFixedWidth(32)
@@ -203,7 +204,14 @@ class GamePanel(QWidget):
         self._start_btn.setObjectName("startButton")
         _play_icon = str(get_anvil_base() / "styles" / "icons" / "files" / "play.png")
         if os.path.exists(_play_icon):
-            self._start_btn.setIcon(QIcon(_play_icon))
+            if theme_color("panel2", ""):
+                # Modern: Dreieck dunkel wie der Button-Text (accent_text)
+                from anvil.styles.dark_theme import tinted_pixmap
+                pix = tinted_pixmap(
+                    QPixmap(_play_icon), theme_color("accent_text", "#0d1113"))
+                self._start_btn.setIcon(QIcon(pix))
+            else:
+                self._start_btn.setIcon(QIcon(_play_icon))
             self._start_btn.setIconSize(QSize(24, 24))
         self._start_btn.setFixedHeight(36)
         self._start_btn.setToolTip(tr("game_panel.start"))
@@ -287,6 +295,8 @@ class GamePanel(QWidget):
             data_reload_btn.setIcon(QIcon(_refresh_icon))
         data_reload_btn.setIconSize(QSize(20, 20))
         data_reload_btn.clicked.connect(self._on_reload_data)
+        if theme_color("panel2", ""):
+            data_reload_btn.setVisible(False)
         data_layout.addWidget(data_reload_btn)
         self._data_tree = QTreeWidget()
         self._data_tree.setObjectName("dataTree")
@@ -329,11 +339,15 @@ class GamePanel(QWidget):
             saves_reload_btn.setIcon(QIcon(_refresh_icon3))
         saves_reload_btn.setIconSize(QSize(20, 20))
         saves_reload_btn.clicked.connect(self._on_reload_saves)
+        if theme_color("panel2", ""):
+            saves_reload_btn.setVisible(False)
         saves_btn_bar.addWidget(saves_reload_btn)
         saves_open_btn = QPushButton(tr("game_panel.saves_open_folder"))
         saves_open_btn.setToolTip(tr("game_panel.saves_open_folder_tip"))
-        saves_open_btn.setIcon(self.style().standardIcon(self.style().StandardPixmap.SP_DirOpenIcon))
-        saves_open_btn.setIconSize(QSize(20, 20))
+        if not theme_color("panel2", ""):
+            # Klassisch mit Ordner-Icon; modern nur Text (Vorlage)
+            saves_open_btn.setIcon(self.style().standardIcon(self.style().StandardPixmap.SP_DirOpenIcon))
+            saves_open_btn.setIconSize(QSize(20, 20))
         saves_open_btn.clicked.connect(self._on_open_saves_folder)
         saves_btn_bar.addWidget(saves_open_btn)
         saves_btn_bar.addStretch()

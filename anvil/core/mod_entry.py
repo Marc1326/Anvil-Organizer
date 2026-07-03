@@ -43,6 +43,7 @@ class ModEntry:
     category: str = ""                     # Comma-separated IDs (primary first)
     primary_category: int = 0              # First ID in category list
     category_ids: list[int] = field(default_factory=list)  # Parsed IDs
+    property_ids: list[int] = field(default_factory=list)  # Eigene Eigenschaften
     nexus_id: int = 0
     author: str = ""
     description: str = ""
@@ -139,6 +140,20 @@ def _build_entry(
                     pass
     primary_cat = cat_ids[0] if cat_ids else 0
 
+    # Benutzerdefinierte Eigenschaften (Komma-Liste wie category)
+    prop_ids: list[int] = []
+    raw_props = meta.get("properties", "")
+    if raw_props:
+        for part in raw_props.split(","):
+            part = part.strip()
+            if part:
+                try:
+                    pid = int(part)
+                    if pid > 0:
+                        prop_ids.append(pid)
+                except ValueError:
+                    pass
+
     # Read separator color from meta.ini (compatible with common meta.ini format)
     sep_color = ""
     sep_deploy_path = ""
@@ -168,6 +183,7 @@ def _build_entry(
         category=raw_cat,
         primary_category=primary_cat,
         category_ids=cat_ids,
+        property_ids=prop_ids,
         nexus_id=nexus_id,
         author=meta.get("author", ""),
         description=meta.get("description", ""),

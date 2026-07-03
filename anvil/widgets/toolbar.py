@@ -19,32 +19,10 @@ _ICONS_DIR = get_anvil_base() / "styles" / "icons"
 
 
 def _icon(name: str) -> QIcon:
-    path = _ICONS_DIR / name
-    if not path.exists():
-        return QIcon()
-    # Modern: SVG-Fill (#d3d3d3) auf Theme-Textfarbe umfärben — sonst sind
-    # die Icons im Hell-Modus unsichtbar, sobald die Icon-Ansicht aktiv ist.
-    from anvil.styles.dark_theme import theme_color
-    if theme_color("panel2", "") and name.endswith(".svg"):
-        try:
-            from PySide6.QtCore import QByteArray
-            from PySide6.QtGui import QPainter, QPixmap
-            from PySide6.QtSvg import QSvgRenderer
-            tint = theme_color("txt2")
-            data = (path.read_text(encoding="utf-8")
-                    .replace("#d3d3d3", tint)
-                    .replace("#FFFFFF", tint)
-                    .replace("#ffffff", tint))
-            renderer = QSvgRenderer(QByteArray(data.encode()))
-            pix = QPixmap(96, 96)
-            pix.fill(Qt.GlobalColor.transparent)
-            p = QPainter(pix)
-            renderer.render(p)
-            p.end()
-            return QIcon(pix)
-        except Exception:
-            pass
-    return QIcon(str(path))
+    # Modern werden die monochromen Icons auf die Theme-Textfarbe gefärbt —
+    # sonst sind sie im Hell-Modus unsichtbar (Icon-Ansicht).
+    from anvil.styles.dark_theme import themed_icon
+    return themed_icon(_ICONS_DIR / name)
 
 
 def create_toolbar(parent=None):

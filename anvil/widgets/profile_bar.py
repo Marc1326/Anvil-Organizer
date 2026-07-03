@@ -482,7 +482,15 @@ class ProfileBar(QWidget):
         btn_backup.setFixedSize(36, 32)
         btn_backup.clicked.connect(lambda: self.backup_requested.emit())
 
-        self._action_btns = [btn_menu, btn_view, btn_restore, btn_backup]
+        if self._plus_inline:
+            # Modern: Sicherung/Wiederherstellen/Ansicht stecken in der
+            # Werkzeug-Zeile — hier bleibt nur das Menü, ganz rechts außen.
+            btn_view.setVisible(False)
+            btn_restore.setVisible(False)
+            btn_backup.setVisible(False)
+            self._action_btns = [btn_menu]
+        else:
+            self._action_btns = [btn_menu, btn_view, btn_restore, btn_backup]
         for btn in self._action_btns:
             btn.setStyleSheet(_button_style())
             layout.addWidget(btn)

@@ -256,7 +256,8 @@ class TitleBarSpan(QWidget):
     klassisch bleibt die Glocke in der Toolbar.
     """
 
-    def __init__(self, menubar, dropdown: QWidget, notif_btn: QWidget):
+    def __init__(self, menubar, dropdown: QWidget, notif_btn: QWidget,
+                 theme_btn: QWidget | None = None):
         super().__init__(menubar)
         self._menubar = menubar
         lay = QHBoxLayout(self)
@@ -265,6 +266,8 @@ class TitleBarSpan(QWidget):
         lay.addStretch(1)
         lay.addWidget(dropdown)
         lay.addStretch(1)
+        if theme_btn is not None:
+            lay.addWidget(theme_btn)
         lay.addWidget(notif_btn)
         menubar.installEventFilter(self)
         self.apply_theme_metrics()

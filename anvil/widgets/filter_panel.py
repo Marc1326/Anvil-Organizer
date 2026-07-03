@@ -107,14 +107,33 @@ class FilterPanel(QWidget):
         lbl_props.setStyleSheet(
             "QLabel { font-weight: bold; padding: 2px 0; }"
         )
-        self._inner_layout.addWidget(lbl_props)
+        from anvil.styles.dark_theme import theme_color as _tc
+        if _tc("panel2", ""):
+            # Wie Kategorien: „Bearbeiten"-Link rechts neben dem Header
+            props_header = QHBoxLayout()
+            props_header.setContentsMargins(0, 0, 0, 0)
+            props_header.addWidget(lbl_props)
+            props_header.addStretch()
+            prop_edit_link = QPushButton(tr("filter.edit_categories"))
+            prop_edit_link.setObjectName("catEditLink")
+            prop_edit_link.setFlat(True)
+            prop_edit_link.setCursor(Qt.CursorShape.PointingHandCursor)
+            prop_edit_link.clicked.connect(
+                lambda checked=False: self._add_property())
+            props_header.addWidget(prop_edit_link)
+            self._inner_layout.addLayout(props_header)
+        else:
+            self._inner_layout.addWidget(lbl_props)
 
         self._prop_flow = FlowLayout(h_spacing=4, v_spacing=4)
         prop_container = QWidget()
         prop_container.setLayout(self._prop_flow)
-        # Verhindere Event-Bubbling von Property-Chips (kein Menü für Properties)
+        # Rechtsklick: eigene Eigenschaften anlegen/umbenennen/löschen
+        # (funktioniert in alter UND neuer GUI)
+        self._prop_container = prop_container
         prop_container.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        prop_container.customContextMenuRequested.connect(lambda pos: None)
+        prop_container.customContextMenuRequested.connect(
+            self._on_prop_area_context_menu)
         self._inner_layout.addWidget(prop_container)
 
         self._prop_chips: list[FilterChip] = []
@@ -123,6 +142,8 @@ class FilterPanel(QWidget):
             chip.toggled.connect(self._on_changed)
             self._prop_flow.addWidget(chip)
             self._prop_chips.append(chip)
+        self._custom_prop_chips: list[FilterChip] = []
+        self._property_manager = None
 
         # ── Kategorien section ────────────────────────────────────
         lbl_cats = QLabel(tr("filter.categories"))
@@ -130,7 +151,23 @@ class FilterPanel(QWidget):
         lbl_cats.setStyleSheet(
             "QLabel { font-weight: bold; padding: 2px 0; }"
         )
-        self._inner_layout.addWidget(lbl_cats)
+        from anvil.styles.dark_theme import theme_color
+        if theme_color("panel2", ""):
+            # Vorlage: „Bearbeiten"-Link rechts neben dem Header (Akzentfarbe)
+            cats_header = QHBoxLayout()
+            cats_header.setContentsMargins(0, 0, 0, 0)
+            cats_header.addWidget(lbl_cats)
+            cats_header.addStretch()
+            edit_link = QPushButton(tr("filter.edit_categories"))
+            edit_link.setObjectName("catEditLink")
+            edit_link.setFlat(True)
+            edit_link.setCursor(Qt.CursorShape.PointingHandCursor)
+            edit_link.clicked.connect(
+                lambda checked=False: self._add_category())
+            cats_header.addWidget(edit_link)
+            self._inner_layout.addLayout(cats_header)
+        else:
+            self._inner_layout.addWidget(lbl_cats)
 
         self._cat_flow = FlowLayout(h_spacing=4, v_spacing=4)
         self._cat_container = QWidget()
@@ -233,8 +270,34 @@ class FilterPanel(QWidget):
             self._cat_chips.append(chip)
 
     def active_property_ids(self) -> set[int]:
-        """Return set of checked property chip IDs."""
-        return {c.chip_id for c in self._prop_chips if c.isChecked()}
+        """Return set of checked property chip IDs (fest + eigene)."""
+        return {c.chip_id
+                for c in self._prop_chips + self._custom_prop_chips
+                if c.isChecked()}
+
+    def set_property_manager(self, manager) -> None:
+        """PropertyManager-Referenz (für Anlegen/Umbenennen/Löschen)."""
+        self._property_manager = manager
+
+    def set_properties(self, properties: list[dict]) -> None:
+        """Eigene Eigenschafts-Chips aus ``[{'id': int, 'name': str}]``."""
+        for chip in self._custom_prop_chips:
+            try:
+                chip.toggled.disconnect(self._on_changed)
+            except (RuntimeError, TypeError):
+                pass
+            chip.hide()
+            self._prop_flow.removeWidget(chip)
+            chip.setParent(None)
+            chip.deleteLater()
+        self._custom_prop_chips.clear()
+
+        for prop in properties:
+            chip = FilterChip(prop["name"], chip_id=prop["id"])
+            chip.toggled.connect(self._on_changed)
+            self._prop_flow.addWidget(chip)
+            chip.show()
+            self._custom_prop_chips.append(chip)
 
     def active_category_ids(self) -> set[int]:
         """Return set of checked category chip IDs."""
@@ -432,6 +495,102 @@ class FilterPanel(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             self._category_manager.remove_category(chip.chip_id)
             self.set_categories(self._category_manager.all_categories())
+
+    # ── Eigene Eigenschaften (anlegen/umbenennen/löschen) ──────────
+
+    def _on_prop_area_context_menu(self, pos):
+        """Rechtsklick im Eigenschaften-Bereich (alte + neue GUI)."""
+        if self._property_manager is None:
+            return
+        from PySide6.QtWidgets import QApplication
+        from anvil.widgets.filter_chip import context_menu_style
+
+        global_pos = self._prop_container.mapToGlobal(pos)
+        widget = QApplication.widgetAt(global_pos)
+        chip = None
+        w = widget
+        while w is not None:
+            if isinstance(w, FilterChip):
+                # Nur eigene Eigenschaften sind editierbar (positive IDs)
+                if w.chip_id > 0:
+                    chip = w
+                break
+            if w is self._prop_container:
+                break
+            w = w.parent()
+
+        menu = QMenu(self)
+        menu.setStyleSheet(context_menu_style())
+        act_add = menu.addAction(tr("context.add"))
+        act_rename = act_delete = None
+        if chip is not None:
+            act_rename = menu.addAction(tr("context.rename"))
+            act_delete = menu.addAction(tr("context.delete"))
+        chosen = menu.exec(global_pos)
+        if chosen == act_add:
+            self._add_property()
+        elif act_rename is not None and chosen == act_rename:
+            self._rename_property(chip)
+        elif act_delete is not None and chosen == act_delete:
+            self._delete_property(chip)
+
+    def _add_property(self):
+        """Dialog: neue Eigenschaft anlegen."""
+        if self._property_manager is None:
+            return
+        from anvil.widgets.category_dialog import CategoryNameDialog
+
+        existing = {p["name"].lower()
+                    for p in self._property_manager.all_properties()}
+        dlg = CategoryNameDialog(
+            parent=self,
+            title=tr("dialog.add_property_title"),
+            label_text=tr("dialog.add_property_label"),
+            existing_names=existing,
+        )
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            name = dlg.get_name()
+            if name:
+                self._property_manager.add_property(name)
+                self.set_properties(self._property_manager.all_properties())
+
+    def _rename_property(self, chip) -> None:
+        if self._property_manager is None:
+            return
+        from anvil.widgets.category_dialog import CategoryNameDialog
+
+        old_name = self._property_manager.get_name(chip.chip_id) or chip.text()
+        existing = {p["name"].lower()
+                    for p in self._property_manager.all_properties()}
+        dlg = CategoryNameDialog(
+            parent=self,
+            title=tr("dialog.rename_property_title"),
+            label_text=tr("dialog.rename_property_label"),
+            existing_names=existing,
+            initial_text=old_name,
+        )
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            new_name = dlg.get_name()
+            if new_name and new_name.lower() != old_name.lower():
+                self._property_manager.rename_property(chip.chip_id, new_name)
+                self.set_properties(self._property_manager.all_properties())
+
+    def _delete_property(self, chip):
+        if self._property_manager is None:
+            return
+        name = self._property_manager.get_name(chip.chip_id) or str(chip.chip_id)
+        reply = QMessageBox.question(
+            self,
+            tr("dialog.delete_property_title"),
+            tr("dialog.delete_property_confirm", name=name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            was_checked = chip.isChecked()
+            self._property_manager.remove_property(chip.chip_id)
+            self.set_properties(self._property_manager.all_properties())
+            if was_checked:
+                self.filter_changed.emit()
 
     # ── Internal ──────────────────────────────────────────────────
 

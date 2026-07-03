@@ -690,6 +690,11 @@ class ModListProxyModel(QSortFilterProxyModel):
                 match = True
             if PROP_NO_CATEGORY in self._filter_prop_ids and not entry.category_ids:
                 match = True
+            # Benutzerdefinierte Eigenschaften (positive IDs aus properties.json)
+            custom_ids = {p for p in self._filter_prop_ids if p > 0}
+            if custom_ids and custom_ids.intersection(
+                    getattr(entry, "property_ids", []) or []):
+                match = True
             # Conflict filters need conflict data from model row
             if source and source_row < source.rowCount():
                 row_data = source._rows[source_row] if source_row < len(source._rows) else None

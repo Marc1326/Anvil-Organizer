@@ -1713,7 +1713,9 @@ class SettingsDialog(QDialog):
     def _on_pick_color(self, role: str) -> None:
         from PySide6.QtWidgets import QColorDialog
         current = QColor(self._effective_color(role))
-        chosen = QColorDialog.getColor(current, self, tr("settings.color_pick_title"))
+        chosen = QColorDialog.getColor(
+            current, self, tr("settings.color_pick_title"),
+            QColorDialog.ColorDialogOption.DontUseNativeDialog)
         if not chosen.isValid():
             return
         hex_value = chosen.name()

@@ -8,6 +8,53 @@ from pathlib import Path
 
 from anvil.core.resource_path import get_anvil_base
 
+
+def themed_icon(path):
+    """QIcon von Platte; modern werden monochrome SVGs/PNGs auf txt2 gefärbt.
+
+    Klassische Themes erhalten das Original (unverändertes Verhalten).
+    """
+    from PySide6.QtGui import QIcon
+    path = Path(path)
+    if not path.exists():
+        return QIcon()
+    tint = theme_color("txt2", "")
+    if not tint:
+        return QIcon(str(path))
+    try:
+        from PySide6.QtCore import QByteArray, Qt
+        from PySide6.QtGui import QPainter, QPixmap
+        if path.suffix.lower() == ".svg":
+            from PySide6.QtSvg import QSvgRenderer
+            data = (path.read_text(encoding="utf-8")
+                    .replace("#d3d3d3", tint)
+                    .replace("#FFFFFF", tint)
+                    .replace("#ffffff", tint))
+            renderer = QSvgRenderer(QByteArray(data.encode()))
+            pix = QPixmap(96, 96)
+            pix.fill(Qt.GlobalColor.transparent)
+            p = QPainter(pix)
+            renderer.render(p)
+            p.end()
+            return QIcon(pix)
+        return QIcon(tinted_pixmap(QPixmap(str(path)), tint))
+    except Exception:
+        return QIcon(str(path))
+
+
+def tinted_pixmap(pix, color: str):
+    """Pixmap-Silhouette in *color* einfärben (Alpha bleibt erhalten)."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QColor, QPainter, QPixmap
+    out = QPixmap(pix.size())
+    out.fill(Qt.GlobalColor.transparent)
+    p = QPainter(out)
+    p.drawPixmap(0, 0, pix)
+    p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    p.fillRect(out.rect(), QColor(color))
+    p.end()
+    return out
+
 _STYLES_DIR = get_anvil_base() / "styles"
 _DEFAULT_THEME = "Anvil Dunkel"
 _FALLBACK_CLASSIC_THEME = "Paper Dark"
