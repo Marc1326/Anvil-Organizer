@@ -82,12 +82,14 @@ MODERN_BASE: dict[str, dict[str, str]] = {
         "line": "#2a2e35", "txt": "#e7e9ed", "txt2": "#9aa1ac",
         "txt3": "#666d78", "hov": "rgba(255,255,255,0.05)",
         "ok": "#4cae7d", "warn": "#b8923f", "accent_text": "#0d1113",
+        "chrome": "#1a1d22",
     },
     MODERN_THEME_LIGHT: {
-        "bg": "#f2f3f5", "panel": "#ffffff", "panel2": "#e9ebee",
-        "line": "#d9dce1", "txt": "#20242c", "txt2": "#5b6170",
+        "bg": "#dcdee3", "panel": "#eceef1", "panel2": "#d3d6dc",
+        "line": "#c2c6cd", "txt": "#20242c", "txt2": "#5b6170",
         "txt3": "#9096a1", "hov": "rgba(20,30,50,0.05)",
         "ok": "#2e8757", "warn": "#9a7526", "accent_text": "#0d1113",
+        "chrome": "#d3d6dc",
     },
 }
 

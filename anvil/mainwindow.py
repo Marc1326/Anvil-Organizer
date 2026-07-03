@@ -2901,6 +2901,27 @@ class MainWindow(QMainWindow):
 
             from PySide6.QtWidgets import QWidgetAction, QPushButton
 
+            def _cat_btn_style(assigned: bool) -> str:
+                from anvil.styles.dark_theme import theme_color
+                if theme_color("panel2", ""):
+                    color = theme_color("accent") if assigned else theme_color("txt")
+                    hover = theme_color("hov")
+                else:
+                    color = "#00d4aa" if assigned else "#e0e0e0"
+                    hover = "#2d2d2d"
+                weight = "font-weight: bold;" if assigned else ""
+                return f"""
+                    QPushButton {{
+                        color: {color};
+                        {weight}
+                        text-align: left;
+                        padding: 6px 12px;
+                        border: none;
+                        background: transparent;
+                    }}
+                    QPushButton:hover {{ background: {hover}; }}
+                """
+
             # "Andere Kategorien" — toggle buttons (Menü bleibt offen)
             for cat in self._category_manager.all_categories():
                 cat_id = cat["id"]
@@ -2911,29 +2932,7 @@ class MainWindow(QMainWindow):
                 btn.setFlat(True)
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 # Styling: türkis wenn zugewiesen
-                if is_assigned:
-                    btn.setStyleSheet("""
-                        QPushButton {
-                            color: #00d4aa;
-                            font-weight: bold;
-                            text-align: left;
-                            padding: 6px 12px;
-                            border: none;
-                            background: transparent;
-                        }
-                        QPushButton:hover { background: #2d2d2d; }
-                    """)
-                else:
-                    btn.setStyleSheet("""
-                        QPushButton {
-                            color: #e0e0e0;
-                            text-align: left;
-                            padding: 6px 12px;
-                            border: none;
-                            background: transparent;
-                        }
-                        QPushButton:hover { background: #2d2d2d; }
-                    """)
+                btn.setStyleSheet(_cat_btn_style(is_assigned))
 
                 # Click-Handler: Toggle und UI aktualisieren
                 def make_toggle_handler(cid, button, cats_menu, prim_menu):
@@ -2945,32 +2944,12 @@ class MainWindow(QMainWindow):
                         new_prefix = "●  " if new_assigned else "    "
                         cat_name = self._category_manager.get_name(cid)
                         button.setText(f"{new_prefix}{cat_name}")
+                        button.setStyleSheet(_cat_btn_style(new_assigned))
                         if new_assigned:
-                            button.setStyleSheet("""
-                                QPushButton {
-                                    color: #00d4aa;
-                                    font-weight: bold;
-                                    text-align: left;
-                                    padding: 6px 12px;
-                                    border: none;
-                                    background: transparent;
-                                }
-                                QPushButton:hover { background: #2d2d2d; }
-                            """)
                             # Erste Kategorie zugewiesen → automatisch als Primary
                             if len(entry.category_ids) == 1:
                                 self._set_primary_category(row, cid)
                         else:
-                            button.setStyleSheet("""
-                                QPushButton {
-                                    color: #e0e0e0;
-                                    text-align: left;
-                                    padding: 6px 12px;
-                                    border: none;
-                                    background: transparent;
-                                }
-                                QPushButton:hover { background: #2d2d2d; }
-                            """)
                             # Letzte Kategorie entfernt → Primary auf 0
                             if not entry.category_ids:
                                 self._set_primary_category(row, 0)

@@ -152,7 +152,7 @@ QMenu {
       color: {{txt}}; }
 
 QMenuBar {
-  background: {{panel}};
+  background: {{chrome}};
   border-bottom: 1px solid {{line}};
   min-height: 46px;
   font-size: 13px; }
@@ -172,7 +172,7 @@ QMenuBar {
 /* ── Toolbar ───────────────────────────────────────────────── */
 
 QToolBar {
-  background: {{panel}};
+  background: {{chrome}};
   border: none;
   border-bottom: 1px solid {{line}};
   spacing: 2px;

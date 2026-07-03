@@ -18,6 +18,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 
 from anvil.core.translator import tr
+from anvil.styles.dark_theme import theme_color
 
 LogLevel = Literal["debug", "info", "warning", "error"]
 
@@ -31,6 +32,10 @@ LEVEL_CONFIG = {
 MAX_ENTRIES = 1000
 
 
+def _modern() -> bool:
+    return bool(theme_color("panel2", ""))
+
+
 class LogEntry(QFrame):
     """Single log entry widget."""
 
@@ -41,6 +46,8 @@ class LogEntry(QFrame):
         self.timestamp = timestamp
 
         config = LEVEL_CONFIG[level]
+        modern = _modern()
+        hover = theme_color("hov") if modern else "#3D3D3D"
 
         self.setStyleSheet(f"""
             QFrame {{
@@ -51,7 +58,7 @@ class LogEntry(QFrame):
                 margin: 0;
             }}
             QFrame:hover {{
-                background: #3D3D3D;
+                background: {hover};
             }}
         """)
 
@@ -68,7 +75,10 @@ class LogEntry(QFrame):
         # Message
         msg_label = QLabel(message)
         msg_label.setWordWrap(False)
-        text_color = config["color"] if level == "error" else "#D3D3D3"
+        if level == "error":
+            text_color = config["color"]
+        else:
+            text_color = theme_color("txt2") if modern else "#D3D3D3"
         msg_label.setStyleSheet(f"""
             color: {text_color};
             font-size: 12px;
@@ -79,8 +89,9 @@ class LogEntry(QFrame):
 
         # Timestamp
         time_label = QLabel(timestamp)
-        time_label.setStyleSheet("""
-            color: #555555;
+        time_color = theme_color("txt3") if modern else "#555555"
+        time_label.setStyleSheet(f"""
+            color: {time_color};
             font-size: 10px;
             font-family: monospace;
             background: transparent;
@@ -111,6 +122,12 @@ class LevelBadge(QPushButton):
         self._update_style()
 
     def _update_style(self):
+        if _modern():
+            idle_bg = theme_color("hov")
+            hover_bg = theme_color("panel2")
+        else:
+            idle_bg = "rgba(255,255,255,0.05)"
+            hover_bg = "rgba(255,255,255,0.1)"
         if self.isChecked():
             self.setStyleSheet(f"""
                 QPushButton {{
@@ -126,7 +143,7 @@ class LevelBadge(QPushButton):
         else:
             self.setStyleSheet(f"""
                 QPushButton {{
-                    background: rgba(255,255,255,0.05);
+                    background: {idle_bg};
                     color: {self._color};
                     border: none;
                     border-radius: 4px;
@@ -134,7 +151,7 @@ class LevelBadge(QPushButton):
                     font-size: 11px;
                 }}
                 QPushButton:hover {{
-                    background: rgba(255,255,255,0.1);
+                    background: {hover_bg};
                 }}
             """)
         self.setText(f"{self._icon} {self._count}")
@@ -160,11 +177,17 @@ class LogPanel(QWidget):
         # Header
         self._header = QWidget()
         self._header.setFixedHeight(32)
-        self._header.setStyleSheet("""
-            QWidget {
-                background: #242424;
-                border-bottom: 1px solid #333333;
-            }
+        if _modern():
+            header_bg = theme_color("panel2")
+            header_line = theme_color("line")
+        else:
+            header_bg = "#242424"
+            header_line = "#333333"
+        self._header.setStyleSheet(f"""
+            QWidget {{
+                background: {header_bg};
+                border-bottom: 1px solid {header_line};
+            }}
         """)
 
         header_layout = QHBoxLayout(self._header)
@@ -188,31 +211,39 @@ class LogPanel(QWidget):
         self._scroll_area.setWidgetResizable(True)
         self._scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._scroll_area.setStyleSheet("""
-            QScrollArea {
-                background: #1a1a1a;
+        if _modern():
+            area_bg = theme_color("panel")
+            handle = theme_color("line")
+            handle_hover = theme_color("accent")
+        else:
+            area_bg = "#1a1a1a"
+            handle = "#3D3D3D"
+            handle_hover = "#006868"
+        self._scroll_area.setStyleSheet(f"""
+            QScrollArea {{
+                background: {area_bg};
                 border: none;
-            }
-            QScrollBar:vertical {
-                background: #1a1a1a;
+            }}
+            QScrollBar:vertical {{
+                background: {area_bg};
                 width: 8px;
                 border-radius: 4px;
-            }
-            QScrollBar::handle:vertical {
-                background: #3D3D3D;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {handle};
                 border-radius: 4px;
                 min-height: 20px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: #006868;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {handle_hover};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 height: 0;
-            }
+            }}
         """)
 
         self._entries_widget = QWidget()
-        self._entries_widget.setStyleSheet("background: #1a1a1a;")
+        self._entries_widget.setStyleSheet(f"background: {area_bg};")
         self._entries_layout = QVBoxLayout(self._entries_widget)
         self._entries_layout.setContentsMargins(8, 8, 8, 8)
         self._entries_layout.setSpacing(2)

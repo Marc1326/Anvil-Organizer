@@ -17,6 +17,12 @@ from PySide6.QtCore import Qt
 from anvil.core.translator import tr
 
 
+
+def _classic_css(css: str) -> str:
+    """Alt-Style nur für klassische Themes — modern erbt das App-QSS."""
+    from anvil.styles.dark_theme import theme_color
+    return "" if theme_color("panel2", "") else css
+
 class CollectionExportDialog(QDialog):
     """Dialog for entering collection name and description before export."""
 
@@ -37,7 +43,7 @@ class CollectionExportDialog(QDialog):
         )
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet("CollectionExportDialog { background: #2B2B2B; }")
+        self.setStyleSheet(_classic_css("CollectionExportDialog { background: #2B2B2B; }"))
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -45,22 +51,18 @@ class CollectionExportDialog(QDialog):
 
         # ── Title ──
         title = QLabel(tr("collection.export_title"))
-        title.setStyleSheet(
-            "font-size: 18px; font-weight: 600; color: #D3D3D3;"
-        )
+        title.setStyleSheet(_classic_css("font-size: 18px; font-weight: 600; color: #D3D3D3;"))
         layout.addWidget(title)
 
         # ── Info card ──
         info_frame = QFrame()
-        info_frame.setStyleSheet(
-            "QFrame { background: #1a1a1a; border-radius: 8px; }"
-        )
+        info_frame.setStyleSheet(_classic_css("QFrame { background: #1a1a1a; border-radius: 8px; }"))
         info_layout = QVBoxLayout(info_frame)
         info_layout.setContentsMargins(16, 12, 16, 12)
         info_layout.setSpacing(4)
 
         game_label = QLabel(f"{tr('collection.game')}: <b>{game_name}</b>")
-        game_label.setStyleSheet("color: #A0A0A0; font-size: 13px;")
+        game_label.setStyleSheet(_classic_css("color: #A0A0A0; font-size: 13px;"))
         info_layout.addWidget(game_label)
 
         stats_text = tr(
@@ -69,22 +71,21 @@ class CollectionExportDialog(QDialog):
             separators=separator_count,
         )
         stats_label = QLabel(stats_text)
-        stats_label.setStyleSheet("color: #A0A0A0; font-size: 13px;")
+        stats_label.setStyleSheet(_classic_css("color: #A0A0A0; font-size: 13px;"))
         info_layout.addWidget(stats_label)
 
         layout.addWidget(info_frame)
 
         # ── Collection name ──
         name_label = QLabel(tr("collection.name_label"))
-        name_label.setStyleSheet("color: #D3D3D3; font-size: 13px;")
+        name_label.setStyleSheet(_classic_css("color: #D3D3D3; font-size: 13px;"))
         layout.addWidget(name_label)
 
         self._name_input = QLineEdit()
         self._name_input.setPlaceholderText(
             tr("collection.name_placeholder")
         )
-        self._name_input.setStyleSheet(
-            """
+        self._name_input.setStyleSheet(_classic_css("""
             QLineEdit {
                 background: #1a1a1a;
                 border: 1px solid #3D3D3D;
@@ -96,13 +97,12 @@ class CollectionExportDialog(QDialog):
             QLineEdit:focus {
                 border-color: #006868;
             }
-            """
-        )
+            """))
         layout.addWidget(self._name_input)
 
         # ── Description (optional) ──
         desc_label = QLabel(tr("collection.description_label"))
-        desc_label.setStyleSheet("color: #D3D3D3; font-size: 13px;")
+        desc_label.setStyleSheet(_classic_css("color: #D3D3D3; font-size: 13px;"))
         layout.addWidget(desc_label)
 
         self._desc_input = QTextEdit()
@@ -110,8 +110,7 @@ class CollectionExportDialog(QDialog):
             tr("collection.description_placeholder")
         )
         self._desc_input.setMaximumHeight(80)
-        self._desc_input.setStyleSheet(
-            """
+        self._desc_input.setStyleSheet(_classic_css("""
             QTextEdit {
                 background: #1a1a1a;
                 border: 1px solid #3D3D3D;
@@ -123,21 +122,19 @@ class CollectionExportDialog(QDialog):
             QTextEdit:focus {
                 border-color: #006868;
             }
-            """
-        )
+            """))
         layout.addWidget(self._desc_input)
 
         # ── Author (optional) ──
         author_label = QLabel(tr("collection.author_label"))
-        author_label.setStyleSheet("color: #D3D3D3; font-size: 13px;")
+        author_label.setStyleSheet(_classic_css("color: #D3D3D3; font-size: 13px;"))
         layout.addWidget(author_label)
 
         self._author_input = QLineEdit()
         self._author_input.setPlaceholderText(
             tr("collection.author_placeholder")
         )
-        self._author_input.setStyleSheet(
-            """
+        self._author_input.setStyleSheet(_classic_css("""
             QLineEdit {
                 background: #1a1a1a;
                 border: 1px solid #3D3D3D;
@@ -149,8 +146,7 @@ class CollectionExportDialog(QDialog):
             QLineEdit:focus {
                 border-color: #006868;
             }
-            """
-        )
+            """))
         layout.addWidget(self._author_input)
 
         # ── Buttons ──
@@ -161,8 +157,7 @@ class CollectionExportDialog(QDialog):
         btn_cancel = QPushButton(tr("button.cancel"))
         btn_cancel.setFixedHeight(36)
         btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_cancel.setStyleSheet(
-            """
+        btn_cancel.setStyleSheet(_classic_css("""
             QPushButton {
                 background: #3D3D3D;
                 color: #D3D3D3;
@@ -175,16 +170,14 @@ class CollectionExportDialog(QDialog):
             QPushButton:hover {
                 background: #4D4D4D;
             }
-            """
-        )
+            """))
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(btn_cancel)
 
         self._btn_export = QPushButton(tr("collection.export_button"))
         self._btn_export.setFixedHeight(36)
         self._btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._btn_export.setStyleSheet(
-            """
+        self._btn_export.setStyleSheet(_classic_css("""
             QPushButton {
                 background: #006868;
                 color: #FFFFFF;
@@ -201,8 +194,7 @@ class CollectionExportDialog(QDialog):
                 background: #3D3D3D;
                 color: #808080;
             }
-            """
-        )
+            """))
         self._btn_export.clicked.connect(self._on_export)
         btn_layout.addWidget(self._btn_export)
 
@@ -231,8 +223,7 @@ class CollectionExportDialog(QDialog):
         """Validate and accept."""
         if not self._name_input.text().strip():
             self._name_input.setFocus()
-            self._name_input.setStyleSheet(
-                """
+            self._name_input.setStyleSheet(_classic_css("""
                 QLineEdit {
                     background: #1a1a1a;
                     border: 1px solid #ff4444;
@@ -241,7 +232,6 @@ class CollectionExportDialog(QDialog):
                     padding: 8px 12px;
                     font-size: 13px;
                 }
-                """
-            )
+                """))
             return
         self.accept()

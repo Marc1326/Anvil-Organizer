@@ -30,6 +30,14 @@ QMenu::item:disabled {
 """
 
 
+def context_menu_style() -> str:
+    """Kontextmenü-Style der aktiven Welt: modern erbt das QSS-Theme."""
+    from anvil.styles.dark_theme import theme_color
+    if theme_color("panel2", ""):
+        return ""
+    return CONTEXT_MENU_STYLE
+
+
 class FilterChip(QPushButton):
     """A small, checkable chip button representing one filter criterion."""
 

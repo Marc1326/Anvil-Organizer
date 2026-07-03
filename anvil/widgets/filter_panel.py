@@ -321,7 +321,7 @@ class FilterPanel(QWidget):
 
         try:
             from PySide6.QtWidgets import QApplication
-            from anvil.widgets.filter_chip import FilterChip, CONTEXT_MENU_STYLE
+            from anvil.widgets.filter_chip import FilterChip, context_menu_style
 
             global_pos = self._cat_container.mapToGlobal(pos)
             widget = QApplication.widgetAt(global_pos)
@@ -338,7 +338,7 @@ class FilterPanel(QWidget):
                 w = w.parent()
 
             menu = QMenu(self)
-            menu.setStyleSheet(CONTEXT_MENU_STYLE)
+            menu.setStyleSheet(context_menu_style())
 
             if chip:
                 # Chip-Menü: Umbenennen | Löschen
@@ -367,10 +367,10 @@ class FilterPanel(QWidget):
 
         if pos.y() > cat_container_bottom:
             # Klick ist unterhalb der Chips - zeige "Hinzufügen" Menü
-            from anvil.widgets.filter_chip import CONTEXT_MENU_STYLE
+            from anvil.widgets.filter_chip import context_menu_style
             global_pos = self._inner.mapToGlobal(pos)
             menu = QMenu(self)
-            menu.setStyleSheet(CONTEXT_MENU_STYLE)
+            menu.setStyleSheet(context_menu_style())
             menu.addAction(tr("context.add"), self._add_category)
             menu.exec(global_pos)
 

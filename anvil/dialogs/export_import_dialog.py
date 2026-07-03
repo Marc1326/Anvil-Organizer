@@ -14,6 +14,12 @@ from PySide6.QtCore import Qt
 
 from anvil.core.translator import tr
 
+
+def _classic_css(css: str) -> str:
+    """Alt-Style nur für klassische Themes — modern erbt das App-QSS."""
+    from anvil.styles.dark_theme import theme_color
+    return "" if theme_color("panel2", "") else css
+
 _CARD_NORMAL = """
     QFrame {
         background: #1a1a1a;
@@ -88,7 +94,7 @@ class _OptionCard(QFrame):
 
     def __init__(self, title: str, description: str, parent=None):
         super().__init__(parent)
-        self.setStyleSheet(_CARD_NORMAL)
+        self.setStyleSheet(_classic_css(_CARD_NORMAL))
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._selected = False
 
@@ -97,21 +103,17 @@ class _OptionCard(QFrame):
         layout.setSpacing(6)
 
         self._title = QLabel(title)
-        self._title.setStyleSheet(
-            "font-size: 13px; font-weight: 600; color: #D3D3D3; background: transparent; border: none;"
-        )
+        self._title.setStyleSheet(_classic_css("font-size: 13px; font-weight: 600; color: #D3D3D3; background: transparent; border: none;"))
         layout.addWidget(self._title)
 
         self._desc = QLabel(description)
-        self._desc.setStyleSheet(
-            "font-size: 11px; color: #808080; background: transparent; border: none;"
-        )
+        self._desc.setStyleSheet(_classic_css("font-size: 11px; color: #808080; background: transparent; border: none;"))
         self._desc.setWordWrap(True)
         layout.addWidget(self._desc)
 
     def set_selected(self, selected: bool) -> None:
         self._selected = selected
-        self.setStyleSheet(_CARD_SELECTED if selected else _CARD_NORMAL)
+        self.setStyleSheet(_classic_css(_CARD_SELECTED if selected else _CARD_NORMAL))
 
     def mousePressEvent(self, event):
         # Dialog finden (kann mehrere Parent-Ebenen hoch sein)
@@ -137,7 +139,7 @@ class ExportImportDialog(QDialog):
             & ~Qt.WindowType.WindowContextHelpButtonHint
         )
 
-        self.setStyleSheet("QDialog { background: #242424; }")
+        self.setStyleSheet(_classic_css("QDialog { background: #242424; }"))
 
         self._current_tab = "export"
         self._selected_format = "csv"
@@ -149,9 +151,7 @@ class ExportImportDialog(QDialog):
 
         # -- Titel --
         title = QLabel(tr("export_import.title"))
-        title.setStyleSheet(
-            "font-size: 18px; font-weight: 600; color: #D3D3D3; background: transparent;"
-        )
+        title.setStyleSheet(_classic_css("font-size: 18px; font-weight: 600; color: #D3D3D3; background: transparent;"))
         layout.addWidget(title)
 
         # -- Tab-Leiste --
@@ -166,9 +166,9 @@ class ExportImportDialog(QDialog):
             btn.setFixedHeight(36)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        self._tab_export.setStyleSheet(_TAB_ACTIVE)
-        self._tab_import.setStyleSheet(_TAB_NORMAL)
-        self._tab_backup.setStyleSheet(_TAB_NORMAL)
+        self._tab_export.setStyleSheet(_classic_css(_TAB_ACTIVE))
+        self._tab_import.setStyleSheet(_classic_css(_TAB_NORMAL))
+        self._tab_backup.setStyleSheet(_classic_css(_TAB_NORMAL))
 
         self._tab_export.clicked.connect(lambda: self._switch_tab("export"))
         self._tab_import.clicked.connect(lambda: self._switch_tab("import"))
@@ -184,12 +184,12 @@ class ExportImportDialog(QDialog):
         # -- Trennlinie --
         sep = QFrame()
         sep.setFixedHeight(1)
-        sep.setStyleSheet("background: #3D3D3D;")
+        sep.setStyleSheet(_classic_css("background: #3D3D3D;"))
         layout.addWidget(sep)
 
         # -- Format-Cards --
         self._format_container = QFrame()
-        self._format_container.setStyleSheet("background: transparent; border: none;")
+        self._format_container.setStyleSheet(_classic_css("background: transparent; border: none;"))
         fmt_layout = QVBoxLayout(self._format_container)
         fmt_layout.setContentsMargins(0, 0, 0, 0)
         fmt_layout.setSpacing(12)
@@ -214,7 +214,7 @@ class ExportImportDialog(QDialog):
 
         # -- Backup-Cards --
         self._backup_container = QFrame()
-        self._backup_container.setStyleSheet("background: transparent; border: none;")
+        self._backup_container.setStyleSheet(_classic_css("background: transparent; border: none;"))
         bak_layout = QVBoxLayout(self._backup_container)
         bak_layout.setContentsMargins(0, 0, 0, 0)
         bak_layout.setSpacing(12)
@@ -249,14 +249,14 @@ class ExportImportDialog(QDialog):
         btn_cancel = QPushButton(tr("button.cancel"))
         btn_cancel.setFixedHeight(36)
         btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_cancel.setStyleSheet(_BTN_CANCEL)
+        btn_cancel.setStyleSheet(_classic_css(_BTN_CANCEL))
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(btn_cancel)
 
         btn_next = QPushButton(tr("export_import.next_button"))
         btn_next.setFixedHeight(36)
         btn_next.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_next.setStyleSheet(_BTN_PRIMARY)
+        btn_next.setStyleSheet(_classic_css(_BTN_PRIMARY))
         btn_next.clicked.connect(self.accept)
         btn_layout.addWidget(btn_next)
 
@@ -266,9 +266,9 @@ class ExportImportDialog(QDialog):
 
     def _switch_tab(self, tab: str) -> None:
         self._current_tab = tab
-        self._tab_export.setStyleSheet(_TAB_ACTIVE if tab == "export" else _TAB_NORMAL)
-        self._tab_import.setStyleSheet(_TAB_ACTIVE if tab == "import" else _TAB_NORMAL)
-        self._tab_backup.setStyleSheet(_TAB_ACTIVE if tab == "backup" else _TAB_NORMAL)
+        self._tab_export.setStyleSheet(_classic_css(_TAB_ACTIVE if tab == "export" else _TAB_NORMAL))
+        self._tab_import.setStyleSheet(_classic_css(_TAB_ACTIVE if tab == "import" else _TAB_NORMAL))
+        self._tab_backup.setStyleSheet(_classic_css(_TAB_ACTIVE if tab == "backup" else _TAB_NORMAL))
         self._format_container.setVisible(tab != "backup")
         self._backup_container.setVisible(tab == "backup")
 

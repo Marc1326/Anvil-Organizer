@@ -71,7 +71,8 @@ def _chip_pixmap(icon: QPixmap | None, game_name: str, w: int = 26,
         if not color:
             color = _CHIP_COLORS[hash(game_name) % len(_CHIP_COLORS)]
         p.fillRect(0, 0, w, h, QColor(color))
-        p.setPen(QColor(theme_color("txt", "#E8E8E8")))
+        # Chips sind immer dunkel gefärbt — Initialen fest hell (auch Hell-Modus)
+        p.setPen(QColor("#E8E8E8"))
         f = QFont()
         f.setPixelSize(9)
         f.setBold(True)

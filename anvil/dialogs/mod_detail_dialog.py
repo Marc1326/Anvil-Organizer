@@ -170,6 +170,30 @@ QLabel { color: #D3D3D3; }
 """
 
 
+def _is_modern() -> bool:
+    from anvil.styles.dark_theme import theme_color
+    return bool(theme_color("panel2", ""))
+
+
+def _path_edit_style(state: str = "dim") -> str:
+    """Pfadzeilen-Style (dim/ok/error): modern = Palette, klassisch = dunkel."""
+    from anvil.styles.dark_theme import theme_color
+    if _is_modern():
+        colors = {"dim": theme_color("txt3"), "ok": theme_color("ok"),
+                  "error": "#F44336"}
+        return f"color: {colors[state]}; background: transparent; border: none;"
+    colors = {"dim": "#808080", "ok": "#4CAF50", "error": "#F44336"}
+    return f"color: {colors[state]}; background: #1C1C1C; border: none;"
+
+
+def _dim_info_style() -> str:
+    """Kleiner grauer Hinweistext."""
+    if _is_modern():
+        from anvil.styles.dark_theme import theme_color
+        return f"color: {theme_color('txt3')}; font-size: 11px;"
+    return "color: #808080; font-size: 11px;"
+
+
 def _icon_path(name):
     """Pfad zu Icon in anvil/styles/icons/files/."""
     from anvil.core.resource_path import get_anvil_base
@@ -583,7 +607,7 @@ def _build_textfiles_tab(mod_path: str):
     path_edit = QLineEdit()
     path_edit.setReadOnly(True)
     path_edit.setPlaceholderText(tr("mod_detail.no_file_selected"))
-    path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
+    path_edit.setStyleSheet(_path_edit_style())
     toolbar_layout.addWidget(path_edit, 1)
     right_layout.addWidget(toolbar_widget)
 
@@ -623,10 +647,10 @@ def _build_textfiles_tab(mod_path: str):
             with open(path, "w", encoding="utf-8") as f:
                 f.write(editor.toPlainText())
             path_edit.setText(tr("mod_detail.saved"))
-            path_edit.setStyleSheet("color: #4CAF50; background: #1C1C1C; border: none;")
+            path_edit.setStyleSheet(_path_edit_style("ok"))
             def restore():
                 path_edit.setText(path)
-                path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
+                path_edit.setStyleSheet(_path_edit_style())
             QTimer.singleShot(2000, restore)
         except Exception as e:
             path_edit.setText(tr("mod_detail.error", error=str(e)))
@@ -710,7 +734,7 @@ def _build_ini_tab(mod_path: str):
 
     # Info-Label für Anzahl
     info_label = QLabel(tr("mod_detail.ini_files_found", count=len(ini_files)))
-    info_label.setStyleSheet("color: #808080; font-size: 11px;")
+    info_label.setStyleSheet(_dim_info_style())
     left_layout.addWidget(info_label)
 
     splitter.addWidget(left_pane)
@@ -756,7 +780,7 @@ def _build_ini_tab(mod_path: str):
     path_edit = QLineEdit()
     path_edit.setReadOnly(True)
     path_edit.setPlaceholderText(tr("mod_detail.no_file_selected"))
-    path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
+    path_edit.setStyleSheet(_path_edit_style())
     toolbar_layout.addWidget(path_edit, 1)
 
     right_layout.addWidget(toolbar_widget)
@@ -794,7 +818,7 @@ def _build_ini_tab(mod_path: str):
         path = item.data(Qt.ItemDataRole.UserRole)
         current_path[0] = path
         path_edit.setText(path)
-        path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
+        path_edit.setStyleSheet(_path_edit_style())
         has_changes[0] = False
 
         try:
@@ -812,14 +836,14 @@ def _build_ini_tab(mod_path: str):
                 f.write(editor.toPlainText())
             has_changes[0] = False
             path_edit.setText(path)
-            path_edit.setStyleSheet("color: #4CAF50; background: #1C1C1C; border: none;")
+            path_edit.setStyleSheet(_path_edit_style("ok"))
 
             def restore():
-                path_edit.setStyleSheet("color: #808080; background: #1C1C1C; border: none;")
+                path_edit.setStyleSheet(_path_edit_style())
             QTimer.singleShot(1500, restore)
         except Exception as e:
             path_edit.setText(tr("mod_detail.error", error=str(e)))
-            path_edit.setStyleSheet("color: #F44336; background: #1C1C1C; border: none;")
+            path_edit.setStyleSheet(_path_edit_style("error"))
 
     def on_reload():
         on_file_selected()
@@ -896,7 +920,7 @@ def _build_optional_esps_tab(mod_path: str):
     left_layout.addWidget(optional_list)
 
     optional_count = QLabel(tr("mod_detail.plugins_count", count=0))
-    optional_count.setStyleSheet("color: #808080; font-size: 11px;")
+    optional_count.setStyleSheet(_dim_info_style())
     left_layout.addWidget(optional_count)
 
     layout.addWidget(left_pane, 1)
@@ -938,7 +962,7 @@ def _build_optional_esps_tab(mod_path: str):
     right_layout.addWidget(active_list)
 
     active_count = QLabel(tr("mod_detail.plugins_count", count=0))
-    active_count.setStyleSheet("color: #808080; font-size: 11px;")
+    active_count.setStyleSheet(_dim_info_style())
     right_layout.addWidget(active_count)
 
     layout.addWidget(right_pane, 1)
@@ -1175,7 +1199,7 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
         ignored_count = len(result["ignored"])
         if ignored_count > 0:
             info = QLabel(tr("mod_detail.ignored_matches", count=ignored_count))
-            info.setStyleSheet("color: #808080; font-size: 11px;")
+            info.setStyleSheet(_dim_info_style())
             info.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(info)
         return page
@@ -1252,7 +1276,7 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
     else:
         info_text = tr("mod_detail.conflicts_count", count=total)
     info = QLabel(info_text)
-    info.setStyleSheet("color: #808080; font-size: 11px;")
+    info.setStyleSheet(_dim_info_style())
     layout.addWidget(info)
 
     return page
@@ -1315,6 +1339,47 @@ QMenu::item:selected {
 """
 
 
+def _category_chip_style() -> str:
+    """Chip-Style des Kategorien-Tabs: modern = Palette, klassisch = alt."""
+    if not _is_modern():
+        return _CATEGORY_CHIP_STYLE
+    from anvil.styles.dark_theme import theme_color
+    panel2 = theme_color("panel2")
+    line = theme_color("line")
+    txt = theme_color("txt")
+    txt2 = theme_color("txt2")
+    accent = theme_color("accent")
+    accent_text = theme_color("accent_text")
+    return f"""
+QPushButton#catChip {{
+    background: {panel2};
+    color: {txt2};
+    border: 1px solid {line};
+    border-radius: 13px;
+    padding: 4px 12px;
+    font-size: 12px;
+}}
+QPushButton#catChip:hover {{
+    color: {txt};
+    border-color: {txt2};
+}}
+QPushButton#catChip:checked {{
+    background: {accent};
+    color: {accent_text};
+    border-color: {accent};
+}}
+QPushButton#catChipPrimary {{
+    background: {accent};
+    color: {accent_text};
+    border: 2px solid {txt};
+    border-radius: 13px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: bold;
+}}
+"""
+
+
 def _build_categories_tab(category_manager, mod_entry, mod_path):
     """Kategorien-Tab: Chips für alle Kategorien, Checked = Mod gehört dazu.
 
@@ -1326,7 +1391,7 @@ def _build_categories_tab(category_manager, mod_entry, mod_path):
     """
     page = QWidget()
     page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-    page.setStyleSheet(_CATEGORY_CHIP_STYLE)
+    page.setStyleSheet(_category_chip_style())
     layout = QVBoxLayout(page)
     layout.setContentsMargins(16, 16, 16, 16)
     layout.setSpacing(12)
@@ -1429,7 +1494,8 @@ def _build_categories_tab(category_manager, mod_entry, mod_path):
         if not chip.isChecked():
             return  # Nur für aktive Chips
         menu = QMenu(chip)
-        menu.setStyleSheet(_CATEGORY_TAB_CONTEXT_MENU_STYLE)
+        menu.setStyleSheet(
+            "" if _is_modern() else _CATEGORY_TAB_CONTEXT_MENU_STYLE)
         act = menu.addAction("★ Als Primär setzen")
         act.setEnabled(cat_id != primary_id)
         action = menu.exec(chip.mapToGlobal(pos))
@@ -1485,36 +1551,45 @@ def _build_categories_tab(category_manager, mod_entry, mod_path):
     # Separator
     sep = QFrame()
     sep.setFrameShape(QFrame.Shape.HLine)
-    sep.setStyleSheet("background: #3a3a3a;")
+    if _is_modern():
+        from anvil.styles.dark_theme import theme_color
+        sep.setStyleSheet(f"background: {theme_color('line')};")
+    else:
+        sep.setStyleSheet("background: #3a3a3a;")
     layout.addWidget(sep)
 
     # Primär-ComboBox
     primary_row = QHBoxLayout()
     primary_label = QLabel(tr("mod_detail.primary_category"))
-    primary_label.setStyleSheet("color: #aaaaaa; font-size: 12px;")
+    if _is_modern():
+        primary_label.setStyleSheet(
+            f"color: {theme_color('txt2')}; font-size: 12px;")
+    else:
+        primary_label.setStyleSheet("color: #aaaaaa; font-size: 12px;")
     primary_row.addWidget(primary_label)
 
     primary_combo = QComboBox()
     primary_combo.setMinimumWidth(200)
-    primary_combo.setStyleSheet("""
-        QComboBox {
-            background: #2b2b2b;
-            color: #e0e0e0;
-            border: 1px solid #3a3a3a;
-            border-radius: 4px;
-            padding: 6px 12px;
-        }
-        QComboBox:hover { border-color: #006868; }
-        QComboBox::drop-down {
-            border: none;
-            width: 20px;
-        }
-        QComboBox QAbstractItemView {
-            background: #2b2b2b;
-            color: #e0e0e0;
-            selection-background-color: #006868;
-        }
-    """)
+    if not _is_modern():
+        primary_combo.setStyleSheet("""
+            QComboBox {
+                background: #2b2b2b;
+                color: #e0e0e0;
+                border: 1px solid #3a3a3a;
+                border-radius: 4px;
+                padding: 6px 12px;
+            }
+            QComboBox:hover { border-color: #006868; }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox QAbstractItemView {
+                background: #2b2b2b;
+                color: #e0e0e0;
+                selection-background-color: #006868;
+            }
+        """)
     primary_combo.currentIndexChanged.connect(on_primary_changed)
     primary_row.addWidget(primary_combo)
     primary_row.addStretch()

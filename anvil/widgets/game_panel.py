@@ -2998,7 +2998,7 @@ class GamePanel(QWidget):
             status_item = self._dl_table.item(row, 2)
             if status_item:
                 status_item.setText(tr("game_panel.not_installed"))
-                status_item.setForeground(QColor("#FFFFFF"))
+                status_item.setForeground(QColor(theme_color("txt", "#FFFFFF")))
 
             # Update date column
             from datetime import datetime

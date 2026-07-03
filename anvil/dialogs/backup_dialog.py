@@ -13,6 +13,12 @@ from PySide6.QtCore import Qt, Signal
 from anvil.core.translator import tr
 
 
+
+def _classic_css(css: str) -> str:
+    """Alt-Style nur für klassische Themes — modern erbt das App-QSS."""
+    from anvil.styles.dark_theme import theme_color
+    return "" if theme_color("panel2", "") else css
+
 CARD_STYLE_NORMAL = """
     QFrame {
         background: #141414;
@@ -45,7 +51,7 @@ class BackupCard(QFrame):
 
         self.setMinimumHeight(64)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setStyleSheet(CARD_STYLE_NORMAL)
+        self.setStyleSheet(_classic_css(CARD_STYLE_NORMAL))
 
         # Main horizontal layout: [text_column] [stretch] [delete_btn]
         main_layout = QHBoxLayout(self)
@@ -85,21 +91,21 @@ class BackupCard(QFrame):
 
         # Date label
         self._date_label = QLabel(date_str)
-        self._date_label.setStyleSheet("""
+        self._date_label.setStyleSheet(_classic_css("""
             font-weight: 600;
             font-size: 14px;
             color: #D3D3D3;
             background: transparent;
-        """)
+        """))
         text_layout.addWidget(self._date_label)
 
         # Info label
         self._info_label = QLabel(f"{mod_count} Mods  ·  {size_str}")
-        self._info_label.setStyleSheet("""
+        self._info_label.setStyleSheet(_classic_css("""
             font-size: 12px;
             color: #808080;
             background: transparent;
-        """)
+        """))
         text_layout.addWidget(self._info_label)
 
         main_layout.addLayout(text_layout)
@@ -109,7 +115,7 @@ class BackupCard(QFrame):
         self._btn_delete = QPushButton("✕")
         self._btn_delete.setFixedSize(32, 32)
         self._btn_delete.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._btn_delete.setStyleSheet("""
+        self._btn_delete.setStyleSheet(_classic_css("""
             QPushButton {
                 background: transparent;
                 color: #808080;
@@ -122,7 +128,7 @@ class BackupCard(QFrame):
                 background: #4D4D4D;
                 color: #ff4444;
             }
-        """)
+        """))
         self._btn_delete.clicked.connect(self._on_delete_clicked)
         main_layout.addWidget(self._btn_delete)
 
@@ -133,31 +139,31 @@ class BackupCard(QFrame):
     def set_selected(self, selected: bool):
         self._selected = selected
         if selected:
-            self.setStyleSheet(CARD_STYLE_SELECTED)
-            self._date_label.setStyleSheet("""
+            self.setStyleSheet(_classic_css(CARD_STYLE_SELECTED))
+            self._date_label.setStyleSheet(_classic_css("""
                 font-weight: 600;
                 font-size: 14px;
                 color: #FFFFFF;
                 background: transparent;
-            """)
-            self._info_label.setStyleSheet("""
+            """))
+            self._info_label.setStyleSheet(_classic_css("""
                 font-size: 12px;
                 color: #A0A0A0;
                 background: transparent;
-            """)
+            """))
         else:
-            self.setStyleSheet(CARD_STYLE_NORMAL)
-            self._date_label.setStyleSheet("""
+            self.setStyleSheet(_classic_css(CARD_STYLE_NORMAL))
+            self._date_label.setStyleSheet(_classic_css("""
                 font-weight: 600;
                 font-size: 14px;
                 color: #D3D3D3;
                 background: transparent;
-            """)
-            self._info_label.setStyleSheet("""
+            """))
+            self._info_label.setStyleSheet(_classic_css("""
                 font-size: 12px;
                 color: #808080;
                 background: transparent;
-            """)
+            """))
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -177,11 +183,11 @@ class BackupDialog(QDialog):
         self.setMinimumHeight(200)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
 
-        self.setStyleSheet("""
+        self.setStyleSheet(_classic_css("""
             QDialog {
                 background: #242424;
             }
-        """)
+        """))
 
         self._selected_backup: Path | None = None
         self._cards: list[BackupCard] = []
@@ -192,28 +198,28 @@ class BackupDialog(QDialog):
 
         # Title
         title = QLabel(tr("dialog.backup_title"))
-        title.setStyleSheet("""
+        title.setStyleSheet(_classic_css("""
             font-size: 18px;
             font-weight: 600;
             color: #D3D3D3;
             background: transparent;
-        """)
+        """))
         layout.addWidget(title)
 
         # Subtitle
         subtitle = QLabel(tr("dialog.backup_select"))
-        subtitle.setStyleSheet("""
+        subtitle.setStyleSheet(_classic_css("""
             font-size: 13px;
             color: #808080;
             background: transparent;
-        """)
+        """))
         layout.addWidget(subtitle)
 
         # Scroll area for cards
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet("""
+        scroll.setStyleSheet(_classic_css("""
             QScrollArea {
                 background: transparent;
                 border: none;
@@ -234,10 +240,10 @@ class BackupDialog(QDialog):
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0;
             }
-        """)
+        """))
 
         self._scroll_widget = QWidget()
-        self._scroll_widget.setStyleSheet("background: transparent;")
+        self._scroll_widget.setStyleSheet(_classic_css("background: transparent;"))
         self._scroll_layout = QVBoxLayout(self._scroll_widget)
         self._scroll_layout.setContentsMargins(0, 0, 8, 0)
         self._scroll_layout.setSpacing(8)
@@ -260,7 +266,7 @@ class BackupDialog(QDialog):
         self._btn_cancel = QPushButton(tr("button.cancel"))
         self._btn_cancel.setFixedHeight(36)
         self._btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._btn_cancel.setStyleSheet("""
+        self._btn_cancel.setStyleSheet(_classic_css("""
             QPushButton {
                 background: #3D3D3D;
                 color: #D3D3D3;
@@ -273,7 +279,7 @@ class BackupDialog(QDialog):
             QPushButton:hover {
                 background: #4D4D4D;
             }
-        """)
+        """))
         self._btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(self._btn_cancel)
 
@@ -281,7 +287,7 @@ class BackupDialog(QDialog):
         self._btn_restore.setFixedHeight(36)
         self._btn_restore.setEnabled(False)
         self._btn_restore.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._btn_restore.setStyleSheet("""
+        self._btn_restore.setStyleSheet(_classic_css("""
             QPushButton {
                 background: #006868;
                 color: #FFFFFF;
@@ -298,7 +304,7 @@ class BackupDialog(QDialog):
                 background: #3D3D3D;
                 color: #808080;
             }
-        """)
+        """))
         self._btn_restore.clicked.connect(self.accept)
         btn_layout.addWidget(self._btn_restore)
 

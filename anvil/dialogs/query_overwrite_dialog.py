@@ -14,6 +14,12 @@ from PySide6.QtCore import Qt
 
 from anvil.core.translator import tr
 
+
+def _classic_css(css: str) -> str:
+    """Alt-Style nur für klassische Themes — modern erbt das App-QSS."""
+    from anvil.styles.dark_theme import theme_color
+    return "" if theme_color("panel2", "") else css
+
 _STYLE = """
 QDialog { background: #1C1C1C; color: #D3D3D3; }
 QLabel { color: #D3D3D3; }
@@ -50,7 +56,7 @@ class QueryOverwriteDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(tr("dialog.mod_exists"))
         self.setMinimumWidth(460)
-        self.setStyleSheet(_STYLE)
+        self.setStyleSheet(_classic_css(_STYLE))
         self._action = OverwriteAction.NONE
 
         layout = QVBoxLayout(self)

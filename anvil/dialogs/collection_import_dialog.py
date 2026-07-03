@@ -20,6 +20,12 @@ from anvil.core.translator import tr
 from anvil.core.collection_io import ImportResult
 
 
+
+def _classic_css(css: str) -> str:
+    """Alt-Style nur für klassische Themes — modern erbt das App-QSS."""
+    from anvil.styles.dark_theme import theme_color
+    return "" if theme_color("panel2", "") else css
+
 class _ModCard(QFrame):
     """A card showing a missing mod with an optional Nexus link."""
 
@@ -30,9 +36,7 @@ class _ModCard(QFrame):
         parent=None,
     ):
         super().__init__(parent)
-        self.setStyleSheet(
-            "QFrame { background: #1a1a1a; border-radius: 6px; }"
-        )
+        self.setStyleSheet(_classic_css("QFrame { background: #1a1a1a; border-radius: 6px; }"))
         self.setMinimumHeight(36)
 
         layout = QHBoxLayout(self)
@@ -40,17 +44,14 @@ class _ModCard(QFrame):
         layout.setSpacing(8)
 
         name_label = QLabel(display_name)
-        name_label.setStyleSheet(
-            "color: #D3D3D3; font-size: 13px; background: transparent;"
-        )
+        name_label.setStyleSheet(_classic_css("color: #D3D3D3; font-size: 13px; background: transparent;"))
         layout.addWidget(name_label, 1)
 
         if nexus_url:
             link_btn = QPushButton(tr("collection.open_nexus"))
             link_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             link_btn.setFixedHeight(28)
-            link_btn.setStyleSheet(
-                """
+            link_btn.setStyleSheet(_classic_css("""
                 QPushButton {
                     background: #006868;
                     color: #FFFFFF;
@@ -62,8 +63,7 @@ class _ModCard(QFrame):
                 QPushButton:hover {
                     background: #007878;
                 }
-                """
-            )
+                """))
             link_btn.clicked.connect(
                 lambda checked=False, u=nexus_url: host_open_url(u)
             )
@@ -100,9 +100,7 @@ class CollectionImportDialog(QDialog):
 
         # ── Title ──
         title = QLabel(tr("collection.import_title"))
-        title.setStyleSheet(
-            "font-size: 18px; font-weight: 600; color: #D3D3D3;"
-        )
+        title.setStyleSheet(_classic_css("font-size: 18px; font-weight: 600; color: #D3D3D3;"))
         layout.addWidget(title)
 
         # ── Game mismatch warning ──
@@ -113,9 +111,7 @@ class CollectionImportDialog(QDialog):
         ):
             self._game_mismatch = True
             warn_frame = QFrame()
-            warn_frame.setStyleSheet(
-                "QFrame { background: #4a2020; border-radius: 8px; }"
-            )
+            warn_frame.setStyleSheet(_classic_css("QFrame { background: #4a2020; border-radius: 8px; }"))
             warn_layout = QVBoxLayout(warn_frame)
             warn_layout.setContentsMargins(16, 12, 16, 12)
             warn_label = QLabel(
@@ -126,17 +122,13 @@ class CollectionImportDialog(QDialog):
                 )
             )
             warn_label.setWordWrap(True)
-            warn_label.setStyleSheet(
-                "color: #ff8888; font-size: 13px; background: transparent;"
-            )
+            warn_label.setStyleSheet(_classic_css("color: #ff8888; font-size: 13px; background: transparent;"))
             warn_layout.addWidget(warn_label)
             layout.addWidget(warn_frame)
 
         # ── Info card ──
         info_frame = QFrame()
-        info_frame.setStyleSheet(
-            "QFrame { background: #1a1a1a; border-radius: 8px; }"
-        )
+        info_frame.setStyleSheet(_classic_css("QFrame { background: #1a1a1a; border-radius: 8px; }"))
         info_layout = QVBoxLayout(info_frame)
         info_layout.setContentsMargins(16, 12, 16, 12)
         info_layout.setSpacing(4)
@@ -147,18 +139,14 @@ class CollectionImportDialog(QDialog):
                 f"{tr('collection.name_label')}: "
                 f"<b>{manifest.collection_name}</b>"
             )
-            coll_label.setStyleSheet(
-                "color: #D3D3D3; font-size: 14px; background: transparent;"
-            )
+            coll_label.setStyleSheet(_classic_css("color: #D3D3D3; font-size: 14px; background: transparent;"))
             info_layout.addWidget(coll_label)
 
         # Game
         game_label = QLabel(
             f"{tr('collection.game')}: <b>{manifest.game_name}</b>"
         )
-        game_label.setStyleSheet(
-            "color: #A0A0A0; font-size: 13px; background: transparent;"
-        )
+        game_label.setStyleSheet(_classic_css("color: #A0A0A0; font-size: 13px; background: transparent;"))
         info_layout.addWidget(game_label)
 
         # Author
@@ -167,19 +155,15 @@ class CollectionImportDialog(QDialog):
                 f"{tr('collection.author_label')}: "
                 f"<b>{manifest.collection_author}</b>"
             )
-            author_label.setStyleSheet(
-                "color: #A0A0A0; font-size: 13px; background: transparent;"
-            )
+            author_label.setStyleSheet(_classic_css("color: #A0A0A0; font-size: 13px; background: transparent;"))
             info_layout.addWidget(author_label)
 
         # Description
         if manifest.collection_description:
             desc_label = QLabel(manifest.collection_description)
             desc_label.setWordWrap(True)
-            desc_label.setStyleSheet(
-                "color: #808080; font-size: 12px; "
-                "margin-top: 4px; background: transparent;"
-            )
+            desc_label.setStyleSheet(_classic_css("color: #808080; font-size: 12px; "
+                "margin-top: 4px; background: transparent;"))
             info_layout.addWidget(desc_label)
 
         # Stats
@@ -192,10 +176,8 @@ class CollectionImportDialog(QDialog):
             separators=len(result.separators),
         )
         stats_label = QLabel(stats_text)
-        stats_label.setStyleSheet(
-            "color: #A0A0A0; font-size: 13px; "
-            "margin-top: 4px; background: transparent;"
-        )
+        stats_label.setStyleSheet(_classic_css("color: #A0A0A0; font-size: 13px; "
+            "margin-top: 4px; background: transparent;"))
         info_layout.addWidget(stats_label)
 
         layout.addWidget(info_frame)
@@ -205,17 +187,14 @@ class CollectionImportDialog(QDialog):
             missing_label = QLabel(
                 tr("collection.missing_mods", count=len(result.missing))
             )
-            missing_label.setStyleSheet(
-                "color: #ff8888; font-size: 14px; font-weight: 600;"
-            )
+            missing_label.setStyleSheet(_classic_css("color: #ff8888; font-size: 14px; font-weight: 600;"))
             layout.addWidget(missing_label)
 
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setFrameShape(QFrame.Shape.NoFrame)
             scroll.setMaximumHeight(200)
-            scroll.setStyleSheet(
-                """
+            scroll.setStyleSheet(_classic_css("""
                 QScrollArea { background: transparent; border: none; }
                 QScrollBar:vertical {
                     background: #242424; width: 8px; border-radius: 4px;
@@ -226,11 +205,10 @@ class CollectionImportDialog(QDialog):
                 QScrollBar::handle:vertical:hover { background: #006868; }
                 QScrollBar::add-line:vertical,
                 QScrollBar::sub-line:vertical { height: 0; }
-                """
-            )
+                """))
 
             scroll_widget = QWidget()
-            scroll_widget.setStyleSheet("background: transparent;")
+            scroll_widget.setStyleSheet(_classic_css("background: transparent;"))
             scroll_layout = QVBoxLayout(scroll_widget)
             scroll_layout.setContentsMargins(0, 0, 8, 0)
             scroll_layout.setSpacing(4)
@@ -258,9 +236,7 @@ class CollectionImportDialog(QDialog):
             tr("collection.apply_categories")
         )
         self._chk_categories.setChecked(True)
-        self._chk_categories.setStyleSheet(
-            "color: #D3D3D3; font-size: 13px;"
-        )
+        self._chk_categories.setStyleSheet(_classic_css("color: #D3D3D3; font-size: 13px;"))
         layout.addWidget(self._chk_categories)
 
         # ── Buttons ──
@@ -271,24 +247,21 @@ class CollectionImportDialog(QDialog):
         btn_cancel = QPushButton(tr("button.cancel"))
         btn_cancel.setFixedHeight(36)
         btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_cancel.setStyleSheet(
-            """
+        btn_cancel.setStyleSheet(_classic_css("""
             QPushButton {
                 background: #3D3D3D; color: #D3D3D3;
                 border: none; border-radius: 6px;
                 padding: 0 20px; font-size: 13px; font-weight: 500;
             }
             QPushButton:hover { background: #4D4D4D; }
-            """
-        )
+            """))
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(btn_cancel)
 
         self._btn_import = QPushButton(tr("collection.import_button"))
         self._btn_import.setFixedHeight(36)
         self._btn_import.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._btn_import.setStyleSheet(
-            """
+        self._btn_import.setStyleSheet(_classic_css("""
             QPushButton {
                 background: #006868; color: #FFFFFF;
                 border: none; border-radius: 6px;
@@ -298,8 +271,7 @@ class CollectionImportDialog(QDialog):
             QPushButton:disabled {
                 background: #3D3D3D; color: #808080;
             }
-            """
-        )
+            """))
         self._btn_import.clicked.connect(self.accept)
         btn_layout.addWidget(self._btn_import)
 
