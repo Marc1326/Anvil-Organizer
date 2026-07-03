@@ -233,7 +233,7 @@ def create_toolbar(parent=None):
     notifications_btn.setIcon(_icon("problems.svg"))
     notifications_btn.setToolTip(tr("status.notifications"))
     notifications_btn.setText(tr("status.notifications"))
-    bar.addWidget(notifications_btn)
+    bar.notifications_action = bar.addWidget(notifications_btn)
 
     def _on_notifications_clicked(checked=False):
         win = bar.window()

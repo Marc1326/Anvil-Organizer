@@ -535,6 +535,7 @@
     "query_rate_limit_wait": "Limite de débit atteinte — attente de 60 secondes..."
   },
   "toast": {
+    "instance_loaded": "Instance « {name} » chargée",
     "backup_created": "{count} Mods sauvegardés | {name} | {size}",
     "backup_restored": "Sauvegarde restaurée : {name}",
     "profile_created": "Profil '{name}' créé",
@@ -932,6 +933,16 @@
     "date_modified": "Date de modification"
   },
   "instance": {
+    "switch_hint": "Changer d'instance — l'instance actuelle sera fermée",
+    "mods_active": "{active} / {total} mods actifs",
+    "mods_active_simple": "{count} mods actifs",
+    "new_instance": "Nouvelle instance…",
+    "open_manager": "Ouvrir le Gestionnaire d'Instances…",
+    "closing": "Fermeture de l'instance « {name} »…",
+    "opening": "Ouverture de l'instance « {name} »…",
+    "separated": "Les instances sont totalement séparées les unes des autres",
+    "none": "Aucune instance",
+    "profile_prefix": "Profil :",
     "manager_title": "Gestionnaire d'Instances",
     "welcome_hint": "Bienvenue dans Anvil Organizer! Creez votre premiere instance pour commencer.",
     "filter_placeholder": "Filtrer les instances...",

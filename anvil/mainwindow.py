@@ -81,6 +81,9 @@ from anvil.core.lspk_parser import LSPKReader
 from anvil.models.mod_list_model import mod_entry_to_row, COL_COUNT, ROLE_GROUP_NAME, ROLE_IS_GROUP_HEAD
 from anvil.core.mod_groups import GroupManager
 from anvil.widgets.instance_wizard import CreateInstanceWizard
+from anvil.widgets.instance_dropdown import InstanceDropdown, TitleBarSpan
+from anvil.widgets.switch_overlay import SwitchOverlay
+from anvil.widgets.notification_panel import NotificationButton, NotificationPanel
 from anvil.widgets.category_dialog import CategoryDialog
 from anvil.widgets.log_panel import LogPanel
 from anvil.core import _todo
@@ -633,6 +636,26 @@ class MainWindow(QMainWindow):
         act = hm.addAction(tr("menu.about_qt"))
         act.triggered.connect(self._on_about_qt)
 
+        # Titelzeile wie im Handoff: Instanz-Dropdown mittig,
+        # Benachrichtigungen rechts (nur modernes Design)
+        self._instance_dropdown = InstanceDropdown(
+            self.instance_manager, self.icon_manager)
+        self._instance_dropdown.instance_selected.connect(
+            self._switch_instance_with_overlay)
+        self._instance_dropdown.new_instance_requested.connect(
+            self._on_dropdown_new_instance)
+        self._instance_dropdown.manager_requested.connect(
+            self._on_manage_instances)
+        self._title_notif_btn = NotificationButton()
+        self._title_notif_btn.setObjectName("titleNotifBtn")
+        self._title_notif_btn.setText(tr("status.notifications"))
+        self._title_notif_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._title_notif_btn.clicked.connect(
+            self._on_title_notifications_clicked)
+        self._title_span = TitleBarSpan(
+            menubar, self._instance_dropdown, self._title_notif_btn)
+        self._switch_overlay = SwitchOverlay(self)
+
     # ── Icon size constants ─────────────────────────────────────────
 
     _ICON_SIZES = [QSize(24, 24), QSize(32, 32), QSize(42, 36)]
@@ -650,6 +673,42 @@ class MainWindow(QMainWindow):
         dlg.exec()
         if dlg.switched_to:
             self.switch_instance(dlg.switched_to)
+
+    def _switch_instance_with_overlay(self, name: str) -> None:
+        """Instanzwechsel aus dem Dropdown: Overlay-Sequenz um das
+        bestehende switch_instance() herum — die Logik bleibt unberührt."""
+        old = self.instance_manager.current_instance() or ""
+        if name == old:
+            return
+        ovl = self._switch_overlay
+        if old:
+            ovl.start(tr("instance.closing", name=old))
+        else:
+            ovl.start(tr("instance.opening", name=name))
+
+        def _phase2() -> None:
+            ovl.set_phase(tr("instance.opening", name=name))
+            QTimer.singleShot(60, _do_switch)
+
+        def _do_switch() -> None:
+            try:
+                self.switch_instance(name)
+            finally:
+                ovl.finish()
+                Toast(self, tr("toast.instance_loaded", name=name))
+
+        QTimer.singleShot(650, _phase2)
+
+    def _on_dropdown_new_instance(self) -> None:
+        """＋ Neue Instanz… aus dem Dropdown — öffnet den Assistenten."""
+        wizard = CreateInstanceWizard(
+            self, self.instance_manager, self.plugin_loader,
+            self.icon_manager,
+        )
+        _center_on_parent(wizard)
+        wizard.exec()
+        if wizard.created_instance:
+            self._switch_instance_with_overlay(wizard.created_instance)
 
     def _on_create_plugin(self) -> None:
         """Datei → Game Plugin erstellen (leerer Dialog)."""
@@ -1236,10 +1295,14 @@ class MainWindow(QMainWindow):
                 self._apply_instance("")
             except Exception:  # noqa: BLE001
                 self._status_bar.clear_instance()
+            if hasattr(self, "_instance_dropdown"):
+                self._instance_dropdown.refresh_current()
             return
         # Erst nach erfolgreichem Laden persistieren — sonst zeigt .current bei
         # einem Fehler auf eine kaputte Instanz und die App startet nicht mehr.
         self.instance_manager.set_current_instance(instance_name)
+        if hasattr(self, "_instance_dropdown"):
+            self._instance_dropdown.refresh_current()
 
     def _apply_instance(self, instance_name: str) -> None:
         """Load instance data and update all widgets.
@@ -7425,9 +7488,17 @@ class MainWindow(QMainWindow):
     # ── Benachrichtigungen (Glocken-Button) ──────────────────────────
     def _on_notifications_changed(self) -> None:
         """Aktualisiert den Zähler-Badge am Glocken-Button."""
+        count = self._notification_center.unread_count()
         btn = getattr(self._toolbar, "notifications_btn", None)
         if btn is not None:
-            btn.set_count(self._notification_center.unread_count())
+            btn.set_count(count)
+        if hasattr(self, "_title_notif_btn"):
+            self._title_notif_btn.set_count(count)
+
+    def _on_title_notifications_clicked(self, checked: bool = False) -> None:
+        """Benachrichtigungen-Button in der Titelzeile (modernes Design)."""
+        panel = NotificationPanel(self._notification_center, self)
+        panel.show_under(self._title_notif_btn)
 
     def _on_notify_download_finished(self, download_id: int, save_path: str) -> None:
         name = Path(save_path).name if save_path else ""

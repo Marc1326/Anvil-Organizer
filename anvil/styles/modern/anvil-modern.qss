@@ -153,15 +153,21 @@ QMenu {
 
 QMenuBar {
   background: {{panel}};
-  border-bottom: 1px solid {{line}}; }
+  border-bottom: 1px solid {{line}};
+  min-height: 40px;
+  font-size: 13px; }
   QMenuBar::item {
     background: transparent;
     color: {{txt2}};
-    padding: 4px 10px;
+    padding: 6px 10px;
     border-radius: 6px; }
   QMenuBar::item:selected {
     background: {{hov}};
     color: {{txt}}; }
+
+#titleNotifBtn {
+  font-size: 12px;
+  padding: 4px 14px; }
 
 /* ── Toolbar ───────────────────────────────────────────────── */
 
@@ -425,6 +431,78 @@ QToolTip {
     background: {{accent_hover}}; }
   #startButton:pressed {
     background: {{accent_pressed}}; }
+
+/* ── Instanz-Dropdown (Menüleiste) ─────────────────────────── */
+
+#instanceDropdown {
+  background: {{panel2}};
+  border: 1px solid {{line}};
+  border-radius: 7px;
+  margin: 3px 8px 3px 0; }
+  #instanceDropdown:hover {
+    border-color: {{accent}}; }
+#instDropName {
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent; }
+#instDropSub {
+  font-size: 10px;
+  color: {{txt3}};
+  background: transparent; }
+#instDropArrow {
+  color: {{txt3}};
+  background: transparent; }
+
+#instancePopup {
+  background: {{panel}};
+  border: 1px solid {{line}};
+  border-radius: 9px; }
+#instPopupHint {
+  color: {{txt3}};
+  font-size: 11px;
+  background: transparent;
+  padding: 2px 4px; }
+#instanceRow {
+  background: transparent;
+  border-radius: 7px; }
+  #instanceRow:hover {
+    background: {{hov}}; }
+#instRowName {
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent; }
+#instRowSub {
+  font-size: 10px;
+  color: {{txt3}};
+  background: transparent; }
+#instRowDot {
+  color: {{ok}};
+  background: transparent; }
+#instNewBtn, #instManagerBtn {
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  text-align: left; }
+  #instNewBtn {
+    color: {{accent}}; }
+  #instNewBtn:hover, #instManagerBtn:hover {
+    background: {{hov}};
+    border: none; }
+
+/* ── Instanzwechsel-Overlay ────────────────────────────────── */
+
+#ovlPhase {
+  color: {{txt}};
+  font-size: 15px;
+  font-weight: 600;
+  background: transparent; }
+#ovlSub {
+  color: {{txt3}};
+  font-size: 11px;
+  background: transparent; }
 
 #exeMenuBtn {
   padding: 0;

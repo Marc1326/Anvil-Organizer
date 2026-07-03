@@ -535,6 +535,7 @@
     "query_rate_limit_wait": "Límite de velocidad alcanzado — esperando 60 segundos..."
   },
   "toast": {
+    "instance_loaded": "Instancia «{name}» cargada",
     "backup_created": "{count} Mods respaldados | {name} | {size}",
     "backup_restored": "Copia de seguridad restaurada: {name}",
     "profile_created": "Perfil '{name}' creado",
@@ -932,6 +933,16 @@
     "date_modified": "Fecha de modificación"
   },
   "instance": {
+    "switch_hint": "Cambiar de instancia — la instancia actual se cerrará",
+    "mods_active": "{active} / {total} mods activos",
+    "mods_active_simple": "{count} mods activos",
+    "new_instance": "Nueva instancia…",
+    "open_manager": "Abrir Administrador de Instancias…",
+    "closing": "Cerrando la instancia «{name}»…",
+    "opening": "Abriendo la instancia «{name}»…",
+    "separated": "Las instancias están completamente separadas entre sí",
+    "none": "Sin instancia",
+    "profile_prefix": "Perfil:",
     "manager_title": "Administrador de Instancias",
     "welcome_hint": "Bienvenido a Anvil Organizer! Crea tu primera instancia para comenzar.",
     "filter_placeholder": "Filtrar instancias...",
