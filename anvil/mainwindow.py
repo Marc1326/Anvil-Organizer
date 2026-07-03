@@ -673,6 +673,9 @@ class MainWindow(QMainWindow):
         dlg.exec()
         if dlg.switched_to:
             self.switch_instance(dlg.switched_to)
+        elif hasattr(self, "_instance_dropdown"):
+            # Cover könnte geändert worden sein — Chip aktualisieren
+            self._instance_dropdown.refresh_current()
 
     def _switch_instance_with_overlay(self, name: str) -> None:
         """Instanzwechsel aus dem Dropdown: Overlay-Sequenz um das

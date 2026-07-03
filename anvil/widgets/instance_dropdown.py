@@ -34,27 +34,29 @@ def _chip_label_text(game_name: str) -> str:
     return label[:4] or "?"
 
 
-def _chip_pixmap(icon: QPixmap | None, game_name: str, size: int = 26) -> QPixmap:
-    """Runder Cover-Chip: Spiel-Icon oder Farbfeld mit Kürzel."""
-    pix = QPixmap(size, size)
+def _chip_pixmap(icon: QPixmap | None, game_name: str, w: int = 26,
+                 h: int = 26, color: str | None = None) -> QPixmap:
+    """Runder Cover-Chip: Bild/Spiel-Icon oder Farbfeld mit Kürzel."""
+    pix = QPixmap(w, h)
     pix.fill(Qt.GlobalColor.transparent)
     p = QPainter(pix)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
     path = QPainterPath()
-    path.addRoundedRect(0, 0, size, size, 6, 6)
+    path.addRoundedRect(0, 0, w, h, 6, 6)
     p.setClipPath(path)
     if icon is not None and not icon.isNull():
         scaled = icon.scaled(
-            size, size,
+            w, h,
             Qt.AspectRatioMode.KeepAspectRatioByExpanding,
             Qt.TransformationMode.SmoothTransformation,
         )
-        x = (scaled.width() - size) // 2
-        y = (scaled.height() - size) // 2
-        p.drawPixmap(0, 0, scaled, x, y, size, size)
+        x = (scaled.width() - w) // 2
+        y = (scaled.height() - h) // 2
+        p.drawPixmap(0, 0, scaled, x, y, w, h)
     else:
-        color = _CHIP_COLORS[hash(game_name) % len(_CHIP_COLORS)]
-        p.fillRect(0, 0, size, size, QColor(color))
+        if not color:
+            color = _CHIP_COLORS[hash(game_name) % len(_CHIP_COLORS)]
+        p.fillRect(0, 0, w, h, QColor(color))
         p.setPen(QColor(theme_color("txt", "#E8E8E8")))
         f = QFont()
         f.setPixelSize(9)
@@ -63,6 +65,24 @@ def _chip_pixmap(icon: QPixmap | None, game_name: str, size: int = 26) -> QPixma
         p.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, _chip_label_text(game_name))
     p.end()
     return pix
+
+
+def instance_chip(inst: dict, instances_base: Path, icon_manager,
+                  w: int = 26, h: int = 26) -> QPixmap:
+    """Chip für eine Instanz: eigenes Cover → Spiel-Icon → Farbe+Kürzel."""
+    icon = None
+    cover_name = inst.get("cover_image", "")
+    if cover_name:
+        cover_path = instances_base / inst.get("name", "") / cover_name
+        if cover_path.is_file():
+            loaded = QPixmap(str(cover_path))
+            if not loaded.isNull():
+                icon = loaded
+    if icon is None and icon_manager is not None:
+        icon = icon_manager.get_game_icon(inst.get("game_short_name", ""))
+    color = inst.get("cover_color", "") or None
+    game = inst.get("game_name", inst.get("name", "?"))
+    return _chip_pixmap(icon, game, w, h, color=color)
 
 
 def _mod_counts(inst: dict, instances_base: Path) -> tuple[int, int]:
@@ -114,12 +134,12 @@ class _InstanceRow(QFrame):
         self._name = inst.get("name", "")
 
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(10, 6, 10, 6)
+        lay.setContentsMargins(12, 8, 12, 8)
         lay.setSpacing(10)
 
         chip_lbl = QLabel()
         chip_lbl.setPixmap(chip)
-        chip_lbl.setFixedSize(26, 26)
+        chip_lbl.setFixedSize(32, 32)
         lay.addWidget(chip_lbl)
 
         col = QVBoxLayout()
@@ -167,11 +187,6 @@ class _InstancePopup(QFrame):
         base = im.instances_path()
         current = im.current_instance() or ""
         for inst in im.list_instances():
-            game = inst.get("game_name", inst.get("name", ""))
-            icon = None
-            if dropdown._icon_manager is not None:
-                icon = dropdown._icon_manager.get_game_icon(
-                    inst.get("game_short_name", ""))
             active, total = _mod_counts(inst, base)
             store = (inst.get("detected_store", "") or "?").capitalize()
             if active > total:
@@ -181,8 +196,9 @@ class _InstancePopup(QFrame):
             else:
                 mods_txt = tr("instance.mods_active", active=active, total=total)
             sub = f"{mods_txt} · {store}"
-            row = _InstanceRow(inst, _chip_pixmap(icon, game),
-                               sub, inst.get("name", "") == current)
+            chip = instance_chip(inst, base, dropdown._icon_manager, w=32, h=32)
+            row = _InstanceRow(inst, chip, sub,
+                               inst.get("name", "") == current)
             row.clicked.connect(self._on_row_clicked)
             lay.addWidget(row)
 
@@ -199,7 +215,7 @@ class _InstancePopup(QFrame):
         mgr_btn.clicked.connect(self._on_manager_clicked)
         lay.addWidget(mgr_btn)
 
-        self.setMinimumWidth(max(300, dropdown.width()))
+        self.setMinimumWidth(max(340, dropdown.width()))
 
     def _on_row_clicked(self, name: str) -> None:
         self.close()
@@ -229,7 +245,7 @@ class TitleBarSpan(QWidget):
         super().__init__(menubar)
         self._menubar = menubar
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(8, 3, 10, 3)
+        lay.setContentsMargins(8, 2, 10, 2)
         lay.setSpacing(8)
         lay.addStretch(1)
         lay.addWidget(dropdown)
@@ -294,7 +310,7 @@ class InstanceDropdown(QWidget):
         lay.setSpacing(8)
 
         self._chip = QLabel()
-        self._chip.setFixedSize(26, 26)
+        self._chip.setFixedSize(32, 32)
         lay.addWidget(self._chip)
 
         col = QVBoxLayout()
@@ -312,8 +328,8 @@ class InstanceDropdown(QWidget):
         arrow.setObjectName("instDropArrow")
         lay.addWidget(arrow)
 
-        self.setMinimumWidth(270)
-        self.setMinimumHeight(46)
+        self.setMinimumWidth(290)
+        self.setMinimumHeight(54)
         self.refresh_current()
         self.apply_theme_metrics()
 
@@ -325,7 +341,7 @@ class InstanceDropdown(QWidget):
         if not current:
             self._name_lbl.setText(tr("instance.none"))
             self._sub_lbl.setText("")
-            self._chip.setPixmap(_chip_pixmap(None, "?"))
+            self._chip.setPixmap(_chip_pixmap(None, "?", 32, 32))
             return
         inst = next(
             (i for i in self._instance_manager.list_instances()
@@ -335,16 +351,15 @@ class InstanceDropdown(QWidget):
         if inst is None:
             self._name_lbl.setText(current)
             self._sub_lbl.setText("")
-            self._chip.setPixmap(_chip_pixmap(None, current))
+            self._chip.setPixmap(_chip_pixmap(None, current, 32, 32))
             return
         store = (inst.get("detected_store", "") or "?").capitalize()
         profile = inst.get("selected_profile", "") or "—"
         self._name_lbl.setText(current)
         self._sub_lbl.setText(f"{store} · {tr('instance.profile_prefix')} {profile}")
-        icon = None
-        if self._icon_manager is not None:
-            icon = self._icon_manager.get_game_icon(inst.get("game_short_name", ""))
-        self._chip.setPixmap(_chip_pixmap(icon, inst.get("game_name", current)))
+        self._chip.setPixmap(instance_chip(
+            inst, self._instance_manager.instances_path(), self._icon_manager,
+            w=32, h=32))
 
     # ── Theme ─────────────────────────────────────────────────────────
 

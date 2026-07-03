@@ -154,7 +154,7 @@ QMenu {
 QMenuBar {
   background: {{panel}};
   border-bottom: 1px solid {{line}};
-  min-height: 40px;
+  min-height: 46px;
   font-size: 13px; }
   QMenuBar::item {
     background: transparent;
@@ -437,16 +437,15 @@ QToolTip {
 #instanceDropdown {
   background: {{panel2}};
   border: 1px solid {{line}};
-  border-radius: 7px;
-  margin: 3px 8px 3px 0; }
+  border-radius: 7px; }
   #instanceDropdown:hover {
     border-color: {{accent}}; }
 #instDropName {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   background: transparent; }
 #instDropSub {
-  font-size: 10px;
+  font-size: 11px;
   color: {{txt3}};
   background: transparent; }
 #instDropArrow {
@@ -459,7 +458,7 @@ QToolTip {
   border-radius: 9px; }
 #instPopupHint {
   color: {{txt3}};
-  font-size: 11px;
+  font-size: 12px;
   background: transparent;
   padding: 2px 4px; }
 #instanceRow {
@@ -468,11 +467,11 @@ QToolTip {
   #instanceRow:hover {
     background: {{hov}}; }
 #instRowName {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   background: transparent; }
 #instRowSub {
-  font-size: 10px;
+  font-size: 11px;
   color: {{txt3}};
   background: transparent; }
 #instRowDot {
@@ -483,14 +482,73 @@ QToolTip {
   border: none;
   border-radius: 7px;
   margin: 0;
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
   text-align: left; }
   #instNewBtn {
     color: {{accent}}; }
   #instNewBtn:hover, #instManagerBtn:hover {
     background: {{hov}};
     border: none; }
+
+/* ── Instanz-Manager-Dialog ────────────────────────────────── */
+
+#createBtn, #switchBtn {
+  background: {{accent}};
+  color: #0f1113;
+  font-weight: 600;
+  border: none; }
+  #createBtn:hover, #switchBtn:hover {
+    background: {{accent_hover}}; }
+  #createBtn:pressed, #switchBtn:pressed {
+    background: {{accent_pressed}}; }
+  #createBtn:disabled, #switchBtn:disabled {
+    background: {{panel2}};
+    color: {{txt3}}; }
+
+#deleteInstance {
+  background: transparent;
+  color: {{warn}};
+  border: 1px solid {{warn}}; }
+  #deleteInstance:hover {
+    background: {{hov}}; }
+  #deleteInstance:disabled {
+    color: {{txt3}};
+    border-color: {{line}}; }
+
+#exploreBtn {
+  background: transparent;
+  border: none;
+  padding: 2px; }
+  #exploreBtn:hover {
+    background: {{hov}}; }
+
+#coverSwatch {
+  background: transparent;
+  border: 1px solid {{line}};
+  border-radius: 5px;
+  padding: 1px; }
+  #coverSwatch:hover {
+    border-color: {{accent}}; }
+
+#welcomeHint {
+  color: {{accent}};
+  font-size: 13px;
+  background: transparent; }
+
+#detailsHeader {
+  font-weight: 600;
+  font-size: 14px;
+  background: transparent; }
+
+#switchNote {
+  color: {{txt3}};
+  font-size: 11px;
+  background: transparent; }
+
+#instanceList::item {
+  min-height: 34px;
+  padding: 2px 6px; }
 
 /* ── Instanzwechsel-Overlay ────────────────────────────────── */
 

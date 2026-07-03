@@ -7,9 +7,9 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QSplitter,
     QListView, QLineEdit, QPushButton, QLabel, QWidget, QFrame,
-    QAbstractItemView, QMessageBox, QStyle,
+    QAbstractItemView, QFileDialog, QMessageBox, QStyle,
 )
-from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon
+from PySide6.QtGui import QStandardItemModel, QStandardItem, QIcon, QColor, QPixmap
 from PySide6.QtCore import Qt, QSortFilterProxyModel, QSettings, QModelIndex, QSize
 from anvil.core.subprocess_env import host_open_path
 
@@ -19,6 +19,11 @@ from anvil.core.icon_manager import IconManager, placeholder_game_icon
 from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.translator import tr
 from anvil.core.resource_path import get_anvil_base
+from anvil.styles.dark_theme import theme_color
+from anvil.widgets.instance_dropdown import instance_chip
+
+# Platzhalterfarben aus dem Design-Handoff (Icon & Bild)
+_COVER_COLORS = ["#3d4a52", "#4a4238", "#3a3f4a", "#443c4a", "#464040", "#3c4644"]
 
 _ICONS_DIR = get_anvil_base() / "styles" / "icons"
 
@@ -88,8 +93,11 @@ class InstanceManagerDialog(QDialog):
         self.switched_to = None
 
         self.setWindowTitle(tr("instance.manager_title"))
-        self.setMinimumSize(800, 500)
-        self.setStyleSheet(_DIALOG_STYLE)
+        self.setMinimumSize(860, 560)
+        self._modern = bool(theme_color("panel2", ""))
+        if not self._modern:
+            # Klassisch: alte Dialog-Optik; modern erbt das App-QSS
+            self.setStyleSheet(_DIALOG_STYLE)
 
         self._setup_ui()
         self._restore_geometry()
@@ -104,28 +112,26 @@ class InstanceManagerDialog(QDialog):
         # Welcome hint
         if self._welcome:
             self._welcome_label = QLabel(tr("instance.welcome_hint"))
-            self._welcome_label.setStyleSheet("color: #4FC3F7; font-size: 13px; padding: 6px 0;")
+            self._welcome_label.setObjectName("welcomeHint")
+            if not self._modern:
+                self._welcome_label.setStyleSheet(
+                    "color: #4FC3F7; font-size: 13px; padding: 6px 0;")
             self._welcome_label.setWordWrap(True)
             layout.addWidget(self._welcome_label)
-
-        # Top bar with "New Instance" button (above splitter)
-        top_bar = QHBoxLayout()
-        top_bar.setSpacing(8)
-        self._new_btn = QPushButton("+ " + tr("instance.btn_new"))
-        self._new_btn.setObjectName("createBtn")
-        self._new_btn.clicked.connect(self._on_new_instance)
-        top_bar.addWidget(self._new_btn)
-        top_bar.addStretch()
-        layout.addLayout(top_bar)
 
         # Main splitter
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Left panel: List + Filter
+        # Left panel: New-Instance button + List + Filter (wie im Handoff)
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(6)
+
+        self._new_btn = QPushButton("+ " + tr("instance.btn_new"))
+        self._new_btn.setObjectName("createBtn")
+        self._new_btn.clicked.connect(self._on_new_instance)
+        left_layout.addWidget(self._new_btn)
 
         self._model = QStandardItemModel()
         self._proxy_model = QSortFilterProxyModel()
@@ -133,6 +139,8 @@ class InstanceManagerDialog(QDialog):
         self._proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
 
         self._list_view = QListView()
+        self._list_view.setObjectName("instanceList")
+        self._list_view.setIconSize(QSize(26, 26))
         self._list_view.setModel(self._proxy_model)
         self._list_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._list_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -155,7 +163,10 @@ class InstanceManagerDialog(QDialog):
         right_layout.setContentsMargins(12, 0, 0, 0)
 
         self._details_label = QLabel(tr("instance.details_header"))
-        self._details_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 8px;")
+        self._details_label.setObjectName("detailsHeader")
+        if not self._modern:
+            self._details_label.setStyleSheet(
+                "font-weight: bold; font-size: 14px; margin-bottom: 8px;")
         right_layout.addWidget(self._details_label)
 
         form = QGridLayout()
@@ -214,6 +225,36 @@ class InstanceManagerDialog(QDialog):
         self._game_path_btn.clicked.connect(lambda: self._on_explore("game"))
         form.addWidget(self._game_path_btn, 3, 2)
 
+        # Zeile 4: Icon & Bild (Cover pro Instanz \u2014 Bild oder Farbe)
+        cover_label = QLabel(tr("instance.label_icon"))
+        form.addWidget(cover_label, 4, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        cover_row = QHBoxLayout()
+        cover_row.setSpacing(8)
+        self._cover_preview = QLabel()
+        self._cover_preview.setFixedSize(40, 54)
+        cover_row.addWidget(self._cover_preview)
+        self._pick_image_btn = QPushButton(tr("instance.pick_image"))
+        self._pick_image_btn.clicked.connect(self._on_pick_image)
+        cover_row.addWidget(self._pick_image_btn)
+        self._swatch_btns = []
+        for color in _COVER_COLORS:
+            sw = QPushButton()
+            sw.setObjectName("coverSwatch")
+            sw.setFixedSize(22, 22)
+            pix = QPixmap(16, 16)
+            pix.fill(QColor(color))
+            sw.setIcon(QIcon(pix))
+            sw.setToolTip(color)
+            sw.clicked.connect(
+                lambda checked=False, c=color: self._on_pick_color(c))
+            cover_row.addWidget(sw)
+            self._swatch_btns.append(sw)
+        self._reset_cover_btn = QPushButton(tr("instance.reset_cover"))
+        self._reset_cover_btn.clicked.connect(self._on_reset_cover)
+        cover_row.addWidget(self._reset_cover_btn)
+        cover_row.addStretch()
+        form.addLayout(cover_row, 4, 1, 1, 2)
+
         right_layout.addLayout(form)
 
         # Delete button at bottom of details section
@@ -226,6 +267,12 @@ class InstanceManagerDialog(QDialog):
         right_layout.addLayout(actions_row)
 
         right_layout.addStretch()
+
+        # Hinweistext wie im Handoff
+        switch_note = QLabel(tr("instance.switch_note"))
+        switch_note.setObjectName("switchNote")
+        switch_note.setWordWrap(True)
+        right_layout.addWidget(switch_note)
 
         self._splitter.addWidget(right_widget)
         self._splitter.setStretchFactor(0, 1)
@@ -240,6 +287,7 @@ class InstanceManagerDialog(QDialog):
         btn_layout.addStretch()
 
         self._switch_btn = QPushButton(tr("instance.btn_switch"))
+        self._switch_btn.setObjectName("switchBtn")
         self._switch_btn.setMinimumHeight(32)
         self._switch_btn.setMinimumWidth(100)
         self._switch_btn.clicked.connect(self._on_switch)
@@ -270,14 +318,9 @@ class InstanceManagerDialog(QDialog):
 
             item = QStandardItem(label)
             item.setData(name, Qt.ItemDataRole.UserRole)
-
-            # Game icon
-            gsn = inst.get("game_short_name", "")
-            icon_pix = self._icons.get_game_icon(gsn) if self._icons and gsn else None
-            if icon_pix is not None:
-                item.setIcon(QIcon(icon_pix))
-            else:
-                item.setIcon(QIcon(placeholder_game_icon(32)))
+            # Chip: Instanz-Cover \u2192 Spiel-Icon \u2192 Farbe+K\u00FCrzel
+            item.setIcon(QIcon(instance_chip(
+                inst, self._im.instances_path(), self._icons)))
 
             self._model.appendRow(item)
 
@@ -314,6 +357,10 @@ class InstanceManagerDialog(QDialog):
         self._rename_btn.setEnabled(has_selection and not is_active)
         self._delete_btn.setEnabled(has_selection and not is_active)
         self._switch_btn.setEnabled(has_selection and not is_active)
+        self._pick_image_btn.setEnabled(has_selection)
+        self._reset_cover_btn.setEnabled(has_selection)
+        for sw in self._swatch_btns:
+            sw.setEnabled(has_selection)
 
     # ── Slots ─────────────────────────────────────────────────────────
 
@@ -342,6 +389,19 @@ class InstanceManagerDialog(QDialog):
         self._location_edit.setText(str(self._im.instances_path() / name))
         self._base_edit.setText(str(self._im.instances_path() / name))
         self._game_path_edit.setText(data.get("game_path", "") or "\u2014")
+        self._update_cover_preview(name)
+
+    def _update_cover_preview(self, name: str) -> None:
+        """Cover-Vorschau (40\u00d754) f\u00fcr die gew\u00e4hlte Instanz aktualisieren."""
+        inst = next(
+            (i for i in self._im.list_instances() if i.get("name") == name),
+            None,
+        ) if self._im else None
+        if inst is None:
+            self._cover_preview.clear()
+            return
+        self._cover_preview.setPixmap(instance_chip(
+            inst, self._im.instances_path(), self._icons, w=40, h=54))
 
     def _clear_details(self) -> None:
         """Clear the details panel."""
@@ -349,6 +409,7 @@ class InstanceManagerDialog(QDialog):
         self._location_edit.clear()
         self._base_edit.clear()
         self._game_path_edit.clear()
+        self._cover_preview.clear()
 
     def _on_new_instance(self) -> None:
         """Stub: Opens CreateInstanceWizard. Backend-Dev fills."""
@@ -441,6 +502,44 @@ class InstanceManagerDialog(QDialog):
             return f"{size / (1024 * 1024):.1f} MB"
         else:
             return f"{size / (1024 * 1024 * 1024):.1f} GB"
+
+    # ── Icon & Bild ───────────────────────────────────────────────────
+
+    def _on_pick_image(self) -> None:
+        """Bilddatei als Instanz-Cover wählen."""
+        name = self._selected_name()
+        if name is None or self._im is None:
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("instance.pick_image"), str(Path.home()),
+            "Bilder (*.png *.jpg *.jpeg *.webp *.bmp)",
+        )
+        if not path:
+            return
+        if self._im.set_cover(name, image=path):
+            self._after_cover_change(name)
+
+    def _on_pick_color(self, color: str) -> None:
+        """Platzhalterfarbe als Instanz-Cover setzen."""
+        name = self._selected_name()
+        if name is None or self._im is None:
+            return
+        if self._im.set_cover(name, color=color):
+            self._after_cover_change(name)
+
+    def _on_reset_cover(self) -> None:
+        """Cover der Instanz zurücksetzen (Spiel-Icon/Kürzel)."""
+        name = self._selected_name()
+        if name is None or self._im is None:
+            return
+        if self._im.set_cover(name):
+            self._after_cover_change(name)
+
+    def _after_cover_change(self, name: str) -> None:
+        """Vorschau + Liste nach Cover-Änderung aktualisieren."""
+        self._update_cover_preview(name)
+        self._refresh_list()
+        self._select_instance(name)
 
     def _on_switch(self) -> None:
         """Stub: Switches to selected instance. Backend-Dev fills."""

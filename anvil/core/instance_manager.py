@@ -145,6 +145,65 @@ class InstanceManager:
 
     # ── Rename ─────────────────────────────────────────────────────────
 
+    # ── Cover (Icon & Bild) ───────────────────────────────────────────
+
+    _COVER_NAMES = ("cover.png", "cover.jpg", "cover.jpeg", "cover.webp", "cover.bmp")
+
+    def set_cover(self, name: str, *, image: str | None = None,
+                  color: str | None = None) -> bool:
+        """Cover einer Instanz setzen: Bild-Datei ODER Platzhalterfarbe.
+
+        image: Pfad zu einer Bilddatei — wird als cover.<ext> in den
+               Instanz-Ordner kopiert. color: Hex-Farbe wie "#3d4a52".
+        Beides None = zurücksetzen.
+        """
+        inst_dir = self._base / name
+        ini = inst_dir / ".anvil.ini"
+        if not ini.is_file():
+            return False
+
+        s = QSettings(str(ini), QSettings.Format.IniFormat)
+        s.beginGroup("General")
+
+        def _remove_cover_file() -> None:
+            for cand in self._COVER_NAMES:
+                f = inst_dir / cand
+                if f.is_file():
+                    try:
+                        f.unlink()
+                    except OSError:
+                        pass
+
+        if image:
+            src = Path(image)
+            suffix = src.suffix.lower().lstrip(".")
+            if suffix == "jpeg":
+                suffix = "jpg"
+            if not src.is_file() or f"cover.{suffix}" not in self._COVER_NAMES:
+                s.endGroup()
+                return False
+            _remove_cover_file()
+            dest = inst_dir / f"cover.{suffix}"
+            try:
+                shutil.copyfile(str(src), str(dest))
+            except OSError:
+                s.endGroup()
+                return False
+            s.setValue("cover_image", dest.name)
+            s.remove("cover_color")
+        elif color:
+            _remove_cover_file()
+            s.setValue("cover_color", color)
+            s.remove("cover_image")
+        else:
+            _remove_cover_file()
+            s.remove("cover_image")
+            s.remove("cover_color")
+
+        s.endGroup()
+        s.sync()
+        return True
+
     def rename_instance(self, old_name: str, new_name: str) -> bool:
         """Rename an instance directory.
 
