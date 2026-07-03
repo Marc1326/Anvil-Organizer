@@ -85,7 +85,6 @@ from anvil.widgets.instance_wizard import CreateInstanceWizard
 from anvil.widgets.instance_dropdown import InstanceDropdown, TitleBarSpan
 from anvil.widgets.switch_overlay import SwitchOverlay
 from anvil.widgets.notification_panel import NotificationButton, NotificationPanel
-from anvil.widgets.category_dialog import CategoryDialog
 from anvil.widgets.log_panel import LogPanel
 from anvil.core import _todo
 from anvil.core import framework_state

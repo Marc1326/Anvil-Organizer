@@ -20,9 +20,31 @@ _ICONS_DIR = get_anvil_base() / "styles" / "icons"
 
 def _icon(name: str) -> QIcon:
     path = _ICONS_DIR / name
-    if path.exists():
-        return QIcon(str(path))
-    return QIcon()
+    if not path.exists():
+        return QIcon()
+    # Modern: SVG-Fill (#d3d3d3) auf Theme-Textfarbe umfärben — sonst sind
+    # die Icons im Hell-Modus unsichtbar, sobald die Icon-Ansicht aktiv ist.
+    from anvil.styles.dark_theme import theme_color
+    if theme_color("panel2", "") and name.endswith(".svg"):
+        try:
+            from PySide6.QtCore import QByteArray
+            from PySide6.QtGui import QPainter, QPixmap
+            from PySide6.QtSvg import QSvgRenderer
+            tint = theme_color("txt2")
+            data = (path.read_text(encoding="utf-8")
+                    .replace("#d3d3d3", tint)
+                    .replace("#FFFFFF", tint)
+                    .replace("#ffffff", tint))
+            renderer = QSvgRenderer(QByteArray(data.encode()))
+            pix = QPixmap(96, 96)
+            pix.fill(Qt.GlobalColor.transparent)
+            p = QPainter(pix)
+            renderer.render(p)
+            p.end()
+            return QIcon(pix)
+        except Exception:
+            pass
+    return QIcon(str(path))
 
 
 def create_toolbar(parent=None):
@@ -68,7 +90,7 @@ def create_toolbar(parent=None):
     if modern:
         # Vorlage: Instanzen · Ordner · Profile · Plugins ·
         #          Aktualisieren · Sicherung · Einstellungen
-        folder_btn_m = _add_btn("archives.svg", tr("toolbar.folders"))
+        folder_btn_m = _add_btn("archives.svg", tr("toolbar.folders") + " ▾")
         folder_btn_m.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         folder_menu_m = QMenu(bar)
         folder_menu_m.addAction(tr("toolbar.open_game_folder"), lambda: _call_win("_open_game_folder"))
@@ -96,7 +118,7 @@ def create_toolbar(parent=None):
 
     plugin_btn = _add_btn(
         "plugin.svg",
-        tr("toolbar.plugins") if modern else tr("menu.plugin_menu"))
+        tr("toolbar.plugins") + " ▾" if modern else tr("menu.plugin_menu"))
     plugin_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
     plugin_menu = QMenu(bar)
     plugin_menu.addAction(tr("menu.create_plugin"), lambda: _call_win("_on_create_plugin"))
@@ -136,7 +158,7 @@ def create_toolbar(parent=None):
 
     if modern:
         # Vorlage: Sicherung ▾ (Erstellen / Wiederherstellen)
-        backup_btn = _add_btn("backup.svg", tr("toolbar.backup_menu"))
+        backup_btn = _add_btn("backup.svg", tr("toolbar.backup_menu") + " ▾")
         backup_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         backup_menu = QMenu(bar)
         backup_menu.addAction(

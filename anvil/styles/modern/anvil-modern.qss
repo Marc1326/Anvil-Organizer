@@ -192,6 +192,9 @@ QToolBar {
     QToolBar QToolButton:hover, QToolBar QToolButton:pressed {
       background: {{hov}};
       color: {{txt}}; }
+    QToolBar QToolButton::menu-indicator {
+      image: none;
+      width: 0; }
 
 #installModBtn {
   background: {{accent_soft}};

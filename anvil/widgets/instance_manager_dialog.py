@@ -197,16 +197,31 @@ class InstanceManagerDialog(QDialog):
         self.switched_to = None
 
         self.setWindowTitle(tr("instance.manager_title"))
-        self.setFixedSize(860, 560)
+        self._modern = bool(theme_color("panel2", ""))
+        # Modern: Vorlage-Maße ×1,25 wie der Einstellungs-Dialog
+        if self._modern:
+            self.setFixedSize(1075, 700)
+        else:
+            self.setFixedSize(860, 560)
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
 
-        self._modern = bool(theme_color("panel2", ""))
         if not self._modern:
             # Klassisch: alte Dialog-Optik; modern erbt das App-QSS
             self.setStyleSheet(_DIALOG_STYLE)
 
         self._setup_ui()
         self._refresh_list()
+
+    def exec(self):  # noqa: A003
+        """Modern: Hauptfenster abdunkeln, solange der Dialog offen ist."""
+        if self._modern and self.parent() is not None:
+            from anvil.widgets.modal_backdrop import ModalBackdrop
+            backdrop = ModalBackdrop(self.parent().window())
+            try:
+                return super().exec()
+            finally:
+                backdrop.dismiss()
+        return super().exec()
 
     def _setup_ui(self) -> None:
         root = QVBoxLayout(self)
@@ -217,7 +232,7 @@ class InstanceManagerDialog(QDialog):
         title_bar = QWidget()
         title_bar.setObjectName("instTitleBar")
         title_bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        title_bar.setFixedHeight(44)
+        title_bar.setFixedHeight(52 if self._modern else 44)
         tb = QHBoxLayout(title_bar)
         tb.setContentsMargins(16, 0, 16, 0)
         tb.setSpacing(0)
@@ -242,7 +257,7 @@ class InstanceManagerDialog(QDialog):
         left_panel = QWidget()
         left_panel.setObjectName("instLeftPanel")
         left_panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        left_panel.setFixedWidth(300)
+        left_panel.setFixedWidth(375 if self._modern else 300)
         lp = QVBoxLayout(left_panel)
         lp.setSpacing(0)
         lp.setContentsMargins(0, 0, 0, 0)
@@ -438,7 +453,7 @@ class InstanceManagerDialog(QDialog):
         footer = QWidget()
         footer.setObjectName("instFooter")
         footer.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        footer.setFixedHeight(52)
+        footer.setFixedHeight(60 if self._modern else 52)
         ft = QHBoxLayout(footer)
         ft.setContentsMargins(16, 0, 16, 0)
         ft.setSpacing(8)
