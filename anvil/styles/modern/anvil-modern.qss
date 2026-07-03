@@ -35,6 +35,12 @@ QAbstractItemView {
 QTreeView, QListView {
   border-radius: 0; }
 
+/* Game-Panel: Daten/Spielstände luftiger als die globale Dichte */
+#savesTree, #dataTree {
+  font-size: 13px; }
+  #savesTree::item, #dataTree::item {
+    min-height: 32px; }
+
 QHeaderView::up-arrow, QHeaderView::down-arrow {
   height: 10px;
   width: 10px;
@@ -419,6 +425,15 @@ QToolTip {
     background: {{accent_hover}}; }
   #startButton:pressed {
     background: {{accent_pressed}}; }
+
+#exeMenuBtn {
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600; }
+  #exeMenuBtn::menu-indicator {
+    image: none;
+    width: 0;
+    height: 0; }
 
 #exeHint {
   color: {{txt3}};

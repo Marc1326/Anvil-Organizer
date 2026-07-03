@@ -50,6 +50,9 @@ class PersistentHeader:
         self._key = settings_key
         self._fixed = fixed_columns or frozenset()
         self._restoring = False
+        # Aus: Breiten weder speichern noch restoren (z.B. wenn das Theme
+        # die Spalten selbst verwaltet) — gespeicherte Werte bleiben erhalten.
+        self.enabled = True
 
         # Debounce timer — fires once after the last resize event settles
         self._save_timer = QTimer()
@@ -62,7 +65,7 @@ class PersistentHeader:
     # ── live save (debounced) ─────────────────────────────────────
 
     def _on_section_resized(self, logical_index: int, _old: int, _new: int) -> None:
-        if self._restoring:
+        if self._restoring or not self.enabled:
             return
 
         # Don't save the stretched last column — its width is layout-dependent
@@ -100,6 +103,8 @@ class PersistentHeader:
 
     def restore(self) -> bool:
         """Apply previously saved widths.  Returns True if widths existed."""
+        if not self.enabled:
+            return False
         s = _settings()
         raw = s.value(f"{self._key}/column_widths")
         if not raw:

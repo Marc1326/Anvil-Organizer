@@ -618,6 +618,7 @@
     "unmanaged": "<Não gerido>",
     "saves_open_folder": "Gestor",
     "saves_open_folder_tip": "Abrir a pasta de saves no gestor de ficheiros",
+    "exe_menu_tip": "Escolher o programa a iniciar",
     "saves_refresh": "Recarregar",
     "saves_no_dir": "Pasta não encontrada",
     "saves_empty": "Nenhum save encontrado",

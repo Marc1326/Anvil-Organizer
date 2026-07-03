@@ -618,6 +618,7 @@
     "unmanaged": "<Unmanaged>",
     "saves_open_folder": "File Manager",
     "saves_open_folder_tip": "Open the save games folder in the file manager",
+    "exe_menu_tip": "Choose which program to launch",
     "saves_refresh": "Refresh",
     "saves_no_dir": "No save game directory found",
     "saves_empty": "No save games found",

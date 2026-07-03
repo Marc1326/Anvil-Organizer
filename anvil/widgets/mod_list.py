@@ -724,6 +724,8 @@ class _DropTreeView(QTreeView):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self._collapsed_separators: set[str] = set()
         self._collapsible_asc: bool = True
         self._collapsible_dsc: bool = True

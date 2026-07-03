@@ -618,6 +618,7 @@
     "unmanaged": "<Non géré>",
     "saves_open_folder": "Gestionnaire",
     "saves_open_folder_tip": "Ouvrir le dossier des sauvegardes dans le gestionnaire de fichiers",
+    "exe_menu_tip": "Choisir le programme à lancer",
     "saves_refresh": "Recharger",
     "saves_no_dir": "Dossier introuvable",
     "saves_empty": "Aucune sauvegarde trouvée",

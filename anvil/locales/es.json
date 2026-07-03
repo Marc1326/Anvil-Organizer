@@ -618,6 +618,7 @@
     "unmanaged": "<No gestionado>",
     "saves_open_folder": "Explorador",
     "saves_open_folder_tip": "Abrir la carpeta de partidas guardadas en el gestor de archivos",
+    "exe_menu_tip": "Elegir el programa a iniciar",
     "saves_refresh": "Recargar",
     "saves_no_dir": "Directorio no encontrado",
     "saves_empty": "No se encontraron partidas",

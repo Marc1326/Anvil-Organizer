@@ -618,6 +618,7 @@
     "unmanaged": "<Unmanaged>",
     "saves_open_folder": "Dateimanager",
     "saves_open_folder_tip": "Spielstände-Ordner im Dateimanager öffnen",
+    "exe_menu_tip": "Programm zum Starten wählen",
     "saves_refresh": "Neu laden",
     "saves_no_dir": "Kein Spielstände-Ordner gefunden",
     "saves_empty": "Keine Spielstände gefunden",

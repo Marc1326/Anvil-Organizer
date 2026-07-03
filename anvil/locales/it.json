@@ -618,6 +618,7 @@
     "unmanaged": "<Non gestito>",
     "saves_open_folder": "Gestione file",
     "saves_open_folder_tip": "Apri la cartella dei salvataggi nel gestore file",
+    "exe_menu_tip": "Scegli il programma da avviare",
     "saves_refresh": "Ricarica",
     "saves_no_dir": "Cartella non trovata",
     "saves_empty": "Nessun salvataggio trovato",

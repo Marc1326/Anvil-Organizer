@@ -106,11 +106,11 @@ class _DraggableDownloadTable(QTableWidget):
 def _game_btn_style() -> str:
     """Cover-Button: modern aus der Palette, klassisch alte Optik."""
     if theme_color("panel2", ""):
+        # Modern ist das Cover reines Bild (kein Menü) — daher auch kein Hover
         return (
             f"QToolButton {{ background: {theme_color('panel2', '#242424')};"
             f" border: 1px solid {theme_color('line', '#3D3D3D')};"
             f" border-radius: 9px; padding: 0; margin: 0; }}"
-            f" QToolButton:hover {{ border-color: {theme_color('accent', '#33b3a8')}; }}"
             " QToolButton::menu-indicator { image: none; width: 0; height: 0; }"
         )
     return (
@@ -122,9 +122,10 @@ def _game_btn_style() -> str:
 
 
 def _cover_size() -> QSize:
-    """Cover-Maße: modern 120×160 hochkant (Handoff), klassisch 140×140."""
+    """Cover-Maße: modern 140×186 hochkant (Handoff-Maß 120×160 fürs 296er-Panel,
+    proportional aufs 340er-Panel skaliert), klassisch 140×140."""
     if theme_color("panel2", ""):
-        return QSize(120, 160)
+        return QSize(140, 186)
     return QSize(140, 140)
 
 
@@ -207,7 +208,20 @@ class GamePanel(QWidget):
         self._start_btn.setFixedHeight(36)
         self._start_btn.setToolTip(tr("game_panel.start"))
         self._start_btn.clicked.connect(self._on_start_clicked)
-        top_layout.addWidget(self._start_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        # ▾-Button rechts neben Starten (nur modern): öffnet das Exe-Menü
+        self._exe_btn = QToolButton()
+        self._exe_btn.setObjectName("exeMenuBtn")
+        self._exe_btn.setText("▾")
+        self._exe_btn.setFixedSize(36, 36)
+        self._exe_btn.setToolTip(tr("game_panel.exe_menu_tip"))
+        self._exe_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._exe_btn.setMenu(self._exe_menu)
+        start_row = QHBoxLayout()
+        start_row.setSpacing(6)
+        start_row.addWidget(self._start_btn)
+        start_row.addWidget(self._exe_btn)
+        top_layout.addLayout(start_row)
+        self._start_row = start_row
         self._top_layout = top_layout
         self._apply_start_btn_mode()
         self._apply_panel_width()
@@ -240,6 +254,8 @@ class GamePanel(QWidget):
         plugins_w = QWidget()
         plugins_layout = QVBoxLayout(plugins_w)
         self._plugins_tree = QTreeWidget()
+        self._plugins_tree.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._plugins_tree.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self._plugins_tree.setColumnCount(3)
         self._plugins_tree.setHeaderLabels([
             tr("game_panel.plugins_col_name"),
@@ -273,6 +289,9 @@ class GamePanel(QWidget):
         data_reload_btn.clicked.connect(self._on_reload_data)
         data_layout.addWidget(data_reload_btn)
         self._data_tree = QTreeWidget()
+        self._data_tree.setObjectName("dataTree")
+        self._data_tree.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._data_tree.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self._data_tree.setColumnCount(5)
         self._data_tree.setHeaderLabels([tr("game_panel.header_name"), tr("game_panel.header_mod"), tr("game_panel.header_type"), tr("game_panel.header_size"), tr("game_panel.header_date")])
         self._data_tree.setAlternatingRowColors(True)
@@ -321,6 +340,9 @@ class GamePanel(QWidget):
         saves_layout.addLayout(saves_btn_bar)
 
         self._saves_tree = QTreeWidget()
+        self._saves_tree.setObjectName("savesTree")
+        self._saves_tree.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._saves_tree.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self._saves_tree.setColumnCount(3)
         self._saves_tree.setHeaderLabels([tr("game_panel.header_name"), tr("game_panel.header_date"), tr("game_panel.header_size")])
         self._saves_tree.setAlternatingRowColors(True)
@@ -353,6 +375,8 @@ class GamePanel(QWidget):
         reload_btn.clicked.connect(self.refresh_downloads)
         dl_layout.addWidget(reload_btn)
         self._dl_table = _DraggableDownloadTable()
+        self._dl_table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._dl_table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self._dl_table.setColumnCount(4)
         self._dl_table.setHorizontalHeaderLabels([tr("game_panel.header_name"), tr("game_panel.header_size"), tr("game_panel.header_status"), tr("game_panel.header_filetime")])
         dl_header = self._dl_table.horizontalHeader()
@@ -804,20 +828,28 @@ class GamePanel(QWidget):
             self.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
 
     def _apply_start_btn_mode(self) -> None:
-        """Modern: voll breiter „Starten"-Button mit Text; klassisch: kompakt."""
+        """Modern: voll breiter „Starten"-Button mit Text + ▾-Exe-Button;
+        klassisch: kompakt, Exe-Menü über den ▾ auf dem Cover."""
         if theme_color("panel2", ""):
             self._start_btn.setText(tr("game_panel.start"))
             self._start_btn.setMinimumWidth(0)
             self._start_btn.setSizePolicy(QSizePolicy.Policy.Expanding,
                                           QSizePolicy.Policy.Fixed)
-            self._top_layout.setAlignment(self._start_btn, Qt.Alignment())
+            self._top_layout.setAlignment(self._start_row, Qt.Alignment())
+            self._exe_btn.setVisible(True)
+            self._cover_arrow.setVisible(False)
+            # Cover ist modern reines Bild — Exe-Menü nur noch am ▾-Button
+            self._game_btn.setMenu(None)
         else:
             self._start_btn.setText("")
             self._start_btn.setMinimumWidth(140)
             self._start_btn.setSizePolicy(QSizePolicy.Policy.Minimum,
                                           QSizePolicy.Policy.Fixed)
-            self._top_layout.setAlignment(self._start_btn,
+            self._top_layout.setAlignment(self._start_row,
                                           Qt.AlignmentFlag.AlignHCenter)
+            self._exe_btn.setVisible(False)
+            self._cover_arrow.setVisible(True)
+            self._game_btn.setMenu(self._exe_menu)
 
     def _update_exe_hint(self) -> None:
         """Gewählte Exe unter dem Start-Button anzeigen (nur modern)."""
@@ -841,6 +873,48 @@ class GamePanel(QWidget):
         self._apply_panel_width()
         self._update_game_button_icon(self._last_game_name)
         self._update_exe_hint()
+        self._apply_tab_view_modes()
+
+    def _apply_tab_view_modes(self) -> None:
+        """Modern: Downloads/Spielstände zweispaltig wie im Handoff — Name
+        gestreckt, Wert-Spalte fix, Meta-Spalten versteckt (Infos im Tooltip),
+        Downloads-Zeilen 52px. Klassisch: alle Spalten frei ziehbar mit
+        gespeicherten Breiten, Settings show_meta_info/compact_list gelten."""
+        modern = bool(theme_color("panel2", ""))
+        dl_header = self._dl_table.horizontalHeader()
+        saves_header = self._saves_tree.header()
+        # Modern verwaltet das Theme die Spalten — Breiten weder speichern
+        # noch restoren, damit die klassischen Nutzer-Breiten erhalten bleiben
+        self._ph_downloads.enabled = not modern
+        self._ph_saves.enabled = not modern
+        if modern:
+            dl_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+            dl_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+            self._dl_table.setColumnWidth(2, 115)
+            self._dl_table.setColumnHidden(1, True)
+            self._dl_table.setColumnHidden(3, True)
+            self._dl_table.verticalHeader().setDefaultSectionSize(32)
+            saves_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+            saves_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+            self._saves_tree.setColumnWidth(1, 118)
+            self._saves_tree.setColumnHidden(2, True)
+        else:
+            dl_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+            saves_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+            s = QSettings(
+                str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf"),
+                QSettings.Format.IniFormat,
+            )
+            show_meta = s.value("Interface/show_meta_info", False, type=bool)
+            self._dl_table.setColumnHidden(1, not show_meta)
+            self._dl_table.setColumnHidden(3, not show_meta)
+            self._saves_tree.setColumnHidden(2, False)
+            if s.value("Interface/compact_list", False, type=bool):
+                self._dl_table.verticalHeader().setDefaultSectionSize(24)
+            else:
+                self._dl_table.verticalHeader().setDefaultSectionSize(46)
+            self._ph_downloads.restore()
+            self._ph_saves.restore()
 
     def _on_explore_virtual_folder(self) -> None:
         """Open the .mods/ directory in the file manager."""
@@ -2165,7 +2239,9 @@ class GamePanel(QWidget):
                 sz = self._format_size(st.st_size)
             except OSError:
                 dt, sz = "—", "—"
-            QTreeWidgetItem(self._saves_tree, [p.name, dt, sz])
+            it = QTreeWidgetItem(self._saves_tree, [p.name, dt, sz])
+            # Größe als Tooltip — modern ist die Spalte versteckt
+            it.setToolTip(0, sz)
         self._saves_count_label.setText(tr("game_panel.saves_count", count=len(saves)))
 
     def _on_reload_saves(self) -> None:
@@ -2372,6 +2448,9 @@ class GamePanel(QWidget):
             date_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
             self._dl_table.setItem(row_idx, 3, QTableWidgetItem(date_str))
 
+            # Größe + Datum als Tooltip — modern sind die Spalten versteckt
+            item_name.setToolTip(f"{self._format_size(size)} · {date_str}")
+
             # Hidden: grey text + hide row
             if is_hidden:
                 grey = QColor(theme_color("txt3", "#808080"))
@@ -2426,16 +2505,8 @@ class GamePanel(QWidget):
         # Sorting bleibt deaktiviert — manuelle Ordnung durch Ordner-Gruppen
         # self._dl_table.setSortingEnabled(True)
 
-        # Setting: show/hide meta columns (Size + Date)
-        show_meta = s.value("Interface/show_meta_info", False, type=bool)
-        self._dl_table.setColumnHidden(1, not show_meta)   # Size
-        self._dl_table.setColumnHidden(3, not show_meta)   # Date
-
-        # Setting: compact list (smaller row height)
-        if s.value("Interface/compact_list", False, type=bool):
-            self._dl_table.verticalHeader().setDefaultSectionSize(24)
-        else:
-            self._dl_table.verticalHeader().setDefaultSectionSize(46)
+        # Spalten-Sichtbarkeit + Zeilenhöhe je nach Theme und Settings
+        self._apply_tab_view_modes()
 
         # Text-Filter erneut anwenden nach Tabellen-Rebuild
         self._on_dl_filter_changed(self._dl_filter_edit.text())
@@ -2853,7 +2924,8 @@ class GamePanel(QWidget):
             new_map[did] = r + 1
         self._active_dl_rows = new_map
         self._active_dl_rows[download_id] = row
-        self._dl_table.setSortingEnabled(True)
+        # Sorting bleibt aus — sonst springt der laufende Download von Zeile 0
+        # weg und die Ordner-Gruppen geraten durcheinander
 
     def _on_dm_progress(self, download_id: int, percent: float, speed_str: str) -> None:
         """Update progress for an active download row."""
