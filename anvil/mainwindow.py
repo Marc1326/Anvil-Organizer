@@ -16,6 +16,7 @@ import sys
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
+    QToolButton,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -809,6 +810,13 @@ class MainWindow(QMainWindow):
     def _set_toolbar_button_style(self, style: Qt.ToolButtonStyle) -> None:
         """Set toolbar button style."""
         self._toolbar.setToolButtonStyle(style)
+        # Qt propagiert den Stil nur auf addAction()-Buttons — unsere
+        # Buttons kommen per addWidget() und brauchen ihn einzeln.
+        install_btn = getattr(self._toolbar, "install_btn", None)
+        for btn in self._toolbar.findChildren(QToolButton):
+            if btn is install_btn or btn.objectName().startswith("qt_"):
+                continue
+            btn.setToolButtonStyle(style)
 
     def _update_toolbar_menu(self) -> None:
         """Sync checkmarks with actual widget state."""
@@ -960,9 +968,9 @@ class MainWindow(QMainWindow):
         key, default_style = self._toolbar_style_key_and_default()
         raw_style = s.value(key)
         if raw_style is None:
-            self._toolbar.setToolButtonStyle(default_style)
+            self._set_toolbar_button_style(default_style)
         else:
-            self._toolbar.setToolButtonStyle(Qt.ToolButtonStyle(int(raw_style)))
+            self._set_toolbar_button_style(Qt.ToolButtonStyle(int(raw_style)))
 
         # Visibility (default: all visible except log)
         if s.value("view/menubar_visible") is not None:
@@ -1830,6 +1838,9 @@ class MainWindow(QMainWindow):
         mods = [e for e in self._current_mod_entries if not e.is_separator]
         active = sum(1 for e in mods if e.enabled)
         self._profile_bar.update_active_count(active, len(mods))
+        bar_value = getattr(self._toolbar, "active_label", None)
+        if bar_value is not None:
+            bar_value.setText(f"{active} / {len(mods)}")
 
     # ── Auto-redeploy helpers ────────────────────────────────────────
 

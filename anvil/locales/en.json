@@ -146,7 +146,13 @@
     "open_ao_logs_folder": "Open AO Logs Folder",
     "open_saves_folder": "Open Save Folder",
     "script_merger": "Script Merger",
-    "loot_sort": "Sort Plugins (LOOT)"
+    "loot_sort": "Sort Plugins (LOOT)",
+    "instances": "Instances",
+    "folders": "Folders",
+    "profiles": "Profiles",
+    "backup_menu": "Backup",
+    "plugins": "Plugins",
+    "refresh": "Refresh"
   },
   "dialog": {
     "backup_title": "Restore Backup",
@@ -542,7 +548,8 @@
     "profile_renamed": "Profile renamed: {old} → {new}",
     "profile_deleted": "Profile '{name}' deleted",
     "delete_error": "Error deleting: {error}",
-    "game_path_missing": "Game path not found — please update it in settings."
+    "game_path_missing": "Game path not found — please update it in settings.",
+    "profiles_hint": "Profiles are managed in the profile bar above the mod list."
   },
   "error": {
     "load_file": "Error loading: {error}",

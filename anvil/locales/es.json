@@ -146,7 +146,13 @@
     "open_ao_logs_folder": "Abrir carpeta de registros de AO",
     "open_saves_folder": "Abrir carpeta de guardados",
     "script_merger": "Script Merger",
-    "loot_sort": "Ordenar Plugins (LOOT)"
+    "loot_sort": "Ordenar Plugins (LOOT)",
+    "instances": "Instancias",
+    "folders": "Carpetas",
+    "profiles": "Perfiles",
+    "backup_menu": "Copia de seguridad",
+    "plugins": "Plugins",
+    "refresh": "Actualizar"
   },
   "dialog": {
     "backup_title": "Restaurar copia de seguridad",
@@ -542,7 +548,8 @@
     "profile_renamed": "Perfil renombrado: {old} → {new}",
     "profile_deleted": "Perfil '{name}' eliminado",
     "delete_error": "Error al eliminar: {error}",
-    "game_path_missing": "No se encontró la ruta del juego — ajústala en los ajustes."
+    "game_path_missing": "No se encontró la ruta del juego — ajústala en los ajustes.",
+    "profiles_hint": "Los perfiles se gestionan en la barra de perfiles sobre la lista de mods."
   },
   "error": {
     "load_file": "Error al cargar: {error}",

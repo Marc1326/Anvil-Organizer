@@ -184,6 +184,7 @@ QToolBar {
   QToolBar QToolButton {
     background: transparent;
     color: {{txt2}};
+    font-size: 15px;
     padding: 5px;
     border: 0;
     border-radius: 7px;
@@ -1169,4 +1170,21 @@ QFileDialog QToolButton {
 #profileBarLabel {
   color: {{txt3}};
   font-size: 12px;
+  background: transparent; }
+
+/* Werkzeug-Zeile: Mod-Zähler rechts (Vorlage) */
+#toolbarActiveLabel {
+  color: {{txt3}};
+  font-size: 15px;
+  padding: 0 6px 0 10px;
+  background: transparent; }
+
+#toolbarActiveValue {
+  color: {{accent}};
+  font-size: 15px;
+  font-weight: 700;
+  border: 1px solid {{line}};
+  border-radius: 7px;
+  padding: 4px 10px;
+  margin-right: 4px;
   background: transparent; }

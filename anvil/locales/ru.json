@@ -146,7 +146,13 @@
     "open_ao_logs_folder": "Открыть папку журналов AO",
     "open_saves_folder": "Открыть сохранения",
     "script_merger": "Script Merger",
-    "loot_sort": "Сортировка плагинов (LOOT)"
+    "loot_sort": "Сортировка плагинов (LOOT)",
+    "instances": "Экземпляры",
+    "folders": "Папки",
+    "profiles": "Профили",
+    "backup_menu": "Резервная копия",
+    "plugins": "Плагины",
+    "refresh": "Обновить"
   },
   "dialog": {
     "backup_title": "Восстановление из резервной копии",
@@ -542,7 +548,8 @@
     "profile_renamed": "Профиль переименован: {old} → {new}",
     "profile_deleted": "Профиль '{name}' удалён",
     "delete_error": "Ошибка при удалении: {error}",
-    "game_path_missing": "Путь к игре не найден — измените его в настройках."
+    "game_path_missing": "Путь к игре не найден — измените его в настройках.",
+    "profiles_hint": "Профили управляются в панели профилей над списком модов."
   },
   "error": {
     "load_file": "Ошибка при загрузке: {error}",

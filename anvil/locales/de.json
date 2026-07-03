@@ -146,7 +146,13 @@
     "open_ao_logs_folder": "AO Log Ordner öffnen",
     "open_saves_folder": "Spielstände öffnen",
     "script_merger": "Script Merger",
-    "loot_sort": "Plugins sortieren (LOOT)"
+    "loot_sort": "Plugins sortieren (LOOT)",
+    "instances": "Instanzen",
+    "folders": "Ordner",
+    "profiles": "Profile",
+    "backup_menu": "Sicherung",
+    "plugins": "Plugins",
+    "refresh": "Aktualisieren"
   },
   "dialog": {
     "backup_title": "Sicherung wiederherstellen",
@@ -542,7 +548,8 @@
     "profile_renamed": "Profil umbenannt: {old} → {new}",
     "profile_deleted": "Profil '{name}' gelöscht",
     "delete_error": "Fehler beim Löschen: {error}",
-    "game_path_missing": "Spielpfad nicht gefunden — bitte in den Einstellungen anpassen."
+    "game_path_missing": "Spielpfad nicht gefunden — bitte in den Einstellungen anpassen.",
+    "profiles_hint": "Profile werden in der Profil-Leiste über der Mod-Liste verwaltet."
   },
   "error": {
     "load_file": "Fehler beim Laden: {error}",

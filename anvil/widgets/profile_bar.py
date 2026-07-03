@@ -488,10 +488,12 @@ class ProfileBar(QWidget):
             layout.addWidget(btn)
 
         # ── Active Badge ──────────────────────────────────────────────
-        layout.addWidget(QLabel(tr("label.active")))
         self._active = QLabel("<b>0</b>")
         self._active.setObjectName("activeCount")
-        layout.addWidget(self._active)
+        if not self._plus_inline:
+            # Modern wandert der Zähler in die Werkzeug-Zeile (Vorlage)
+            layout.addWidget(QLabel(tr("label.active")))
+            layout.addWidget(self._active)
 
         # Connect scroll for fade updates
         self._scroll_area.horizontalScrollBar().valueChanged.connect(self._update_fade_visibility)
