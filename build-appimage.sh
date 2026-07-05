@@ -121,7 +121,8 @@ fi
 # ── Build AppImage ───────────────────────────────────────────
 echo "[..] Building AppImage..."
 mkdir -p "$RELEASE_DIR"
-ARCH=x86_64 "$APPIMAGETOOL" "$APPDIR" "$RELEASE_DIR/$APPIMAGE_NAME" 2>&1 | tail -5
+rm -f "$RELEASE_DIR/$APPIMAGE_NAME"
+ARCH=x86_64 "$APPIMAGETOOL" --appimage-extract-and-run "$APPDIR" "$RELEASE_DIR/$APPIMAGE_NAME" 2>&1 | tail -5
 
 if [ ! -f "$RELEASE_DIR/$APPIMAGE_NAME" ]; then
     echo "ERROR: AppImage build failed!"

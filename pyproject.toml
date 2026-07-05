@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "anvil-organizer"
 version = "1.5.2"
-description = "A native Linux mod manager inspired by Mod Organizer 2"
+description = "A native Linux mod manager"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
 requires-python = ">=3.11"
@@ -48,6 +48,8 @@ anvil-organizer = "anvil.__main__:main"
 [tool.setuptools.package-data]
 anvil = [
     "styles/*.qss",
+    "styles/modern/*.qss",
+    "styles/modern/**/*.svg",
     "styles/icons/**/*.svg",
     "styles/icons/**/*.png",
     "styles/icons/**/*.zip",
