@@ -66,7 +66,7 @@ mkdir -p "$(dirname "$DESKTOP_FILE")"
 cat > "$DESKTOP_FILE" << EOF
 [Desktop Entry]
 Name=Anvil Organizer
-Comment=Linux Mod Manager inspired by Mod Organizer 2
+Comment=Linux Mod Manager
 Exec="$VENV_DIR/bin/python" "$SCRIPT_DIR/main.py" %u
 Icon=anvil-organizer
 Terminal=false

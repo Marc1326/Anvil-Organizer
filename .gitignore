@@ -27,6 +27,7 @@ _dev/
 # Claude Code (nicht veröffentlichen)
 CLAUDE.md
 .claude/
+docs/workflow/
 
 # Build/Dist-Kopie
 Anvil-Organizer/

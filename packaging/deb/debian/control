@@ -17,7 +17,7 @@ Depends: ${python3:Depends},
          ${misc:Depends},
          python3-pyside6,
          python3-lz4
-Description: Native Linux Mod Manager inspired by Mod Organizer 2
+Description: Native Linux Mod Manager
  Anvil Organizer is a native Linux mod manager for games like Skyrim,
  Fallout 4, Cyberpunk 2077, Baldur's Gate 3, Starfield, and more.
  .

@@ -1,8 +1,8 @@
 # 🔨 Anvil Organizer
 
-A native **Linux mod manager** inspired by [Mod Organizer 2](https://github.com/ModOrganizer2/modorganizer), built with Python and PySide6 (Qt6).
+A native **Linux mod manager** built with Python and PySide6 (Qt6).
 
-MO2 dominates on Windows — Anvil fills the gap on Linux.
+Most mod managers only target Windows — Anvil fills the gap on Linux.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue)
 ![Qt](https://img.shields.io/badge/GUI-PySide6%20(Qt6)-green)
@@ -300,6 +300,5 @@ If Anvil Organizer is useful to you, consider supporting its development:
 
 ## Acknowledgments
 
-- Inspired by [Mod Organizer 2](https://github.com/ModOrganizer2/modorganizer)
 - Built with [PySide6](https://doc.qt.io/qtforpython-6/) (Qt for Python)
 - Migration from Windows: [GoodbyeWindows](https://github.com/Marc1326/GoodbyeWindows)

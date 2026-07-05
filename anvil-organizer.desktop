@@ -2,8 +2,8 @@
 Type=Application
 Name=Anvil Organizer
 GenericName=Mod Manager
-Comment=Native Linux Mod Manager inspired by Mod Organizer 2
-Comment[de]=Nativer Linux Mod Manager inspiriert von Mod Organizer 2
+Comment=Native Linux Mod Manager
+Comment[de]=Nativer Linux Mod Manager
 Exec=anvil-organizer %u
 Icon=anvil-organizer
 Terminal=false

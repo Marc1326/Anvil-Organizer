@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>com.github.Marc1326.AnvilOrganizer</id>
   <name>Anvil Organizer</name>
-  <summary>Native Linux Mod Manager inspired by Mod Organizer 2</summary>
+  <summary>Native Linux Mod Manager</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
 
@@ -12,7 +12,7 @@
       Fallout 4, Cyberpunk 2077, Baldur's Gate 3, Starfield, and more.
     </p>
     <p>
-      Inspired by Mod Organizer 2, it features virtual file system deployment,
+      It features virtual file system deployment,
       profile management, Nexus Mods integration, drag-and-drop load ordering,
       and plugin conflict detection.
     </p>

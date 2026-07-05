@@ -1,7 +1,7 @@
 Name:           anvil-organizer
 Version:        1.5.2
 Release:        1%{?dist}
-Summary:        Native Linux Mod Manager inspired by Mod Organizer 2
+Summary:        Native Linux Mod Manager
 
 License:        GPL-3.0-or-later
 URL:            https://github.com/Marc1326/Anvil-Organizer
@@ -22,7 +22,7 @@ Requires:       hicolor-icon-theme
 %description
 Anvil Organizer is a native Linux mod manager for games like Skyrim,
 Fallout 4, Cyberpunk 2077, Baldur's Gate 3, Starfield, and more.
-Inspired by Mod Organizer 2, it features virtual file system deployment,
+It features virtual file system deployment,
 profile management, Nexus Mods integration, and plugin load ordering.
 
 %prep
