@@ -1,3 +1,3 @@
 """Central version definition for Anvil Organizer."""
 
-APP_VERSION = "1.5.2"
+APP_VERSION = "1.6.0"
