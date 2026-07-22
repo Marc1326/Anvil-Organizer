@@ -16,8 +16,7 @@ TODO (future):
   - .ba2 Archive — Bethesda-Archive
   - F4SE (Fallout 4 Script Extender) Integration
   - Creation Kit Integration (Steam ID 1946160)
-  - LOOT-Integration (--game="Fallout4")
-  - Creation Club / Fallout4.ccc Parser
+  - LOOT-Masterlist-Metadaten (optionale Erweiterung des nativen Sortierers)
   - Save-Game Metadata Parsing (.fos/.f4se)
 """
 
@@ -73,8 +72,12 @@ class Fallout4Game(BaseGame):
         "DLCworkshop02.esm",
         "DLCworkshop03.esm",
         "DLCNukaWorld.esm",
-        "DLCUltraHighResolution.esm",
     ]
+    PluginLoadOrderFormat = "asterisk"
+    SupportsNativePluginSorting = True
+    PluginIndexFormat = "regular-light"
+    CreationClubFile = "Fallout4.ccc"
+    ImplicitPluginPrefixes = ("cc",)
 
     # -- BA2-Packing (loose files → BA2 archives via BSArch/Proton) ---------
 
@@ -203,8 +206,8 @@ class Fallout4Game(BaseGame):
     # TODO: .ba2 Archive -- Bethesda-Archive
     # TODO: F4SE Integration (Version check, plugin loading)
     # TODO: Creation Kit Integration (Steam ID 1946160)
-    LootGameName = "Fallout4"
-    # TODO: Creation Club / Fallout4.ccc Parser
+
+    # TODO: LOOT-Masterlist-Metadaten fuer optionale Sortierregeln
     # TODO: Save-Game Metadata Parsing (.fos/.f4se)
 
     def get_default_categories(self) -> list[dict] | None:

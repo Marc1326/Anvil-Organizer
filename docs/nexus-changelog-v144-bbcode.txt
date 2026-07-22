@@ -1,0 +1,20 @@
+Anvil Organizer v1.4.4
+
+[size=4][b]Bug Fixes[/b][/size]
+
+[b]AppImage: Ordner öffnen, LOOT & externe Tools funktionieren wieder[/b]
+[list]
+[*]Fixed: "Ordner öffnen" (xdg-open) crashte im AppImage mit Fehlern wie "GLIBC_2.38 not found"
+[*]Fixed: LOOT (Flatpak) startete nicht — Fehler "cannot open shared object file"
+[*]Fixed: Nexus API-Key konnte im AppImage nicht geladen werden (fehlende keyring-Bibliothek)
+[*]Ursache: PyInstaller setzt LD_LIBRARY_PATH auf interne (ältere) Bibliotheken — alle Kindprozesse haben diese statt der System-Bibliotheken geladen
+[*]Lösung: Alle subprocess-Aufrufe (xdg-open, LOOT, Proton, unrar, 7z, git, pip) bereinigen die Umgebungsvariable vor dem Start
+[/list]
+
+[b]Baldur's Gate 3[/b]
+[list]
+[*]Fixed: Ladereihenfolge in modsettings.lsx war invertiert — Mods oben in der Liste hatten niedrigste statt höchste Priorität
+[*]Fixed: Drag & Drop in der Mod-Liste aktivierte versehentlich alle inaktiven Mods
+[*]Fixed: Mod aktivieren synchronisierte die interne Reihenfolge nicht korrekt
+[*]Fixed: modsettings.lsx Format an aktuelle BG3 Game-Version angepasst
+[/list]

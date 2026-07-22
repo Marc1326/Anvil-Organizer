@@ -164,13 +164,6 @@ def detect_problems(idata: dict, sysinfo: dict, path_checks: list[dict]) -> list
             problems.append({"severity": "warning",
                              "message": tr("label.diag_problem_dir_not_writable", label=label)})
 
-    try:
-        from anvil.core.loot.loot_runner import find_loot_binary
-        if find_loot_binary() is None:
-            problems.append({"severity": "info", "message": tr("label.diag_problem_loot_missing")})
-    except Exception:  # noqa: BLE001 — LOOT-Check darf nie crashen
-        pass
-
     mode = sysinfo.get("run_mode", "")
     if mode in ("Flatpak", "AppImage"):
         problems.append({"severity": "info",

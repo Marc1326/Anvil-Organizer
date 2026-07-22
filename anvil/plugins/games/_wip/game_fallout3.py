@@ -49,11 +49,12 @@ class Fallout3Game(BaseGame):
     GameDocumentsDirectory = ""
     GameSavesDirectory = ""
     GameSaveExtension = "fos"
+    PluginLoadOrderFormat = "plain"
+    # WIP: requires separate loadorder.txt + active-only plugins.txt support.
 
     GameNexusId = 120
     GameNexusName = "fallout3"
 
-    LootGameName = "Fallout3"
 
     # -- Primary & DLC Plugins ----------------------------------------------
 

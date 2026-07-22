@@ -1,0 +1,45 @@
+Anvil Organizer v1.4.8
+
+[size=4][b]Bug Fixes[/b][/size]
+
+[b]Nexus Mods Integration[/b]
+[list]
+[*]Fixed: "Download with Mod Manager" sometimes didn't start the download when clicking multiple mods quickly — downloads were silently lost
+[*]Fixed: SSO login ("Connect to Nexus") didn't open the browser for users with Snap-installed browsers (Firefox, Chromium etc.)
+[*]Fixed: API key was lost after closing Settings or restarting the app — now stored securely via keyring with encrypted file fallback
+[*]Fixed: Flatpak — "Download with Mod Manager" didn't work because the IPC socket path wasn't shared between sandbox and host
+[/list]
+
+[b]Baldur's Gate 3[/b]
+[list]
+[*]Fixed: ModOrder block was missing from modsettings.lsx — some mods didn't load correctly
+[*]Fixed: Load order reversal removed — Anvil's order is now written 1:1 to modsettings.lsx
+[*]Fixed: Reordering mods caused wrong positions due to a sync bug in the internal list
+[/list]
+
+[b]AppImage[/b]
+[list]
+[*]Fixed: Games wouldn't start from AppImage — LD_LIBRARY_PATH conflict with Steam/Proton
+[*]Fixed: Removed bundled libreadline/libtinfo that caused crashes in subprocesses (LOOT, unrar, 7z)
+[/list]
+
+[b]Flatpak[/b]
+[list]
+[*]Fixed: External tools (Steam, Proton, LOOT) now reachable from inside the sandbox
+[*]Fixed: Write access to /mnt, /media, /run/media for games on external drives
+[*]Fixed: Taskbar icon now shows correctly
+[/list]
+
+[b]General[/b]
+[list]
+[*]Fixed: Profile dialog was empty — didn't show existing profiles, buttons weren't connected
+[*]Fixed: CSV mod list import — auto-detects delimiter, finds columns by header name, case-insensitive matching, shows result summary
+[*]Fixed: Cyberpunk 2077 Data-Overrides now recognized correctly
+[*]Fixed: Keyring fallback when keyring module is not available (minimal installs)
+[/list]
+
+[size=4][b]Download[/b][/size]
+[list]
+[*][url=https://github.com/Marc1326/Anvil-Organizer/releases/latest]GitHub Releases[/url] — AppImage, .deb, .rpm, .snap, Flatpak, Installer
+[*]AUR: [font=Courier New]paru -S anvil-organizer[/font]
+[/list]

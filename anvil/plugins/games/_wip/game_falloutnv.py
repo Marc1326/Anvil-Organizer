@@ -49,11 +49,12 @@ class FalloutNVGame(BaseGame):
     GameDocumentsDirectory = ""
     GameSavesDirectory = ""
     GameSaveExtension = "fos"
+    PluginLoadOrderFormat = "plain"
+    # WIP: requires separate loadorder.txt + active-only plugins.txt support.
 
     GameNexusId = 130
     GameNexusName = "newvegas"
 
-    LootGameName = "FalloutNV"
 
     # -- Primary & DLC Plugins ----------------------------------------------
 

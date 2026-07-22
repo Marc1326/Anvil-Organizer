@@ -817,7 +817,7 @@ class SettingsDialog(QDialog):
         diagnose_root = QTreeWidgetItem(self._pl_tree, [tr("settings.plugins_diagnose"), ""])
         diagnose_root.setExpanded(True)
         for name, ver, enabled in [
-            ("LOOT Plugin Checker", "1.0", True),
+            ("Load Order Checker", "1.0", True),
             ("Script Extender Checker", "1.0", True),
         ]:
             item = QTreeWidgetItem(diagnose_root, [name, ver])
@@ -1156,75 +1156,31 @@ class SettingsDialog(QDialog):
 
         self._tabs.addTab(sm_tab, tr("settings.tab_script_merger"))
 
-        # ── LOOT Tab ──────────────────────────────────────────────────
-        loot_tab = QWidget()
-        loot_tab_layout = QVBoxLayout(loot_tab)
+        # ── Native load-order sorting tab ─────────────────────────────
+        load_order_tab = QWidget()
+        load_order_tab_layout = QVBoxLayout(load_order_tab)
 
-        # Detection status
-        from anvil.core.loot.loot_runner import find_loot_binary
-        detected = find_loot_binary()
-        if detected:
-            status_text = tr("settings.loot_detected").replace("{path}", detected)
-            status_color = "#30b050"
-        else:
-            status_text = tr("settings.loot_not_found")
-            status_color = "#e04040"
-        status_label = QLabel(f'<b style="color:{status_color}">{status_text}</b>')
-        status_label.setWordWrap(True)
-        loot_tab_layout.addWidget(status_label)
+        description = QLabel(tr("settings.native_sort_description"))
+        description.setWordWrap(True)
+        load_order_tab_layout.addWidget(description)
 
-        # Binary path
-        path_grp = QGroupBox(tr("settings.loot_binary_path"))
-        path_layout = QHBoxLayout(path_grp)
-        self._loot_path_edit = QLineEdit()
-        if detected and not settings.value("LOOT/binary_path", "", type=str):
-            self._loot_path_edit.setPlaceholderText(
-                tr("settings.loot_auto_detected").replace("{path}", detected)
-            )
-        else:
-            self._loot_path_edit.setPlaceholderText("loot / flatpak run io.github.loot.loot")
-        self._loot_path_edit.setText(
-            settings.value("LOOT/binary_path", "", type=str)
-        )
-        path_layout.addWidget(self._loot_path_edit)
-        loot_browse_btn = QPushButton(tr("settings.loot_browse"))
-        loot_browse_btn.clicked.connect(self._on_loot_browse)
-        path_layout.addWidget(loot_browse_btn)
-        loot_tab_layout.addWidget(path_grp)
-
-        # Options
-        opts_grp = QGroupBox(tr("settings.tab_loot"))
+        opts_grp = QGroupBox(tr("settings.tab_load_order"))
         opts_layout = QFormLayout(opts_grp)
-
-        self._loot_log_combo = QComboBox()
-        self._loot_log_combo.addItems(["info", "debug", "trace"])
-        saved_level = settings.value("LOOT/log_level", "info", type=str)
-        idx = self._loot_log_combo.findText(saved_level)
-        if idx >= 0:
-            self._loot_log_combo.setCurrentIndex(idx)
-        opts_layout.addRow(tr("settings.diag_loot_log_level"), self._loot_log_combo)
-
-        self._loot_auto_sort = QCheckBox(tr("settings.loot_auto_sort"))
-        self._loot_auto_sort.setChecked(
-            settings.value("LOOT/auto_sort_on_deploy", False, type=bool)
+        self._load_order_auto_sort = QCheckBox(tr("settings.load_order_auto_sort"))
+        auto_sort = settings.value("LoadOrder/auto_sort_on_deploy", None)
+        if auto_sort is None:
+            auto_sort = settings.value(
+                "LOOT/auto_sort_on_deploy", False, type=bool
+            )
+        self._load_order_auto_sort.setChecked(
+            str(auto_sort).lower() in {"1", "true", "yes"}
+            if not isinstance(auto_sort, bool)
+            else auto_sort
         )
-        opts_layout.addRow(self._loot_auto_sort)
-
-        self._loot_update_ml = QCheckBox(tr("settings.loot_update_masterlist"))
-        self._loot_update_ml.setChecked(
-            settings.value("LOOT/update_masterlist", True, type=bool)
-        )
-        opts_layout.addRow(self._loot_update_ml)
-
-        loot_tab_layout.addWidget(opts_grp)
-
-        # Install hint
-        hint_label = QLabel(tr("settings.loot_install_hint"))
-        hint_label.setWordWrap(True)
-        loot_tab_layout.addWidget(hint_label)
-
-        loot_tab_layout.addStretch()
-        self._tabs.addTab(loot_tab, tr("settings.tab_loot"))
+        opts_layout.addRow(self._load_order_auto_sort)
+        load_order_tab_layout.addWidget(opts_grp)
+        load_order_tab_layout.addStretch()
+        self._tabs.addTab(load_order_tab, tr("settings.tab_load_order"))
 
         if self._modern:
             tabs_wrap = QWidget()
@@ -1769,14 +1725,6 @@ class SettingsDialog(QDialog):
         """Open the styles directory in the file manager."""
         host_open_path(str(get_styles_dir()))
 
-    def _on_loot_browse(self) -> None:
-        """Browse for LOOT binary."""
-        path, _ = QFileDialog.getOpenFileName(
-            self, tr("settings.loot_browse"), "",
-            "LOOT (loot loot.exe);;All Files (*)",
-        )
-        if path:
-            self._loot_path_edit.setText(path)
 
     def accept(self):
         """Save all settings, then close."""
@@ -1835,11 +1783,10 @@ class SettingsDialog(QDialog):
         settings.setValue("ScriptMerger/review_in_kdiff3", self._cb_sm_review_in_kdiff3.isChecked())
         settings.setValue("ScriptMerger/auto_delete_stale", self._cb_sm_auto_delete_stale.isChecked())
         settings.setValue("ScriptMerger/auto_overwrite", self._cb_sm_auto_overwrite.isChecked())
-        # LOOT settings
-        settings.setValue("LOOT/binary_path", self._loot_path_edit.text().strip())
-        settings.setValue("LOOT/log_level", self._loot_log_combo.currentText())
-        settings.setValue("LOOT/auto_sort_on_deploy", self._loot_auto_sort.isChecked())
-        settings.setValue("LOOT/update_masterlist", self._loot_update_ml.isChecked())
+        # Native load-order settings
+        settings.setValue(
+            "LoadOrder/auto_sort_on_deploy", self._load_order_auto_sort.isChecked()
+        )
         # Tab-Index merken
         settings.setValue("SettingsDialog/tab_index", self._tabs.currentIndex())
         settings.sync()  # Sicherstellen dass Änderungen geschrieben werden

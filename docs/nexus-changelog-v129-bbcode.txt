@@ -1,0 +1,67 @@
+Anvil Organizer v1.2.9
+
+[size=4][b]New Features[/b][/size]
+
+[b]Automatic Framework Detection[/b]
+[list]
+[*]Anvil now auto-detects framework mods (Script Extender, ASI Loader, CET, etc.)
+[*]Score-based heuristic analyzes DLLs, keywords, and missing mod files
+[*]Confirmation dialog shows why the mod was flagged
+[*]Confirmed frameworks are installed to the game directory and saved for future recognition
+[*]Works for all games — including BG3 with its separate install path
+[/list]
+
+[b]Game Plugin Menu[/b]
+[list]
+[*]New submenu: File → Game Plugin → Create / Edit
+[*]Create new game plugins or edit existing ones (paths, frameworks, cover)
+[*]Puzzle-piece toolbar button for quick access
+[*]Native file dialogs (Dolphin/Nautilus/Nemo) used instead of Qt's built-in dialog
+[/list]
+
+[size=4][b]Bug Fixes[/b][/size]
+
+[b]Separator Drag & Drop (all games)[/b]
+[list]
+[*]Moving a separator no longer captures ALL mods below it
+[*]New child_count system: each separator tracks exactly which mods belong to it
+[*]Block-move only takes the separator's own mods — no more swallowing unrelated mods
+[*]Separator auto-collapses after drop for clean visual feedback
+[*]Collapse/expand always shows the exact same mods
+[*]"Move to separator" context menu works correctly
+[/list]
+
+[b]BG3 — Drag & Drop[/b]
+[list]
+[*].pak files can now be installed directly via drag & drop
+[*]Duplicate detection prevents double mod entries
+[*]Mods land at the drop position instead of always at the bottom
+[*]Newly installed mods are no longer auto-activated
+[/list]
+
+[b]BG3 — Mod Management[/b]
+[list]
+[*]Deactivated mods now stay visible in the mod list
+[*]Data-override mods classified correctly — cosmetic in mod list, framework-like in framework panel
+[*]Locked Mods feature removed (caused unwanted auto-activation)
+[/list]
+
+[b]BG3 — Separators[/b]
+[list]
+[*]Separators now visible when using model insert
+[*]DnD ghost entries fixed — uuid_order filtered, reload loop removed
+[/list]
+
+[b]UI[/b]
+[list]
+[*]Search bar clear button now vertically centered
+[*]Removed duplicate Nexus query button from frameworks header
+[*]Plugin Creator saves the Pattern column for JSON frameworks
+[/list]
+
+[size=4][b]AppImage Compatibility Fix[/b][/size]
+[list]
+[*]Fixed GLIBC compatibility — AppImage now works on Ubuntu 22.04+, PikaOS, Mint, and other distros
+[*]Previously required GLIBC 2.43 (only Arch/CachyOS), now only GLIBC 2.35
+[*]Users who got "GLIBC_2.43 not found" errors can now run the AppImage
+[/list]

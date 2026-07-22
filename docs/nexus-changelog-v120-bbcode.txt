@@ -1,0 +1,85 @@
+[size=4][b]Anvil Organizer v1.2.0 — Changelog[/b][/size]
+
+[size=3][b]LOOT — Load Order Optimisation Tool[/b][/size]
+[list]
+[*]LOOT integration for all Bethesda games — Skyrim SE, Fallout 4, Starfield, Fallout 3, Fallout NV
+[*]One-click sorting: click the LOOT button in the toolbar, LOOT opens automatically with auto-sort enabled
+[*]plugins.txt is automatically re-read after LOOT closes — no manual reload needed
+[*]LOOT button only visible for Bethesda games that support plugin load ordering
+[*]Supports native LOOT binary (AUR) and Flatpak (io.github.loot.loot)
+[*]Flatpak sandbox permissions handled automatically — game paths on /mnt and external drives are accessible
+[/list]
+
+[size=3][b]Native Script Merger (Witcher 3)[/b][/size]
+[list]
+[*]Built-in Script Merger — the Windows-only SM-FAE is no longer needed
+[*]Automatic detection of conflicting .ws and .xml script files across active mods
+[*]Auto-merge when changes are in different sections of the same file
+[*]KDiff3 integration for manual conflict resolution
+[*]Merged files are placed in a separate mod (mod0000_MergedFiles) — original mods stay untouched
+[*]Configurable in Anvil Settings (scan options, KDiff3 path, automation)
+[/list]
+
+[size=3][b]FOMOD Selection Memory[/b][/size]
+[list]
+[*]FOMOD wizard remembers your previous choices on reinstall
+[*]Options are automatically pre-selected — just confirm or change
+[*]Saved per mod in fomod_choices.json with structure fingerprinting
+[*]If the FOMOD XML changes (mod update), saved choices are ignored automatically
+[*]UTF-16 encoded ModuleConfig.xml files are now supported
+[/list]
+
+[size=3][b]Unified Export / Import / Backup Dialog[/b][/size]
+[list]
+[*]New central dialog for all export, import and backup operations
+[*]Tab navigation: Export | Import | Backup
+[*]Export formats: CSV (simple list) or Anvilpack (full mod setup with Nexus IDs, separators, categories)
+[*]Import: read CSV or Anvilpack files — Anvilpack shows a preview with missing mods and Nexus links
+[*]Backup: create or restore backups (modlist, categories, metadata) — all in one place
+[*]Replaces the previous separate menu entries
+[/list]
+
+[size=3][b]ModIndex Caching[/b][/size]
+[list]
+[*]File lists of all mods are cached for faster filemap rebuild
+[*]mtime-based invalidation — only changed mods are re-scanned
+[*]Significant speedup for large mod setups (100+ mods)
+[*]Cache can be cleared in Settings
+[/list]
+
+[size=3][b]Locked Mods[/b][/size]
+[list]
+[*]Mods can be locked so they cannot be accidentally disabled or moved
+[*]Right-click a mod and select "Lock" — a lock icon appears next to the mod name
+[*]Locked mods stay enabled and in their position regardless of bulk operations (enable/disable all)
+[/list]
+
+[size=3][b]Framework Protection[/b][/size]
+[list]
+[*]Frameworks (e.g. Script Merger, F4SE, BG3 Mod Fixer) cannot be accidentally disabled
+[*]Uninstalling a framework shows a strong warning about dependencies
+[*]The "(optional)" label has been removed — frameworks are not optional
+[/list]
+
+[size=3][b]Plugin Settings — Categories[/b][/size]
+[list]
+[*]Plugin tab in Settings now shows categories like MO2: Installer, Diagnose, Tool, Game
+[*]Plugin list column is wider and user-resizable
+[/list]
+
+[size=3][b]UI Improvements[/b][/size]
+[list]
+[*]QFileDialog icons are now visible on dark themes (ProxyStyle + breeze-dark fallback)
+[*]New Plus icon for profile creation button (matches existing icon style)
+[*]Download path from Settings is now used everywhere — no more hardcoded .downloads/
+[*]Reinstall uses the configured download path and fuzzy archive name matching
+[*]Error messages show the actual download path instead of .downloads/
+[/list]
+
+[size=3][b]Bug Fixes[/b][/size]
+[list]
+[*]Fixed FOMOD installer not detecting ModuleConfig.xml in UTF-16 encoded archives
+[*]Fixed file dialog icons invisible on dark QSS themes
+[*]Fixed reinstall not finding archives when download path was changed in Settings
+[*]Fixed "Im Dateimanager oeffnen" text — now "Dateimanager oeffnen"
+[/list]

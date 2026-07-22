@@ -1,0 +1,68 @@
+Anvil Organizer — All Changes since v1.3.9
+
+[size=5][b]Summary[/b][/size]
+
+Since v1.3.9 there was a big version jump: v1.4.0 through v1.4.2 were skipped because automated packaging on GitHub was broken. v1.4.3 was the first working release in the 1.4.x series. Starting with v1.4.6, all packages (AppImage, .deb, .rpm, .snap) are built automatically.
+
+[size=4][b]v1.4.6 — AppImage & BG3 Bug Fixes[/b][/size]
+
+[b]AppImage: Folder Actions, LOOT & External Tools[/b]
+[list]
+[*]Fixed: "Open folder" crashed in AppImage with "GLIBC not found"
+[*]Fixed: LOOT (Flatpak) failed to start in AppImage
+[*]Fixed: Nexus API key could not be loaded in AppImage
+[*]Cause: PyInstaller set LD_LIBRARY_PATH to internal libraries — all child processes loaded those instead of system libraries
+[*]Also affects Proton/REDmod tools — all fixed
+[/list]
+
+[b]Baldur's Gate 3[/b]
+[list]
+[*]Fixed: Load order in modsettings.lsx was inverted
+[*]Fixed: Drag & Drop accidentally activated all inactive mods
+[*]Fixed: Activating a mod did not sync the internal order correctly
+[*]Fixed: modsettings.lsx format updated for current BG3 game version
+[/list]
+
+[b]Packaging[/b]
+[list]
+[*]All packages are now built automatically with every release: AppImage, .deb, .rpm, .snap
+[/list]
+
+[size=4][b]v1.4.3 — Installer, .deb Package & Compatibility[/b][/size]
+
+[b]New Installer[/b]
+[list]
+[*]One-line installer for all Linux distros:
+[code]curl -sSL https://raw.githubusercontent.com/Marc1326/Anvil-Organizer/main/Anvil-Organizer-installer.sh | bash[/code]
+[*]Downloads the AppImage to ~/Applications/, creates a desktop entry and registers the NXM handler
+[*]No sudo required — works on Ubuntu, Fedora, Arch, Manjaro, Steam Deck, etc.
+[/list]
+
+[b].deb Package (Debian / Ubuntu)[/b]
+[list]
+[*]New .deb package available on the GitHub Releases page
+[*]Install: [font=Courier New]sudo apt install ./anvil-organizer_1.4.6_amd64.deb[/font]
+[*]Includes desktop entry, icon, and NXM handler
+[/list]
+
+[b]Bug Fixes[/b]
+[list]
+[*]Fixed: AppImage crashed on Ubuntu/Debian with GLIBC_2.38/2.43 errors — now built on Ubuntu 22.04
+[*]Fixed: NXM handler did not detect AppImage builds correctly
+[*]Fixed: Some game plugins failed to load in AppImage (missing hidden imports)
+[/list]
+
+[i]Note: v1.4.0 through v1.4.2 were skipped — automated packaging on GitHub was broken for those versions.[/i]
+
+[size=4][b]v1.3.9 — BG3 Parser Fix[/b][/size]
+[list]
+[*]Fixed: Some BG3 mods (e.g. EasyCheat) were not shown after installation
+[*]Cause: The .pak parser only supported LZ4 compression, but some mods use Zlib
+[*]All compression types are now supported: None, Zlib, LZ4
+[/list]
+
+[size=4][b]Download[/b][/size]
+[list]
+[*][url=https://github.com/Marc1326/Anvil-Organizer/releases/latest]GitHub Releases[/url] — AppImage, .deb, .rpm, .snap, Installer
+[*]AUR: [font=Courier New]paru -S anvil-organizer[/font]
+[/list]

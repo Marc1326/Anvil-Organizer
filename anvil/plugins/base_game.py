@@ -148,9 +148,27 @@ class BaseGame:
     """Primary/DLC plugin files (.esm) that are always active.
     Only relevant for Bethesda Creation Engine games."""
 
-    LootGameName: str = ""
-    """LOOT --game parameter value (e.g. 'Skyrim Special Edition', 'Fallout4').
-    Empty string means LOOT is not available for this game."""
+    PluginLoadOrderFormat: str = ""
+    """Persistence mechanism, e.g. ``asterisk`` for modern Bethesda games."""
+
+    SupportsNativePluginSorting: bool = False
+    """Whether Anvil's current parser fully supports safe native sorting."""
+
+    PluginIndexFormat: str = ""
+    """Index display mode; empty means no reliable index calculation."""
+
+    ForcePrimaryPluginsActive: bool = True
+    """Whether PRIMARY_PLUGINS are implicitly active and locked in the UI."""
+
+    CreationClubFile: str = ""
+    """Optional game-root manifest for implicitly loaded official content."""
+
+    ImplicitPluginPrefixes: tuple[str, ...] = ()
+    """Filename prefixes used when an official-content manifest is absent."""
+
+    ImplicitPluginNames: tuple[str, ...] = ()
+    """Known implicitly loaded plugin filenames outside the primary list."""
+
 
     # ── BA2-Packing (Bethesda-Spiele unter Proton) ─────────────────────
 
@@ -463,8 +481,8 @@ class BaseGame:
     # ── Plugin-Liste (Bethesda) ──────────────────────────────────────
 
     def has_plugins_txt(self) -> bool:
-        """Return True if this game uses a plugins.txt load order file."""
-        return bool(self.PRIMARY_PLUGINS)
+        """Return True for games using modern asterisk plugins.txt state."""
+        return self.PluginLoadOrderFormat == "asterisk"
 
     def plugins_txt_path(self) -> Path | None:
         """Return path to plugins.txt in the Proton prefix, or None."""

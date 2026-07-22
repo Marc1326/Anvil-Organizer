@@ -1,0 +1,32 @@
+[size=4][b]Anvil Organizer v1.2.8 — Changelog[/b][/size]
+
+[size=3][b]Automatic Framework Detection[/b][/size]
+[list]
+[*]Anvil now auto-detects framework mods (Script Extender, ASI Loader, CET, etc.)
+[*]Score-based heuristic flags DLLs, keywords, missing mod files
+[*]Confirmation dialog before installing to game directory
+[*]Works for all games including BG3
+[/list]
+
+[size=3][b]Game Plugin Menu[/b][/size]
+[list]
+[*]New submenu: File → Game Plugin → Create / Edit
+[*]Create new game plugins or edit existing ones (paths, frameworks, cover)
+[*]Puzzle-piece toolbar button for quick access
+[*]Native file dialogs (Dolphin/Nautilus/Nemo) replace Qt dialog
+[/list]
+
+[size=3][b]BG3 Fixes[/b][/size]
+[list]
+[*].pak drag & drop with duplicate detection
+[*]Mods land at drop position, no longer auto-activated
+[*]Deactivated mods stay visible in the list
+[*]Data-override mods classified correctly
+[*]Locked Mods feature removed (caused auto-activation)
+[/list]
+
+[size=3][b]Other Fixes[/b][/size]
+[list]
+[*]Removed duplicate Nexus query button from frameworks header
+[*]Plugin Creator saves Pattern column for JSON frameworks
+[/list]

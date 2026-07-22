@@ -1,0 +1,16 @@
+Anvil Organizer v1.3.8
+
+[size=4][b]Bug Fixes[/b][/size]
+
+[b]NXM Download Handler (AppImage)[/b]
+[list]
+[*]Fixed: "Mod Manager Download" links from Nexus Mods did nothing when running the AppImage
+[*]The handler now correctly detects AppImage, frozen builds, and dev environments
+[*]Clicking "Link with MOD MANAGER DOWNLOAD" in Settings → Nexus now registers the correct path
+[/list]
+
+[b]AppImage: Missing Mods[/b]
+[list]
+[*]Fixed: Mod list was empty when running the AppImage (all games affected)
+[*]Cause: Game plugins failed to load due to missing internal dependencies in the build
+[/list]

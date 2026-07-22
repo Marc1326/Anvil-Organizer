@@ -1,0 +1,50 @@
+[size=3][b]Eigenes Game-Plugin erstellen[/b][/size]
+
+Anvil Organizer unterstuetzt bereits viele Spiele (Skyrim, Cyberpunk 2077, Fallout 4, BG3, Starfield, ...). Falls dein Spiel nicht dabei ist, kannst du selbst ein Game-Plugin erstellen — ganz ohne Programmierung.
+
+[size=2][b]So geht's[/b][/size]
+
+1. Klick auf das Puzzle-Symbol in der Toolbar (oder Datei > Game Plugin > Erstellen)
+2. Fuell die Pflichtfelder aus:
+
+[b]Game Name[/b] — Der volle Name des Spiels (z.B. "Kingdom Come Deliverance II")
+[b]Short Name[/b] — Kurzname ohne Leerzeichen (wird automatisch generiert)
+[b]Game Binary[/b] — Die .exe-Datei des Spiels (z.B. "KingdomCome.exe")
+[b]Steam ID[/b] — Die Steam App-ID (siehe unten wie du sie findest)
+[b]Data Path[/b] — Wo Mods relativ zum Spielordner landen (leer = Spielordner, "Data" = Unterordner Data, "Mods" = Unterordner Mods)
+
+3. Optional: Documents-Pfad, Savegame-Pfad, Savegame-Endung, Nexus Game-ID
+4. Optional: Frameworks hinzufuegen (Script Extender, ASI Loader, etc.)
+5. Optional: Cover-Bild auswaehlen
+6. Auf "Erstellen" klicken — fertig!
+
+Das Plugin wird in ~/.anvil-organizer/plugins/games/ gespeichert und beim naechsten Start automatisch geladen.
+
+[size=2][b]Steam ID finden[/b][/size]
+
+Die Steam ID ist die Nummer, die jedes Spiel auf Steam hat. Anvil braucht sie, um den Spielordner automatisch zu finden.
+
+[b]Methode 1 — Steam Store[/b]
+Oeffne das Spiel im Steam Store (Browser oder Steam Client). In der URL steht die ID:
+store.steampowered.com/app/[b]489830[/b]/...
+Die Zahl nach /app/ ist die Steam ID (hier: 489830).
+
+[b]Methode 2 — SteamDB[/b]
+Geh auf steamdb.info und suche nach dem Spiel. Die App-ID steht direkt auf der Ergebnis-Seite.
+
+[b]Methode 3 — Steam Bibliothek[/b]
+Rechtsklick auf das Spiel in deiner Steam-Bibliothek > Eigenschaften > Updates. Die App-ID steht ganz oben.
+
+[size=2][b]Frameworks hinzufuegen[/b][/size]
+
+Falls dein Spiel Frameworks wie Script Extender, BepInEx oder ASI Loader hat:
+- Klick "Hinzufuegen" in der Frameworks-Tabelle
+- Trag Name, Zielordner, Nexus-ID und Erkennungsmuster ein
+- Anvil erkennt installierte Frameworks dann automatisch
+
+[size=2][b]Plugin bearbeiten[/b][/size]
+
+Bereits vorhandene Plugins koennen ueber Datei > Game Plugin > Aendern angepasst werden. Dort lassen sich Pfade korrigieren, Frameworks hinzufuegen/entfernen und das Cover-Bild aendern.
+
+Ausfuehrliche Dokumentation mit Beispielen im Wiki:
+github.com/Marc1326/Anvil-Organizer/wiki

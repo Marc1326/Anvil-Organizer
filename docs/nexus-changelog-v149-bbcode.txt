@@ -1,0 +1,40 @@
+Anvil Organizer v1.4.9
+
+[size=4][b]Framework Management[/b][/size]
+
+[list]
+[*]Framework panel with version column and lock indicator
+[*]Toggle frameworks on/off by clicking the status column
+[*]Context menu: Info, Update Check, Activate/Lock
+[*]Auto Re-Lock — frameworks lock automatically on game start, instance switch, and app start (5-min cooldown per instance)
+[*]Framework state (lock/active/version) is now persisted per instance
+[*]Reinstall finds Nexus archives even with mismatched filenames
+[/list]
+
+[size=4][b]Bug Fixes[/b][/size]
+
+[b]Mod Installation[/b]
+[list]
+[*]Fixed: Mods with DLLs could silently disappear when the framework detection heuristic triggered — "No" now installs the mod normally instead of discarding it
+[*]Fixed: Archive extraction errors now show a visible status bar message instead of failing silently
+[*]Fixed: Downloads are now written to a [font=Courier New].part[/font] file during transfer — prevents corrupted installs when dragging a file that's still downloading
+[/list]
+
+[b]Frameworks[/b]
+[list]
+[*]Fixed: Wildcard patterns (e.g. Address Library) caused double folder paths during installation (e.g. [font=Courier New]Data/SFSE/SFSE/Plugins/[/font])
+[*]Fixed: "Already installed" check failed for wildcard paths
+[/list]
+
+[b]Nexus & Flatpak[/b]
+[list]
+[*]Fixed: Flatpak lost Nexus connection after restart
+[*]Fixed: Keyring detection improved (DBus + secretstorage fallback)
+[*]Fixed: Separator display in mod list and Nexus query for manually added mods
+[/list]
+
+[size=4][b]Download[/b][/size]
+[list]
+[*][url=https://github.com/Marc1326/Anvil-Organizer/releases/latest]GitHub Releases[/url] — AppImage, .deb, .rpm, .snap, Flatpak, Installer
+[*]AUR: [font=Courier New]paru -S anvil-organizer[/font]
+[/list]

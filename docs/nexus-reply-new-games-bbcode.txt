@@ -1,0 +1,27 @@
+Thanks for the language fix report — that's been patched in v1.3.5 already. System locale is now detected automatically, English users no longer get German as default.
+
+As for your game requests — all three are now added as beta plugins:
+
+[b]MechWarrior 5: Mercenaries[/b]
+[list]
+[*]Steam, GOG and Epic support
+[*]Mod path: MW5Mercs/Mods/
+[*]INI management (Engine.ini, GameUserSettings.ini, Input.ini, Game.ini)
+[/list]
+
+[b]S.T.A.L.K.E.R. 2: Heart of Chornobyl[/b]
+[list]
+[*]Steam, GOG and Epic support
+[*]Mod path: Stalker2/Content/Paks/~mods/
+[*]Copy deploy (IO Store doesn't support symlinks)
+[*]UE4SS framework detection
+[/list]
+
+[b]Ready or Not[/b]
+[list]
+[*]Steam support
+[*]Mod path: ReadyOrNot/Content/Paks/~mods/
+[*]UE4SS framework detection
+[/list]
+
+All three are marked as beta since I don't own these games — would appreciate your feedback on whether paths and detection work correctly. They'll be in the next release.

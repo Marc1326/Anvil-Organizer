@@ -1,0 +1,123 @@
+[center][size=5][b]Anvil Organizer[/b][/size]
+[size=3]Native Linux Mod Manager. Open Source. Built for Linux gamers.[/size]
+[url=https://anvil-organizer.net]Website[/url] | [url=https://github.com/Marc1326/Anvil-Organizer]GitHub[/url] | [url=https://github.com/Marc1326/Anvil-Organizer/wiki]Wiki[/url][/center]
+
+
+[size=4][b]What is Anvil?[/b][/size]
+
+Anvil Organizer is a native mod manager for Linux. Built with Python and Qt6, it runs directly on your system — no Wine, no Proton wrapper, no workarounds.
+
+Anvil uses physical symlinks instead of a virtual file system. Your game directory stays clean. Mods are deployed on launch and removed on exit.
+
+Over 30 games are supported — including Cyberpunk 2077, Baldur's Gate 3, Skyrim SE, Fallout 4, Elden Ring, Starfield, Witcher 3 and Red Dead Redemption 2. Thanks to the open plugin system, anyone can add new games.
+
+
+[size=4][b]Features[/b][/size]
+
+[size=3][b]Symlink-based Deploy[/b][/size]
+[list]
+[*]Physical symlinks instead of a virtual file system
+[*]No overhead, no compatibility issues
+[*]Works with any Proton prefix — Steam and Heroic Games Launcher
+[*]Game directory stays clean
+[/list]
+
+[size=3][b]Mod Management[/b][/size]
+[list]
+[*]Drag & drop mod ordering with conflict detection
+[*]Collapsible separators with color coding
+[*]Multiple profiles per game
+[*]Category system with filter panel
+[*]Locked mods
+[/list]
+
+[size=3][b]NexusMods Integration[/b][/size]
+[list]
+[*]NXM link handler — "Mod Manager Download" directly from your browser
+[*]SSO login and API key
+[*]One-click downloads
+[*]Mod info tab
+[/list]
+
+[size=3][b]Framework Detection[/b][/size]
+[list]
+[*]Automatic detection and installation of game frameworks
+[*]CET, RED4ext, REDmod, ASI Loader, ScriptHook, F4SE, SFSE, SKSE64, and more
+[*]Framework protection against accidental disabling
+[/list]
+
+[size=3][b]LOOT Integration[/b][/size]
+[list]
+[*]Load order optimization for Bethesda games
+[*]One-click sorting directly from Anvil
+[/list]
+
+[size=3][b]Script Merger (Witcher 3)[/b][/size]
+[list]
+[*]Built-in script merger — no Windows tool needed
+[*]KDiff3 integration for manual conflict resolution
+[/list]
+
+[size=3][b]F4SE / SFSE Proton Shims[/b][/size]
+[list]
+[*]F4SE and SFSE work under Linux/Proton
+[*]Automatic DLL injection — no manual configuration needed
+[/list]
+
+[size=3][b]FOMOD Installer[/b][/size]
+[list]
+[*]Full FOMOD installer with graphical interface
+[*]Remembers your selections on reinstall
+[/list]
+
+[size=3][b]Export / Import / Backup[/b][/size]
+[list]
+[*]Export as CSV or Anvilpack
+[*]Import with preview and Nexus links
+[*]Create or restore backups
+[/list]
+
+[size=3][b]More[/b][/size]
+[list]
+[*]Savegame browser
+[*]Mod detail dialog with tabs
+[*]Game running lock
+[*]Auto-redeploy
+[*]Self-update via GitHub
+[*]7 languages — EN, DE, FR, ES, IT, PT, RU
+[*]Dark theme
+[*]Open plugin system — anyone can add new games via a simple Python file
+[/list]
+
+
+[size=4][b]Migration from Windows[/b][/size]
+
+Coming from Windows? With [url=https://github.com/Marc1326/GoodbyeWindows]GoodbyeWindows & HelloLinux[/url] you can bring your entire mod setup — mods, load order, profiles, Nexus IDs. No re-downloading needed.
+
+[list]
+[*][b]GoodbyeWindows[/b] (Windows) — Exports your mod setup
+[*][b]HelloLinux[/b] (Linux) — Imports everything into Anvil Organizer
+[*]Transfer via USB, external drive, or LAN
+[*]Vortex import planned
+[/list]
+
+[url=https://github.com/Marc1326/GoodbyeWindows]GitHub[/url] | [url=https://www.nexusmods.com/site/mods/1758]NexusMods[/url] | [url=https://anvil-organizer.net/goodbye.html]Website[/url]
+
+
+[size=4][b]Available on[/b][/size]
+
+[list]
+[*][b]AppImage[/b] (recommended)
+[*][b]Flatpak[/b]
+[*][b]Snap[/b]
+[*][b]DEB Package[/b]
+[*][b]RPM Package[/b]
+[*][b]AUR[/b]
+[*][b]Source Code[/b]
+[/list]
+
+
+[size=4][b]Open Source[/b][/size]
+
+Anvil Organizer is free and open source (GPL-3.0). Contributions welcome.
+Built with Python and PySide6 (Qt6).

@@ -1,0 +1,36 @@
+Separator DnD Fix — Zusammenfassung für Changelog
+===================================================
+
+Bug:
+Wenn ein Separator (Trenner) per Drag & Drop verschoben wurde, hat er
+automatisch ALLE Mods unterhalb von sich "eingefangen" — bis zum nächsten
+Separator oder Listenende. Der User hatte keine Kontrolle darüber, welche
+Mods zum Separator gehören. Beim Zuklappen waren plötzlich alle Mods
+verschwunden, weil sie fälschlicherweise dem Separator zugeordnet waren.
+
+Betroffen: Alle Games (Cyberpunk 2077, Fallout 4, Baldur's Gate 3, etc.)
+
+Ursache:
+Das alte System war rein positionsbasiert — ein Separator "besaß" einfach
+alles zwischen sich und dem nächsten Separator. Beim Verschieben wurde
+diese Grenze neu berechnet und der Separator schluckte dabei fremde Mods.
+
+Fix:
+Neues child_count-System eingeführt. Jeder Separator merkt sich jetzt
+exakt, wie viele Mods ihm gehören. Beim Verschieben (DnD, Kontextmenü)
+werden nur diese Mods mitgenommen — keine zusätzlichen.
+
+Was sich ändert:
+- Separator verschiebt nur seine eigenen Mods (Block-Move)
+- Mods zwischen dem letzten Kind eines Separators und dem nächsten
+  Separator sind "frei" und gehören keinem Separator
+- Separator wird nach dem Verschieben automatisch zugeklappt
+- Zuklappen/Aufklappen zeigt immer exakt die gleichen Mods
+- Einzelne Mods per DnD in/aus Separatoren verschieben aktualisiert
+  die Zuordnung korrekt
+- "In Trenner verschieben" (Kontextmenü) funktioniert ebenfalls korrekt
+
+Geänderte Dateien:
+- anvil/models/mod_list_model.py (child_count, Block-Move, Delta-Tracking)
+- anvil/widgets/mod_list.py (Collapse-Logik, Auto-Collapse nach Drop)
+- anvil/mainwindow.py (Kontextmenü-Move, Cleanup)

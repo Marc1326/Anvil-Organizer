@@ -1,0 +1,38 @@
+[size=4][b]Anvil Organizer v1.2.6 — Changelog[/b][/size]
+
+[size=3][b]BG3 Drag-and-Drop Fix[/b][/size]
+[list]
+[*]BG3 mods dragged from the file manager now correctly route through the BG3 installer
+[*]Drag-and-drop now respects the drop position in the mod list — mods land where you drop them, not at the end
+[*]Previously, dragging BG3 mods bypassed the BG3-specific installation and broke the PAK file structure
+[/list]
+
+[size=3][b]Framework Nexus Query[/b][/size]
+[list]
+[*]Right-click any framework to query its Nexus page — check for updates, get download links
+[*]Batch query: right-click queries all installed frameworks with Nexus IDs at once
+[*]Toast notifications show query progress and results
+[*]Frameworks now carry their Nexus mod ID for direct API lookups
+[/list]
+
+[size=3][b]Collection Export / Import[/b][/size]
+[list]
+[*]Fixed: Export dialog now uses the native file dialog directly
+[*]Fixed: Card click in the Export/Import dialog now works correctly
+[/list]
+
+[size=3][b]Packaging & Distribution[/b][/size]
+[list]
+[*]Available as: AppImage, .deb, .rpm, .snap — all built automatically via CI
+[*]AUR package available: [font=Courier New]yay -S anvil-organizer[/font]
+[*]Flatpak submission in progress
+[*]All package versions are now synchronized across all formats
+[/list]
+
+[size=3][b]Bug Fixes[/b][/size]
+[list]
+[*]Fixed framework query UI not refreshing after results came in
+[*]Fixed i18n keys for framework query notifications
+[*]Fixed packaging: resource files now correctly included in all package formats
+[*]Removed duplicate Nexus query button from frameworks header bar (context menu only)
+[/list]

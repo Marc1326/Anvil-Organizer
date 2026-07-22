@@ -1,0 +1,43 @@
+[size=4][b]Anvil Organizer v1.3.2 — Changelog[/b][/size]
+
+[size=3][b]REDmod Deploy Support for Cyberpunk 2077[/b][/size]
+
+Anvil Organizer now fully supports REDmod mods on Linux. Previously, REDmod mods were placed in the game directory but never compiled — meaning none of them actually worked in-game. This update fixes both the file routing and adds automatic compilation via Proton.
+
+[size=3][b]Automatic REDmod Compilation[/b][/size]
+[list]
+[*]When you click "Start" with active REDmod mods, Anvil automatically runs [font=Courier]redMod.exe deploy[/font] via Proton before launching the game
+[*]Modern overlay with pulsing progress bar — no terminal window
+[*]Cancel button to abort the compilation at any time
+[*]If compilation fails, a dialog lets you choose: launch anyway or cancel
+[*]If no REDmod mods are active, the game starts instantly with zero delay
+[/list]
+
+[size=3][b]REDmod Mod Routing Fixed[/b][/size]
+[list]
+[*]All three common REDmod packaging patterns are now recognized and deployed correctly
+[*]Pattern A (info.json in mod root) — now correctly routed to [font=Courier]game/mods/[/font]
+[*]Pattern B (mods/<name>/ prefix already present) — already worked, no regression
+[*]Pattern C (subfolder with info.json, no mods/ prefix) — now correctly routed to [font=Courier]game/mods/[/font]
+[*]Mixed mods (REDmod + regular files like r6/scripts/) work correctly
+[/list]
+
+[size=3][b]Script Shim for Proton Compatibility[/b][/size]
+[list]
+[*]REDmod mods containing [font=Courier]scripts/[/font] folders would crash redMod.exe under Wine/Proton (script compiler incompatibility)
+[*]Anvil temporarily renames script folders before compilation and restores them after — fully automatic, no user action needed
+[/list]
+
+[size=3][b]Menu Options[/b][/size]
+[list]
+[*]"Skip REDmod deploy" — toggle in the executable dropdown to skip compilation on next launch
+[*]"Manually deploy REDmod" — run compilation without launching the game
+[/list]
+
+[size=3][b]Technical Details[/b][/size]
+[list]
+[*]Uses the game's own [font=Courier]tools/redmod/bin/redMod.exe[/font] via Proton (requires REDmod DLC installed)
+[*]Symlink-based deployment — no files are copied, instant deploy/purge
+[*]REDmod cache files ([font=Courier]r6/cache/modded/[/font]) are managed by redMod.exe itself and not touched by Anvil
+[*]Works with Steam + Proton. GOG/Epic support planned for a future update.
+[/list]

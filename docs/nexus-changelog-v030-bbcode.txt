@@ -1,0 +1,72 @@
+[size=4][b]Anvil Organizer v1.0.9 — Changelog[/b][/size]
+
+[size=3][b]STARFIELD — New Game Support[/b][/size]
+[list]
+[*]Full Starfield plugin with store detection (Steam/GOG), Proton prefix paths, and save game directory
+[*]SFSE (Starfield Script Extender) — automatic injection via Proton Shim
+[*]Correct Steam & Proton launch
+[/list]
+
+[size=3][b]DEPLOYER — Cyberpunk Frameworks (broken since v0.1.0)[/b][/size]
+[list]
+[*]Frameworks are always deployed now (were skipped after active_mods.json migration)
+[*]Deployer priority order fixed — correct "last wins" logic
+[*]root/ prefix stripped automatically (MO2 RootBuilder pattern)
+[*]Frameworks can overwrite real files (safety check no longer blocks them)
+[*]CET folder structure repaired
+[*]RedData leftover scripts removed after uninstallation
+[/list]
+
+[size=3][b]NEW FEATURES[/b][/size]
+[list]
+[*]Game Running Lock — UI locked while a game is running
+[*]CET Lua mods deployed as copies instead of symlinks (Wine S: drive fix)
+[*]Image tab in mod detail dialog
+[*]Framework update dialog with confirmation prompt
+[*]Separator counter no longer counts separators
+[*]Repair script for broken mod folders
+[*]New instances use v2 modlist format
+[/list]
+
+[size=3][b]NEXUS INTEGRATION[/b][/size]
+[list]
+[*]Fetch Nexus info (right-click) — fully automatic mod ID detection via 3 methods
+[*]Nexus data no longer overwrites mod folder names
+[*]Nexus info auto-transferred on install from downloads
+[*]Nexus info tab in mod detail dialog (ID, name, author, version, clickable URL, description)
+[*]Next/Previous navigation in mod detail dialog with wrap-around
+[/list]
+
+[size=3][b]BG3 (Baldur's Gate 3) — Complete Overhaul[/b][/size]
+[list]
+[*]Unified mod list — active/inactive split removed, single list
+[*]Auto-Deploy — every change immediately written to modsettings.lsx
+[*]All Anvil features now available: separators, drag & drop, profiles, context menu
+[*]Dedicated master state (bg3_modstate.json), independent from other games
+[*]Profiles separated per game — no more mixing
+[*]BG3WASD recognized as framework (installs to bin/NativeMods/)
+[*]NativeModLoader correctly installed to bin/
+[*]BG3 mod search, download tab, and Proton prefix fix
+[/list]
+
+[size=3][b]FALLOUT 4 — F4SE Proton Shim[/b][/size]
+[list]
+[*]Automatic F4SE injection via X3DAudio1_7.dll proxy shim
+[*]No manual launching of f4se_loader.exe required — just click Start
+[*]Requires Steam launch option: WINEDLLOVERRIDES="X3DAudio1_7=n,b" %command%
+[/list]
+
+[size=3][b]FRAMEWORK REVERSE-SYNC[/b][/size]
+[list]
+[*]Frameworks no longer reset to old versions when switching games
+[*]Anvil detects newer installed versions and preserves them
+[/list]
+
+[size=3][b]BUG FIXES[/b][/size]
+[list]
+[*]"Open in File Manager" now opens the actual framework folder, not game root
+[*]Framework drag & drop validation fixed
+[*]Broken data override manifests cleaned up
+[*]Unnecessary shim warning dialog on game start removed
+[*]Separator filter crash fixed
+[/list]

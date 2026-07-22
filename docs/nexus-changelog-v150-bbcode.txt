@@ -1,0 +1,39 @@
+Anvil Organizer v1.5.0
+
+[size=4][b]New Game Support[/b][/size]
+
+[list]
+[*]Windrose (Solo) and Windrose Dedicated Server plugins added
+[/list]
+
+[size=4][b]Critical Fixes for Fresh Installs[/b][/size]
+
+[b]Silent crash on startup (Bazzite / Nobara / CachyOS / fresh installs)[/b]
+[list]
+[*]Anvil could exit silently on first launch when the data directory [font=Courier New]~/.anvil-organizer[/font] did not yet exist — the single-instance socket failed to bind and the app assumed another instance was already running
+[*]The directory is now created automatically before any subsystem touches it
+[*]Fixes the "nothing happens / app refuses to start" reports on multiple distros
+[/list]
+
+[b]SSL certificate verify failed on Nexus connect (CachyOS / Void / others)[/b]
+[list]
+[*]The bundled OpenSSL in the AppImage uses a hardcoded default certificate path that doesn't exist on every distro
+[*]Anvil now probes common system CA bundles at startup and sets [font=Courier New]SSL_CERT_FILE[/font] automatically:
+[font=Courier New]/etc/ssl/certs/ca-certificates.crt[/font] (Debian/Ubuntu/Arch/CachyOS/Void), [font=Courier New]/etc/pki/tls/certs/ca-bundle.crt[/font] (Fedora/RHEL), [font=Courier New]/etc/ssl/cert.pem[/font] (Alpine), [font=Courier New]/var/lib/ca-certificates/ca-bundle.pem[/font] (openSUSE)
+[*]User-set [font=Courier New]SSL_CERT_FILE[/font] is respected
+[/list]
+
+[size=4][b]Bug Fixes[/b][/size]
+
+[b]Cyberpunk 2077 — REDmod[/b]
+[list]
+[*]Fixed: REDmod deploy in the Flatpak version now passes the environment through to Proton correctly
+[*]Fixed: Cancelling a REDmod deploy now kills the full Wine process group instead of leaving stray processes
+[*]JB Third Person Mod is now handled as a framework instead of being installed as a regular mod
+[/list]
+
+[size=4][b]Download[/b][/size]
+[list]
+[*][url=https://github.com/Marc1326/Anvil-Organizer/releases/latest]GitHub Releases[/url] — AppImage, .deb, .rpm, .snap, Flatpak, Installer
+[*]AUR: [font=Courier New]paru -S anvil-organizer[/font]
+[/list]

@@ -147,7 +147,7 @@
     "open_ao_logs_folder": "Ouvrir le dossier des journaux AO",
     "open_saves_folder": "Ouvrir le dossier des sauvegardes",
     "script_merger": "Script Merger",
-    "loot_sort": "Trier les Plugins (LOOT)",
+    "plugin_sort": "Trier les plugins (Anvil)",
     "instances": "Instances",
     "folders": "Dossiers",
     "profiles": "Profils",
@@ -421,7 +421,6 @@
     "diag_problem_game_path": "Le chemin du jeu n'existe pas : {path}",
     "diag_problem_dir_missing": "Dossier manquant : {label}",
     "diag_problem_dir_not_writable": "Dossier non inscriptible : {label}",
-    "diag_problem_loot_missing": "LOOT introuvable (tri désactivé)",
     "diag_problem_sandbox": "Exécution en tant que {mode}"
   },
   "placeholder": {
@@ -819,17 +818,9 @@
     "diag_log_level": "Niveau de journal :",
     "diag_crash_dump": "Vidage mémoire :",
     "diag_max_crash_dumps": "Maximum de vidages à conserver :",
-    "diag_integrated_loot": "LOOT intégré",
-    "diag_loot_log_level": "Niveau de journal LOOT :",
-    "tab_loot": "LOOT",
-    "loot_binary_path": "Chemin LOOT:",
-    "loot_browse": "Parcourir...",
-    "loot_auto_sort": "Trier automatiquement lors du déploiement",
-    "loot_update_masterlist": "Mettre à jour la masterlist avant le tri",
-    "loot_install_hint": "Installer LOOT: AUR (loot) ou Flatpak (io.github.loot.loot)",
-    "loot_detected": "✓ LOOT détecté : {path}",
-    "loot_not_found": "✗ LOOT introuvable — veuillez installer ou configurer le chemin",
-    "loot_auto_detected": "Auto-détecté : {path}",
+    "tab_load_order": "Ordre de chargement",
+    "native_sort_description": "Anvil trie les plugins nativement selon le contenu officiel et les dépendances de masters. Aucune installation externe de LOOT n’est requise.",
+    "load_order_auto_sort": "Trier automatiquement lors du déploiement",
     "diag_hint": "Les journaux et vidages mémoire sont stockés dans votre instance actuelle dans les répertoires logs et crashDumps. L'envoi de journaux et/ou vidages aux développeurs peut aider à enquêter sur les problèmes.",
     "tab_diagnostics": "Diagnostic",
     "nexus_key_received": "Clé API reçue.",
@@ -1230,16 +1221,14 @@
     "kdiff3_no_output": "KDiff3 n'a produit aucun résultat.",
     "kdiff3_too_many_mods": "Plus de 2 mods impliqués. KDiff3 n'affichera que Vanilla + les 2 premiers mods."
   },
-  "loot": {
-    "dialog_title": "LOOT — Optimisation de l'ordre de chargement",
-    "restart_button": "Relancer LOOT",
-    "close_button": "Fermer",
-    "loot_running": "LOOT est en cours d'exécution — triez dans LOOT et fermez-le quand c'est fini.",
-    "loot_closed": "LOOT a été fermé. plugins.txt a été relu.",
-    "plugins_reloaded": "plugins.txt relu",
-    "sorting_failed": "Erreur LOOT",
-    "no_binary": "LOOT introuvable. Configurez le chemin dans les Paramètres.",
-    "not_bethesda": "LOOT n'est disponible que pour les jeux Bethesda."
+  "load_order": {
+    "sorting_failed": "Échec du tri",
+    "sorting_complete": "L’ordre de chargement a été trié avec succès.",
+    "missing_masters_title": "Masters manquants",
+    "cycles_title": "Dépendances cycliques",
+    "parse_errors_title": "Plugins illisibles",
+    "write_error_title": "Erreur d’écriture",
+    "not_bethesda": "Le tri natif n’est pas disponible pour ce jeu."
   },
   "proton_tools": {
     "title": "Proton Tools",

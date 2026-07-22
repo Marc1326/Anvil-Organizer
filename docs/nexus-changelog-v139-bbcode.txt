@@ -1,0 +1,11 @@
+Anvil Organizer v1.3.9
+
+[size=4][b]Bug Fix[/b][/size]
+
+[b]BG3: Mods mit Zlib-komprimierter meta.lsx wurden nicht erkannt[/b]
+[list]
+[*]Fixed: Einige BG3 Mods (z.B. EasyCheat) wurden nach Drag-and-Drop Installation nicht in der Mod-Liste angezeigt
+[*]Ursache: Der .pak Parser unterstützte nur LZ4-Kompression, aber manche Mods verwenden Zlib für die meta.lsx
+[*]Die UUID konnte nicht gelesen werden → Mod war unsichtbar
+[*]Jetzt werden alle Kompressionstypen unterstützt: None, Zlib, LZ4
+[/list]

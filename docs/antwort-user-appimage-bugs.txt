@@ -1,0 +1,19 @@
+Hey, thanks for the detailed bug report — really appreciate you taking the time to include the error messages and exact steps.
+
+I'm also on CachyOS and couldn't reproduce all of the issues at first, which doesn't mean they aren't real. After some analysis, the root cause turned out to be that the AppImage ships its own (older) libraries and passes them to every program it launches. On a rolling release like CachyOS, the system libraries are newer — which causes all the crashes and error messages.
+
+[b]Confirmed and fixed:[/b]
+[list]
+[*][b]Folder actions[/b] — fixed, all child processes now get clean system libraries
+[*][b]Nexus API[/b] — a module was missing from the AppImage bundle, added it
+[*][b]LOOT not detected[/b] — same root cause as folder actions, fixed as well
+[/list]
+
+[b]Could not reproduce:[/b]
+[list]
+[*][b]Profile switching[/b] — couldn't reproduce, but should be fixed by the general fix as well
+[*][b]Custom path crash[/b] — might be GPU/toolkit related, no issue on my end
+[*][b]Screenshot crash[/b] — Anvil doesn't have a screenshot function, that was your system screenshot tool
+[/list]
+
+All fixes are in [b]v1.4.6[/b]. Hoping this covers your issues — let me know if anything is still broken.

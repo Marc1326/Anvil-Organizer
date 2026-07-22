@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { width:1280px; height:640px; overflow:hidden; background:#060a10; font-family:'Space Grotesk',sans-serif; }
+.banner {
+  width:1280px; height:640px; position:relative;
+  background: #060a10;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; overflow:hidden;
+}
+.banner::before {
+  content:''; position:absolute; inset:0;
+  background-image:
+    linear-gradient(rgba(0,104,104,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,104,104,.04) 1px, transparent 1px);
+  background-size:40px 40px;
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black, transparent);
+}
+.banner::after {
+  content:''; position:absolute; top:-30%; left:50%; transform:translateX(-50%);
+  width:700px; height:700px;
+  background:radial-gradient(circle, rgba(0,104,104,.12) 0%, transparent 70%);
+  pointer-events:none;
+}
+.content { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; }
+.logo-row { display:flex; align-items:center; gap:14px; margin-bottom:20px; }
+.logo-row svg { width:48px; height:38px; filter:drop-shadow(0 0 20px rgba(0,104,104,.4)); }
+.logo-row span { font-size:13px; color:#00a3a3; font-weight:500; letter-spacing:.06em; text-transform:uppercase; }
+h1 { font-size:52px; font-weight:700; color:#d0dae8; line-height:1.05; letter-spacing:-.03em; margin-bottom:12px; }
+.tagline { font-size:18px; color:#8896aa; line-height:1.5; margin-bottom:28px; }
+.tagline em { color:#00cccc; font-style:normal; font-weight:500; }
+.keywords { display:flex; gap:10px; margin-bottom:36px; }
+.kw {
+  padding:6px 16px; border-radius:100px;
+  background:rgba(0,104,104,.12); border:1px solid rgba(0,104,104,.25);
+  color:#00cccc; font-size:13px; font-weight:500; letter-spacing:.02em;
+}
+.screenshot {
+  width:680px; border-radius:10px; overflow:hidden;
+  box-shadow: 0 20px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(138,160,190,.08);
+}
+.screenshot img { display:block; width:100%; height:auto; }
+.bottom-bar {
+  position:absolute; bottom:0; left:0; right:0;
+  height:40px; display:flex; align-items:center; justify-content:center; gap:24px;
+  background:linear-gradient(to top, rgba(6,10,16,.9), transparent);
+  z-index:3; padding-top:10px;
+}
+.bottom-bar span { font-size:11px; color:#5a6a80; letter-spacing:.08em; text-transform:uppercase; }
+.bottom-bar .sep { color:#1a2638; }
+</style>
+</head>
+<body>
+<div class="banner">
+  <div class="content">
+    <div class="logo-row">
+      <svg viewBox="-2 18 84 64" fill="none"><path d="M40 80 L0 65 L40 50 L80 65 Z" fill="#003333" stroke="#004d4d" stroke-width="1"/><path d="M40 65 L0 50 L40 35 L80 50 Z" fill="#004d4d" stroke="#006868" stroke-width="1"/><path d="M40 50 L0 35 L40 20 L80 35 Z" fill="#006868" stroke="#008585" stroke-width="1"/></svg>
+      <span>Native Linux Mod Manager</span>
+    </div>
+    <h1>Anvil Organizer</h1>
+    <p class="tagline">Inspired by MO2. <em>Reimagined for Linux.</em></p>
+    <div class="keywords">
+      <span class="kw">35+ Games</span>
+      <span class="kw">Symlink Deploy</span>
+      <span class="kw">Open Source</span>
+    </div>
+    <div class="screenshot">
+      <img src="file:///home/mob/Projekte/Anvil%20Organizer/site/img/starfield.png" alt="Anvil Organizer">
+    </div>
+  </div>
+  <div class="bottom-bar">
+    <span>Python & Qt6</span><span class="sep">·</span>
+    <span>NexusMods Integration</span><span class="sep">·</span>
+    <span>F4SE / SFSE Proton Shims</span><span class="sep">·</span>
+    <span>GPL-3.0</span>
+  </div>
+</div>
+</body>
+</html>

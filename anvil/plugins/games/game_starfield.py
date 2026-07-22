@@ -16,7 +16,7 @@ TODO (future):
   - .ba2 Archive — Bethesda-Archive
   - SFSE (Starfield Script Extender) Integration
   - Creation Kit Integration (Steam ID 2722710)
-  - LOOT-Integration (--game="Starfield")
+  - LOOT-Masterlist-Metadaten (optionale Erweiterung des nativen Sortierers)
   - Creation Club / ContentCatalog.txt Parser
   - sTestFile-Diagnostik (StarfieldCustom.ini)
   - Save-Game Metadata Parsing (.sfs/.sfse)
@@ -81,6 +81,8 @@ class StarfieldGame(BaseGame):
         "SFBGS008.esm",
         "BlueprintShips-Starfield.esm",
     ]
+    PluginLoadOrderFormat = "asterisk"
+    ForcePrimaryPluginsActive = False
 
     DLC_PLUGINS = [
         "Constellation.esm",
@@ -206,8 +208,8 @@ class StarfieldGame(BaseGame):
     # TODO: .ba2 Archive -- Bethesda-Archive
     # TODO: SFSE Integration (Version check, plugin loading)
     # TODO: Creation Kit Integration
-    LootGameName = "Starfield"
-    # TODO: Creation Club / ContentCatalog.txt Parser
+
+    # TODO: ContentCatalog.txt Parser + optionale Masterlist-Metadaten
     # TODO: sTestFile-Diagnostik (StarfieldCustom.ini)
     # TODO: Save-Game Metadata Parsing (.sfs/.sfse)
 

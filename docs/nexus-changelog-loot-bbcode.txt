@@ -1,0 +1,31 @@
+[size=4][b]Anvil Organizer v1.2.0 — LOOT Integration[/b][/size]
+
+[size=3][b]LOOT — Load Order Optimisation Tool[/b][/size]
+[list]
+[*]LOOT integration for all Bethesda games — Skyrim SE, Fallout 4, Starfield, Fallout 3, Fallout NV
+[*]One-click sorting: click the LOOT button in the toolbar, LOOT opens automatically with auto-sort enabled
+[*]plugins.txt is automatically re-read after LOOT closes — no manual reload needed
+[*]LOOT button only visible for Bethesda games that support plugin load ordering
+[*]Supports native LOOT binary (AUR) and Flatpak (io.github.loot.loot)
+[*]Flatpak sandbox permissions handled automatically — game paths on /mnt and external drives are accessible
+[*]LOOT binary path configurable in Settings
+[*]Restart button available if you need to re-sort without closing the dialog
+[/list]
+
+[size=3][b]HOW TO USE[/b][/size]
+[list]
+[*]Install LOOT via Flatpak ([font=Courier New]flatpak install io.github.loot.loot[/font]) or AUR ([font=Courier New]yay -S loot[/font])
+[*]Open a Bethesda game in Anvil — the LOOT button appears in the toolbar
+[*]Click the LOOT button — LOOT opens and sorts your plugins automatically
+[*]Review the results in LOOT, apply if needed, then close LOOT
+[*]Anvil picks up the new load order automatically
+[/list]
+
+[size=3][b]SUPPORTED GAMES[/b][/size]
+[list]
+[*]The Elder Scrolls V: Skyrim Special Edition
+[*]Fallout 4
+[*]Starfield
+[*]Fallout 3 (WIP)
+[*]Fallout: New Vegas (WIP)
+[/list]

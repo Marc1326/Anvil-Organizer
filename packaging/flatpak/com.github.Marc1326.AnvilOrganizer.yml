@@ -27,7 +27,7 @@ finish-args:
   - --talk-name=org.freedesktop.secrets
   - --talk-name=org.kde.kwalletd5
   - --talk-name=org.kde.kwalletd6
-  # Host access (launch Steam, LOOT, Proton from sandbox)
+  # Host access (launch Steam and Proton tools from sandbox)
   - --talk-name=org.freedesktop.Flatpak
 
 modules:

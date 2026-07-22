@@ -147,7 +147,7 @@
     "open_ao_logs_folder": "Apri cartella log AO",
     "open_saves_folder": "Apri cartella salvataggi",
     "script_merger": "Script Merger",
-    "loot_sort": "Ordina Plugin (LOOT)",
+    "plugin_sort": "Ordina plugin (Anvil)",
     "instances": "Istanze",
     "folders": "Cartelle",
     "profiles": "Profili",
@@ -421,7 +421,6 @@
     "diag_problem_game_path": "Il percorso del gioco non esiste: {path}",
     "diag_problem_dir_missing": "Cartella mancante: {label}",
     "diag_problem_dir_not_writable": "Cartella non scrivibile: {label}",
-    "diag_problem_loot_missing": "LOOT non trovato (ordinamento disattivato)",
     "diag_problem_sandbox": "In esecuzione come {mode}"
   },
   "placeholder": {
@@ -819,17 +818,9 @@
     "diag_log_level": "Livello log:",
     "diag_crash_dump": "Dump crash:",
     "diag_max_crash_dumps": "Massimo dump da conservare:",
-    "diag_integrated_loot": "LOOT integrato",
-    "diag_loot_log_level": "Livello log LOOT:",
-    "tab_loot": "LOOT",
-    "loot_binary_path": "Percorso LOOT:",
-    "loot_browse": "Sfoglia...",
-    "loot_auto_sort": "Ordina automaticamente durante il deploy",
-    "loot_update_masterlist": "Aggiorna masterlist prima dell'ordinamento",
-    "loot_install_hint": "Installa LOOT: AUR (loot) o Flatpak (io.github.loot.loot)",
-    "loot_detected": "✓ LOOT rilevato: {path}",
-    "loot_not_found": "✗ LOOT non trovato — installare o configurare il percorso",
-    "loot_auto_detected": "Auto-rilevato: {path}",
+    "tab_load_order": "Ordine di caricamento",
+    "native_sort_description": "Anvil ordina i plugin nativamente in base ai contenuti ufficiali e alle dipendenze dei master. Non è necessaria un’installazione esterna di LOOT.",
+    "load_order_auto_sort": "Ordina automaticamente durante il deploy",
     "diag_hint": "I log e i dump crash sono archiviati nella tua istanza corrente nelle directory logs e crashDumps. L'invio di log e/o dump agli sviluppatori può aiutare a indagare i problemi.",
     "tab_diagnostics": "Diagnostica",
     "nexus_key_received": "Chiave API ricevuta.",
@@ -1230,16 +1221,14 @@
     "kdiff3_no_output": "KDiff3 non ha prodotto alcun risultato.",
     "kdiff3_too_many_mods": "Più di 2 mod coinvolti. KDiff3 mostrerà solo Vanilla + i primi 2 mod."
   },
-  "loot": {
-    "dialog_title": "LOOT — Ottimizzazione ordine di caricamento",
-    "restart_button": "Riavvia LOOT",
-    "close_button": "Chiudi",
-    "loot_running": "LOOT è in esecuzione — ordina in LOOT e chiudilo quando hai finito.",
-    "loot_closed": "LOOT è stato chiuso. plugins.txt è stato riletto.",
-    "plugins_reloaded": "plugins.txt riletto",
-    "sorting_failed": "Errore LOOT",
-    "no_binary": "LOOT non trovato. Configura il percorso nelle Impostazioni.",
-    "not_bethesda": "LOOT è disponibile solo per i giochi Bethesda."
+  "load_order": {
+    "sorting_failed": "Ordinamento non riuscito",
+    "sorting_complete": "L’ordine di caricamento è stato ordinato correttamente.",
+    "missing_masters_title": "Master mancanti",
+    "cycles_title": "Dipendenze cicliche",
+    "parse_errors_title": "Plugin illeggibili",
+    "write_error_title": "Errore di scrittura",
+    "not_bethesda": "L’ordinamento nativo non è disponibile per questo gioco."
   },
   "proton_tools": {
     "title": "Proton Tools",

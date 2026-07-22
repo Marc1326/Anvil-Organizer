@@ -1,0 +1,15 @@
+Vielen Dank für die Rückmeldung!
+
+Das klingt so, als ob das AppImage beim Start sofort abstürzt.
+
+Kannst du bitte einmal das AppImage im Terminal starten? Dann sehen wir die Fehlermeldung:
+[code]chmod +x Anvil_Organizer-1.2.8-x86_64.AppImage
+./Anvil_Organizer-1.2.8-x86_64.AppImage[/code]
+
+Falls es sofort schließt ohne Ausgabe, probier bitte:
+[code]sudo apt install libfuse2[/code]
+und dann nochmal starten.
+
+Auf neueren Ubuntu-basierten Distros fehlt libfuse2 oft — das wird aber von AppImages benötigt.
+
+Schick mir bitte die Terminal-Ausgabe, dann kann ich dir weiterhelfen!

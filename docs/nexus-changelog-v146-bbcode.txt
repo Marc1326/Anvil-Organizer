@@ -1,0 +1,33 @@
+Anvil Organizer v1.4.6
+
+[size=4][b]Bug Fixes[/b][/size]
+
+[b]AppImage: Folder Actions, LOOT & External Tools[/b]
+[list]
+[*]Fixed: "Open folder" crashed in AppImage with "GLIBC not found"
+[*]Fixed: LOOT (Flatpak) failed to start in AppImage
+[*]Fixed: Nexus API key could not be loaded in AppImage
+[*]Cause: PyInstaller set LD_LIBRARY_PATH to internal libraries — all child processes (xdg-open, LOOT, unrar, 7z, git) loaded those instead of system libraries
+[*]Also affects Proton/REDmod tools — all fixed
+[/list]
+
+[b]Baldur's Gate 3[/b]
+[list]
+[*]Fixed: Load order in modsettings.lsx was inverted — mods at the top had lowest instead of highest priority
+[*]Fixed: Drag & Drop in the mod list accidentally activated all inactive mods
+[*]Fixed: Activating a mod did not sync the internal order correctly
+[*]Fixed: modsettings.lsx format updated for current BG3 game version
+[/list]
+
+[size=4][b]Packaging[/b][/size]
+[list]
+[*]All packages are now built automatically with every release:
+[*]AppImage, .deb (Debian/Ubuntu), .rpm (Fedora), .snap
+[*]Installer script is included automatically
+[/list]
+
+[size=4][b]Download[/b][/size]
+[list]
+[*][url=https://github.com/Marc1326/Anvil-Organizer/releases/latest]GitHub Releases[/url] — AppImage, .deb, .rpm, .snap, Installer
+[*]AUR: [font=Courier New]paru -S anvil-organizer[/font]
+[/list]

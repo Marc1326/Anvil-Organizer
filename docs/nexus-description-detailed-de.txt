@@ -1,0 +1,187 @@
+[center][size=5][b]Anvil Organizer[/b][/size]
+[size=3]Der erste native Linux Mod Manager. Inspiriert von MO2. Neu gedacht für Linux.[/size]
+[url=https://anvil-organizer.net]Webseite[/url] | [url=https://github.com/Marc1326/Anvil-Organizer]GitHub[/url] | [url=https://github.com/Marc1326/Anvil-Organizer/wiki]Wiki[/url][/center]
+
+
+[size=4][b]Was ist Anvil?[/b][/size]
+
+MO2 dominiert auf Windows — Anvil füllt die Lücke auf Linux.
+
+Komplett neu geschrieben mit Python und PySide6 (Qt6). Kein Wine, kein Proton-Wrapper, keine Workarounds. Anvil nutzt physische Symlinks statt eines virtuellen Dateisystems. Dein Spielverzeichnis bleibt sauber.
+
+Anvil ist [b]kein[/b] Fork oder Port von MO2. Jede Zeile Code wurde von Grund auf geschrieben — aber der Workflow fühlt sich sofort vertraut an für jeden, der MO2 kennt.
+
+
+[size=4][b]Features[/b][/size]
+
+[size=3][b]Symlink-basierter Deploy[/b][/size]
+[list]
+[*]Physische Symlinks statt virtuellem Dateisystem (USVFS)
+[*]Kein Overhead, keine Wine-Kompatibilitätsprobleme
+[*]Funktioniert mit jedem Proton-Prefix — Steam und Heroic Games Launcher
+[*]Spielverzeichnis bleibt sauber — Mods werden beim Start deployed, beim Beenden entfernt
+[/list]
+
+[size=3][b]Mod-Verwaltung[/b][/size]
+[list]
+[*]Drag & Drop Mod-Reihenfolge mit visuellen Prioritäts-Indikatoren
+[*]Automatische Konflikterkennung — sehe sofort welche Mod welche Dateien überschreibt
+[*]Klappbare Separatoren mit Farbcodierung für große Mod-Listen
+[*]Mehrere Profile pro Spiel — sofort zwischen verschiedenen Mod-Setups wechseln
+[*]Kategorie-System — Primär- und Sekundärkategorien mit Filter-Panel
+[*]Gesperrte Mods — versehentliches Deaktivieren oder Verschieben verhindern
+[/list]
+
+[size=3][b]NexusMods Integration[/b][/size]
+[list]
+[*]NXM Link Handler — "Mod Manager Download" funktioniert direkt aus dem Browser
+[*]SSO-Login und API-Key Authentifizierung
+[*]Ein-Klick Downloads mit Fortschrittsanzeige
+[*]Mod-Info Tab — Details von Nexus mit einem Klick abrufen
+[/list]
+
+[size=3][b]Framework-Erkennung & Verwaltung[/b][/size]
+[list]
+[*]Automatische Erkennung und Installation von Game-Frameworks
+[*]Unterstützte Frameworks: CET, RED4ext, REDmod, ASI Loader, ScriptHookRDR2, LML, F4SE, SFSE, SKSE64, BG3 Mod Fixer, WASD
+[*]Framework-Status auf einen Blick im Hauptfenster
+[*]Framework-Schutz — Frameworks können nicht versehentlich deaktiviert werden
+[/list]
+
+[size=3][b]LOOT Integration[/b][/size]
+[list]
+[*]LOOT Integration für alle Bethesda-Spiele — Skyrim SE, Fallout 4, Starfield, Fallout 3, Fallout NV
+[*]Ein-Klick Sortierung: LOOT-Button in der Toolbar, LOOT öffnet sich automatisch mit Auto-Sort
+[*]plugins.txt wird automatisch nach dem Schließen von LOOT neu eingelesen
+[*]Unterstützt native LOOT Binary (AUR) und Flatpak
+[/list]
+
+[size=3][b]Nativer Script Merger (Witcher 3)[/b][/size]
+[list]
+[*]Eingebauter Script Merger — das Windows-only SM-FAE wird nicht mehr benötigt
+[*]Automatische Erkennung von Konflikten in .ws und .xml Script-Dateien
+[*]Auto-Merge wenn Änderungen in verschiedenen Abschnitten sind
+[*]KDiff3 Integration für manuelle Konfliktlösung
+[*]Zusammengeführte Dateien in einem separaten Mod — Original-Mods bleiben unverändert
+[/list]
+
+[size=3][b]F4SE / SFSE Proton Shims[/b][/size]
+[list]
+[*]Weltneuheit: F4SE und SFSE funktionieren unter Linux/Proton
+[*]Automatische DLL-Injektion über WINEDLLOVERRIDES
+[*]F4SE nutzt X3DAudio1_7.dll als Shim (nicht version.dll)
+[*]SFSE nutzt Address Library Detection
+[*]Kein manuelles Konfigurieren nötig — Anvil erledigt alles automatisch
+[/list]
+
+[size=3][b]FOMOD Installer[/b][/size]
+[list]
+[*]Vollständiger FOMOD Installer mit grafischer Oberfläche
+[*]FOMOD Selection Memory — merkt sich deine Auswahl bei Neuinstallation
+[*]UTF-16 kodierte ModuleConfig.xml Dateien werden unterstützt
+[/list]
+
+[size=3][b]Export / Import / Backup[/b][/size]
+[list]
+[*]Zentraler Dialog für alle Export-, Import- und Backup-Operationen
+[*]Export-Formate: CSV (einfache Liste) oder Anvilpack (komplettes Mod-Setup mit Nexus-IDs)
+[*]Import: CSV oder Anvilpack Dateien einlesen — Vorschau mit fehlenden Mods und Nexus-Links
+[*]Backup: Sicherungen erstellen oder wiederherstellen (Modliste, Kategorien, Metadaten)
+[/list]
+
+[size=3][b]Weitere Features[/b][/size]
+[list]
+[*]Savegame-Browser — Spielstände pro Game anzeigen, im Dateimanager öffnen
+[*]Mod-Detail-Dialog — alle Infos auf einen Blick mit Tabs (Nexus-Info, Bilder, Dateien, Verzeichnisbaum)
+[*]Game Running Lock — UI gesperrt während ein Spiel läuft
+[*]Auto-Redeploy — Mods werden bei jeder Änderung automatisch neu deployed
+[*]Selbst-Update — prüft GitHub auf Updates, Ein-Klick Update + Neustart
+[*]ModIndex Caching — schnellerer Filemap-Rebuild bei großen Mod-Setups
+[*]7 Sprachen — Deutsch, English, Français, Español, Italiano, Português, Русский
+[*]Dark Theme — mehrere Styles enthalten
+[/list]
+
+
+[size=4][b]Offenes Plugin-System[/b][/size]
+
+Anvil hat ein offenes Plugin-System — jeder kann neue Games hinzufügen. Ein Game-Plugin ist nur eine einfache Python-Datei mit ein paar Attributen. Kein Framework-Wissen nötig.
+
+[code]class ValheimGame(BaseGame):
+    GameName = "Valheim"
+    GameBinary = "valheim.exe"
+    GameDataPath = ""
+    GameSteamId = 892970[/code]
+
+Das war's. Datei in den Plugins-Ordner legen, Anvil neustarten, fertig. Genau wie bei MO2's basic_games System.
+
+
+[size=4][b]Unterstützte Spiele[/b][/size]
+
+[size=3][b]Vollständig integriert (7)[/b][/size]
+[list]
+[*]Cyberpunk 2077 — CET, RED4ext, REDmod, ASI Frameworks
+[*]Baldur's Gate 3 — Unified Mod List, Auto-Deploy, modsettings.lsx, NativeModLoader, WASD
+[*]Fallout 4 — F4SE Proton Shim, BA2 Packing, plugins.txt
+[*]Starfield — SFSE Proton Shim, Address Library Detection
+[*]The Witcher 3 — Multi-Folder Routing (mods/dlc/bin), Script Merger
+[*]Red Dead Redemption 2 — ScriptHookRDR2, ASI Loader, LML
+[*]Skyrim Special Edition — SKSE64 Proton Shim, LOOT Integration
+[/list]
+
+[size=3][b]Beta-Plugins (27+)[/b][/size]
+[list]
+[*]Elden Ring, Fallout 3, Fallout New Vegas, Morrowind, Oblivion Remastered
+[*]Stardew Valley, Valheim, No Man's Sky, Bannerlord, Dark Souls
+[*]Dragon Age Origins, Dragon Age 2, Hogwarts Legacy, Kingdom Come Deliverance
+[*]Monster Hunter World, Nier Automata, Sekiro, Subnautica, Stellar Blade
+[*]Control, Darkest Dungeon, Divinity Original Sin EE, Dragons Dogma Dark Arisen
+[*]Final Fantasy VII Remake, Blade and Sorcery, Witcher 1, Witcher 2
+[/list]
+
+Funktioniert mit [b]Steam[/b] und [b]Heroic Games Launcher[/b] (GOG/Epic via Proton/Wine).
+
+
+[size=4][b]Migration von Windows[/b][/size]
+
+Du kommst von Windows? Mit [url=https://github.com/Marc1326/GoodbyeWindows]GoodbyeWindows & HelloLinux[/url] kannst du dein komplettes MO2-Setup mitnehmen — Mods, Ladereihenfolge, Profile, Nexus-IDs. Kein erneutes Herunterladen nötig.
+
+[list]
+[*][b]GoodbyeWindows[/b] (Windows) — Exportiert dein MO2-Setup
+[*][b]HelloLinux[/b] (Linux) — Importiert alles in Anvil Organizer
+[*]Transfer per USB, externe Festplatte oder direkte LAN-Übertragung
+[*]Vortex-Import geplant
+[/list]
+
+
+[size=4][b]Verfügbar auf[/b][/size]
+
+[list]
+[*][b]AppImage[/b] — Universell, keine Installation nötig (empfohlen)
+[*][b]Flatpak[/b] — Flathub
+[*][b]Snap[/b] — Snapcraft
+[*][b]DEB Package[/b] — Ubuntu, Debian, Linux Mint, Pop!_OS
+[*][b]RPM Package[/b] — Fedora, openSUSE
+[*][b]AUR[/b] — Arch Linux, CachyOS, EndeavourOS, Manjaro
+[*][b]Source Code[/b] — Python 3.13+, PySide6
+[/list]
+
+
+[size=4][b]Links[/b][/size]
+
+[list]
+[*][url=https://anvil-organizer.net]Webseite[/url]
+[*][url=https://github.com/Marc1326/Anvil-Organizer]GitHub Repository[/url]
+[*][url=https://github.com/Marc1326/Anvil-Organizer/releases/latest]Download (Neuestes Release)[/url]
+[*][url=https://github.com/Marc1326/Anvil-Organizer/wiki]Wiki[/url]
+[*][url=https://github.com/Marc1326/GoodbyeWindows]GoodbyeWindows — Migration Toolkit[/url]
+[*][url=https://anvil-organizer.net/goodbye.html]GoodbyeWindows Webseite[/url]
+[/list]
+
+
+[size=4][b]Open Source[/b][/size]
+
+Anvil Organizer ist kostenlos und Open Source (GPL-3.0). Beiträge willkommen!
+Gebaut mit Python und PySide6 (Qt6).
+
+[size=2]Inspiriert von: [url=https://github.com/ModOrganizer2/modorganizer]Mod Organizer 2[/url]
+Anvil Organizer ist eine komplette Neuimplementierung — aller Code wurde von Grund auf in Python/PySide6 geschrieben. Es wurde kein Code von MO2 kopiert oder abgeleitet.[/size]

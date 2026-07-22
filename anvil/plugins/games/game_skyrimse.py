@@ -17,8 +17,7 @@ TODO (future):
   - .bsa Archive — Bethesda-Archive
   - SKSE64 Integration (Version check, plugin loading)
   - Creation Kit Integration (Steam ID 1946180)
-  - LOOT-Integration (--game="Skyrim Special Edition")
-  - Creation Club / Skyrim.ccc Parser
+  - LOOT-Masterlist-Metadaten (optionale Erweiterung des nativen Sortierers)
   - Save-Game Metadata Parsing (.ess/.skse)
 """
 
@@ -84,6 +83,12 @@ class SkyrimSEGame(BaseGame):
         "HearthFires.esm",
         "Dragonborn.esm",
     ]
+    PluginLoadOrderFormat = "asterisk"
+    SupportsNativePluginSorting = True
+    PluginIndexFormat = "regular-light"
+    CreationClubFile = "Skyrim.ccc"
+    ImplicitPluginPrefixes = ("cc",)
+    ImplicitPluginNames = ("_ResourcePack.esl",)
 
     # -- BA2-Packing (loose files → BA2 archives via BSArch/Proton) ---------
 
@@ -234,8 +239,8 @@ class SkyrimSEGame(BaseGame):
     # TODO: .bsa Archive -- Bethesda-Archive
     # TODO: SKSE64 Integration (Version check, plugin loading)
     # TODO: Creation Kit Integration (Steam ID 1946180)
-    LootGameName = "Skyrim Special Edition"
-    # TODO: Creation Club / Skyrim.ccc Parser
+
+    # TODO: LOOT-Masterlist-Metadaten fuer optionale Sortierregeln
     # TODO: Save-Game Metadata Parsing (.ess/.skse)
 
     def get_conflict_ignores(self) -> list[str]:

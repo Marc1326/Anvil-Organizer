@@ -1,0 +1,63 @@
+Anvil Organizer v1.3.6
+
+[size=4][b]New Features[/b][/size]
+
+[b]Proton Tools — Launch Windows Tools directly[/b]
+[list]
+[*]New Proton button in the toolbar (Steam games)
+[*]Dropdown menu for quick-launching configured tools (xEdit, BodySlide, Pandora, etc.)
+[*]Add, edit, and remove tools via the management dialog
+[*]Tools run inside the game's Proton prefix — no manual setup needed
+[/list]
+
+[b]Native Script Merger (Witcher 3)[/b]
+[list]
+[*]Built-in script merger replaces the Windows-only WitcherScriptMerger
+[*]Scans .ws and .xml conflicts between mods
+[*]3-way diff against vanilla scripts with auto-merge for non-overlapping changes
+[*]KDiff3 integration for manual conflict resolution
+[*]Configurable via Settings → Script Merger
+[/list]
+
+[b]LOOT Integration (Bethesda Games)[/b]
+[list]
+[*]Plugin load order analysis for Skyrim SE, Fallout 4, and Starfield
+[*]Toolbar button to run LOOT sorting
+[*]Settings for LOOT binary path, log level, and auto-sort on deploy
+[/list]
+
+[b]Bundle / Group Mods[/b]
+[list]
+[*]Visually group related mods within separators
+[*]Collapse and expand groups in the mod list
+[*]Context menu to create, rename, and dissolve groups
+[*]Groups move as a block during drag & drop
+[/list]
+
+[b]Custom Deploy Paths[/b]
+[list]
+[*]Set alternative deploy target directories per separator
+[*]Right-click a separator → "Set deploy path..." to choose a custom folder
+[*]Mods under that separator deploy to the custom path instead of the game directory
+[*]Useful for games with multiple mod directories or external tool folders
+[/list]
+
+[b]ReShade Wizard[/b]
+[list]
+[*]Guided ReShade installation wizard
+[*]Automatic DLL detection and setup
+[*]Preset management — import, switch, and remove presets
+[*]Available via Tools menu for all games
+[/list]
+
+[b]New Game Plugins[/b]
+[list]
+[*]MechWarrior 5: Mercenaries
+[*]S.T.A.L.K.E.R. 2: Heart of Chornobyl
+[*]Ready or Not
+[/list]
+
+[size=4][b]Bug Fixes[/b][/size]
+[list]
+[*]Language detection now uses system locale instead of hardcoded German
+[/list]

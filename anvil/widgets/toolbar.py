@@ -234,26 +234,26 @@ def create_toolbar(parent=None):
     bar.merger_action = merger_action
     bar.merger_sep = merger_sep
 
-    # LOOT-Button (Bethesda-spezifisch, standardmäßig unsichtbar)
-    loot_sep = bar.addSeparator()
-    loot_sep.setVisible(False)
+    # Nativer Plugin-Sortierbutton (standardmäßig unsichtbar)
+    plugin_sort_sep = bar.addSeparator()
+    plugin_sort_sep.setVisible(False)
 
-    loot_btn = QToolButton(bar)
-    loot_btn.setIcon(_icon("sort.svg"))
-    loot_btn.setToolTip(tr("toolbar.loot_sort"))
-    loot_btn.setText(tr("toolbar.loot_sort"))
-    loot_action = bar.addWidget(loot_btn)
-    loot_action.setVisible(False)
+    plugin_sort_btn = QToolButton(bar)
+    plugin_sort_btn.setIcon(_icon("sort.svg"))
+    plugin_sort_btn.setToolTip(tr("toolbar.plugin_sort"))
+    plugin_sort_btn.setText(tr("toolbar.plugin_sort"))
+    plugin_sort_action = bar.addWidget(plugin_sort_btn)
+    plugin_sort_action.setVisible(False)
 
-    def _on_loot():
+    def _on_plugin_sort():
         win = bar.window()
-        if win and hasattr(win, "_on_loot_sort_clicked"):
-            win._on_loot_sort_clicked()
+        if win and hasattr(win, "_on_plugin_sort_clicked"):
+            win._on_plugin_sort_clicked()
 
-    loot_btn.clicked.connect(_on_loot)
-    bar.loot_btn = loot_btn
-    bar.loot_action = loot_action
-    bar.loot_sep = loot_sep
+    plugin_sort_btn.clicked.connect(_on_plugin_sort)
+    bar.plugin_sort_btn = plugin_sort_btn
+    bar.plugin_sort_action = plugin_sort_action
+    bar.plugin_sort_sep = plugin_sort_sep
 
     # Spacer: rechte Icons bündig rechts
     spacer = QWidget()

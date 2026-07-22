@@ -47,7 +47,7 @@ from PySide6.QtWidgets import (
 )
 
 from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont
-from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl, QMimeData, QSettings
+from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl, QMimeData, QSettings, QTimer
 
 from anvil.core.mod_installer import (
     SUPPORTED_EXTENSIONS,
@@ -57,7 +57,11 @@ from anvil.core.mod_installer import (
 from anvil.core.mod_deployer import ModDeployer
 from anvil.core.download_manager import DownloadManager
 from anvil.core.persistent_header import PersistentHeader
-from anvil.core.plugins_txt_writer import PluginsTxtWriter
+from anvil.core.plugins_txt_writer import (
+    PluginEntry,
+    PluginSortResult,
+    PluginsTxtWriter,
+)
 from anvil.core.desktop_shortcut import create_game_shortcut
 from anvil.core.translator import tr
 from anvil.styles.dark_theme import theme_color
@@ -79,6 +83,25 @@ class _NumericSortItem(QTableWidgetItem):
         if val is not None and other_val is not None:
             return val < other_val
         return super().__lt__(other)
+
+
+class _PluginOrderTree(QTreeWidget):
+    """Top-level-only plugin tree that reports a completed internal drop."""
+
+    order_dropped = Signal()
+
+    def dropEvent(self, event) -> None:
+        before = [
+            id(self.topLevelItem(index))
+            for index in range(self.topLevelItemCount())
+        ]
+        super().dropEvent(event)
+        after = [
+            id(self.topLevelItem(index))
+            for index in range(self.topLevelItemCount())
+        ]
+        if event.isAccepted() and before != after:
+            QTimer.singleShot(0, self.order_dropped.emit)
 
 
 class _DraggableDownloadTable(QTableWidget):
@@ -311,7 +334,7 @@ class GamePanel(QWidget):
         # ── Plugins-Tab (Index 0) ──────────────────────────────────────
         plugins_w = QWidget()
         plugins_layout = QVBoxLayout(plugins_w)
-        self._plugins_tree = QTreeWidget()
+        self._plugins_tree = _PluginOrderTree()
         self._plugins_tree.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self._plugins_tree.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self._plugins_tree.setColumnCount(3)
@@ -322,6 +345,14 @@ class GamePanel(QWidget):
         ])
         self._plugins_tree.setAlternatingRowColors(True)
         self._plugins_tree.setRootIsDecorated(False)
+        self._plugins_tree.setDragDropMode(
+            QAbstractItemView.DragDropMode.InternalMove
+        )
+        self._plugins_tree.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self._plugins_tree.setDropIndicatorShown(True)
+        self._updating_plugins = False
+        self._plugins_tree.itemChanged.connect(self._on_plugin_item_changed)
+        self._plugins_tree.order_dropped.connect(self._on_plugin_order_dropped)
         plugins_header = self._plugins_tree.header()
         plugins_header.setStretchLastSection(False)
         plugins_header.setCascadingSectionResizes(True)
@@ -600,8 +631,14 @@ class GamePanel(QWidget):
             and game_plugin.has_plugins_txt()
         )
         self._tabs.setTabVisible(0, has_plugins)
-        if has_plugins:
+        instance_matches = (
+            self._instance_path is not None
+            and (instance_dir is None or self._instance_path == instance_dir)
+        )
+        if has_plugins and instance_matches:
             self._refresh_plugins_tab()
+        else:
+            self._plugins_tree.clear()
 
         # Saves-Tab: dynamisch aktivieren
         saves_dir = None
@@ -1043,6 +1080,33 @@ class GamePanel(QWidget):
 
     # ── Silent deploy / purge (called from MainWindow) ──────────────
 
+    @staticmethod
+    def _record_plugin_write_failure(
+        result: object,
+        writer: PluginsTxtWriter,
+        message: str = "",
+    ) -> None:
+        message = message or writer.last_error or "plugins.txt write failed"
+        setattr(result, "success", False)
+        errors = getattr(result, "errors", None)
+        if isinstance(errors, list):
+            errors.append(message)
+
+    @staticmethod
+    def _plugin_sort_failure_message(result: PluginSortResult) -> str:
+        if result.write_error:
+            return result.write_error
+        details: list[str] = []
+        if result.missing_masters:
+            details.append(f"missing masters: {len(result.missing_masters)}")
+        if result.cycles:
+            details.append(f"cycles: {len(result.cycles)}")
+        if result.parse_errors:
+            details.append(f"unreadable plugins: {len(result.parse_errors)}")
+        if not details:
+            return ""
+        return "plugin auto-sort not applied (" + ", ".join(details) + ")"
+
     def silent_deploy(self) -> object | None:
         """Deploy mods silently.  Called automatically by MainWindow."""
         if getattr(self._current_plugin, "RequiresForgeDeployment", False):
@@ -1106,27 +1170,36 @@ class GamePanel(QWidget):
                     flush=True,
                 )
 
-        # Write plugins.txt for Bethesda games
+        # Write plugins.txt for Bethesda games after a successful deploy
         if (
-            self._current_plugin is not None
+            result is not None
+            and bool(getattr(result, "success", False))
+            and self._current_plugin is not None
             and hasattr(self._current_plugin, "has_plugins_txt")
             and self._current_plugin.has_plugins_txt()
             and self._current_game_path is not None
             and self._instance_path is not None
         ):
             writer = PluginsTxtWriter(
-                self._current_plugin, self._current_game_path, self._instance_path
+                self._current_plugin,
+                self._current_game_path,
+                self._instance_path,
+                profile_name=self._current_profile_name,
             )
             result_path = writer.write()
             if result_path is None:
+                self._record_plugin_write_failure(result, writer)
                 print("[GamePanel] plugins.txt write failed or skipped", flush=True)
-
-            # Optional: LOOT auto-sort on deploy
-            from PySide6.QtCore import QSettings
-            if QSettings().value("LOOT/auto_sort_on_deploy", False, type=bool):
-                loot_name = getattr(self._current_plugin, "LootGameName", "")
-                if loot_name:
-                    self._auto_loot_sort(writer)
+            elif (
+                getattr(self._current_plugin, "SupportsNativePluginSorting", False)
+                and self._auto_plugin_sort_enabled()
+            ):
+                sort_result = self._auto_plugin_sort(writer)
+                sort_error = self._plugin_sort_failure_message(sort_result)
+                if sort_error:
+                    self._record_plugin_write_failure(
+                        result, writer, sort_error
+                    )
 
             self._refresh_plugins_tab()
 
@@ -1148,6 +1221,7 @@ class GamePanel(QWidget):
         _dlog("[DEPLOY-CHAIN] About to apply DLL overrides...")
         self._apply_proton_dll_overrides()
         _dlog("[DEPLOY-CHAIN] silent_deploy() DONE")
+        return result
 
     def silent_deploy_fast(self) -> object | None:
         """Deploy mods without BA2 packing.  Used for quick redeploy after toggle."""
@@ -1162,24 +1236,42 @@ class GamePanel(QWidget):
                 f"success={result.success}, errors={len(result.errors)}"
             )
             return result
+        result = None
         if self._deployer:
-            self._deployer.deploy()
+            result = self._deployer.deploy()
 
-        # Write plugins.txt for Bethesda games
+        # Write plugins.txt for Bethesda games after a successful deploy
         if (
-            self._current_plugin is not None
+            result is not None
+            and bool(getattr(result, "success", False))
+            and self._current_plugin is not None
             and hasattr(self._current_plugin, "has_plugins_txt")
             and self._current_plugin.has_plugins_txt()
             and self._current_game_path is not None
             and self._instance_path is not None
         ):
             writer = PluginsTxtWriter(
-                self._current_plugin, self._current_game_path, self._instance_path
+                self._current_plugin,
+                self._current_game_path,
+                self._instance_path,
+                profile_name=self._current_profile_name,
             )
             result_path = writer.write()
             if result_path is None:
+                self._record_plugin_write_failure(result, writer)
                 print("[GamePanel] plugins.txt write failed or skipped", flush=True)
+            elif (
+                getattr(self._current_plugin, "SupportsNativePluginSorting", False)
+                and self._auto_plugin_sort_enabled()
+            ):
+                sort_result = self._auto_plugin_sort(writer)
+                sort_error = self._plugin_sort_failure_message(sort_result)
+                if sort_error:
+                    self._record_plugin_write_failure(
+                        result, writer, sort_error
+                    )
             self._refresh_plugins_tab()
+        return result
 
     def silent_purge(self) -> object | None:
         """Purge deployed mods silently.  Called automatically by MainWindow."""
@@ -1195,8 +1287,11 @@ class GamePanel(QWidget):
             )
             return result
         _dlog(f"[DEPLOY-CHAIN] silent_purge() called, deployer={self._deployer is not None}")
+        result = None
         if self._deployer:
-            self._deployer.purge()
+            result = self._deployer.purge()
+            if not bool(getattr(result, "success", False)):
+                return result
 
         # BA2-Cleanup for Bethesda games
         needs_ba2 = getattr(self._current_plugin, "NeedsBa2Packing", False)
@@ -1211,21 +1306,9 @@ class GamePanel(QWidget):
             packer.cleanup_ba2s()
             packer.restore_ini()
 
-        # Remove plugins.txt for Bethesda games
-        if (
-            self._current_plugin is not None
-            and hasattr(self._current_plugin, "has_plugins_txt")
-            and self._current_plugin.has_plugins_txt()
-            and self._current_game_path is not None
-            and self._instance_path is not None
-        ):
-            writer = PluginsTxtWriter(
-                self._current_plugin, self._current_game_path, self._instance_path
-            )
-            writer.remove()
-
         # Remove Proton DLL overrides
         self._remove_proton_dll_overrides()
+        return result
 
     def _deploy_proton_shims(self, shim_files: list[str]) -> None:
         """Copy Proton shim DLLs into the game root and record in manifest."""
@@ -1437,13 +1520,62 @@ class GamePanel(QWidget):
         except (OSError, json.JSONDecodeError) as exc:
             print(f"[BA2] Failed to update manifest: {exc}", flush=True)
 
-    def _auto_loot_sort(self, writer: PluginsTxtWriter) -> None:
-        """Auto-sort via LOOT on deploy — disabled.
+    @staticmethod
+    def _auto_plugin_sort_enabled() -> bool:
+        """Read native setting, falling back to the legacy LOOT key once."""
+        settings = QSettings()
+        legacy = settings.value("LOOT/auto_sort_on_deploy", False, type=bool)
+        return bool(settings.value(
+            "LoadOrder/auto_sort_on_deploy", legacy, type=bool
+        ))
 
-        LOOT is a GUI application and does not support silent CLI sorting.
-        Users should sort via the LOOT toolbar button instead.
-        """
-        pass
+    def _auto_plugin_sort(
+        self, writer: PluginsTxtWriter
+    ) -> PluginSortResult:
+        """Run Anvil's native sorter after deploy when enabled."""
+        result = writer.sort_and_write()
+        if (
+            result.missing_masters
+            or result.cycles
+            or result.parse_errors
+            or result.write_error
+        ):
+            print(
+                "[PluginSort] Auto-sort not applied: "
+                f"missing={len(result.missing_masters)}, "
+                f"cycles={len(result.cycles)}, "
+                f"parse_errors={len(result.parse_errors)}",
+                flush=True,
+            )
+        return result
+
+    def sort_plugins_native(self) -> PluginSortResult | None:
+        """Sort and persist the current profile without an external process."""
+        if (
+            self._current_plugin is None
+            or self._current_game_path is None
+            or self._instance_path is None
+            or not self._current_plugin.has_plugins_txt()
+            or not getattr(
+                self._current_plugin, "SupportsNativePluginSorting", False
+            )
+        ):
+            return None
+        writer = PluginsTxtWriter(
+            self._current_plugin,
+            self._current_game_path,
+            self._instance_path,
+            profile_name=self._current_profile_name,
+        )
+        result = writer.sort_and_write()
+        if (
+            not result.missing_masters
+            and not result.cycles
+            and not result.parse_errors
+            and not result.write_error
+        ):
+            self._refresh_plugins_tab()
+        return result
 
     def _refresh_plugins_tab(self) -> None:
         """Populate the plugins tree with scanned plugin files."""
@@ -1459,25 +1591,46 @@ class GamePanel(QWidget):
             return
 
         writer = PluginsTxtWriter(
-            self._current_plugin, self._current_game_path, self._instance_path
+            self._current_plugin,
+            self._current_game_path,
+            self._instance_path,
+            profile_name=self._current_profile_name,
         )
-        plugins = writer.scan_plugins()
+        entries = writer.read_entries()
 
-        primary_lower = {
-            p.lower()
-            for p in getattr(self._current_plugin, "PRIMARY_PLUGINS", [])
+        primary_lower = (
+            {
+                p.casefold()
+                for p in getattr(self._current_plugin, "PRIMARY_PLUGINS", [])
+            }
+            if getattr(self._current_plugin, "ForcePrimaryPluginsActive", True)
+            else set()
+        )
+        locked_lower = primary_lower | {
+            name.casefold() for name in writer.implicit_plugin_names(entries)
         }
 
-        for idx, name in enumerate(plugins):
+        indices = writer.plugin_indices(entries)
+        self._updating_plugins = True
+        for entry in entries:
+            name = entry.name
             ext = Path(name).suffix.lower()
-            is_primary = name.lower() in primary_lower
+            is_locked = name.casefold() in locked_lower
 
             item = QTreeWidgetItem()
-            # Column 0: Plugin name
+            # Column 0: Plugin name and real persisted activation state
             item.setText(0, name)
-            item.setCheckState(0, Qt.CheckState.Checked)
-            if is_primary:
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(
+                0,
+                Qt.CheckState.Checked if entry.active else Qt.CheckState.Unchecked,
+            )
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsDropEnabled)
+            if is_locked:
+                item.setFlags(
+                    item.flags()
+                    & ~Qt.ItemFlag.ItemIsUserCheckable
+                    & ~Qt.ItemFlag.ItemIsDragEnabled
+                )
                 font = item.font(0)
                 font.setItalic(True)
                 item.setFont(0, font)
@@ -1487,10 +1640,125 @@ class GamePanel(QWidget):
             type_label = ext.lstrip(".").upper()
             item.setText(1, type_label)
 
-            # Column 2: Mod index (hex, 2-digit)
-            item.setText(2, f"{idx:02X}")
+            # Column 2: load index (regular or FE light-plugin slot)
+            item.setText(2, indices.get(name.casefold(), ""))
 
             self._plugins_tree.addTopLevelItem(item)
+        self._updating_plugins = False
+
+    def _on_plugin_item_changed(self, item: QTreeWidgetItem, column: int) -> None:
+        """Persist user activation changes from the Plugins tab."""
+        if self._updating_plugins or column != 0:
+            return
+        if (
+            self._current_plugin is None
+            or self._current_game_path is None
+            or self._instance_path is None
+        ):
+            return
+
+        name = item.text(0)
+        writer = PluginsTxtWriter(
+            self._current_plugin,
+            self._current_game_path,
+            self._instance_path,
+            profile_name=self._current_profile_name,
+        )
+        current_entries = writer.read_entries()
+        primary_locked = (
+            {
+                plugin.casefold()
+                for plugin in getattr(self._current_plugin, "PRIMARY_PLUGINS", [])
+            }
+            if getattr(self._current_plugin, "ForcePrimaryPluginsActive", True)
+            else set()
+        )
+        locked = primary_locked | {
+            plugin.casefold()
+            for plugin in writer.implicit_plugin_names(current_entries)
+        }
+        if name.casefold() in locked:
+            return
+
+        changed_active = item.checkState(0) == Qt.CheckState.Checked
+        entries = [
+            PluginEntry(entry.name, changed_active)
+            if entry.name.casefold() == name.casefold()
+            else entry
+            for entry in current_entries
+        ]
+        if writer.write_entries(entries) is not None:
+            QTimer.singleShot(0, self._refresh_plugins_tab)
+        else:
+            QMessageBox.warning(
+                self,
+                tr("load_order.write_error_title"),
+                writer.last_error or tr("load_order.sorting_failed"),
+            )
+            QTimer.singleShot(0, self._refresh_plugins_tab)
+
+    def _on_plugin_order_dropped(self) -> None:
+        if not self._updating_plugins:
+            self._persist_plugin_tree_order()
+            QTimer.singleShot(0, self._refresh_plugins_tab)
+
+    def _persist_plugin_tree_order(self) -> bool:
+        """Persist drag-and-drop order while keeping primary plugins canonical."""
+        if (
+            self._current_plugin is None
+            or self._current_game_path is None
+            or self._instance_path is None
+        ):
+            return False
+
+        tree_entries: list[PluginEntry] = []
+        for index in range(self._plugins_tree.topLevelItemCount()):
+            item = self._plugins_tree.topLevelItem(index)
+            if item is None:
+                continue
+            tree_entries.append(
+                PluginEntry(
+                    item.text(0),
+                    item.checkState(0) == Qt.CheckState.Checked,
+                )
+            )
+
+        writer = PluginsTxtWriter(
+            self._current_plugin,
+            self._current_game_path,
+            self._instance_path,
+            profile_name=self._current_profile_name,
+        )
+        by_key = {entry.name.casefold(): entry for entry in tree_entries}
+        locked: list[PluginEntry] = []
+        locked_keys: set[str] = set()
+        declared_primary = (
+            list(getattr(self._current_plugin, "PRIMARY_PLUGINS", []))
+            if getattr(self._current_plugin, "ForcePrimaryPluginsActive", True)
+            else []
+        )
+        declared_locked = [
+            *declared_primary,
+            *writer.implicit_plugin_names(tree_entries),
+        ]
+        for declared in declared_locked:
+            key = declared.casefold()
+            entry = by_key.get(key)
+            if entry is not None and key not in locked_keys:
+                locked.append(PluginEntry(entry.name, True))
+                locked_keys.add(key)
+        remaining = [
+            entry for entry in tree_entries
+            if entry.name.casefold() not in locked_keys
+        ]
+        if writer.write_entries(locked + remaining) is None:
+            QMessageBox.warning(
+                self,
+                tr("load_order.write_error_title"),
+                writer.last_error or tr("load_order.sorting_failed"),
+            )
+            return False
+        return True
 
     def _on_exe_selected(self, index: int) -> None:
         """Handle executable selection from the menu."""
@@ -1595,7 +1863,10 @@ class GamePanel(QWidget):
 
         working_dir = str(binary_path.parent)
         self.start_requested.emit(str(binary_path), working_dir)
-        self.game_started.emit(self._game_label.text(), -1)
+
+    def notify_game_started(self, pid: int) -> None:
+        """Emit the running-state signal after the launcher confirms success."""
+        self.game_started.emit(self._game_label.text(), pid)
 
     # ── REDmod Deploy ─────────────────────────────────────────────────
 
@@ -2471,6 +2742,11 @@ class GamePanel(QWidget):
             )
         else:
             self._deployer = None
+        if (
+            self._current_plugin is not None
+            and self._current_plugin.has_plugins_txt()
+        ):
+            self._refresh_plugins_tab()
 
     def set_downloads_path(self, downloads_path: Path, mods_path: Path) -> None:
         """Set paths and populate the downloads table."""

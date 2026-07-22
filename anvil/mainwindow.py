@@ -53,6 +53,7 @@ from anvil.dialogs.quick_install_dialog import QuickInstallDialog
 from anvil.dialogs.query_overwrite_dialog import QueryOverwriteDialog, OverwriteAction
 from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.instance_manager import InstanceManager
+from anvil.core.profile_name import is_valid_profile_name, safe_profile_directory
 from anvil.core.icon_manager import IconManager
 from anvil.core.mod_entry import ModEntry, scan_mods_directory
 from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
@@ -1335,8 +1336,8 @@ class MainWindow(QMainWindow):
             self._toolbar.proton_action.setVisible(False)
             self._toolbar.merger_sep.setVisible(False)
             self._toolbar.merger_action.setVisible(False)
-            self._toolbar.loot_sep.setVisible(False)
-            self._toolbar.loot_action.setVisible(False)
+            self._toolbar.plugin_sort_sep.setVisible(False)
+            self._toolbar.plugin_sort_action.setVisible(False)
             self._mod_list_stack.setCurrentWidget(self._mod_list_view)
             self._update_active_count()
             self._status_bar.clear_instance()
@@ -1431,15 +1432,15 @@ class MainWindow(QMainWindow):
         self._toolbar.merger_sep.setVisible(is_witcher3)
         self._toolbar.merger_action.setVisible(is_witcher3)
 
-        # LOOT button visibility (Bethesda games only)
-        has_loot = (
+        # Native load-order button visibility
+        has_plugin_sort = (
             plugin is not None
-            and getattr(plugin, "LootGameName", "") != ""
             and hasattr(plugin, "has_plugins_txt")
             and plugin.has_plugins_txt()
+            and getattr(plugin, "SupportsNativePluginSorting", False)
         )
-        self._toolbar.loot_sep.setVisible(has_loot)
-        self._toolbar.loot_action.setVisible(has_loot)
+        self._toolbar.plugin_sort_sep.setVisible(has_plugin_sort)
+        self._toolbar.plugin_sort_action.setVisible(has_plugin_sort)
 
         self._mod_list_stack.setCurrentWidget(self._mod_list_view)
         self._bg3_installer = None
@@ -1471,7 +1472,7 @@ class MainWindow(QMainWindow):
         # Migrate modlist order: separators before their mods (v1 → v2)
         migrate_modlist_order(profiles_dir)
 
-        profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir()])
+        profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir() and not d.is_symlink()])
         if not profile_folders:
             (profiles_dir / "Default").mkdir(exist_ok=True)
             profile_folders = ["Default"]
@@ -2146,6 +2147,8 @@ class MainWindow(QMainWindow):
                 self, tr("error.start_failed_title"),
                 tr("error.start_failed_message", path=binary_path),
             )
+            return
+        self._game_panel.notify_game_started(pid)
 
     def _on_custom_tool_start(
         self, exe_path: str, args: list, working_dir: str, use_proton: bool
@@ -2156,7 +2159,8 @@ class MainWindow(QMainWindow):
         neben Anvil, man soll währenddessen weiterarbeiten können. Nur das Spiel sperrt
         die UI.
         """
-        self._predeploy_for_launch("custom_tool_start")
+        if not self._predeploy_for_launch("custom_tool_start"):
+            return
         if use_proton:
             self._game_panel.run_with_proton(exe_path, list(args), working_dir or None)
             return
@@ -3920,11 +3924,16 @@ class MainWindow(QMainWindow):
 
     def _on_profile_created(self, name: str) -> None:
         """Handle new profile creation - create folder and copy Default's active_mods."""
-        if not self._current_instance_path:
+        if not self._current_instance_path or not is_valid_profile_name(name):
             return
 
         profiles_dir = self._current_instance_path / ".profiles"
-        new_profile_dir = profiles_dir / name
+        try:
+            new_profile_dir = safe_profile_directory(
+                self._current_instance_path, name
+            )
+        except ValueError:
+            return
         new_profile_dir.mkdir(parents=True, exist_ok=True)
 
         # ── BG3-Weiche: bg3_modstate.json kopieren statt active_mods.json ──
@@ -3952,25 +3961,71 @@ class MainWindow(QMainWindow):
             active_mods = {e.name for e in self._current_mod_entries if e.enabled}
             write_active_mods(new_profile_dir, active_mods)
 
+        # Plugin activation and order are profile-specific too.
+        default_plugins = default_profile / "plugins.txt"
+        if default_plugins.is_file():
+            shutil.copy2(default_plugins, new_profile_dir / "plugins.txt")
+
         # Switch to new profile
         self._on_profile_changed(name)
         Toast(self, tr("toast.profile_created", name=name))
 
     def _on_profile_renamed(self, old_name: str, new_name: str) -> None:
         """Handle profile rename - rename folder on disk."""
-        if not self._current_instance_path:
+        if (
+            not self._current_instance_path
+            or not is_valid_profile_name(old_name)
+            or not is_valid_profile_name(new_name)
+        ):
             return
 
         profiles_dir = self._current_instance_path / ".profiles"
-        old_path = profiles_dir / old_name
-        new_path = profiles_dir / new_name
+        try:
+            old_path = safe_profile_directory(
+                self._current_instance_path, old_name
+            )
+            new_path = safe_profile_directory(
+                self._current_instance_path, new_name
+            )
+        except ValueError:
+            return
 
-        if old_path.exists() and not new_path.exists():
+        def reject_rename(message: str) -> None:
+            names = [tab.text() for tab in self._profile_bar._tabs]
+            restored = [
+                old_name if name == new_name else name for name in names
+            ]
+            active = (
+                old_name
+                if self._profile_bar._active_profile == new_name
+                else self._profile_bar._active_profile
+            )
+            self._profile_bar.set_profiles(restored, active=active)
+            QMessageBox.warning(
+                self, tr("error.rename_failed_title"), message
+            )
+
+        if not old_path.exists() or new_path.exists():
+            reject_rename(tr("error.rename_failed_title"))
+            return
+        try:
             old_path.rename(new_path)
+        except OSError as exc:
+            reject_rename(str(exc))
+            return
 
-        # Update current profile path if this was the active profile
+        # Update every active-profile consumer together.
         if self._current_profile_path and self._current_profile_path.name == old_name:
             self._current_profile_path = new_path
+            current_instance = self.instance_manager.current_instance()
+            if current_instance:
+                data = self.instance_manager.load_instance(current_instance)
+                if data:
+                    data["selected_profile"] = new_name
+                    self.instance_manager.save_instance(current_instance, data)
+            self._game_panel.set_instance_path(
+                self._current_instance_path, profile_name=new_name
+            )
 
         Toast(self, tr("toast.profile_renamed", old=old_name, new=new_name))
 
@@ -3980,11 +4035,16 @@ class MainWindow(QMainWindow):
         The global modlist.txt (load order) is shared across profiles.
         Only active_mods.json differs per profile.
         """
-        if not self._current_instance_path:
+        if not self._current_instance_path or not is_valid_profile_name(name):
             return
 
         profiles_dir = self._current_instance_path / ".profiles"
-        new_profile_path = profiles_dir / name
+        try:
+            new_profile_path = safe_profile_directory(
+                self._current_instance_path, name
+            )
+        except ValueError:
+            return
         new_profile_path.mkdir(parents=True, exist_ok=True)
 
         # ── BG3-Weiche: bg3_modstate.json pro Profil ──
@@ -4109,11 +4169,16 @@ class MainWindow(QMainWindow):
 
     def _on_profile_deleted(self, name: str) -> None:
         """Handle profile deletion request."""
-        if not self._current_instance_path:
+        if not self._current_instance_path or not is_valid_profile_name(name):
             return
 
         profiles_dir = self._current_instance_path / ".profiles"
-        profile_path = profiles_dir / name
+        try:
+            profile_path = safe_profile_directory(
+                self._current_instance_path, name
+            )
+        except ValueError:
+            return
 
         # Profil-Ordner löschen
         if profile_path.exists():
@@ -4135,7 +4200,7 @@ class MainWindow(QMainWindow):
                 pass
 
         # Profile neu laden
-        profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir()])
+        profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir() and not d.is_symlink()])
         if not profile_folders:
             (profiles_dir / "Default").mkdir(exist_ok=True)
             profile_folders = ["Default"]
@@ -4163,6 +4228,8 @@ class MainWindow(QMainWindow):
 
     def _on_dialog_profile_selected(self, name: str) -> None:
         """Handle profile selection from ProfileDialog."""
+        if not is_valid_profile_name(name):
+            return
         self._profile_bar.set_profiles(self._get_profile_list(), active=name)
         self._on_profile_changed(name)
 
@@ -4173,7 +4240,7 @@ class MainWindow(QMainWindow):
         profiles_dir = self._current_instance_path / ".profiles"
         if not profiles_dir.is_dir():
             return ["Default"]
-        profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir()])
+        profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir() and not d.is_symlink()])
         if not profile_folders:
             return ["Default"]
         order_file = profiles_dir / "profiles_order.json"
@@ -6478,9 +6545,9 @@ class MainWindow(QMainWindow):
         self._toolbar.proton_action.setVisible(False)
         self._toolbar.merger_sep.setVisible(False)
         self._toolbar.merger_action.setVisible(False)
-        # BG3 has no LOOT support
-        self._toolbar.loot_sep.setVisible(False)
-        self._toolbar.loot_action.setVisible(False)
+        # BG3 has no native Creation Engine plugin sorting
+        self._toolbar.plugin_sort_sep.setVisible(False)
+        self._toolbar.plugin_sort_action.setVisible(False)
         # Enable conflict highlighting on mod click
         s = self._settings()
         self._mod_list_view._tree._conflict_highlight_on_select = s.value(
@@ -6519,7 +6586,7 @@ class MainWindow(QMainWindow):
         profiles_dir.mkdir(parents=True, exist_ok=True)
 
         profile_folders = sorted(
-            [d.name for d in profiles_dir.iterdir() if d.is_dir()],
+            [d.name for d in profiles_dir.iterdir() if d.is_dir() and not d.is_symlink()],
         ) if profiles_dir.is_dir() else ["Default"]
         if not profile_folders:
             (profiles_dir / "Default").mkdir(exist_ok=True)
@@ -6919,26 +6986,66 @@ class MainWindow(QMainWindow):
         if dlg.has_changes:
             self._reload_mod_list()
 
-    # ── LOOT (Bethesda) ─────────────────────────────────────────
+    # ── Native plugin sorting (Bethesda) ─────────────────────────
 
-    def _on_loot_sort_clicked(self) -> None:
-        """Open the LOOT sort dialog for the current Bethesda instance."""
+    def _on_plugin_sort_clicked(self) -> None:
+        """Run Anvil's native dependency sorter for the current profile."""
         plugin = self._current_plugin
-        if plugin is None:
-            return
-        loot_name = getattr(plugin, "LootGameName", "")
-        if not loot_name or not plugin.has_plugins_txt():
-            self.statusBar().showMessage(tr("loot.not_bethesda"), 5000)
-            return
-
-        game_path = self._current_game_path
-        instance_path = self._current_instance_path
-        if game_path is None or instance_path is None:
+        if (
+            plugin is None
+            or not plugin.has_plugins_txt()
+            or not getattr(plugin, "SupportsNativePluginSorting", False)
+        ):
+            self.statusBar().showMessage(tr("load_order.not_bethesda"), 5000)
             return
 
-        from anvil.widgets.loot_dialog import LootDialog
-        dlg = LootDialog(self, plugin, game_path, instance_path)
-        dlg.exec()
+        result = self._game_panel.sort_plugins_native()
+        if result is None:
+            self.statusBar().showMessage(tr("load_order.sorting_failed"), 5000)
+            return
+
+        problems: list[str] = []
+        if result.missing_masters:
+            lines = [
+                f"{name}: {', '.join(masters)}"
+                for name, masters in result.missing_masters.items()
+            ]
+            problems.append(
+                tr("load_order.missing_masters_title") + ":\n" + "\n".join(lines)
+            )
+        if result.cycles:
+            problems.append(
+                tr("load_order.cycles_title") + ":\n"
+                + "\n".join(" → ".join(cycle) for cycle in result.cycles)
+            )
+        if result.parse_errors:
+            lines = [
+                f"{name}: {error}"
+                for name, error in result.parse_errors.items()
+            ]
+            problems.append(
+                tr("load_order.parse_errors_title") + ":\n" + "\n".join(lines)
+            )
+
+        if result.write_error:
+            problems.append(
+                tr("load_order.write_error_title") + ":\n" + result.write_error
+            )
+
+        if problems:
+            QMessageBox.warning(
+                self,
+                tr("load_order.sorting_failed"),
+                "\n\n".join(problems),
+            )
+            return
+
+        self.statusBar().showMessage(tr("load_order.sorting_complete"), 5000)
+        QMessageBox.information(
+            self,
+            tr("toolbar.plugin_sort"),
+            tr("load_order.sorting_complete"),
+        )
 
     def _on_bg3_context_menu(self, global_pos, section: str, mod_data: dict) -> None:
         """BG3-specific context menu."""

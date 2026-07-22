@@ -1,0 +1,136 @@
+{
+  "game_slug": "cyberpunk2077",
+  "timestamp": 1780852451.9340312,
+  "categories": [
+    {
+      "category_id": 1,
+      "name": "Cyberpunk 2077",
+      "parent_category": false
+    },
+    {
+      "category_id": 2,
+      "name": "Miscellaneous",
+      "parent_category": 1
+    },
+    {
+      "category_id": 3,
+      "name": "Armour and Clothing",
+      "parent_category": 1
+    },
+    {
+      "category_id": 4,
+      "name": "Audio",
+      "parent_category": 1
+    },
+    {
+      "category_id": 5,
+      "name": "Characters",
+      "parent_category": 1
+    },
+    {
+      "category_id": 6,
+      "name": "Crafting",
+      "parent_category": 1
+    },
+    {
+      "category_id": 7,
+      "name": "Gameplay",
+      "parent_category": 1
+    },
+    {
+      "category_id": 8,
+      "name": "User Interface",
+      "parent_category": 1
+    },
+    {
+      "category_id": 9,
+      "name": "Utilities",
+      "parent_category": 1
+    },
+    {
+      "category_id": 10,
+      "name": "Visuals and Graphics",
+      "parent_category": 1
+    },
+    {
+      "category_id": 11,
+      "name": "Weapons",
+      "parent_category": 1
+    },
+    {
+      "category_id": 12,
+      "name": "Modders Resources",
+      "parent_category": 1
+    },
+    {
+      "category_id": 13,
+      "name": "Appearance",
+      "parent_category": 1
+    },
+    {
+      "category_id": 14,
+      "name": "Vehicles",
+      "parent_category": 1
+    },
+    {
+      "category_id": 15,
+      "name": "Animations",
+      "parent_category": 1
+    },
+    {
+      "category_id": 16,
+      "name": "Locations",
+      "parent_category": 1
+    },
+    {
+      "category_id": 17,
+      "name": "Scripts",
+      "parent_category": 1
+    },
+    {
+      "category_id": 18,
+      "name": "Add-On Apartment",
+      "parent_category": 16
+    },
+    {
+      "category_id": 19,
+      "name": "AI Voices",
+      "parent_category": 4
+    },
+    {
+      "category_id": 20,
+      "name": "Adverts",
+      "parent_category": 1
+    },
+    {
+      "category_id": 21,
+      "name": "Apartment",
+      "parent_category": 16
+    },
+    {
+      "category_id": 22,
+      "name": "Appearance Change Unlocker Preset",
+      "parent_category": 1
+    },
+    {
+      "category_id": 23,
+      "name": "Atelier Shop",
+      "parent_category": 1
+    },
+    {
+      "category_id": 24,
+      "name": "Props and Decorations",
+      "parent_category": 1
+    },
+    {
+      "category_id": 25,
+      "name": "Appearance Menu Mod Preset",
+      "parent_category": 13
+    },
+    {
+      "category_id": 26,
+      "name": "Audio Replacer",
+      "parent_category": 4
+    }
+  ]
+}

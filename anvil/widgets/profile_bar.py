@@ -22,6 +22,7 @@ from PySide6.QtCore import QSize, Signal, Qt, QTimer, QPoint, QEvent
 from anvil.core import _todo
 from anvil.core.translator import tr
 from anvil.core.resource_path import get_anvil_base
+from anvil.core.profile_name import is_valid_profile_name
 from anvil.styles.dark_theme import theme_color
 
 ICON_DIR = str(get_anvil_base() / "styles" / "icons" / "files")
@@ -699,7 +700,7 @@ class ProfileBar(QWidget):
     def _finish_inline_create(self, edit: QLineEdit):
         """Handle Enter press - create the profile."""
         name = edit.text().strip()
-        if not name:
+        if not is_valid_profile_name(name):
             self._cancel_inline_create(edit)
             return
 
@@ -772,7 +773,7 @@ class ProfileBar(QWidget):
         new_name = edit.text().strip()
 
         # If empty or same name, cancel
-        if not new_name or new_name == old_name:
+        if not is_valid_profile_name(new_name) or new_name == old_name:
             self._cancel_inline_rename(edit, tab)
             return
 

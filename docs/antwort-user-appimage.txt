@@ -1,0 +1,16 @@
+Danke für das Log — das hilft sehr!
+
+Das Problem ist eine GLIBC-Version: Das AppImage wurde mit einer neueren glibc (2.43) gebaut als PikaOS mitliefert (2.39). Das ist ein bekanntes Packaging-Problem auf unserer Seite, das wir im nächsten Release fixen werden.
+
+In der Zwischenzeit kannst du Anvil direkt aus dem Quellcode starten:
+
+```
+git clone https://github.com/Marc1326/Anvil-Organizer.git
+cd Anvil-Organizer
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+Sag Bescheid ob es klappt!

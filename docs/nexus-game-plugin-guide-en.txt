@@ -1,0 +1,50 @@
+[size=3][b]Create Your Own Game Plugin[/b][/size]
+
+Anvil Organizer already supports many games (Skyrim, Cyberpunk 2077, Fallout 4, BG3, Starfield, ...). If your game is not listed, you can create your own game plugin — no coding required.
+
+[size=2][b]How To[/b][/size]
+
+1. Click the puzzle icon in the toolbar (or File > Game Plugin > Create)
+2. Fill in the required fields:
+
+[b]Game Name[/b] — Full name of the game (e.g. "Kingdom Come Deliverance II")
+[b]Short Name[/b] — Short identifier without spaces (auto-generated)
+[b]Game Binary[/b] — The game's .exe file (e.g. "KingdomCome.exe")
+[b]Steam ID[/b] — The Steam App ID (see below how to find it)
+[b]Data Path[/b] — Where mods go relative to the game folder (empty = game root, "Data" = Data subfolder, "Mods" = Mods subfolder)
+
+3. Optional: Documents path, savegame path, save extension, Nexus Game ID
+4. Optional: Add frameworks (Script Extender, ASI Loader, etc.)
+5. Optional: Select a cover image
+6. Click "Create" — done!
+
+The plugin is saved to ~/.anvil-organizer/plugins/games/ and automatically loaded on next startup.
+
+[size=2][b]Finding Your Steam ID[/b][/size]
+
+The Steam ID is the number that identifies every game on Steam. Anvil needs it to automatically locate your game folder.
+
+[b]Method 1 — Steam Store[/b]
+Open the game in the Steam Store (browser or client). The ID is in the URL:
+store.steampowered.com/app/[b]489830[/b]/...
+The number after /app/ is the Steam ID (here: 489830).
+
+[b]Method 2 — SteamDB[/b]
+Go to steamdb.info and search for the game. The App ID is shown directly on the results page.
+
+[b]Method 3 — Steam Library[/b]
+Right-click the game in your Steam Library > Properties > Updates. The App ID is shown at the top.
+
+[size=2][b]Adding Frameworks[/b][/size]
+
+If your game uses frameworks like Script Extender, BepInEx or ASI Loader:
+- Click "Add" in the frameworks table
+- Enter name, target folder, Nexus ID and detection pattern
+- Anvil will then automatically detect installed frameworks
+
+[size=2][b]Editing a Plugin[/b][/size]
+
+Existing plugins can be modified via File > Game Plugin > Edit. You can change paths, add/remove frameworks and update the cover image.
+
+Full documentation with examples on the Wiki:
+github.com/Marc1326/Anvil-Organizer/wiki

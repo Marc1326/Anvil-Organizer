@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import unittest
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from unittest import mock
 
+from PySide6.QtWidgets import QApplication
+
 from anvil.mainwindow import MainWindow
+from anvil.widgets.game_panel import GamePanel
 
 
 class _Timer:
@@ -61,6 +65,85 @@ class PredeployLaunchTests(unittest.TestCase):
 
         popen.assert_not_called()
         warning.assert_called_once()
+
+    def test_custom_tool_stops_when_predeploy_fails(self) -> None:
+        panel = SimpleNamespace(run_with_proton=mock.Mock())
+        window: Any = SimpleNamespace(
+            _predeploy_for_launch=lambda _reason: False,
+            _game_panel=panel,
+        )
+
+        with mock.patch("anvil.mainwindow.host_popen") as popen:
+            MainWindow._on_custom_tool_start(
+                window,
+                "/tools/xedit.exe",
+                [],
+                "/tools",
+                True,
+            )
+
+        panel.run_with_proton.assert_not_called()
+        popen.assert_not_called()
+
+    def test_failed_predeploy_does_not_emit_game_started(self) -> None:
+        app = QApplication.instance() or QApplication([])
+        with tempfile.TemporaryDirectory() as temp:
+            game_path = Path(temp)
+            (game_path / "game.exe").touch()
+            panel = GamePanel()
+            panel._current_game_path = game_path
+            panel._game_label.setText("Test Game")
+            window: Any = SimpleNamespace(
+                _predeploy_for_launch=lambda _reason: False,
+            )
+            panel.start_requested.connect(
+                lambda binary, working: MainWindow._on_start_game(
+                    window, binary, working
+                )
+            )
+            started: list[tuple[str, int]] = []
+            panel.game_started.connect(
+                lambda name, pid: started.append((name, pid))
+            )
+
+            with mock.patch("anvil.mainwindow.QMessageBox.warning"):
+                panel._do_launch(None, "game.exe", False)
+
+            self.assertEqual(started, [])
+            panel.deleteLater()
+            app.processEvents()
+
+    def test_successful_direct_launch_emits_real_pid(self) -> None:
+        app = QApplication.instance() or QApplication([])
+        with tempfile.TemporaryDirectory() as temp:
+            game_path = Path(temp)
+            (game_path / "game.exe").touch()
+            panel = GamePanel()
+            panel._current_game_path = game_path
+            panel._game_label.setText("Test Game")
+            window: Any = SimpleNamespace(
+                _predeploy_for_launch=lambda _reason: True,
+                _game_panel=panel,
+            )
+            panel.start_requested.connect(
+                lambda binary, working: MainWindow._on_start_game(
+                    window, binary, working
+                )
+            )
+            started: list[tuple[str, int]] = []
+            panel.game_started.connect(
+                lambda name, pid: started.append((name, pid))
+            )
+
+            with mock.patch(
+                "anvil.mainwindow.host_popen",
+                return_value=SimpleNamespace(pid=12345),
+            ):
+                panel._do_launch(None, "game.exe", False)
+
+            self.assertEqual(started, [("Test Game", 12345)])
+            panel.deleteLater()
+            app.processEvents()
 
     def test_auto_redeploy_reports_failure_instead_of_success(self) -> None:
         timer = _Timer()

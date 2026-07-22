@@ -1,0 +1,47 @@
+Anvil Organizer v1.4.3
+
+[size=4][b]New: Easier Installation[/b][/size]
+
+[b]Installer Script[/b]
+[list]
+[*]New one-line installer for all Linux distros:
+[code]curl -sSL https://raw.githubusercontent.com/Marc1326/Anvil-Organizer/main/Anvil-Organizer-installer.sh | bash[/code]
+[*]Downloads the latest AppImage to ~/Applications/
+[*]Creates a desktop entry (shows up in your app menu)
+[*]Registers the NXM link handler (nxm:// links from the browser open Anvil directly)
+[*]No sudo required — everything stays in your home directory
+[*]Works on every Linux distro (Ubuntu, Fedora, Arch, Manjaro, Steam Deck, etc.)
+[/list]
+
+[b].deb Package (Debian / Ubuntu)[/b]
+[list]
+[*]New .deb package available on the GitHub Releases page
+[*]Install with: sudo apt install ./anvil-organizer_1.4.3_amd64.deb
+[*]Includes desktop entry, icon, and NXM handler
+[*]All Qt dependencies are pulled in automatically
+[/list]
+
+[size=4][b]Bug Fixes[/b][/size]
+
+[b]AppImage Compatibility[/b]
+[list]
+[*]Fixed: AppImage crashed on Ubuntu/Debian-based distros with GLIBC_2.38/2.43 errors
+[*]AppImage is now built on Ubuntu 22.04 for maximum compatibility
+[*]Works on Ubuntu 22.04+, Fedora 38+, Debian 12+, PikaOS, and all Arch-based distros
+[/list]
+
+[b]NXM Handler[/b]
+[list]
+[*]Fixed: NXM link handler now correctly detects AppImage, venv, and frozen builds
+[/list]
+
+[b]AppImage Plugin Loading[/b]
+[list]
+[*]Fixed: Some game plugins failed to load in AppImage due to missing hidden imports
+[/list]
+
+[size=4][b]Download[/b][/size]
+[list]
+[*][url=https://github.com/Marc1326/Anvil-Organizer/releases/latest]GitHub Releases[/url] — AppImage, .deb, Installer Script
+[*]AUR: paru -S anvil-organizer
+[/list]
