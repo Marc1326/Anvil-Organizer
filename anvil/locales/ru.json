@@ -571,6 +571,8 @@
     "mod_create_error": "Создание мода",
     "start_failed_title": "Запуск не удался",
     "start_failed_message": "Не удалось запустить:\n{path}",
+    "deploy_failed_title": "Развертывание не удалось",
+    "deploy_failed_message": "Не удалось развернуть моды в игре. Игра не была запущена.\n\n{details}",
     "rename_failed_title": "Переименование не удалось",
     "export_failed_title": "Экспорт не удался",
     "import_failed_title": "Импорт не удался"

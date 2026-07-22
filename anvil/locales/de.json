@@ -571,6 +571,8 @@
     "mod_create_error": "Mod erstellen",
     "start_failed_title": "Starten fehlgeschlagen",
     "start_failed_message": "Konnte nicht gestartet werden:\n{path}",
+    "deploy_failed_title": "Deployment fehlgeschlagen",
+    "deploy_failed_message": "Die Mods konnten nicht ins Spiel deployed werden. Das Spiel wurde nicht gestartet.\n\n{details}",
     "rename_failed_title": "Umbenennen fehlgeschlagen",
     "export_failed_title": "Export fehlgeschlagen",
     "import_failed_title": "Import fehlgeschlagen"

@@ -571,6 +571,8 @@
     "mod_create_error": "Criar Mod",
     "start_failed_title": "Arranque falhou",
     "start_failed_message": "Não foi possível iniciar:\n{path}",
+    "deploy_failed_title": "Implementação falhou",
+    "deploy_failed_message": "Não foi possível implementar os mods no jogo. O jogo não foi iniciado.\n\n{details}",
     "rename_failed_title": "Renomeação falhou",
     "export_failed_title": "Exportação falhou",
     "import_failed_title": "Importação falhou"

@@ -30,6 +30,25 @@ if TYPE_CHECKING:
 SUPPORTED_EXTENSIONS = {".zip", ".rar", ".7z"}
 
 
+def detect_archive_extension(path: Path) -> str:
+    """Return an archive extension from suffix or file magic, else ``""``."""
+    suffix = path.suffix.lower()
+    if suffix in SUPPORTED_EXTENSIONS:
+        return suffix
+    try:
+        with path.open("rb") as stream:
+            magic = stream.read(8)
+    except OSError:
+        return ""
+    if magic.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")):
+        return ".zip"
+    if magic.startswith(b"7z\xbc\xaf\x27\x1c"):
+        return ".7z"
+    if magic.startswith((b"Rar!\x1a\x07\x00", b"Rar!\x1a\x07\x01\x00")):
+        return ".rar"
+    return ""
+
+
 class ModInstaller:
     """Extract archives and install them into an instance's ``.mods/`` folder."""
 
@@ -431,8 +450,8 @@ class ModInstaller:
     # ── Extraction ─────────────────────────────────────────────────────
 
     def _extract(self, archive: Path, dest: Path) -> bool:
-        """Dispatch extraction based on file extension."""
-        ext = archive.suffix.lower()
+        """Dispatch extraction based on a known suffix or archive magic."""
+        ext = detect_archive_extension(archive)
         if ext == ".zip":
             return self._extract_zip(archive, dest)
         if ext == ".rar":

@@ -571,6 +571,8 @@
     "mod_create_error": "Crea Mod",
     "start_failed_title": "Avvio fallito",
     "start_failed_message": "Impossibile avviare:\n{path}",
+    "deploy_failed_title": "Distribuzione fallita",
+    "deploy_failed_message": "Non è stato possibile distribuire le mod nel gioco. Il gioco non è stato avviato.\n\n{details}",
     "rename_failed_title": "Rinomina fallita",
     "export_failed_title": "Esportazione fallita",
     "import_failed_title": "Importazione fallita"

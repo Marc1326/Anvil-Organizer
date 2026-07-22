@@ -10,6 +10,7 @@ import signal
 import subprocess
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Protocol
 
 from anvil.core.resource_path import get_anvil_base
 from anvil.core.subprocess_env import clean_subprocess_env, clean_env, host_popen, host_open_url, host_open_path
@@ -48,7 +49,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont
 from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl, QMimeData, QSettings
 
-from anvil.core.mod_installer import SUPPORTED_EXTENSIONS, ModInstaller
+from anvil.core.mod_installer import (
+    SUPPORTED_EXTENSIONS,
+    ModInstaller,
+    detect_archive_extension,
+)
 from anvil.core.mod_deployer import ModDeployer
 from anvil.core.download_manager import DownloadManager
 from anvil.core.persistent_header import PersistentHeader
@@ -56,6 +61,14 @@ from anvil.core.plugins_txt_writer import PluginsTxtWriter
 from anvil.core.desktop_shortcut import create_game_shortcut
 from anvil.core.translator import tr
 from anvil.styles.dark_theme import theme_color
+
+
+class _Deployer(Protocol):
+    _separator_deploy_paths: dict[str, str]
+
+    def deploy(self) -> Any: ...
+    def purge(self) -> Any: ...
+    def is_deployed(self) -> bool: ...
 
 
 class _NumericSortItem(QTableWidgetItem):
@@ -101,6 +114,43 @@ class _DraggableDownloadTable(QTableWidget):
         if urls:
             mime.setUrls(urls)
         return mime
+
+
+def _download_archive_record(
+    entry: Path,
+) -> tuple[str, int, float, Path, bool, bool, str] | None:
+    """Return one Downloads-table record, accepting extensionless archives."""
+    if not entry.is_file() or not detect_archive_extension(entry):
+        return None
+    try:
+        metadata = entry.stat()
+    except OSError:
+        return None
+
+    display_name = entry.name
+    is_hidden = False
+    meta_installed = False
+    meta_install_file = ""
+    meta = Path(str(entry) + ".meta")
+    if meta.is_file():
+        cp = configparser.ConfigParser()
+        try:
+            cp.read(str(meta), encoding="utf-8")
+            display_name = cp.get("General", "name", fallback="").strip() or entry.name
+            is_hidden = cp.getboolean("General", "removed", fallback=False)
+            meta_installed = cp.getboolean("General", "installed", fallback=False)
+            meta_install_file = cp.get("General", "installationFile", fallback="")
+        except (configparser.Error, OSError, ValueError):
+            pass
+    return (
+        display_name,
+        metadata.st_size,
+        metadata.st_mtime,
+        entry,
+        is_hidden,
+        meta_installed,
+        meta_install_file,
+    )
 
 
 def _game_btn_style() -> str:
@@ -441,7 +491,7 @@ class GamePanel(QWidget):
         self._instance_cover_image: str = ""
         self._instance_cover_color: str = ""
         self._current_profile_name: str = "Default"
-        self._deployer: ModDeployer | None = None
+        self._deployer: _Deployer | None = None
         self._separator_deploy_paths: dict[str, str] = {}
         self._mod_index = None  # ModIndex, set from mainwindow
         # REDmod deploy state
@@ -526,16 +576,10 @@ class GamePanel(QWidget):
         self._instance_cover_color = instance_cover_color
 
         # Re-init deployer if instance_path already set
-        direct_patterns = getattr(game_plugin, "GameDirectInstallMods", []) if game_plugin else []
-        data_path = getattr(game_plugin, "GameDataPath", "") if game_plugin else ""
-        nest = getattr(game_plugin, "GameNestModsUnderName", False) if game_plugin else False
-        lml_path = getattr(game_plugin, "GameLMLPath", "") if game_plugin else ""
-        multi_routes = getattr(game_plugin, "GameMultiFolderRoutes", {}) if game_plugin else {}
-        ba2_packing = getattr(game_plugin, "NeedsBa2Packing", False) if game_plugin else False
-        copy_paths = getattr(game_plugin, "GameCopyDeployPaths", []) if game_plugin else []
-        redmod_path = getattr(game_plugin, "GameRedmodPath", "") if game_plugin else ""
         if self._instance_path and game_path:
-            self._deployer = ModDeployer(self._instance_path, game_path, direct_patterns, profile_name=self._current_profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index, redmod_path=redmod_path, separator_deploy_paths=self._separator_deploy_paths)
+            self._deployer = self._create_deployer(
+                self._instance_path, game_path, self._current_profile_name
+            )
 
         # Update label
         self._game_label.setText(game_name or tr("game_panel.no_game_selected"))
@@ -999,8 +1043,19 @@ class GamePanel(QWidget):
 
     # ── Silent deploy / purge (called from MainWindow) ──────────────
 
-    def silent_deploy(self) -> None:
+    def silent_deploy(self) -> object | None:
         """Deploy mods silently.  Called automatically by MainWindow."""
+        if getattr(self._current_plugin, "RequiresForgeDeployment", False):
+            _dlog("[DEPLOY-CHAIN] GRB Forge deployment requested")
+            if self._deployer is None:
+                _dlog("[DEPLOY-CHAIN] GRB Forge deployer is unavailable")
+                return None
+            result = self._deployer.deploy()
+            _dlog(
+                f"[DEPLOY-CHAIN] GRB Forge deploy result: "
+                f"success={result.success}, errors={len(result.errors)}"
+            )
+            return result
         _dlog("[DEPLOY-CHAIN] silent_deploy() called")
         _dlog(f"[DEPLOY-CHAIN]   deployer={self._deployer is not None}")
         _dlog(f"[DEPLOY-CHAIN]   plugin={getattr(self._current_plugin, 'GameName', None)}")
@@ -1094,8 +1149,19 @@ class GamePanel(QWidget):
         self._apply_proton_dll_overrides()
         _dlog("[DEPLOY-CHAIN] silent_deploy() DONE")
 
-    def silent_deploy_fast(self) -> None:
+    def silent_deploy_fast(self) -> object | None:
         """Deploy mods without BA2 packing.  Used for quick redeploy after toggle."""
+        if getattr(self._current_plugin, "RequiresForgeDeployment", False):
+            _dlog("[DEPLOY-CHAIN] Fast GRB Forge deployment requested")
+            if self._deployer is None:
+                _dlog("[DEPLOY-CHAIN] GRB Forge deployer is unavailable")
+                return None
+            result = self._deployer.deploy()
+            _dlog(
+                f"[DEPLOY-CHAIN] Fast GRB Forge deploy result: "
+                f"success={result.success}, errors={len(result.errors)}"
+            )
+            return result
         if self._deployer:
             self._deployer.deploy()
 
@@ -1115,8 +1181,19 @@ class GamePanel(QWidget):
                 print("[GamePanel] plugins.txt write failed or skipped", flush=True)
             self._refresh_plugins_tab()
 
-    def silent_purge(self) -> None:
+    def silent_purge(self) -> object | None:
         """Purge deployed mods silently.  Called automatically by MainWindow."""
+        if getattr(self._current_plugin, "RequiresForgeDeployment", False):
+            _dlog("[DEPLOY-CHAIN] GRB Forge purge requested")
+            if self._deployer is None:
+                _dlog("[DEPLOY-CHAIN] GRB Forge deployer is unavailable")
+                return None
+            result = self._deployer.purge()
+            _dlog(
+                f"[DEPLOY-CHAIN] GRB Forge purge result: "
+                f"success={result.success}, errors={len(result.errors)}"
+            )
+            return result
         _dlog(f"[DEPLOY-CHAIN] silent_purge() called, deployer={self._deployer is not None}")
         if self._deployer:
             self._deployer.purge()
@@ -1459,6 +1536,21 @@ class GamePanel(QWidget):
             and hasattr(plugin, "detectedStore")
             and plugin.detectedStore() == "steam"
         )
+
+        # GRB must rebuild its Forge archives before every launch path.  Unlike
+        # normal games, the Steam path does not pass through MainWindow's
+        # generic pre-launch deploy hook.
+        if getattr(plugin, "RequiresForgeDeployment", False):
+            deploy_result = self.silent_deploy()
+            if deploy_result is None or not getattr(deploy_result, "success", False):
+                errors = getattr(deploy_result, "errors", []) if deploy_result else []
+                detail = "\n".join(str(error) for error in errors[:5])
+                QMessageBox.warning(
+                    self,
+                    tr("error.deploy_failed_title"),
+                    tr("error.deploy_failed_message", details=detail),
+                )
+                return
 
         # Check if REDmod deploy is needed before launching
         needs_redmod = self._needs_redmod_deploy(plugin)
@@ -2334,20 +2426,49 @@ class GamePanel(QWidget):
         """Set the ModIndex for cached file lists during deployment."""
         self._mod_index = mod_index
 
+    def _create_deployer(
+        self,
+        instance_path: Path,
+        game_path: Path,
+        profile_name: str,
+    ) -> Any:
+        """Create a plugin-specific deployer or Anvil's standard deployer."""
+        plugin = self._current_plugin
+        factory = getattr(plugin, "create_deployer", None)
+        if callable(factory):
+            return factory(instance_path, game_path, profile_name)
+        direct_patterns = getattr(plugin, "GameDirectInstallMods", []) if plugin else []
+        data_path = getattr(plugin, "GameDataPath", "") if plugin else ""
+        nest = getattr(plugin, "GameNestModsUnderName", False) if plugin else False
+        lml_path = getattr(plugin, "GameLMLPath", "") if plugin else ""
+        multi_routes = getattr(plugin, "GameMultiFolderRoutes", {}) if plugin else {}
+        ba2_packing = getattr(plugin, "NeedsBa2Packing", False) if plugin else False
+        copy_paths = getattr(plugin, "GameCopyDeployPaths", []) if plugin else []
+        redmod_path = getattr(plugin, "GameRedmodPath", "") if plugin else ""
+        return ModDeployer(
+            instance_path,
+            game_path,
+            direct_patterns,
+            profile_name=profile_name,
+            data_path=data_path,
+            nest_under_mod_name=nest,
+            lml_path=lml_path,
+            multi_folder_routes=multi_routes,
+            needs_ba2_packing=ba2_packing,
+            copy_deploy_paths=copy_paths,
+            mod_index=self._mod_index,
+            redmod_path=redmod_path,
+            separator_deploy_paths=self._separator_deploy_paths,
+        )
+
     def set_instance_path(self, instance_path: Path, profile_name: str = "Default") -> None:
         """Set instance path and initialize the deployer."""
         self._instance_path = instance_path
         self._current_profile_name = profile_name
-        direct_patterns = getattr(self._current_plugin, "GameDirectInstallMods", []) if self._current_plugin else []
-        data_path = getattr(self._current_plugin, "GameDataPath", "") if self._current_plugin else ""
-        nest = getattr(self._current_plugin, "GameNestModsUnderName", False) if self._current_plugin else False
-        lml_path = getattr(self._current_plugin, "GameLMLPath", "") if self._current_plugin else ""
-        multi_routes = getattr(self._current_plugin, "GameMultiFolderRoutes", {}) if self._current_plugin else {}
-        ba2_packing = getattr(self._current_plugin, "NeedsBa2Packing", False) if self._current_plugin else False
-        copy_paths = getattr(self._current_plugin, "GameCopyDeployPaths", []) if self._current_plugin else []
-        redmod_path = getattr(self._current_plugin, "GameRedmodPath", "") if self._current_plugin else ""
         if self._current_game_path and instance_path:
-            self._deployer = ModDeployer(instance_path, self._current_game_path, direct_patterns, profile_name=profile_name, data_path=data_path, nest_under_mod_name=nest, lml_path=lml_path, multi_folder_routes=multi_routes, needs_ba2_packing=ba2_packing, copy_deploy_paths=copy_paths, mod_index=self._mod_index, redmod_path=redmod_path, separator_deploy_paths=self._separator_deploy_paths)
+            self._deployer = self._create_deployer(
+                instance_path, self._current_game_path, profile_name
+            )
         else:
             self._deployer = None
 
@@ -2366,26 +2487,9 @@ class GamePanel(QWidget):
         """Scan a folder for archives and return metadata tuples."""
         results = []
         for entry in folder.rglob("*"):
-            if entry.is_file() and entry.suffix.lower() in SUPPORTED_EXTENSIONS:
-                try:
-                    stat = entry.stat()
-                    is_hidden = False
-                    meta_installed = False
-                    meta_install_file = ""
-                    meta = Path(str(entry) + ".meta")
-                    if meta.is_file():
-                        cp = configparser.ConfigParser()
-                        cp.optionxform = str
-                        try:
-                            cp.read(str(meta), encoding="utf-8")
-                            is_hidden = cp.getboolean("General", "removed", fallback=False)
-                            meta_installed = cp.getboolean("General", "installed", fallback=False)
-                            meta_install_file = cp.get("General", "installationFile", fallback="")
-                        except Exception:
-                            pass
-                    results.append((entry.name, stat.st_size, stat.st_mtime, entry, is_hidden, meta_installed, meta_install_file))
-                except OSError:
-                    continue
+            record = _download_archive_record(entry)
+            if record is not None:
+                results.append(record)
         results.sort(key=lambda t: t[0].lower())
         return results
 
@@ -2403,26 +2507,9 @@ class GamePanel(QWidget):
         # 1. Root-Dateien sammeln (direkte Kinder, keine Rekursion)
         root_archives = []
         for entry in self._downloads_path.iterdir():
-            if entry.is_file() and entry.suffix.lower() in SUPPORTED_EXTENSIONS:
-                try:
-                    stat = entry.stat()
-                    is_hidden = False
-                    meta_installed = False
-                    meta_install_file = ""
-                    meta = Path(str(entry) + ".meta")
-                    if meta.is_file():
-                        cp = configparser.ConfigParser()
-                        cp.optionxform = str
-                        try:
-                            cp.read(str(meta), encoding="utf-8")
-                            is_hidden = cp.getboolean("General", "removed", fallback=False)
-                            meta_installed = cp.getboolean("General", "installed", fallback=False)
-                            meta_install_file = cp.get("General", "installationFile", fallback="")
-                        except Exception:
-                            pass
-                    root_archives.append((entry.name, stat.st_size, stat.st_mtime, entry, is_hidden, meta_installed, meta_install_file))
-                except OSError:
-                    continue
+            record = _download_archive_record(entry)
+            if record is not None:
+                root_archives.append(record)
         root_archives.sort(key=lambda t: t[0].lower())
 
         # 2. Unterordner sammeln (1 Ebene), Archive darin rekursiv
@@ -2965,7 +3052,7 @@ class GamePanel(QWidget):
         row = 0
         self._dl_table.insertRow(row)
 
-        item_name = QTableWidgetItem(task.file_name)
+        item_name = QTableWidgetItem(task.display_name())
         item_name.setData(Qt.ItemDataRole.UserRole, str(task.save_path))
         self._dl_table.setItem(row, 0, item_name)
 

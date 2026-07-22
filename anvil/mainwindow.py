@@ -1865,20 +1865,39 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(tr("status.deploying"), 0)
         self._redeploy_timer.start()
 
-    def _do_redeploy(self) -> None:
-        """Execute purge + fast deploy immediately."""
+    def _do_redeploy(self) -> bool:
+        """Execute purge + fast deploy and report whether it succeeded."""
         self._redeploy_timer.stop()
         if not self._current_instance_path:
-            return
+            return False
         # BG3: kein Symlink-Deploy — Auto-Deploy läuft über den Installer
         if self._bg3_installer is not None:
-            return
+            return True
         print("[PURGE] Auto-redeploy: purging current deployment", flush=True)
-        self._game_panel.silent_purge()
+        purge_result = self._game_panel.silent_purge()
+        if purge_result is not None and not getattr(purge_result, "success", False):
+            errors = getattr(purge_result, "errors", [])
+            details = "\n".join(str(error) for error in errors[:5])
+            QMessageBox.warning(
+                self,
+                tr("error.deploy_failed_title"),
+                tr("error.deploy_failed_message", details=details),
+            )
+            return False
         print("[DEPLOY] Auto-redeploy: deploying mods (fast, no BA2)", flush=True)
         self._sync_separator_deploy_paths()
-        self._game_panel.silent_deploy_fast()
+        deploy_result = self._game_panel.silent_deploy_fast()
+        if deploy_result is not None and not getattr(deploy_result, "success", False):
+            errors = getattr(deploy_result, "errors", [])
+            details = "\n".join(str(error) for error in errors[:5])
+            QMessageBox.warning(
+                self,
+                tr("error.deploy_failed_title"),
+                tr("error.deploy_failed_message", details=details),
+            )
+            return False
         self.statusBar().showMessage(tr("status.deployed"), 3000)
+        return True
 
     def _on_filter_changed(self) -> None:
         """Mod search or FilterPanel chip changed — update proxy filter."""
@@ -2086,21 +2105,32 @@ class MainWindow(QMainWindow):
         self._install_archives([Path(p) for p in remaining], insert_at=target_row)
         self._game_panel.refresh_downloads()
 
-    def _predeploy_for_launch(self, reason: str) -> None:
-        """Relock frameworks + full purge/deploy before launching anything."""
+    def _predeploy_for_launch(self, reason: str) -> bool:
+        """Relock frameworks and return whether purge/deploy succeeded."""
         self._redeploy_timer.stop()
         if self._current_instance_path:
             # Vor dem Start: alle Frameworks dieser Instanz locken
             self._auto_relock_instance(self._current_instance_path, reason)
             print("[PURGE] Pre-launch purge", flush=True)
-            self._game_panel.silent_purge()
+            purge_result = self._game_panel.silent_purge()
+            if purge_result is not None and not getattr(purge_result, "success", False):
+                return False
             print("[DEPLOY] Pre-launch full deploy (with BA2)", flush=True)
             self._sync_separator_deploy_paths()
-            self._game_panel.silent_deploy()
+            deploy_result = self._game_panel.silent_deploy()
+            if deploy_result is not None and not getattr(deploy_result, "success", False):
+                return False
+        return True
 
     def _on_start_game(self, binary_path: str, working_dir: str) -> None:
         """Launch the selected game executable."""
-        self._predeploy_for_launch("game_start")
+        if not self._predeploy_for_launch("game_start"):
+            QMessageBox.warning(
+                self,
+                tr("error.deploy_failed_title"),
+                tr("error.deploy_failed_message", details=""),
+            )
+            return
         success, pid = True, -1
         try:
             proc = host_popen(

@@ -571,6 +571,8 @@
     "mod_create_error": "Crear Mod",
     "start_failed_title": "Inicio fallido",
     "start_failed_message": "No se pudo iniciar:\n{path}",
+    "deploy_failed_title": "Despliegue fallido",
+    "deploy_failed_message": "Los mods no se pudieron desplegar en el juego. El juego no se inició.\n\n{details}",
     "rename_failed_title": "Renombrado fallido",
     "export_failed_title": "Exportación fallida",
     "import_failed_title": "Importación fallida"

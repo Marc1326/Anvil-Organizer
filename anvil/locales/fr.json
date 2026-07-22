@@ -571,6 +571,8 @@
     "mod_create_error": "Créer un Mod",
     "start_failed_title": "Démarrage échoué",
     "start_failed_message": "Impossible de démarrer :\n{path}",
+    "deploy_failed_title": "Échec du déploiement",
+    "deploy_failed_message": "Les mods n’ont pas pu être déployés dans le jeu. Le jeu n’a pas été démarré.\n\n{details}",
     "rename_failed_title": "Renommage échoué",
     "export_failed_title": "Exportation échouée",
     "import_failed_title": "Importation échouée"

@@ -122,6 +122,10 @@ class DownloadTask:
             return f"{bps / 1024:.1f} KB/s"
         return f"{bps / (1024 * 1024):.1f} MB/s"
 
+    def display_name(self) -> str:
+        """Return Nexus metadata name, falling back to the physical filename."""
+        return self.mod_name.strip() or self.file_name
+
 
 class DownloadManager(QObject):
     """Manages HTTP downloads with a queue (stdlib only, no QtNetwork).
