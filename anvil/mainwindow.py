@@ -12,6 +12,8 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
+import time
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -33,8 +35,9 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QFrame,
+    QInputDialog,
 )
-from PySide6.QtCore import Qt, QModelIndex, QSettings, QTimer, QSize
+from PySide6.QtCore import Qt, QModelIndex, QSettings, QThread, QTimer, QSize
 from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence
 
 from anvil.core.subprocess_env import clean_subprocess_env, host_popen, host_open_url, host_open_path
@@ -52,7 +55,14 @@ from anvil.dialogs import ModDetailDialog
 from anvil.dialogs.quick_install_dialog import QuickInstallDialog
 from anvil.dialogs.query_overwrite_dialog import QueryOverwriteDialog, OverwriteAction
 from anvil.plugins.plugin_loader import PluginLoader
+from anvil.core.base_dir import anvil_base_paths
 from anvil.core.instance_manager import InstanceManager
+from anvil.core.instance_paths import (
+    InstancePaths,
+    StorageComponentStatus,
+    resolve_instance_paths,
+    unavailable_configured_storage,
+)
 from anvil.core.profile_name import is_valid_profile_name, safe_profile_directory
 from anvil.core.icon_manager import IconManager
 from anvil.core.mod_entry import ModEntry, scan_mods_directory
@@ -159,6 +169,25 @@ class _CenteredClearLineEdit(QLineEdit):
             centered_y = (self.height() - g.height()) // 2
             if g.y() != centered_y:
                 btn.setGeometry(g.x(), centered_y, g.width(), g.height())
+
+
+def _first_unavailable_storage(
+    paths: InstancePaths,
+    instance_data: dict,
+) -> StorageComponentStatus | None:
+    unavailable = unavailable_configured_storage(paths, instance_data)
+    return unavailable[0] if unavailable else None
+
+
+def _active_instance_paths(window) -> InstancePaths:
+    """Return active roots, with legacy defaults for lightweight test doubles."""
+    paths = getattr(window, "_current_instance_paths", None)
+    if paths is not None:
+        return paths
+    instance_path = getattr(window, "_current_instance_path", None)
+    if instance_path is None:
+        raise RuntimeError("no active instance paths")
+    return resolve_instance_paths(instance_path, {})
 
 
 class MainWindow(QMainWindow):
@@ -382,6 +411,7 @@ class MainWindow(QMainWindow):
         self._pending_fw_query_name: str = ""
         self._current_profile_path: Path | None = None
         self._current_instance_path: Path | None = None
+        self._current_instance_paths: InstancePaths | None = None
         self._current_downloads_path: Path | None = None
         self._current_plugin = None  # Active game plugin
         self._current_game_path: Path | None = None
@@ -866,6 +896,8 @@ class MainWindow(QMainWindow):
             self.instance_manager,
             on_clear_modindex=self._clear_modindex_cache,
             diagnostics_provider=self.collect_diagnostics_conflicts,
+            on_storage_migration=self._on_storage_migration,
+            on_locate_storage=self._on_locate_storage,
         )
         _center_on_parent(dlg)
         accepted = dlg.exec() == SettingsDialog.DialogCode.Accepted
@@ -896,6 +928,339 @@ class MainWindow(QMainWindow):
             # Reload current instance to apply changed paths
             if self.instance_manager.current_instance():
                 self.switch_instance(self.instance_manager.current_instance())
+
+    def _on_locate_storage(self) -> None:
+        name = self.instance_manager.current_instance()
+        if not name:
+            QMessageBox.warning(self, tr("storage.title"), tr("storage.error_no_instances"))
+            return
+        data = self.instance_manager.load_instance(name)
+        instance = self.instance_manager.instances_path() / name
+        paths = resolve_instance_paths(instance, data)
+        unavailable = unavailable_configured_storage(paths, data)
+        if not unavailable:
+            QMessageBox.information(
+                self,
+                tr("storage.title"),
+                tr("storage.locate_none_missing"),
+            )
+            return
+        components = [status.component for status in unavailable]
+        labels = [tr(f"storage.component_{component}") for component in components]
+        label, accepted = QInputDialog.getItem(
+            self,
+            tr("storage.locate"),
+            tr("storage.locate_choose_component"),
+            labels,
+            0,
+            False,
+        )
+        if not accepted:
+            return
+        component = components[labels.index(label)]
+        candidate = QFileDialog.getExistingDirectory(
+            self,
+            tr("storage.locate"),
+            str(instance),
+        )
+        if not candidate:
+            return
+        from anvil.core.storage_markers import verify_location_marker
+
+        try:
+            instance_id = self.instance_manager.ensure_instance_id(name)
+            verify_location_marker(Path(candidate), instance_id, component)
+            key = {
+                "mods": "path_mods_directory",
+                "downloads": "path_downloads_directory",
+                "profiles": "path_profiles_directory",
+                "overwrite": "path_overwrite_directory",
+                "backups": "path_backups_directory",
+                "cache": "path_cache_directory",
+            }[component]
+            old_values = self.instance_manager.update_instance_paths_atomic(
+                name,
+                {key: candidate},
+            )
+            if not self.switch_instance(name):
+                self.instance_manager.update_instance_paths_atomic(name, old_values)
+                self.switch_instance(name)
+                raise RuntimeError(tr("storage.error_load_instance", name=name))
+        except Exception as exc:
+            QMessageBox.warning(self, tr("storage.title"), str(exc))
+            return
+        Toast(self, tr("storage.locate_success", path=candidate))
+
+    def _on_storage_migration(self) -> None:
+        thread = getattr(self, "_storage_thread", None)
+        if thread is not None and thread.isRunning():
+            Toast(self, tr("storage.already_running"))
+            return
+        from anvil.dialogs.storage_migration_dialog import StorageMigrationDialog
+
+        dialog = StorageMigrationDialog(
+            self,
+            manager=self.instance_manager,
+            current_instance=self.instance_manager.current_instance(),
+        )
+        self._storage_dialog = dialog
+        dialog.migration_requested.connect(self._begin_storage_migration)
+        dialog.cancel_requested.connect(self._cancel_storage_migration)
+        _center_on_parent(dialog)
+        dialog.exec()
+        if getattr(self, "_storage_dialog", None) is dialog:
+            self._storage_dialog = None
+
+    def _schedule_base_directory_migration(self, request) -> None:
+        if self._game_running:
+            self._storage_fail(tr("storage.error_game_running"))
+            return
+        source = anvil_base_paths().base
+        target = request.target_base / source.name
+        if target.exists():
+            self._storage_fail(tr("base_dir.error_target_exists", path=str(target)))
+            return
+        answer = QMessageBox.question(
+            self,
+            tr("base_dir.migration_title"),
+            tr(
+                "base_dir.migration_confirm",
+                source=str(source),
+                target=str(target),
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            dialog = getattr(self, "_storage_dialog", None)
+            if dialog is not None:
+                dialog._running = False
+                dialog._show_page(dialog.PAGE_REVIEW)
+            return
+
+        for data in self.instance_manager.list_instances():
+            name = str(data["name"])
+            if not self.switch_instance(name):
+                self._storage_fail(tr("storage.error_load_instance", name=name))
+                return
+            purge_result = self._game_panel.silent_purge()
+            if purge_result is not None and not getattr(purge_result, "success", False):
+                errors = getattr(purge_result, "errors", [])
+                self._storage_fail("\n".join(str(error) for error in errors))
+                return
+
+        from anvil.core.base_migration import schedule_base_migration
+        from anvil.core.storage_migration import VerificationLevel
+
+        try:
+            schedule_base_migration(
+                source=source,
+                target=target,
+                verification=(
+                    VerificationLevel.FULL
+                    if request.verification == "full"
+                    else VerificationLevel.FAST
+                ),
+            )
+        except Exception as exc:
+            self._storage_fail(str(exc))
+            return
+        dialog = getattr(self, "_storage_dialog", None)
+        if dialog is not None:
+            dialog.accept()
+        QTimer.singleShot(0, self._restart_app)
+
+    def _begin_storage_migration(self, request) -> None:
+        if request.base_directory:
+            self._schedule_base_directory_migration(request)
+            return
+        if self._game_running:
+            self._storage_fail(tr("storage.error_game_running"))
+            return
+        for name in request.instances:
+            data = self.instance_manager.load_instance(name)
+            if not data:
+                self._storage_fail(tr("storage.error_instance_missing", name=name))
+                return
+            if data.get("game_short_name") == "baldursgate3":
+                self._storage_fail(tr("storage.error_bg3_excluded", name=name))
+                return
+
+        self._storage_request = request
+        self._storage_queue = list(request.instances)
+        self._storage_original_instance = self.instance_manager.current_instance()
+        self._storage_cancel_event = threading.Event()
+        self._storage_started_at = time.monotonic()
+        self._storage_completed_instances = 0
+        self._storage_failed = False
+        self._start_next_storage_instance()
+
+    def _start_next_storage_instance(self) -> None:
+        if self._storage_failed:
+            return
+        if not self._storage_queue:
+            original = self._storage_original_instance
+            if original and self.instance_manager.current_instance() != original:
+                self.switch_instance(original)
+            dialog = getattr(self, "_storage_dialog", None)
+            if dialog is not None:
+                dialog.show_result(
+                    success=True,
+                    message=tr(
+                        "storage.complete_message",
+                        count=self._storage_completed_instances,
+                    ),
+                )
+            return
+
+        from anvil.core.storage_migration import (
+            InstanceStorageMigration,
+            VerificationLevel,
+        )
+        from anvil.dialogs.storage_migration_dialog import StorageMigrationWorker
+
+        name = self._storage_queue.pop(0)
+        self._storage_active_instance = name
+        if not self.switch_instance(name):
+            self._storage_fail(tr("storage.error_load_instance", name=name))
+            return
+        purge_result = self._game_panel.silent_purge()
+        if purge_result is not None and not getattr(purge_result, "success", False):
+            errors = getattr(purge_result, "errors", [])
+            self._storage_fail("\n".join(str(error) for error in errors))
+            return
+
+        folder_names = {
+            "mods": "Mods",
+            "downloads": "Downloads",
+            "profiles": "Profiles",
+            "overwrite": "Overwrite",
+            "backups": "Backups",
+            "cache": "Cache",
+        }
+        base = self._storage_request.target_base / name
+        components = {
+            component: base / folder_names[component]
+            for component in self._storage_request.components
+        }
+        journal_directory = (
+            self.instance_manager.instances_path().parent
+            / ".migration-journals"
+            / "active"
+            / name
+        )
+        instance_path = self.instance_manager.instances_path() / name
+
+        def reindex(mods_path: Path) -> None:
+            index = ModIndex(instance_path, mods_path=mods_path)
+            index.rebuild()
+
+        migration = InstanceStorageMigration(
+            manager=self.instance_manager,
+            instance_name=name,
+            components=components,
+            journal_directory=journal_directory,
+            reindex=reindex,
+            verification=(
+                VerificationLevel.FULL
+                if self._storage_request.verification == "full"
+                else VerificationLevel.FAST
+            ),
+            cancel_requested=self._storage_cancel_event.is_set,
+            defer_completion=True,
+        )
+        thread = QThread(self)
+        worker = StorageMigrationWorker(migration)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.progress.connect(self._on_storage_progress)
+        worker.finished.connect(self._on_storage_worker_finished)
+        worker.failed.connect(self._on_storage_worker_failed)
+        worker.finished.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(self._on_storage_thread_finished)
+        worker.finished.connect(worker.deleteLater)
+        worker.failed.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        self._storage_thread = thread
+        self._storage_worker = worker
+        self._storage_pending_next = False
+        thread.start()
+
+    def _on_storage_progress(self, component: str, progress) -> None:
+        dialog = getattr(self, "_storage_dialog", None)
+        if dialog is None:
+            return
+        current = progress.bytes_copied + progress.current_file_bytes
+        total = max(1, progress.total_bytes)
+        fraction = min(1.0, current / total)
+        elapsed = max(0.001, time.monotonic() - self._storage_started_at)
+        speed = current / elapsed
+        remaining = max(0, total - current)
+        eta = remaining / speed if speed > 0 else 0
+        current_file = str(progress.current_path) if progress.current_path else "—"
+        dialog.update_progress(
+            fraction=fraction,
+            component=tr(f"storage.component_{component}"),
+            current_file=current_file,
+            counts=tr(
+                "storage.progress_counts",
+                files=progress.files_copied,
+                bytes=current,
+                total=progress.total_bytes,
+            ),
+            timing=tr(
+                "storage.progress_timing",
+                speed=f"{speed / (1024 * 1024):.1f} MiB/s",
+                elapsed=f"{elapsed:.1f}s",
+                eta=f"{eta:.1f}s",
+            ),
+        )
+
+    def _on_storage_worker_finished(self, migration) -> None:
+        name = self._storage_active_instance
+        deploy_ok = self.switch_instance(name)
+        try:
+            migration.complete_after_redeploy(deploy_ok)
+        except Exception as exc:
+            self.switch_instance(name)
+            self._storage_fail(str(exc))
+            return
+
+        active_journal = migration.journal_directory
+        if active_journal.is_dir():
+            history = (
+                active_journal.parent.parent
+                / "history"
+                / f"{name}-{time.time_ns()}"
+            )
+            history.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(active_journal), str(history))
+        self._storage_completed_instances += 1
+        self._storage_pending_next = True
+
+    def _on_storage_worker_failed(self, message: str) -> None:
+        self.switch_instance(self._storage_active_instance)
+        self._storage_fail(message)
+
+    def _on_storage_thread_finished(self) -> None:
+        self._storage_thread = None
+        self._storage_worker = None
+        if getattr(self, "_storage_pending_next", False) and not self._storage_failed:
+            QTimer.singleShot(0, self._start_next_storage_instance)
+
+    def _cancel_storage_migration(self) -> None:
+        event = getattr(self, "_storage_cancel_event", None)
+        if event is not None:
+            event.set()
+
+    def _storage_fail(self, message: str) -> None:
+        self._storage_failed = True
+        if hasattr(self, "_storage_queue"):
+            self._storage_queue.clear()
+        dialog = getattr(self, "_storage_dialog", None)
+        if dialog is not None:
+            dialog.show_result(success=False, message=message)
 
     def _on_reshade_wizard(self) -> None:
         """Werkzeuge → ReShade Wizard."""
@@ -1199,7 +1564,13 @@ class MainWindow(QMainWindow):
                 if game_path_str:
                     game_path = Path(game_path_str)
                     if game_path.is_dir():
-                        deployer = ModDeployer(instance_path, game_path)
+                        paths = resolve_instance_paths(instance_path, data)
+                        deployer = ModDeployer(
+                            instance_path,
+                            game_path,
+                            mods_path=paths.mods,
+                            profiles_path=paths.profiles,
+                        )
                         deployer.purge()
 
     def _teardown_current_instance(self) -> None:
@@ -1265,13 +1636,14 @@ class MainWindow(QMainWindow):
         self._current_mod_entries = []
         self._current_profile_path = None
         self._current_instance_path = None
+        self._current_instance_paths = None
         self._current_downloads_path = None
         self._current_plugin = None
         self._current_game_path = None
         self._bg3_installer = None
         self._mod_index = None
 
-    def switch_instance(self, instance_name: str) -> None:
+    def switch_instance(self, instance_name: str) -> bool:
         """Switch to a different instance and update all UI components.
 
         Called by the toolbar after the instance manager dialog closes.
@@ -1282,7 +1654,7 @@ class MainWindow(QMainWindow):
         """
         self._teardown_current_instance()
         try:
-            self._apply_instance(instance_name)
+            deploy_ok = self._apply_instance(instance_name)
         except Exception as e:  # noqa: BLE001 — kaputte Instanz darf die App nicht abschießen
             import traceback
             self._log_panel.add_log(
@@ -1300,14 +1672,15 @@ class MainWindow(QMainWindow):
                 self._status_bar.clear_instance()
             if hasattr(self, "_instance_dropdown"):
                 self._instance_dropdown.refresh_current()
-            return
+            return False
         # Erst nach erfolgreichem Laden persistieren — sonst zeigt .current bei
         # einem Fehler auf eine kaputte Instanz und die App startet nicht mehr.
         self.instance_manager.set_current_instance(instance_name)
         if hasattr(self, "_instance_dropdown"):
             self._instance_dropdown.refresh_current()
+        return deploy_ok
 
-    def _apply_instance(self, instance_name: str) -> None:
+    def _apply_instance(self, instance_name: str) -> bool:
         """Load instance data and update all widgets.
 
         Phase 2 of instance switching: builds new state.
@@ -1342,7 +1715,7 @@ class MainWindow(QMainWindow):
             self._update_active_count()
             self._status_bar.clear_instance()
             self._act_reshade.setEnabled(False)
-            return
+            return False
 
         game_name = data.get("game_name", instance_name)
         short_name = data.get("game_short_name", "")
@@ -1392,20 +1765,48 @@ class MainWindow(QMainWindow):
         # 3. Instance path
         self._current_instance_path = self.instance_manager.instances_path() / instance_name
         instance_path = self._current_instance_path
+        self._current_instance_paths = resolve_instance_paths(instance_path, data)
+        instance_paths = self._current_instance_paths
+        unavailable_storage = _first_unavailable_storage(instance_paths, data)
+        if unavailable_storage is not None:
+            self._current_profile_path = None
+            self._current_downloads_path = instance_paths.downloads
+            self._current_mod_entries = []
+            self._mod_index = None
+            self._game_panel.set_downloads_path(
+                instance_paths.downloads,
+                instance_paths.mods,
+                instance_paths.profiles,
+            )
+            self._toolbar.deploy_sep.setVisible(False)
+            self._toolbar.deploy_action.setVisible(False)
+            self._toolbar.proton_action.setVisible(False)
+            self._toolbar.merger_sep.setVisible(False)
+            self._toolbar.merger_action.setVisible(False)
+            self._toolbar.plugin_sort_sep.setVisible(False)
+            self._toolbar.plugin_sort_action.setVisible(False)
+            message = tr(
+                "toast.storage_path_unavailable",
+                path=str(unavailable_storage.path),
+            )
+            Toast(self, message)
+            self._log_panel.add_log("error", message)
+            self._status_bar.update_instance(game_name, short_name, store)
+            return False
         # Falls in dieser Instanz noch Frameworks unlocked sind, locken.
         if framework_state.has_unlocked(instance_path):
             framework_state.lock_all(instance_path)
 
-        # 4. Downloads tab — Pfade aus Instance-Config lesen
-        def resolve_path(val: str) -> Path:
-            resolved = val.replace("%INSTANCE_DIR%", str(instance_path))
-            return Path(resolved)
-
-        downloads_dir = resolve_path(data.get("path_downloads_directory", "%INSTANCE_DIR%/.downloads"))
-        mods_dir = resolve_path(data.get("path_mods_directory", "%INSTANCE_DIR%/.mods"))
+        # 4. Downloads tab — zentral aufgelöste Pfade verwenden
+        downloads_dir = instance_paths.downloads
+        mods_dir = instance_paths.mods
 
         self._current_downloads_path = downloads_dir
-        self._game_panel.set_downloads_path(downloads_dir, mods_dir)
+        self._game_panel.set_downloads_path(
+            downloads_dir,
+            mods_dir,
+            instance_paths.profiles,
+        )
         self._game_panel.download_manager().set_downloads_dir(downloads_dir)
 
         # ── BG3-specific path ─────────────────────────────────────
@@ -1413,7 +1814,7 @@ class MainWindow(QMainWindow):
             self._apply_bg3_instance(instance_name, data, plugin, game_path)
             self._status_bar.update_instance(game_name, short_name, store)
             self._restore_ui_state()
-            return
+            return True
 
         # ── Standard path (non-BG3) ──────────────────────────────
         # Hide BG3 deploy button, switch to standard mod list
@@ -1463,7 +1864,7 @@ class MainWindow(QMainWindow):
         self._load_nexus_categories(instance_path)
 
         # Load available profiles from disk
-        profiles_dir = instance_path / ".profiles"
+        profiles_dir = instance_paths.profiles
         profiles_dir.mkdir(parents=True, exist_ok=True)
 
         # Migrate legacy per-profile modlist.txt to global modlist + active_mods.json
@@ -1494,18 +1895,18 @@ class MainWindow(QMainWindow):
             profile_name = profile_folders[0]
 
         self._profile_bar.set_profiles(profile_folders, active=profile_name)
-        self._current_profile_path = instance_path / ".profiles" / profile_name
+        self._current_profile_path = profiles_dir / profile_name
 
         # Load groups for this profile
         self._group_manager.load(self._current_profile_path)
         # Cleanup orphaned group members
-        mods_dir = instance_path / ".mods"
+        mods_dir = instance_paths.mods
         if mods_dir.is_dir():
             existing_folders = {d.name for d in mods_dir.iterdir() if d.is_dir()}
             self._group_manager.cleanup_orphans(existing_folders)
 
         # Rebuild mod file index (only re-scans changed mods)
-        self._mod_index = ModIndex(instance_path)
+        self._mod_index = ModIndex(instance_path, mods_path=instance_paths.mods)
         self._mod_index.rebuild()
 
         include_ext = self._settings().value("ModList/show_external_mods", True, type=bool)
@@ -1513,6 +1914,8 @@ class MainWindow(QMainWindow):
             instance_path, self._current_profile_path,
             include_external=include_ext,
             mod_index=self._mod_index,
+            mods_path=instance_paths.mods,
+            profiles_path=instance_paths.profiles,
         )
         # Mark direct-install (framework) mods
         direct_patterns = getattr(plugin, "GameDirectInstallMods", []) if plugin else []
@@ -1544,9 +1947,7 @@ class MainWindow(QMainWindow):
         self._game_panel.set_mod_index(self._mod_index)
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
         self._sync_separator_deploy_paths()
-        self._game_panel.silent_deploy()
-
-        # Framework detection (nach Deploy, damit Shims vorhanden sind)
+        deploy_result = self._game_panel.silent_deploy()
         if plugin is not None:
             fw_list = [
                 self._build_fw_dict(fw, installed)
@@ -1604,6 +2005,8 @@ class MainWindow(QMainWindow):
             if prop_set or cat_set or nexus_set:
                 self._filter_panel.restore_state(prop_set, cat_set, nexus_set)
 
+        return deploy_result is None or bool(getattr(deploy_result, "success", False))
+
     def _entry_for_row(self, source_row: int):
         """Resolve a source-model row to the matching ModEntry by folder name.
 
@@ -1636,7 +2039,7 @@ class MainWindow(QMainWindow):
         if self._current_profile_path is None or self._current_instance_path is None:
             return
 
-        profiles_dir = self._current_instance_path / ".profiles"
+        profiles_dir = _active_instance_paths(self).profiles
 
         # 1. Write global load order (all mod names)
         mod_names = [e.name for e in self._current_mod_entries]
@@ -1967,7 +2370,7 @@ class MainWindow(QMainWindow):
         if not self._current_instance_path:
             return {}
         all_mods = [
-            {"name": e.name, "path": str(self._current_instance_path / ".mods" / e.name)}
+            {"name": e.name, "path": str(_active_instance_paths(self).mods / e.name)}
             for e in self._current_mod_entries if e.enabled
         ]
         if not all_mods:
@@ -2293,6 +2696,7 @@ class MainWindow(QMainWindow):
         installer = ModInstaller(
             self._current_instance_path, flatten=flatten,
             script_extender_dir=se_dir,
+            mods_path=_active_instance_paths(self).mods,
         )
         temp_dir = installer.extract_to_temp(archive)
         if temp_dir is None:
@@ -2348,7 +2752,12 @@ class MainWindow(QMainWindow):
         """
         flatten = getattr(self._current_plugin, "GameFlattenArchive", True) if self._current_plugin else True
         se_dir = getattr(self._current_plugin, "ScriptExtenderDir", "") if self._current_plugin else ""
-        installer = ModInstaller(self._current_instance_path, flatten=flatten, script_extender_dir=se_dir)
+        installer = ModInstaller(
+            self._current_instance_path,
+            flatten=flatten,
+            script_extender_dir=se_dir,
+            mods_path=_active_instance_paths(self).mods,
+        )
         installed = []
         frameworks_installed = []
         _prev_inserted_name: str | None = None  # Track last inserted mod for multi-DnD
@@ -2650,7 +3059,7 @@ class MainWindow(QMainWindow):
                             "repository": "Nexus",
                         })
 
-                profiles_dir = self._current_instance_path / ".profiles"
+                profiles_dir = _active_instance_paths(self).profiles
                 global_modlist = profiles_dir / "modlist.txt"
                 if global_modlist.is_file():
                     # Global system: write to .profiles/modlist.txt
@@ -2689,7 +3098,7 @@ class MainWindow(QMainWindow):
                         add_mod_to_modlist(self._current_profile_path, mod_path.name, enabled=False)
                 installed.append(mod_path.name)
                 # Mark as installed in .meta
-                downloads_dir = self._current_downloads_path or (self._current_instance_path / ".downloads")
+                downloads_dir = _active_instance_paths(self).downloads
                 if archive.parent == downloads_dir:
                     self._write_install_meta(archive, mod_path.name)
                     # Auto-hide: removed=true in Meta wenn Setting aktiv
@@ -2801,7 +3210,7 @@ class MainWindow(QMainWindow):
         """Find the .meta file that references mod_name and set installed=false."""
         if not self._current_instance_path:
             return
-        downloads_path = self._current_downloads_path or (self._current_instance_path / ".downloads")
+        downloads_path = _active_instance_paths(self).downloads
         if not downloads_path.is_dir():
             return
         for meta_file in downloads_path.glob("*.meta"):
@@ -2824,7 +3233,7 @@ class MainWindow(QMainWindow):
         """Update installationFile in the .meta file when a mod is renamed."""
         if not self._current_instance_path:
             return
-        downloads_path = self._current_downloads_path or (self._current_instance_path / ".downloads")
+        downloads_path = _active_instance_paths(self).downloads
         if not downloads_path.is_dir():
             return
         for meta_file in downloads_path.glob("*.meta"):
@@ -2859,9 +3268,9 @@ class MainWindow(QMainWindow):
         mod_names = self._mod_list_view.get_visible_mod_names()
 
         while mod_name:
-            mod_path = str(self._current_instance_path / ".mods" / mod_name)
+            mod_path = str(_active_instance_paths(self).mods / mod_name)
             all_mods = [
-                {"name": e.name, "path": str(self._current_instance_path / ".mods" / e.name)}
+                {"name": e.name, "path": str(_active_instance_paths(self).mods / e.name)}
                 for e in self._current_mod_entries if e.enabled
             ]
             mod_entry = next(
@@ -3366,7 +3775,7 @@ class MainWindow(QMainWindow):
             return
 
         # ── Standard path: Ordner in .mods/ + modlist.txt ──
-        mods_dir = self._current_instance_path / ".mods"
+        mods_dir = _active_instance_paths(self).mods
         sep_path = mods_dir / folder_name
 
         if sep_path.exists():
@@ -3385,7 +3794,7 @@ class MainWindow(QMainWindow):
             return
 
         # Globale Modlist aktualisieren (nicht Legacy per-Profile)
-        profiles_dir = self._current_instance_path / ".profiles"
+        profiles_dir = _active_instance_paths(self).profiles
         global_list = read_global_modlist(profiles_dir)
         # Position: vor der aktuellen Auswahl, oder ganz oben
         tree = self._mod_list_view._tree
@@ -3713,7 +4122,7 @@ class MainWindow(QMainWindow):
         """Open the mods folder in file manager."""
         if not self._current_instance_path:
             return
-        path = self._current_instance_path / ".mods"
+        path = _active_instance_paths(self).mods
         if path.is_dir():
             host_open_path(str(path))
 
@@ -3777,7 +4186,7 @@ class MainWindow(QMainWindow):
         """Open the downloads folder in file manager."""
         if not self._current_instance_path:
             return
-        path = self._current_downloads_path or (self._current_instance_path / ".downloads")
+        path = _active_instance_paths(self).downloads
         if path.is_dir():
             host_open_path(str(path))
 
@@ -3804,11 +4213,15 @@ class MainWindow(QMainWindow):
 
     def _open_ao_logs_folder(self) -> None:
         """Open the Anvil Organizer logs folder in file manager."""
-        path = Path.home() / ".anvil-organizer" / "logs"
-        if not path.exists():
-            path.mkdir(parents=True, exist_ok=True)
+        path = anvil_base_paths().logs
         if path.is_dir():
             host_open_path(str(path))
+            return
+        QMessageBox.warning(
+            self,
+            tr("dialog.warning"),
+            tr("storage.base_unavailable", path=str(path.parent)),
+        )
 
     def _create_backup(self) -> None:
         """Create a ZIP backup of modlist, categories, and all meta.ini files."""
@@ -3822,11 +4235,11 @@ class MainWindow(QMainWindow):
                 return
 
             # Paths
-            backups_dir = self._current_instance_path / ".backups"
+            backups_dir = _active_instance_paths(self).backups
             backups_dir.mkdir(exist_ok=True)
             timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
             zip_path = backups_dir / f"backup_{timestamp}.zip"
-            mods_dir = self._current_instance_path / ".mods"
+            mods_dir = _active_instance_paths(self).mods
             print(f"[BACKUP] ZIP: {zip_path}")
 
             # Create ZIP
@@ -3877,7 +4290,7 @@ class MainWindow(QMainWindow):
         if not self._current_instance_path or not self._current_profile_path:
             return
 
-        backups_dir = self._current_instance_path / ".backups"
+        backups_dir = _active_instance_paths(self).backups
         backups = sorted(backups_dir.glob("backup_*.zip"), reverse=True)
 
         if not backups:
@@ -3906,7 +4319,7 @@ class MainWindow(QMainWindow):
                 (self._current_instance_path / "categories.json").write_bytes(data)
 
             # meta.ini files
-            mods_dir = self._current_instance_path / ".mods"
+            mods_dir = _active_instance_paths(self).mods
             for name in zf.namelist():
                 if name.startswith("mods/") and name.endswith("/meta.ini"):
                     parts = name.split("/")
@@ -3927,10 +4340,11 @@ class MainWindow(QMainWindow):
         if not self._current_instance_path or not is_valid_profile_name(name):
             return
 
-        profiles_dir = self._current_instance_path / ".profiles"
+        profiles_dir = _active_instance_paths(self).profiles
         try:
             new_profile_dir = safe_profile_directory(
-                self._current_instance_path, name
+                self._current_instance_path, name,
+                profiles_root=profiles_dir,
             )
         except ValueError:
             return
@@ -3979,13 +4393,15 @@ class MainWindow(QMainWindow):
         ):
             return
 
-        profiles_dir = self._current_instance_path / ".profiles"
+        profiles_dir = _active_instance_paths(self).profiles
         try:
             old_path = safe_profile_directory(
-                self._current_instance_path, old_name
+                self._current_instance_path, old_name,
+                profiles_root=profiles_dir,
             )
             new_path = safe_profile_directory(
-                self._current_instance_path, new_name
+                self._current_instance_path, new_name,
+                profiles_root=profiles_dir,
             )
         except ValueError:
             return
@@ -4038,10 +4454,11 @@ class MainWindow(QMainWindow):
         if not self._current_instance_path or not is_valid_profile_name(name):
             return
 
-        profiles_dir = self._current_instance_path / ".profiles"
+        profiles_dir = _active_instance_paths(self).profiles
         try:
             new_profile_path = safe_profile_directory(
-                self._current_instance_path, name
+                self._current_instance_path, name,
+                profiles_root=profiles_dir,
             )
         except ValueError:
             return
@@ -4099,7 +4516,7 @@ class MainWindow(QMainWindow):
         # 2b. Load groups for new profile
         self._group_manager.load(self._current_profile_path)
         if self._current_instance_path:
-            mods_dir = self._current_instance_path / ".mods"
+            mods_dir = _active_instance_paths(self).mods
             if mods_dir.is_dir():
                 existing_folders = {d.name for d in mods_dir.iterdir() if d.is_dir()}
                 self._group_manager.cleanup_orphans(existing_folders)
@@ -4172,10 +4589,11 @@ class MainWindow(QMainWindow):
         if not self._current_instance_path or not is_valid_profile_name(name):
             return
 
-        profiles_dir = self._current_instance_path / ".profiles"
+        profiles_dir = _active_instance_paths(self).profiles
         try:
             profile_path = safe_profile_directory(
-                self._current_instance_path, name
+                self._current_instance_path, name,
+                profiles_root=profiles_dir,
             )
         except ValueError:
             return
@@ -4237,7 +4655,7 @@ class MainWindow(QMainWindow):
         """Profil-Liste von Disk lesen (mit gespeicherter Reihenfolge)."""
         if not self._current_instance_path:
             return ["Default"]
-        profiles_dir = self._current_instance_path / ".profiles"
+        profiles_dir = _active_instance_paths(self).profiles
         if not profiles_dir.is_dir():
             return ["Default"]
         profile_folders = sorted([d.name for d in profiles_dir.iterdir() if d.is_dir() and not d.is_symlink()])
@@ -4259,7 +4677,7 @@ class MainWindow(QMainWindow):
         if not self._current_instance_path:
             return
 
-        profiles_dir = self._current_instance_path / ".profiles"
+        profiles_dir = _active_instance_paths(self).profiles
         order_file = profiles_dir / "profiles_order.json"
         order_file.write_text(json.dumps(order, indent=2))
 
@@ -4304,7 +4722,12 @@ class MainWindow(QMainWindow):
         archive_path = Path(path)
         flatten = getattr(self._current_plugin, "GameFlattenArchive", True) if self._current_plugin else True
         se_dir = getattr(self._current_plugin, "ScriptExtenderDir", "") if self._current_plugin else ""
-        installer = ModInstaller(self._current_instance_path, flatten=flatten, script_extender_dir=se_dir)
+        installer = ModInstaller(
+            self._current_instance_path,
+            flatten=flatten,
+            script_extender_dir=se_dir,
+            mods_path=_active_instance_paths(self).mods,
+        )
         result = installer.install_from_archive(archive_path)
 
         if result:
@@ -4329,7 +4752,7 @@ class MainWindow(QMainWindow):
             return
         name = name.strip()
 
-        mods_dir = self._current_instance_path / ".mods"
+        mods_dir = _active_instance_paths(self).mods
         mod_path = mods_dir / name
 
         if mod_path.exists():
@@ -4598,6 +5021,8 @@ class MainWindow(QMainWindow):
             game_short_name=game_short,
             game_nexus_name=game_nexus,
             collection_name=coll_name,
+            mods_path=_active_instance_paths(self).mods,
+            profiles_path=_active_instance_paths(self).profiles,
         )
 
         try:
@@ -4661,7 +5086,11 @@ class MainWindow(QMainWindow):
             return
 
         # Analyze against installed mods
-        result = analyze_collection(manifest, self._current_instance_path)
+        result = analyze_collection(
+            manifest,
+            self._current_instance_path,
+            mods_path=_active_instance_paths(self).mods,
+        )
 
         # Get current game short name
         current_game_short = ""
@@ -4693,6 +5122,8 @@ class MainWindow(QMainWindow):
                 profile_path=self._current_profile_path,
                 apply_categories=dialog.apply_categories(),
                 categories_data=cats_data,
+                mods_path=_active_instance_paths(self).mods,
+                profiles_path=_active_instance_paths(self).profiles,
             )
         except Exception as exc:
             QMessageBox.warning(
@@ -4976,12 +5407,12 @@ class MainWindow(QMainWindow):
         entry = self._entry_for_row(row)
         if not entry:
             return
-        mod_path = self._current_instance_path / ".mods" / entry.name
+        mod_path = _active_instance_paths(self).mods / entry.name
 
         if not mod_path.is_dir():
             return
 
-        backups_dir = self._current_instance_path / ".backups"
+        backups_dir = _active_instance_paths(self).backups
         backups_dir.mkdir(parents=True, exist_ok=True)
 
         zip_name = f"{entry.name}.zip"
@@ -5687,8 +6118,8 @@ class MainWindow(QMainWindow):
             return
         new_name = new_name.strip()
 
-        old_path = self._current_instance_path / ".mods" / old_name
-        new_path = self._current_instance_path / ".mods" / new_name
+        old_path = _active_instance_paths(self).mods / old_name
+        new_path = _active_instance_paths(self).mods / new_name
 
         if new_path.exists():
             QMessageBox.warning(
@@ -5705,7 +6136,7 @@ class MainWindow(QMainWindow):
             )
             return
 
-        profiles_dir = self._current_instance_path / ".profiles"
+        profiles_dir = _active_instance_paths(self).profiles
         rename_mod_globally(profiles_dir, old_name, new_name)
         self._update_install_meta_name(old_name, new_name)
         # Anzeigename (meta.ini "name") nachziehen, sonst zeigt die Liste den alten Namen
@@ -5724,7 +6155,7 @@ class MainWindow(QMainWindow):
         entry = self._entry_for_row(row)
         if not entry:
             return
-        downloads_path = self._current_downloads_path or (self._current_instance_path / ".downloads")
+        downloads_path = _active_instance_paths(self).downloads
         print(f"DEBUG reinstall: _current_downloads_path={self._current_downloads_path}, downloads_path={downloads_path}", flush=True)
 
         if not downloads_path.is_dir():
@@ -5740,7 +6171,7 @@ class MainWindow(QMainWindow):
 
         # 1. Try exact match from meta.ini installationFile
         from anvil.core.mod_metadata import read_meta_ini
-        mod_dir = self._current_instance_path / ".mods" / entry.name
+        mod_dir = _active_instance_paths(self).mods / entry.name
         meta = read_meta_ini(mod_dir)
         inst_file = meta.get("installationFile", "")
         if inst_file:
@@ -5773,7 +6204,7 @@ class MainWindow(QMainWindow):
             return
 
         # Pass existing mod path for FOMOD Selection Memory
-        mod_path = self._current_instance_path / ".mods" / entry.name
+        mod_path = _active_instance_paths(self).mods / entry.name
         self._install_archives([archive], reinstall_mod_path=mod_path)
         self._game_panel.refresh_downloads()
         self._do_redeploy()
@@ -5826,11 +6257,11 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        profiles_dir = self._current_instance_path / ".profiles"
+        profiles_dir = _active_instance_paths(self).profiles
         for name in names:
             # Remove from group before deleting
             self._group_manager.remove_member(name)
-            mod_path = self._current_instance_path / ".mods" / name
+            mod_path = _active_instance_paths(self).mods / name
             if mod_path.is_dir():
                 shutil.rmtree(mod_path)
             remove_mod_globally(profiles_dir, name)
@@ -5849,7 +6280,7 @@ class MainWindow(QMainWindow):
         entry = self._entry_for_row(row)
         if not entry:
             return
-        mod_path = self._current_instance_path / ".mods" / entry.name
+        mod_path = _active_instance_paths(self).mods / entry.name
         if mod_path.is_dir():
             host_open_path(str(mod_path))
 
@@ -5858,7 +6289,7 @@ class MainWindow(QMainWindow):
         entry = self._entry_for_row(row)
         if not entry:
             return
-        mod_path = self._current_instance_path / ".mods" / entry.name
+        mod_path = _active_instance_paths(self).mods / entry.name
 
         # Collect info
         info_lines = [
@@ -5924,6 +6355,8 @@ class MainWindow(QMainWindow):
             self._current_instance_path, self._current_profile_path,
             include_external=include_ext,
             mod_index=self._mod_index,
+            mods_path=_active_instance_paths(self).mods,
+            profiles_path=_active_instance_paths(self).profiles,
         )
         # Re-mark direct-install mods
         plugin = self._current_plugin
@@ -5936,7 +6369,7 @@ class MainWindow(QMainWindow):
                     entry.is_direct_install = True
         # Cleanup orphaned group members
         if self._current_instance_path:
-            mods_dir = self._current_instance_path / ".mods"
+            mods_dir = _active_instance_paths(self).mods
             if mods_dir.is_dir():
                 existing_folders = {d.name for d in mods_dir.iterdir() if d.is_dir()}
                 self._group_manager.cleanup_orphans(existing_folders)
@@ -7307,6 +7740,7 @@ class MainWindow(QMainWindow):
             installer = ModInstaller(
                 self._current_instance_path, flatten=flatten,
                 script_extender_dir=se_dir,
+                mods_path=_active_instance_paths(self).mods,
             )
             content_hits: list[Path] = []
             for f in candidates:
@@ -7613,7 +8047,12 @@ class MainWindow(QMainWindow):
         # Filter: only install archives that are actually framework mods
         flatten = getattr(self._current_plugin, "GameFlattenArchive", True)
         se_dir = getattr(self._current_plugin, "ScriptExtenderDir", "")
-        installer = ModInstaller(self._current_instance_path, flatten=flatten, script_extender_dir=se_dir)
+        installer = ModInstaller(
+            self._current_instance_path,
+            flatten=flatten,
+            script_extender_dir=se_dir,
+            mods_path=_active_instance_paths(self).mods,
+        )
         fw_archives: list[Path] = []
         rejected: list[str] = []
 

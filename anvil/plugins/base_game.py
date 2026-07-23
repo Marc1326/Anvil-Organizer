@@ -558,10 +558,11 @@ class BaseGame:
 
     def _framework_json_dirs(self) -> list[Path]:
         """Verzeichnisse in denen nach JSON-Framework-Dateien gesucht wird."""
+        from anvil.core.base_dir import anvil_base_paths
         from anvil.core.resource_path import get_anvil_base
         return [
             get_anvil_base() / "plugins" / "games",
-            Path.home() / ".anvil-organizer" / "plugins" / "games",
+            anvil_base_paths().user_plugins,
         ]
 
     def is_framework_mod(self, archive_contents: list[str]) -> FrameworkMod | None:
@@ -685,11 +686,10 @@ class BaseGame:
         pattern: list[str] | None = None,
     ) -> None:
         """Save a new framework entry to the user's plugin JSON file."""
+        from anvil.core.base_dir import anvil_base_paths
+
         short = self.GameShortName.lower()
-        json_path = (
-            Path.home() / ".anvil-organizer" / "plugins" / "games"
-            / f"game_{short}.json"
-        )
+        json_path = anvil_base_paths().user_plugins / f"game_{short}.json"
         json_path.parent.mkdir(parents=True, exist_ok=True)
 
         data: dict = {"frameworks": []}

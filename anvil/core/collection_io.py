@@ -145,6 +145,9 @@ def build_manifest(
     collection_name: str,
     collection_description: str = "",
     collection_author: str = "",
+    *,
+    mods_path: Path | None = None,
+    profiles_path: Path | None = None,
 ) -> CollectionManifest:
     """Build a CollectionManifest from the current instance state.
 
@@ -164,8 +167,8 @@ def build_manifest(
     Returns:
         A populated CollectionManifest.
     """
-    profiles_dir = instance_path / ".profiles"
-    mods_dir = instance_path / ".mods"
+    profiles_dir = profiles_path if profiles_path is not None else instance_path / ".profiles"
+    mods_dir = mods_path if mods_path is not None else instance_path / ".mods"
 
     mod_order = read_global_modlist(profiles_dir)
     active_mods = read_active_mods(profile_path)
@@ -329,6 +332,8 @@ class ImportResult:
 def analyze_collection(
     manifest: CollectionManifest,
     instance_path: Path,
+    *,
+    mods_path: Path | None = None,
 ) -> ImportResult:
     """Compare the collection's mods against what is installed.
 
@@ -339,7 +344,7 @@ def analyze_collection(
     Returns:
         An ImportResult with installed, missing, and separator lists.
     """
-    mods_dir = instance_path / ".mods"
+    mods_dir = mods_path if mods_path is not None else instance_path / ".mods"
     on_disk: set[str] = set()
     if mods_dir.is_dir():
         try:
@@ -366,6 +371,9 @@ def apply_collection(
     profile_path: Path,
     apply_categories: bool = True,
     categories_data: list[dict[str, Any]] | None = None,
+    *,
+    mods_path: Path | None = None,
+    profiles_path: Path | None = None,
 ) -> int:
     """Apply a collection to the current instance.
 
@@ -383,8 +391,14 @@ def apply_collection(
     Returns:
         Number of missing mods (not on disk, excluding separators).
     """
-    profiles_dir = instance_path / ".profiles"
-    mods_dir = instance_path / ".mods"
+    profiles_dir = profiles_path if profiles_path is not None else instance_path / ".profiles"
+    mods_dir = mods_path if mods_path is not None else instance_path / ".mods"
+    for explicit_path in (
+        mods_dir if mods_path is not None else None,
+        profiles_dir if profiles_path is not None else None,
+    ):
+        if explicit_path is not None and not explicit_path.is_dir():
+            raise FileNotFoundError(f"configured storage directory is unavailable: {explicit_path}")
     mods_dir.mkdir(parents=True, exist_ok=True)
 
     on_disk: set[str] = set()

@@ -66,11 +66,20 @@ class GhostReconBreakpointGame(BaseGame):
         instance_path: Path,
         game_path: Path,
         profile_name: str = "Default",
+        *,
+        mods_path: Path | None = None,
+        profiles_path: Path | None = None,
     ):
         """Create the native Forge deployer used by Anvil's deploy lifecycle."""
         from anvil.core.grb_deployer import GRBDeployer
 
-        return GRBDeployer(instance_path, game_path, profile_name)
+        return GRBDeployer(
+            instance_path,
+            game_path,
+            profile_name,
+            mods_path=mods_path,
+            profiles_path=profiles_path,
+        )
 
     def forgeFiles(self) -> list[Path]:
         """Return no-follow regular GRB archives from the configured root."""

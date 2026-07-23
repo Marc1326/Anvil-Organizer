@@ -47,6 +47,8 @@ from anvil.styles.dark_theme import (
     is_modern_theme, style_prefs, MODERN_THEME_DARK, MODERN_THEME_LIGHT,
     MODERN_ACCENTS, theme_color,
 )
+from anvil.core.base_dir import anvil_base_paths
+from anvil.core.instance_paths import resolve_instance_paths
 from anvil.core.nexus_api import NexusAPI
 from anvil.core.nexus_sso import NexusSSOLogin
 from anvil.core.translator import Translator, tr
@@ -76,12 +78,15 @@ def _design_preview_pixmap(dark: bool) -> QPixmap:
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, plugin_loader: PluginLoader | None = None,
                  instance_manager=None, on_clear_modindex=None,
-                 diagnostics_provider=None):
+                 diagnostics_provider=None, on_storage_migration=None,
+                 on_locate_storage=None):
         super().__init__(parent)
         self._plugin_loader = plugin_loader
         self._instance_manager = instance_manager
         self._on_clear_modindex = on_clear_modindex
         self._diagnostics_provider = diagnostics_provider
+        self._on_storage_migration = on_storage_migration
+        self._on_locate_storage = on_locate_storage
         self.setWindowTitle(tr("dialog.settings_title"))
         # Modern: feste Vorlage-Größe, rahmenlos mit eigener Titelleiste,
         # Radius 12 + 1px-Rahmen (Fensterecken transparent)
@@ -587,6 +592,7 @@ class SettingsDialog(QDialog):
             return le
 
         # ── Resolve paths from the active instance ──────────────
+        _anvil_base_dir = str(anvil_base_paths().base)
         _base_dir = ""
         _downloads = ""
         _mods = ""
@@ -598,18 +604,22 @@ class SettingsDialog(QDialog):
         if self._instance_path is not None:
             ipath = self._instance_path
             _base_dir = str(ipath)
-
-            def _resolve(val: str) -> str:
-                return val.replace("%INSTANCE_DIR%", str(ipath))
-
-            _downloads = _resolve(self._idata.get("path_downloads_directory", ""))
-            _mods = _resolve(self._idata.get("path_mods_directory", ""))
-            _profiles = _resolve(self._idata.get("path_profiles_directory", ""))
-            _overwrite = _resolve(self._idata.get("path_overwrite_directory", ""))
-            _caches = str(ipath / ".webcache")
+            resolved = resolve_instance_paths(ipath, self._idata)
+            _downloads = str(resolved.downloads)
+            _mods = str(resolved.mods)
+            _profiles = str(resolved.profiles)
+            _overwrite = str(resolved.overwrite)
+            _caches = str(resolved.cache)
             _game_path = self._idata.get("game_path", "")
 
         pf_form = QFormLayout()
+        add_path_row(
+            pf_form,
+            tr("settings.path_anvil_base_dir"),
+            _anvil_base_dir,
+            False,
+            readonly=True,
+        )
         add_path_row(pf_form, tr("settings.path_base_dir"), _base_dir, False, readonly=True)
         self._le_downloads = add_path_row(pf_form, tr("settings.path_downloads"), _downloads, False)
         self._le_mods = add_path_row(pf_form, tr("settings.path_mods"), _mods, False)
@@ -622,6 +632,33 @@ class SettingsDialog(QDialog):
         pf_game_form = QFormLayout()
         self._le_game_path = add_path_row(pf_game_form, tr("settings.path_managed_game"), _game_path, False)
         pf_content_layout.addLayout(pf_game_form)
+
+        _storage_btn = QPushButton(tr("storage.manage"))
+        _storage_btn.setObjectName("setOkBtn")
+        _storage_btn.setToolTip(tr("storage.manage_tooltip"))
+        _storage_callback = self._on_storage_migration
+        if _storage_callback is not None:
+            _storage_btn.clicked.connect(
+                lambda checked=False, callback=_storage_callback: callback()
+            )
+        else:
+            _storage_btn.setEnabled(False)
+        _storage_row = QHBoxLayout()
+        _storage_row.addWidget(_storage_btn)
+        _locate_btn = QPushButton(tr("storage.locate"))
+        _locate_btn.setToolTip(tr("storage.locate_tooltip"))
+        _locate_callback = self._on_locate_storage
+        if _locate_callback is not None:
+            _locate_btn.clicked.connect(
+                lambda checked=False, callback=_locate_callback: callback()
+            )
+        else:
+            _locate_btn.setEnabled(False)
+        _storage_row.addWidget(_locate_btn)
+        _storage_row.addStretch()
+        pf_content_layout.addSpacing(12)
+        pf_content_layout.addLayout(_storage_row)
+
         # Mod-Index Cache Button
         _clear_idx_btn = QPushButton(tr("settings.clear_modindex_cache"))
         _clear_idx_btn.setToolTip(tr("settings.clear_modindex_tooltip"))

@@ -13,6 +13,8 @@ import platform
 import sys
 from pathlib import Path
 
+from anvil.core.base_dir import anvil_base_paths
+
 from anvil.version import APP_VERSION
 from anvil.core.subprocess_env import is_flatpak, is_appimage
 from anvil.core.translator import tr
@@ -228,7 +230,7 @@ def collect_deploy_status(instance_path) -> dict:
 def log_sources() -> list[dict]:
     """Verfügbare Logdateien: activity.log (+ Backups) und ggf. debug.log."""
     sources: list[dict] = []
-    log_dir = Path.home() / ".anvil-organizer" / "logs"
+    log_dir = anvil_base_paths().logs
     active = log_dir / "activity.log"
     if active.is_file():
         sources.append({"label": "activity.log", "path": str(active)})

@@ -43,12 +43,18 @@ class GRBDeployer:
         profile_name: str = "Default",
         *,
         process_root: str | Path = "/proc",
+        mods_path: str | Path | None = None,
+        profiles_path: str | Path | None = None,
     ) -> None:
         self.instance_path = Path(instance_path)
         self.game_path = Path(game_path)
         self.profile_name = profile_name
-        self.mods_path = self.instance_path / ".mods"
-        self.profiles_path = self.instance_path / ".profiles"
+        self.mods_path = Path(mods_path) if mods_path is not None else self.instance_path / ".mods"
+        self.profiles_path = (
+            Path(profiles_path)
+            if profiles_path is not None
+            else self.instance_path / ".profiles"
+        )
         self.profile_path = self.profiles_path / profile_name
         self.state_path = self.instance_path / ".anvil"
         self.backup_path = self.state_path / "grb_backups"

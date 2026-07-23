@@ -15,11 +15,19 @@ def is_valid_profile_name(name: str) -> bool:
     )
 
 
-def safe_profile_directory(instance_path: Path, name: str) -> Path:
+def safe_profile_directory(
+    instance_path: Path,
+    name: str,
+    *,
+    profiles_root: Path | None = None,
+) -> Path:
     """Return a profile directory only when no path component is a symlink."""
     if not is_valid_profile_name(name):
         raise ValueError(f"invalid profile name: {name!r}")
-    profiles_root = instance_path / ".profiles"
+    profiles_root = profiles_root if profiles_root is not None else instance_path / ".profiles"
+    default_root = instance_path.absolute() / ".profiles"
+    if profiles_root.absolute() != default_root and not profiles_root.is_dir():
+        raise ValueError(f"profiles directory unavailable: {profiles_root}")
     candidate = profiles_root / name
     if profiles_root.is_symlink() or candidate.is_symlink():
         raise ValueError(f"unsafe profile path: {candidate}")

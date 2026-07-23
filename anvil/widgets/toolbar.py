@@ -143,6 +143,9 @@ def create_toolbar(parent=None):
             tr("tooltip.create_backup"), lambda: _call_win("_create_backup"))
         backup_menu.addAction(
             tr("tooltip.restore_backup"), lambda: _call_win("_restore_backup"))
+        backup_menu.addSeparator()
+        backup_menu.addAction(
+            tr("storage.action"), lambda: _call_win("_on_storage_migration"))
         backup_btn.setMenu(backup_menu)
 
     if not modern:
@@ -156,6 +159,7 @@ def create_toolbar(parent=None):
         tools_menu.addAction(tr("menu.executables"), lambda: _call_win("_on_menu_executables"))
         tools_menu.addSeparator()
         tools_menu.addAction(tr("menu.reshade_wizard"), lambda: _call_win("_on_reshade_wizard"))
+        tools_menu.addAction(tr("storage.action"), lambda: _call_win("_on_storage_migration"))
         tools_menu.addSeparator()
         tools_menu.addAction(tr("menu.settings"), lambda: _call_win("_on_menu_settings"))
         tools_btn.setMenu(tools_menu)

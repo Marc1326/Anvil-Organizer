@@ -517,6 +517,7 @@ class GamePanel(QWidget):
         self._has_nexus_api_key: bool = False
         self._downloads_path: Path | None = None
         self._mods_path: Path | None = None
+        self._profiles_path: Path | None = None
         self._instance_path: Path | None = None
         self._instance_dir: Path | None = None
         self._instance_cover_image: str = ""
@@ -1144,10 +1145,18 @@ class GamePanel(QWidget):
             and self._instance_path is not None
         ):
             from anvil.core.ba2_packer import BA2Packer
-            packer = BA2Packer(self._current_plugin, self._instance_path)
+            packer = BA2Packer(
+                self._current_plugin,
+                self._instance_path,
+                mods_path=self._mods_path,
+            )
             if packer.is_available():
                 # Read enabled mods from profile
-                profiles_dir = self._instance_path / ".profiles"
+                profiles_dir = (
+                    self._profiles_path
+                    if self._profiles_path is not None
+                    else self._instance_path / ".profiles"
+                )
                 from anvil.core.mod_list_io import read_global_modlist, read_active_mods
                 global_order = read_global_modlist(profiles_dir)
                 profile_path = profiles_dir / self._current_profile_name
@@ -1185,6 +1194,7 @@ class GamePanel(QWidget):
                 self._current_game_path,
                 self._instance_path,
                 profile_name=self._current_profile_name,
+                profiles_path=self._profiles_path,
             )
             result_path = writer.write()
             if result_path is None:
@@ -1255,6 +1265,7 @@ class GamePanel(QWidget):
                 self._current_game_path,
                 self._instance_path,
                 profile_name=self._current_profile_name,
+                profiles_path=self._profiles_path,
             )
             result_path = writer.write()
             if result_path is None:
@@ -1302,7 +1313,11 @@ class GamePanel(QWidget):
             and self._instance_path is not None
         ):
             from anvil.core.ba2_packer import BA2Packer
-            packer = BA2Packer(self._current_plugin, self._instance_path)
+            packer = BA2Packer(
+                self._current_plugin,
+                self._instance_path,
+                mods_path=self._mods_path,
+            )
             packer.cleanup_ba2s()
             packer.restore_ini()
 
@@ -1566,6 +1581,7 @@ class GamePanel(QWidget):
             self._current_game_path,
             self._instance_path,
             profile_name=self._current_profile_name,
+            profiles_path=self._profiles_path,
         )
         result = writer.sort_and_write()
         if (
@@ -1595,6 +1611,7 @@ class GamePanel(QWidget):
             self._current_game_path,
             self._instance_path,
             profile_name=self._current_profile_name,
+            profiles_path=self._profiles_path,
         )
         entries = writer.read_entries()
 
@@ -1663,6 +1680,7 @@ class GamePanel(QWidget):
             self._current_game_path,
             self._instance_path,
             profile_name=self._current_profile_name,
+            profiles_path=self._profiles_path,
         )
         current_entries = writer.read_entries()
         primary_locked = (
@@ -1728,6 +1746,7 @@ class GamePanel(QWidget):
             self._current_game_path,
             self._instance_path,
             profile_name=self._current_profile_name,
+            profiles_path=self._profiles_path,
         )
         by_key = {entry.name.casefold(): entry for entry in tree_entries}
         locked: list[PluginEntry] = []
@@ -1915,12 +1934,20 @@ class GamePanel(QWidget):
         # Check if any active mod has a REDmod component
         if self._instance_path is None:
             return False
-        mods_path = self._instance_path / ".mods"
+        mods_path = (
+            self._mods_path
+            if self._mods_path is not None
+            else self._instance_path / ".mods"
+        )
         if not mods_path.is_dir():
             return False
 
         from anvil.core.mod_list_io import read_global_modlist, read_active_mods
-        profiles_dir = self._instance_path / ".profiles"
+        profiles_dir = (
+            self._profiles_path
+            if self._profiles_path is not None
+            else self._instance_path / ".profiles"
+        )
         global_order = read_global_modlist(profiles_dir)
         active_mods = read_active_mods(profiles_dir / self._current_profile_name)
 
@@ -2707,6 +2734,14 @@ class GamePanel(QWidget):
         plugin = self._current_plugin
         factory = getattr(plugin, "create_deployer", None)
         if callable(factory):
+            if getattr(plugin, "RequiresForgeDeployment", False):
+                return factory(
+                    instance_path,
+                    game_path,
+                    profile_name,
+                    mods_path=getattr(self, "_mods_path", None),
+                    profiles_path=getattr(self, "_profiles_path", None),
+                )
             return factory(instance_path, game_path, profile_name)
         direct_patterns = getattr(plugin, "GameDirectInstallMods", []) if plugin else []
         data_path = getattr(plugin, "GameDataPath", "") if plugin else ""
@@ -2730,6 +2765,8 @@ class GamePanel(QWidget):
             mod_index=self._mod_index,
             redmod_path=redmod_path,
             separator_deploy_paths=self._separator_deploy_paths,
+            mods_path=self._mods_path,
+            profiles_path=self._profiles_path,
         )
 
     def set_instance_path(self, instance_path: Path, profile_name: str = "Default") -> None:
@@ -2748,10 +2785,17 @@ class GamePanel(QWidget):
         ):
             self._refresh_plugins_tab()
 
-    def set_downloads_path(self, downloads_path: Path, mods_path: Path) -> None:
-        """Set paths and populate the downloads table."""
+    def set_downloads_path(
+        self,
+        downloads_path: Path,
+        mods_path: Path,
+        profiles_path: Path | None = None,
+    ) -> None:
+        """Set storage paths and populate the downloads table."""
         self._downloads_path = downloads_path
         self._mods_path = mods_path
+        if profiles_path is not None:
+            self._profiles_path = profiles_path
         self.refresh_downloads()
 
     def _is_separator_row(self, row: int) -> bool:

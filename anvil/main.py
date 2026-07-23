@@ -23,20 +23,19 @@ if sys.platform.startswith("linux") and "SSL_CERT_FILE" not in os.environ:
             os.environ.setdefault("REQUESTS_CA_BUNDLE", _cert)
             break
 
-# Daten-Verzeichnis anlegen bevor irgendwas darauf zugreift —
-# sonst scheitert QLocalServer.listen() in single_instance und Anvil exited stumm.
-(Path.home() / ".anvil-organizer").mkdir(parents=True, exist_ok=True)
-
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog
 from PySide6.QtCore import QLocale, QSettings, QTranslator, QLibraryInfo
 from PySide6.QtGui import QIcon
 
-from anvil.mainwindow import MainWindow
+from anvil.core.base_dir import (
+    anvil_base_paths,
+    configure_base_dir,
+    configured_base_is_custom,
+    legacy_base_dir,
+    resolve_base_dir,
+    top_level_settings,
+)
 from anvil.core.translator import Translator
-from anvil.core.single_instance import SingleInstance
-from anvil.core.nxm_handler import get_nxm_arg
-from anvil.core.desktop_shortcut import get_launch_instance_arg
-from anvil.core.activity_log import log_action
 from anvil.version import APP_VERSION
 
 
@@ -52,21 +51,49 @@ def _init_translator():
     translator.load(saved_lang)
 
 
+def _ensure_base_directory(app: QApplication) -> bool:
+    settings = top_level_settings()
+    from anvil.core.base_migration import pending_base_migration
+
+    if pending_base_migration(settings) is not None:
+        from anvil.widgets.base_migration_dialog import BaseMigrationProgressDialog
+
+        migration_dialog = BaseMigrationProgressDialog(None, settings=settings)
+        if migration_dialog.start() != QDialog.DialogCode.Accepted:
+            return False
+
+    configured = resolve_base_dir(settings)
+    custom = configured_base_is_custom(settings)
+    first_run = not settings.contains("General/base_dir") and not legacy_base_dir().exists()
+    recovery = custom and not configured.is_dir()
+
+    if not first_run and not recovery:
+        configure_base_dir(
+            configured if custom else legacy_base_dir(),
+            settings=settings,
+            create=True,
+        )
+        return True
+
+    from anvil.widgets.base_dir_setup_dialog import BaseDirSetupDialog
+
+    dialog = BaseDirSetupDialog(
+        None,
+        settings=settings,
+        recovery=recovery,
+        missing_path=configured if recovery else None,
+    )
+    return dialog.exec() == QDialog.DialogCode.Accepted
+
+
 def main():
-    log_action("START", f"Anvil v{APP_VERSION}")
-
-    def _excepthook(exc_type, exc_value, exc_tb):
-        import traceback
-        msg = f"{exc_type.__name__}: {exc_value}"
-        log_action("ERROR", msg)
-        sys.__excepthook__(exc_type, exc_value, exc_tb)
-    sys.excepthook = _excepthook
-
     app = QApplication(sys.argv)
-    app.aboutToQuit.connect(lambda: log_action("EXIT", ""))
     app.setApplicationName("Anvil Organizer")
     app.setApplicationVersion(APP_VERSION)
     app.setDesktopFileName("com.github.Marc1326.AnvilOrganizer")
+
+    # Translator muss vor dem First-Run-/Recovery-Dialog bereit sein.
+    _init_translator()
 
     # Icon-Theme für sichtbare Dialog-Icons (dark + light kompatibel)
     if not QIcon.themeName():
@@ -76,6 +103,26 @@ def main():
     # ProxyStyle: Standard-Icons durch Theme-Icons ersetzen (QFileDialog etc.)
     from anvil.styles.icon_proxy_style import IconProxyStyle
     app.setStyle(IconProxyStyle(app.style()))
+
+    if not _ensure_base_directory(app):
+        return 0
+
+    # Basisabhängige Module erst nach Auswahl bzw. Recovery importieren.
+    from anvil.mainwindow import MainWindow
+    from anvil.core.activity_log import log_action
+    from anvil.core.desktop_shortcut import get_launch_instance_arg
+    from anvil.core.nxm_handler import get_nxm_arg
+    from anvil.core.single_instance import SingleInstance
+
+    log_action("START", f"Anvil v{APP_VERSION}")
+
+    def _excepthook(exc_type, exc_value, exc_tb):
+        msg = f"{exc_type.__name__}: {exc_value}"
+        log_action("ERROR", msg)
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+    sys.excepthook = _excepthook
+    app.aboutToQuit.connect(lambda: log_action("EXIT", ""))
 
     # ── Single-instance check ────────────────────────────────
     single = SingleInstance(app)
@@ -99,9 +146,6 @@ def main():
         sys.stderr.flush()
         # os._exit vermeidet einen Qt-Teardown-Crash im kurzlebigen Forwarder-Prozess
         os._exit(0)
-
-    # Translator mit gespeicherter Sprache initialisieren
-    _init_translator()
 
     # Qt-eigene Übersetzungen laden (für About Qt, Datei-Dialoge, etc.)
     lang = Translator.instance().current_language

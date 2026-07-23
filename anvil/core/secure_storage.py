@@ -14,6 +14,8 @@ import os
 import sys
 from pathlib import Path
 
+from anvil.core.base_dir import anvil_base_paths
+
 _SERVICE = "AnvilOrganizer"
 _ACCOUNT = "nexus_api_key"
 _CRED_FILE = "credentials.bin"
@@ -25,7 +27,7 @@ _logged_negative: bool = False
 
 
 def _config_dir() -> Path:
-    return Path.home() / ".anvil-organizer"
+    return anvil_base_paths().base
 
 
 def _cred_path() -> Path:

@@ -53,9 +53,11 @@ class ModInstaller:
     """Extract archives and install them into an instance's ``.mods/`` folder."""
 
     def __init__(self, instance_path: Path, flatten: bool = True,
-                 script_extender_dir: str = "") -> None:
+                 script_extender_dir: str = "",
+                 mods_path: Path | None = None) -> None:
         self.instance_path = instance_path
-        self.mods_path = instance_path / ".mods"
+        self.mods_path = mods_path if mods_path is not None else instance_path / ".mods"
+        self._explicit_mods_path = mods_path is not None
         self._flatten = flatten
         self._se_dir = script_extender_dir
 
@@ -169,6 +171,15 @@ class ModInstaller:
         if not archive_path.is_file():
             print(
                 f"mod_installer: file not found: {archive_path}",
+                file=sys.stderr,
+            )
+            return None
+        if self._explicit_mods_path and (
+            not self.mods_path.is_dir()
+            or not os.access(self.mods_path, os.W_OK | os.X_OK)
+        ):
+            print(
+                f"mod_installer: configured mods directory is unavailable: {self.mods_path}",
                 file=sys.stderr,
             )
             return None

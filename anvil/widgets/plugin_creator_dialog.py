@@ -35,11 +35,12 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from anvil.core.base_dir import anvil_base_paths
 from anvil.core.translator import tr
 
 
 # Pfad fuer User-Plugins
-_USER_PLUGINS_DIR = Path.home() / ".anvil-organizer" / "plugins" / "games"
+_USER_PLUGINS_DIR = anvil_base_paths().user_plugins
 
 
 class PluginCreatorDialog(QDialog):

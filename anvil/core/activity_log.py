@@ -10,7 +10,9 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-_LOG_DIR = Path.home() / ".anvil-organizer" / "logs"
+from anvil.core.base_dir import anvil_base_paths, configured_base_is_custom
+
+_LOG_DIR = anvil_base_paths().logs
 _LOG_FILE = _LOG_DIR / "activity.log"
 _MAX_BACKUPS = 4
 _ROTATE_AFTER_DAYS = 7
@@ -54,6 +56,12 @@ def _rotate_if_needed() -> None:
 def log_action(category: str, message: str = "") -> None:
     """Append a line to the activity log. Never raises."""
     try:
+        if configured_base_is_custom() and not _LOG_DIR.parent.is_dir():
+            print(
+                f"activity_log: configured base is unavailable: {_LOG_DIR.parent}",
+                file=sys.stderr,
+            )
+            return
         _LOG_DIR.mkdir(parents=True, exist_ok=True)
         _rotate_if_needed()
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

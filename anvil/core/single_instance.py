@@ -10,8 +10,10 @@ from pathlib import Path
 from PySide6.QtCore import Signal, QObject, QByteArray
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
-# Absolute path in home dir so Flatpak sandbox and host share the same socket
-SERVER_NAME = str(Path.home() / ".anvil-organizer" / "instance.sock")
+from anvil.core.base_dir import anvil_base_paths
+
+# Absolute path so Flatpak sandbox and host share the same socket.
+SERVER_NAME = str(anvil_base_paths().socket)
 
 
 class SingleInstance(QObject):

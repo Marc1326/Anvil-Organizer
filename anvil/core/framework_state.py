@@ -7,6 +7,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from PySide6.QtCore import QSettings
+
+from anvil.core.instance_paths import resolve_instance_paths
 
 DISABLED_SUFFIX = ".anvil-disabled"
 
@@ -14,7 +17,16 @@ _BOX_KEY = "_unlock_box_expires_at"
 
 
 def _state_file(instance_path: Path) -> Path:
-    return instance_path / ".profiles" / "framework_state.json"
+    ini_path = instance_path / ".anvil.ini"
+    data: dict[str, str] = {}
+    if ini_path.is_file():
+        settings = QSettings(str(ini_path), QSettings.Format.IniFormat)
+        settings.beginGroup("Paths")
+        data["path_profiles_directory"] = str(
+            settings.value("profiles_directory", "%INSTANCE_DIR%/.profiles")
+        )
+        settings.endGroup()
+    return resolve_instance_paths(instance_path, data).profiles / "framework_state.json"
 
 
 def load(instance_path: Path) -> dict[str, dict]:
@@ -38,6 +50,13 @@ def load(instance_path: Path) -> dict[str, dict]:
 def save(instance_path: Path, state: dict[str, dict]) -> None:
     """Write the whole state dict."""
     path = _state_file(instance_path)
+    default_profiles = instance_path.absolute() / ".profiles"
+    if path.parent != default_profiles and not path.parent.is_dir():
+        print(
+            f"framework_state: profiles directory unavailable: {path.parent}",
+            file=sys.stderr,
+        )
+        return
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(

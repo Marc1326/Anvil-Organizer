@@ -47,14 +47,22 @@ class PluginsTxtWriter:
         game_path: Path,
         instance_path: Path,
         profile_name: str = "Default",
+        profiles_path: Path | None = None,
     ) -> None:
         if not is_valid_profile_name(profile_name):
             raise ValueError(f"invalid profile name: {profile_name!r}")
         self._game_plugin = game_plugin
         self._game_path = game_path
         self._instance_path = instance_path
+        self._profiles_path = (
+            profiles_path if profiles_path is not None else instance_path / ".profiles"
+        )
         self._profile_name = profile_name
-        safe_profile_directory(instance_path, profile_name)
+        safe_profile_directory(
+            instance_path,
+            profile_name,
+            profiles_root=self._profiles_path,
+        )
         self._primary: list[str] = getattr(game_plugin, "PRIMARY_PLUGINS", [])
         self.last_error = ""
 
@@ -62,7 +70,9 @@ class PluginsTxtWriter:
     def profile_plugins_path(self) -> Path:
         """Return Anvil's profile-specific persistent plugin state."""
         return safe_profile_directory(
-            self._instance_path, self._profile_name
+            self._instance_path,
+            self._profile_name,
+            profiles_root=self._profiles_path,
         ) / "plugins.txt"
 
     # ── Private helpers ──────────────────────────────────────────────

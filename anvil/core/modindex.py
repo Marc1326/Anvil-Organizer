@@ -48,9 +48,9 @@ class ModIndex:
             (e.g. ``~/.anvil-organizer/instances/Cyberpunk 2077/``).
     """
 
-    def __init__(self, instance_path: Path) -> None:
+    def __init__(self, instance_path: Path, mods_path: Path | None = None) -> None:
         self._instance_path = instance_path
-        self._mods_path = instance_path / ".mods"
+        self._mods_path = mods_path if mods_path is not None else instance_path / ".mods"
         self._cache_path = instance_path / _CACHE_FILENAME
         self._index: dict[str, _ModCache] = {}
         self._dirty = False

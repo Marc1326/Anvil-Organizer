@@ -21,6 +21,7 @@ Safety rules:
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 from dataclasses import dataclass, field
@@ -97,6 +98,8 @@ class ModDeployer:
         mod_index: ModIndex | None = None,
         redmod_path: str = "",
         separator_deploy_paths: dict[str, str] | None = None,
+        mods_path: Path | None = None,
+        profiles_path: Path | None = None,
     ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
@@ -105,8 +108,10 @@ class ModDeployer:
         self._lml_path = lml_path
         self._redmod_path = redmod_path
         self._multi_folder_routes = multi_folder_routes or {}
-        self._mods_path = instance_path / ".mods"
-        self._profiles_dir = instance_path / ".profiles"
+        self._explicit_mods_path = mods_path is not None
+        self._explicit_profiles_path = profiles_path is not None
+        self._mods_path = mods_path if mods_path is not None else instance_path / ".mods"
+        self._profiles_dir = profiles_path if profiles_path is not None else instance_path / ".profiles"
         self._profile_path = self._profiles_dir / profile_name
         self._manifest_path = instance_path / self.MANIFEST_NAME
         self._direct_patterns = [p.lower() for p in (direct_install_patterns or [])]
@@ -142,6 +147,20 @@ class ModDeployer:
             DeployResult with statistics and any errors.
         """
         result = DeployResult()
+
+        for component, path, explicit in (
+            ("mods", self._mods_path, self._explicit_mods_path),
+            ("profiles", self._profiles_dir, self._explicit_profiles_path),
+        ):
+            if explicit and (
+                not path.is_dir()
+                or not os.access(path, os.R_OK | os.X_OK)
+            ):
+                result.success = False
+                result.errors.append(
+                    f"configured {component} directory is unavailable: {path}"
+                )
+                return result
 
         # Purge old deployment first (clean slate)
         if self.is_deployed():
@@ -621,6 +640,21 @@ class ModDeployer:
                     result.errors.append(f"unlink shim {link_rel}: {exc}")
                 continue
 
+            # Every managed symlink must still target the configured mods root.
+            if deploy_type in {"symlink", "dir_symlink"} and link_path.is_symlink():
+                try:
+                    real_target = link_path.resolve(strict=False)
+                    mods_root = self._mods_path.resolve(strict=False)
+                except OSError as exc:
+                    result.errors.append(f"skip {link_rel}: cannot verify target: {exc}")
+                    continue
+                if not real_target.is_relative_to(mods_root):
+                    result.errors.append(
+                        f"skip {link_rel}: target {real_target} "
+                        f"not inside {mods_root}"
+                    )
+                    continue
+
             # Directory symlinks (LML mods)
             if deploy_type == "dir_symlink":
                 if link_path.is_symlink():
@@ -634,19 +668,6 @@ class ModDeployer:
             if not link_path.is_symlink():
                 # Already gone or replaced by a real file — skip
                 continue
-
-            # Safety: only remove if target points into .mods/
-            try:
-                real_target = link_path.resolve()
-                mods_str = str(self._mods_path.resolve())
-                if not str(real_target).startswith(mods_str):
-                    result.errors.append(
-                        f"skip {link_rel}: target {real_target} "
-                        f"not inside {mods_str}"
-                    )
-                    continue
-            except OSError:
-                pass  # broken symlink is fine to remove
 
             try:
                 link_path.unlink()

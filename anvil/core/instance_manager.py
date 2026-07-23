@@ -20,28 +20,55 @@ Directory layout per instance::
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from PySide6.QtCore import QSettings
 
+from anvil.core.base_dir import anvil_base_paths, configured_base_is_custom
+from anvil.core.instance_paths import resolve_instance_paths
 from anvil.plugins.base_game import BaseGame
 
 # ── Defaults ──────────────────────────────────────────────────────────
 
-_DEFAULT_BASE = Path.home() / ".anvil-organizer" / "instances"
-_CURRENT_FILE = Path.home() / ".anvil-organizer" / ".current"
-
 _SUBDIRS = (".mods", ".downloads", ".profiles", ".overwrite")
+
+_PATH_KEYS = {
+    "path_mods_directory": "mods_directory",
+    "path_downloads_directory": "downloads_directory",
+    "path_profiles_directory": "profiles_directory",
+    "path_overwrite_directory": "overwrite_directory",
+    "path_backups_directory": "backups_directory",
+    "path_cache_directory": "cache_directory",
+}
 
 
 class InstanceManager:
     """Create, list, load, switch, and delete game instances."""
 
-    def __init__(self, base_path: Path | None = None) -> None:
-        self._base = base_path or _DEFAULT_BASE
+    def __init__(
+        self,
+        base_path: Path | None = None,
+        *,
+        settings: QSettings | None = None,
+    ) -> None:
+        if base_path is not None:
+            self._base = Path(base_path)
+            self._base.mkdir(parents=True, exist_ok=True)
+            return
+        paths = anvil_base_paths(settings)
+        if configured_base_is_custom(settings):
+            if paths.base.is_symlink() or not paths.base.is_dir():
+                raise FileNotFoundError(
+                    f"configured Anvil base directory is unavailable: {paths.base}"
+                )
+        else:
+            paths.base.mkdir(parents=True, exist_ok=True)
+        self._base = paths.instances
         self._base.mkdir(parents=True, exist_ok=True)
 
     # ── Getters ───────────────────────────────────────────────────────
@@ -380,6 +407,101 @@ class InstanceManager:
 
         s.sync()
 
+    def ensure_instance_id(self, name: str) -> str:
+        instance = self._base / name
+        ini = instance / ".anvil.ini"
+        if not ini.is_file():
+            raise FileNotFoundError(ini)
+        current = self._read_ini(ini).get("instance_id", "").strip()
+        if current:
+            try:
+                uuid.UUID(current)
+            except ValueError as exc:
+                raise ValueError(f"invalid instance id in {ini}") from exc
+            return current
+
+        instance_id = str(uuid.uuid4())
+        temporary = ini.with_name(ini.name + ".instance-id.tmp")
+        temporary.unlink(missing_ok=True)
+        try:
+            shutil.copy2(ini, temporary)
+            settings = QSettings(str(temporary), QSettings.Format.IniFormat)
+            settings.beginGroup("General")
+            settings.setValue("instance_id", instance_id)
+            settings.endGroup()
+            settings.sync()
+            if settings.status() != QSettings.Status.NoError:
+                raise OSError(f"QSettings failed with status {settings.status()}")
+            if self._read_ini(temporary).get("instance_id") != instance_id:
+                raise OSError("failed to persist instance id")
+            os.replace(temporary, ini)
+            directory_fd = os.open(instance, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return instance_id
+
+    def update_instance_paths_atomic(
+        self,
+        name: str,
+        updates: dict[str, str | None],
+    ) -> dict[str, str | None]:
+        unknown = set(updates) - set(_PATH_KEYS)
+        if unknown:
+            raise ValueError(f"unsupported instance path keys: {sorted(unknown)}")
+        instance = self._base / name
+        ini = instance / ".anvil.ini"
+        if not ini.is_file():
+            raise FileNotFoundError(ini)
+
+        current = self._read_ini(ini)
+        old_values = {key: current.get(key) for key in updates}
+        candidate = dict(current)
+        for key, value in updates.items():
+            if value is None:
+                candidate.pop(key, None)
+            else:
+                candidate[key] = value
+        resolve_instance_paths(instance, candidate)
+
+        temporary = ini.with_name(ini.name + ".migration.tmp")
+        temporary.unlink(missing_ok=True)
+        try:
+            shutil.copy2(ini, temporary)
+            settings = QSettings(str(temporary), QSettings.Format.IniFormat)
+            settings.beginGroup("Paths")
+            for key, value in updates.items():
+                ini_key = _PATH_KEYS[key]
+                if value is None:
+                    settings.remove(ini_key)
+                else:
+                    settings.setValue(ini_key, value)
+            settings.endGroup()
+            settings.sync()
+            if settings.status() is not QSettings.Status.NoError:
+                raise OSError(f"QSettings failed with status {settings.status()}")
+
+            written = self._read_ini(temporary)
+            for key, expected in updates.items():
+                if expected is None:
+                    if key in written:
+                        raise OSError(f"failed to remove {key}")
+                elif written.get(key) != expected:
+                    raise OSError(f"failed to persist {key}")
+
+            os.replace(temporary, ini)
+            directory_fd = os.open(instance, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return old_values
+
     # ── Current instance ──────────────────────────────────────────────
 
     def current_instance(self) -> str | None:
@@ -445,6 +567,7 @@ class InstanceManager:
         s.setValue("detected_store", game_plugin.detectedStore() or "")
         s.setValue("selected_profile", "Default")
         s.setValue("created", datetime.now(timezone.utc).isoformat())
+        s.setValue("instance_id", str(uuid.uuid4()))
         s.setValue("portable", portable)
         s.setValue("local_inis", local_inis)
         s.setValue("local_saves", local_saves)

@@ -106,10 +106,11 @@ class BA2Packer:
         game_plugin,
         instance_path: Path,
         bsarch_path: Path | None = None,
+        mods_path: Path | None = None,
     ) -> None:
         self._plugin = game_plugin
         self._instance_path = instance_path
-        self._mods_path = instance_path / ".mods"
+        self._mods_path = mods_path if mods_path is not None else instance_path / ".mods"
         self._game_path: Path | None = game_plugin.gameDirectory()
         self._data_path = self._game_path / (game_plugin.GameDataPath or "") if self._game_path else None
         self._bsarch_override = bsarch_path

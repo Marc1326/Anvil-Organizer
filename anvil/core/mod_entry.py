@@ -203,6 +203,9 @@ def scan_mods_directory(
     profile_path: Path,
     include_external: bool = True,
     mod_index: ModIndex | None = None,
+    *,
+    mods_path: Path | None = None,
+    profiles_path: Path | None = None,
 ) -> list[ModEntry]:
     """Scan an instance's mods and return a sorted list of ModEntry.
 
@@ -233,8 +236,8 @@ def scan_mods_directory(
         List of :class:`ModEntry`, ordered by priority
         (index 0 = lowest priority).
     """
-    mods_dir = instance_path / ".mods"
-    profiles_dir = instance_path / ".profiles"
+    mods_dir = mods_path if mods_path is not None else instance_path / ".mods"
+    profiles_dir = profiles_path if profiles_path is not None else instance_path / ".profiles"
 
     # 1. Try global modlist first, fallback to legacy per-profile
     global_modlist = profiles_dir / "modlist.txt"
