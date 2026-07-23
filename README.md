@@ -18,8 +18,9 @@ Most mod managers only target Windows — Anvil fills the gap on Linux.
 
 ## Features
 
-- **MO2-style virtual file system** — mods never touch your game directory (symlink-based deploy)
+- **MO2-style virtual file system** — symlink-based deployment for standard game plugins
 - **Multi-instance support** — separate configurations per game
+- **Storage management** — move individual components, game instances, or the complete Anvil data directory with verification and rollback
 - **Profile system** — switch mod setups per game instance
 - **Drag & drop mod ordering** — with collapsible separators and color coding
 - **Category system** — primary + secondary categories, filter panel
@@ -34,6 +35,7 @@ Most mod managers only target Windows — Anvil fills the gap on Linux.
 - **Nexus Info Tab** — fetch mod info from Nexus with one click, view details in mod dialog
 - **Mod detail navigation** — next/previous buttons to browse through your mod list
 - **BG3 Auto-Deploy** — every change is immediately written to modsettings.lsx
+- **Ghost Recon Breakpoint** — native Linux Forge archive deployment with verified backups and restore
 - **Framework Reverse-Sync** — detects newer framework versions and preserves them
 - **Self-update** — checks GitHub for updates, one-click git pull + restart
 - **7 languages** — DE, EN, FR, ES, IT, PT, RU
@@ -41,7 +43,7 @@ Most mod managers only target Windows — Anvil fills the gap on Linux.
 
 ## Supported Games (35)
 
-### Fully Supported (8)
+### Fully Supported (7)
 
 | Game | Notes |
 |------|-------|
@@ -53,7 +55,7 @@ Most mod managers only target Windows — Anvil fills the gap on Linux.
 | Fallout 4 | F4SE Proton Shim (auto-injection), BA2 packing, plugins.txt |
 | Starfield | SFSE Proton Shim, Address Library detection |
 
-### Beta (27) — [Feedback welcome!](https://github.com/Marc1326/Anvil-Organizer/issues)
+### Beta (28) — [Feedback welcome!](https://github.com/Marc1326/Anvil-Organizer/issues)
 
 | Game | Steam | GOG | Game | Steam | GOG |
 |------|:-----:|:---:|------|:-----:|:---:|
@@ -72,6 +74,7 @@ Most mod managers only target Windows — Anvil fills the gap on Linux.
 | FF VII Remake | ✅ | — | | | |
 | Hogwarts Legacy | ✅ | ✅ | | | |
 | Kingdom Come: Deliverance | ✅ | ✅ | | | |
+| Ghost Recon Breakpoint | ✅ | — | | | |
 
 Works with **Steam** and **Heroic Games Launcher** (GOG/Epic via Proton/Wine).
 
@@ -247,14 +250,16 @@ Anvil-Organizer/
 
 ## How It Works
 
-Anvil uses a **symlink-based virtual file system** similar to MO2:
+For most games, Anvil uses a **symlink-based virtual file system**:
 
 1. Mods are stored in `.mods/` inside each instance directory
 2. On game launch, Anvil creates symlinks from the game directory to your mods
 3. On game close (or app exit), symlinks are removed
-4. **Your game directory stays clean** — no files are ever copied or modified
+4. Purging removes the links and restores the undeployed state
 
 This approach works natively on Linux without the need for a virtual filesystem driver.
+
+Ghost Recon Breakpoint is the exception: its mods are deployed natively into Forge archives. Anvil creates verified pristine backups before the first change and rebuilds or restores the archives from those backups when the active mod set changes.
 
 ---
 
