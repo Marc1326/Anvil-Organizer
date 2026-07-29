@@ -1,6 +1,6 @@
 """No Man's Sky game plugin for Anvil Organizer.
 
-No Man's Sky Mods werden als .pak-Dateien ins GAMEDATA/PCBANKS/MODS
+No Man's Sky Mods werden als .pak-Dateien ins GAMEDATA/MODS
 Verzeichnis installiert.
 
 Features:
@@ -33,7 +33,7 @@ class NoMansSkyGame(BaseGame):
     GameName = "No Man's Sky"
     GameShortName = "nomanssky"
     GameBinary = "Binaries/NMS.exe"
-    GameDataPath = "GAMEDATA/PCBANKS/MODS"
+    GameDataPath = "GAMEDATA/MODS"
 
     GameSteamId = 275850
     GameGogId = 1446213994

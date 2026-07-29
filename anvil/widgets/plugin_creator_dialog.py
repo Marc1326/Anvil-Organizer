@@ -4,8 +4,8 @@ Bietet ein Formular in dem der User alle Daten eines Game-Plugins
 sehen, bearbeiten und neue Plugins erstellen kann — ohne Python-Code
 schreiben zu muessen.
 
-Im Edit-Modus (bestehendes Plugin) werden Frameworks in JSON gespeichert
-und das Bild kann geaendert werden.
+Im Edit-Modus (bestehendes Plugin) werden editierbare Plugin-Felder und
+Frameworks in JSON gespeichert; außerdem kann das Bild geändert werden.
 """
 
 from __future__ import annotations
@@ -363,22 +363,42 @@ class PluginCreatorDialog(QDialog):
             self._on_create()
 
     def _on_save(self) -> None:
-        """Edit-Modus: JSON-Frameworks und Bild speichern."""
+        """Edit-Modus: Plugin-Overrides, JSON-Frameworks und Bild speichern."""
         short = self._plugin.GameShortName
 
-        # JSON-Frameworks sammeln (nur nicht-Built-in)
         frameworks = self._collect_frameworks()
         json_path = _USER_PLUGINS_DIR / f"game_{short.lower()}.json"
         _USER_PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
 
+        data: dict = {}
+        if json_path.is_file():
+            try:
+                data = json.loads(json_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                data = {}
+
+        nexus_id = self._nexus_id.text().strip()
+        data["overrides"] = {
+            "GameDataPath": self._data_path.currentText().strip(),
+            "_WIN_DOCUMENTS": self._win_documents.text().strip(),
+            "_WIN_SAVES": self._win_saves.text().strip(),
+            "GameSaveExtension": self._save_ext.text().strip() or "save",
+            "GameNexusId": (
+                int(nexus_id)
+                if nexus_id.isdigit()
+                else getattr(self._plugin, "GameNexusId", 0)
+            ),
+        }
+
         if frameworks:
-            json_path.write_text(
-                json.dumps({"frameworks": frameworks}, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-        elif json_path.exists():
-            # Keine JSON-Frameworks mehr → Datei loeschen
-            json_path.unlink()
+            data["frameworks"] = frameworks
+        else:
+            data.pop("frameworks", None)
+
+        json_path.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
         # Bild speichern
         if self._new_icon_path:

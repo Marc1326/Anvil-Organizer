@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
+import json
 import sys
 from pathlib import Path
 
@@ -33,6 +34,14 @@ from anvil.core.resource_path import get_anvil_base
 
 _BUILTIN_GAMES_DIR = get_anvil_base() / "plugins" / "games"
 _USER_GAMES_DIR = anvil_base_paths().user_plugins
+
+_PLUGIN_OVERRIDE_TYPES: dict[str, type] = {
+    "GameDataPath": str,
+    "_WIN_DOCUMENTS": str,
+    "_WIN_SAVES": str,
+    "GameSaveExtension": str,
+    "GameNexusId": int,
+}
 
 _USER_README = """\
 # Eigene Spiel-Plugins fuer Anvil Organizer
@@ -276,15 +285,17 @@ class PluginLoader:
 
                 try:
                     instance = cls()
+                    self._apply_user_overrides(instance)
                     # Duplikat-Check: User-Plugin ersetzt Built-in
-                    short = instance.GameShortName
+                    short_name = instance.GameShortName
+                    short = short_name.casefold()
                     replaced = False
                     for i, existing in enumerate(self._plugins):
-                        if existing.GameShortName == short:
+                        if existing.GameShortName.casefold() == short:
                             print(
                                 f"plugin_loader: {name} ({py_file.name}) "
                                 f"ersetzt {existing.__class__.__name__} "
-                                f"(gleicher GameShortName: {short})",
+                                f"(gleicher GameShortName: {short_name})",
                             )
                             self._plugins[i] = instance
                             replaced = True
@@ -296,6 +307,30 @@ class PluginLoader:
                         f"plugin_loader: failed to instantiate {name}: {exc}",
                         file=sys.stderr,
                     )
+
+    @staticmethod
+    def _apply_user_overrides(plugin: BaseGame) -> None:
+        json_path = _USER_GAMES_DIR / f"game_{plugin.GameShortName.casefold()}.json"
+        if not json_path.is_file():
+            return
+        try:
+            data = json.loads(json_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            print(
+                f"plugin_loader: failed to read overrides from {json_path}: {exc}",
+                file=sys.stderr,
+            )
+            return
+
+        overrides = data.get("overrides", {})
+        if not isinstance(overrides, dict):
+            return
+        for attribute, expected_type in _PLUGIN_OVERRIDE_TYPES.items():
+            value = overrides.get(attribute)
+            if isinstance(value, expected_type) and not (
+                expected_type is int and isinstance(value, bool)
+            ):
+                setattr(plugin, attribute, value)
 
     # ── Getters ────────────────────────────────────────────────────────
 
@@ -316,8 +351,9 @@ class PluginLoader:
         Returns:
             The matching plugin, or None if not found.
         """
+        normalized = short_name.casefold()
         for plugin in self._plugins:
-            if plugin.GameShortName == short_name:
+            if plugin.GameShortName.casefold() == normalized:
                 return plugin
         return None
 
