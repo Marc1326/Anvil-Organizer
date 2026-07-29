@@ -9,6 +9,7 @@ Supported formats:
 
 from __future__ import annotations
 
+import configparser
 import os
 import re
 import shutil
@@ -362,6 +363,8 @@ class ModInstaller:
             active=True,
             version=version,
         )
+        if archive_path is not None:
+            self._mark_download_installed(archive_path, framework.name)
 
         return {
             "name": framework.name,
@@ -371,6 +374,26 @@ class ModInstaller:
             "status": "installed",
             "version": version,
         }
+
+    @staticmethod
+    def _mark_download_installed(archive_path: Path, framework_name: str) -> None:
+        meta_path = Path(str(archive_path) + ".meta")
+        metadata = configparser.ConfigParser()
+        setattr(metadata, "optionxform", str)
+        if meta_path.is_file():
+            try:
+                metadata.read(meta_path, encoding="utf-8")
+            except (configparser.Error, OSError):
+                return
+        if not metadata.has_section("General"):
+            metadata.add_section("General")
+        metadata.set("General", "installed", "true")
+        metadata.set("General", "installationFile", framework_name)
+        try:
+            with meta_path.open("w", encoding="utf-8") as stream:
+                metadata.write(stream)
+        except OSError:
+            pass
 
     @staticmethod
     def _find_install_root(temp_dir: Path, patterns: list[str],
