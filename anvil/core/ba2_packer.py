@@ -28,6 +28,8 @@ from anvil.core.subprocess_env import clean_env, host_popen
 
 from PySide6.QtCore import QSettings
 
+from anvil.core.archive_packing import is_archive_loose_path
+
 
 # ── Constants ────────────────────────────────────────────────────────
 
@@ -86,8 +88,14 @@ def _sanitize_name(name: str) -> str:
     return clean[:200]
 
 
-def _classify_file(rel_path: Path) -> str:
+def _classify_file(
+    rel_path: Path,
+    loose_paths: list[str] | None = None,
+    data_path: str = "",
+) -> str:
     """Classify a file as 'skip', 'texture', or 'general'."""
+    if is_archive_loose_path(rel_path, loose_paths or [], data_path):
+        return "skip"
     ext = rel_path.suffix.lower()
     if ext in _SYMLINK_EXTENSIONS:
         return "skip"
@@ -113,6 +121,7 @@ class BA2Packer:
         self._mods_path = mods_path if mods_path is not None else instance_path / ".mods"
         self._game_path: Path | None = game_plugin.gameDirectory()
         self._data_path = self._game_path / (game_plugin.GameDataPath or "") if self._game_path else None
+        self._loose_paths = list(getattr(game_plugin, "Ba2LoosePaths", []))
         self._bsarch_override = bsarch_path
 
     # ── BSArch finden ────────────────────────────────────────────────
@@ -229,7 +238,11 @@ class BA2Packer:
             except ValueError:
                 continue
 
-            classification = _classify_file(rel)
+            classification = _classify_file(
+                rel,
+                self._loose_paths,
+                self._plugin.GameDataPath,
+            )
             if classification == "skip":
                 skipped_count += 1
                 continue
@@ -448,7 +461,14 @@ class BA2Packer:
             # Check if mod has any packable files
             has_packable = False
             for f in mod_dir.rglob("*"):
-                if f.is_file() and _classify_file(f.relative_to(mod_dir)) != "skip":
+                if (
+                    f.is_file()
+                    and _classify_file(
+                        f.relative_to(mod_dir),
+                        self._loose_paths,
+                        self._plugin.GameDataPath,
+                    ) != "skip"
+                ):
                     has_packable = True
                     break
 

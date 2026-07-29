@@ -85,6 +85,32 @@ class PredeployLaunchTests(unittest.TestCase):
         panel.run_with_proton.assert_not_called()
         popen.assert_not_called()
 
+    def test_toolbar_proton_tool_stops_when_predeploy_fails(self) -> None:
+        predeploy = mock.Mock(return_value=False)
+        panel = SimpleNamespace(run_with_proton=mock.Mock())
+        window: Any = SimpleNamespace(
+            _current_instance_path=Path("/tmp/instance"),
+            _predeploy_for_launch=predeploy,
+            _game_panel=panel,
+        )
+        tools = [
+            {
+                "name": "BodySlide",
+                "exe_path": "/tools/BodySlide.exe",
+                "args": [],
+                "working_dir": "/tools",
+            }
+        ]
+
+        with mock.patch(
+            "anvil.widgets.proton_tools_dialog.load_proton_tools",
+            return_value=tools,
+        ):
+            MainWindow._run_proton_tool(window, 0)
+
+        predeploy.assert_called_once_with("proton_tool_start")
+        panel.run_with_proton.assert_not_called()
+
     def test_failed_predeploy_does_not_emit_game_started(self) -> None:
         app = QApplication.instance() or QApplication([])
         with tempfile.TemporaryDirectory() as temp:

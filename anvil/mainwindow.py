@@ -1307,6 +1307,8 @@ class MainWindow(QMainWindow):
         exe_path = tool.get("exe_path", "")
         if not exe_path:
             return
+        if not self._predeploy_for_launch("proton_tool_start"):
+            return
         args = tool.get("args", [])
         wdir = tool.get("working_dir", "")
         self._game_panel.run_with_proton(exe_path, args, wdir or None)

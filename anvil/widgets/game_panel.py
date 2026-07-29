@@ -1126,20 +1126,17 @@ class GamePanel(QWidget):
         _dlog(f"[DEPLOY-CHAIN]   plugin={getattr(self._current_plugin, 'GameName', None)}")
         _dlog(f"[DEPLOY-CHAIN]   game_path={self._current_game_path}")
         _dlog(f"[DEPLOY-CHAIN]   instance_path={self._instance_path}")
-        result = None
-        if self._deployer:
-            result = self._deployer.deploy()
-            _dlog(f"[DEPLOY-CHAIN]   deploy result: success={result.success}, links={result.links_created}, errors={len(result.errors)}")
-            if result.errors:
-                for e in result.errors[:5]:
-                    _dlog(f"[DEPLOY-CHAIN]   ERROR: {e}")
 
-        # BA2-Packing for Bethesda games (only if deploy succeeded)
-        needs_ba2 = getattr(self._current_plugin, "NeedsBa2Packing", False)
+        # Decide the deployment mode before walking any mod files.  If the
+        # archive toolchain is unavailable, every loose file must be deployed
+        # instead of being omitted under the assumption that it will be packed.
+        needs_ba2 = bool(
+            getattr(self._current_plugin, "NeedsBa2Packing", False)
+        )
+        packer = None
+        ba2_available = False
         if (
             needs_ba2
-            and result is not None
-            and result.success
             and self._current_plugin is not None
             and self._current_game_path is not None
             and self._instance_path is not None
@@ -1150,7 +1147,35 @@ class GamePanel(QWidget):
                 self._instance_path,
                 mods_path=self._mods_path,
             )
-            if packer.is_available():
+            ba2_available = packer.is_available()
+
+        if self._deployer:
+            set_packing = getattr(
+                self._deployer,
+                "set_ba2_packing_enabled",
+                None,
+            )
+            if callable(set_packing):
+                set_packing(needs_ba2 and ba2_available)
+
+        result = None
+        if self._deployer:
+            result = self._deployer.deploy()
+            _dlog(f"[DEPLOY-CHAIN]   deploy result: success={result.success}, links={result.links_created}, errors={len(result.errors)}")
+            if result.errors:
+                for e in result.errors[:5]:
+                    _dlog(f"[DEPLOY-CHAIN]   ERROR: {e}")
+
+        # BA2-Packing for Bethesda games (only if deploy succeeded)
+        if (
+            needs_ba2
+            and result is not None
+            and result.success
+            and self._current_plugin is not None
+            and self._current_game_path is not None
+            and self._instance_path is not None
+        ):
+            if packer is not None and ba2_available:
                 # Read enabled mods from profile
                 profiles_dir = (
                     self._profiles_path
@@ -1164,7 +1189,11 @@ class GamePanel(QWidget):
                 enabled = [n for n in global_order if n in active_mods]
 
                 pack_result = packer.pack_all_mods(enabled)
-                if pack_result.ba2_paths:
+                if not pack_result.success:
+                    packer.cleanup_ba2s()
+                    result.success = False
+                    result.errors.extend(pack_result.errors)
+                elif pack_result.ba2_paths:
                     # Extract just filenames for INI
                     ba2_names = [Path(p).name for p in pack_result.ba2_paths]
                     packer.update_ini(ba2_names)
@@ -1175,7 +1204,7 @@ class GamePanel(QWidget):
             else:
                 print(
                     "[BA2] BSArch or Wine not available — "
-                    "loose files will not be packed into BA2 archives",
+                    "deploying all files loose instead",
                     flush=True,
                 )
 
@@ -1248,6 +1277,13 @@ class GamePanel(QWidget):
             return result
         result = None
         if self._deployer:
+            set_packing = getattr(
+                self._deployer,
+                "set_ba2_packing_enabled",
+                None,
+            )
+            if callable(set_packing):
+                set_packing(False)
             result = self._deployer.deploy()
 
         # Write plugins.txt for Bethesda games after a successful deploy
@@ -2749,6 +2785,7 @@ class GamePanel(QWidget):
         lml_path = getattr(plugin, "GameLMLPath", "") if plugin else ""
         multi_routes = getattr(plugin, "GameMultiFolderRoutes", {}) if plugin else {}
         ba2_packing = getattr(plugin, "NeedsBa2Packing", False) if plugin else False
+        ba2_loose_paths = getattr(plugin, "Ba2LoosePaths", []) if plugin else []
         copy_paths = getattr(plugin, "GameCopyDeployPaths", []) if plugin else []
         redmod_path = getattr(plugin, "GameRedmodPath", "") if plugin else ""
         return ModDeployer(
@@ -2761,6 +2798,7 @@ class GamePanel(QWidget):
             lml_path=lml_path,
             multi_folder_routes=multi_routes,
             needs_ba2_packing=ba2_packing,
+            ba2_loose_paths=ba2_loose_paths,
             copy_deploy_paths=copy_paths,
             mod_index=self._mod_index,
             redmod_path=redmod_path,

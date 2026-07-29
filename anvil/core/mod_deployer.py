@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from anvil.core.archive_packing import is_archive_loose_path
 from anvil.core.mod_list_io import read_global_modlist, read_active_mods
 
 if TYPE_CHECKING:
@@ -94,6 +95,7 @@ class ModDeployer:
         lml_path: str = "",
         multi_folder_routes: dict[str, str] | None = None,
         needs_ba2_packing: bool = False,
+        ba2_loose_paths: list[str] | None = None,
         copy_deploy_paths: list[str] | None = None,
         mod_index: ModIndex | None = None,
         redmod_path: str = "",
@@ -116,6 +118,7 @@ class ModDeployer:
         self._manifest_path = instance_path / self.MANIFEST_NAME
         self._direct_patterns = [p.lower() for p in (direct_install_patterns or [])]
         self._needs_ba2_packing = needs_ba2_packing
+        self._ba2_loose_paths = ba2_loose_paths or []
         self._copy_deploy_paths = [p.replace("\\", "/") for p in (copy_deploy_paths or [])]
         self._mod_index = mod_index
         self._separator_deploy_paths = separator_deploy_paths or {}
@@ -127,6 +130,10 @@ class ModDeployer:
         """
         lower = mod_name.lower()
         return any(pat in lower for pat in self._direct_patterns)
+
+    def set_ba2_packing_enabled(self, enabled: bool) -> None:
+        """Choose whether packable loose files are omitted from symlink deploy."""
+        self._needs_ba2_packing = enabled
 
     # ── Public API ─────────────────────────────────────────────────────
 
@@ -388,12 +395,6 @@ class ModDeployer:
                 if src_file.parent == mod_dir and src_file.suffix.lower() in _SKIP_ROOT_EXTENSIONS:
                     continue
 
-                # BA2-Packing: skip files that will be packed into BA2
-                if self._needs_ba2_packing:
-                    ext = src_file.suffix.lower()
-                    if ext not in _BA2_SYMLINK_EXTENSIONS:
-                        continue
-
                 # Compute relative path from mod root
                 try:
                     rel = src_file.relative_to(mod_dir)
@@ -403,6 +404,18 @@ class ModDeployer:
                 # Strip "root/" prefix (RootBuilder pattern)
                 if rel.parts and rel.parts[0].lower() == "root":
                     rel = Path(*rel.parts[1:]) if len(rel.parts) > 1 else rel
+
+                # BA2-Packing: keep tool working data loose, skip only files
+                # that the archive packer will actually consume.
+                if self._needs_ba2_packing:
+                    ext = src_file.suffix.lower()
+                    stays_loose = is_archive_loose_path(
+                        rel,
+                        self._ba2_loose_paths,
+                        self._data_path,
+                    )
+                    if ext not in _BA2_SYMLINK_EXTENSIONS and not stays_loose:
+                        continue
 
                 # Direct-install mods skip data_path (frameworks go into game root)
                 is_direct = self.is_direct_install(mod_name)

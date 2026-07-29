@@ -94,6 +94,7 @@ class SkyrimSEGame(BaseGame):
     # -- BA2-Packing (loose files → BA2 archives via BSArch/Proton) ---------
 
     NeedsBa2Packing = True
+    Ba2LoosePaths = ["CalienteTools"]
     Ba2Format = "sse"             # BSArch: -sse -mt
     Ba2TextureFormat = "sse"      # SSE textures: same flag
     Ba2IniSection = "Archive"
