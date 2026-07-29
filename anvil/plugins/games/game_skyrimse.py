@@ -61,6 +61,7 @@ class SkyrimSEGame(BaseGame):
     GameSupportURL = "https://github.com/Marc1326/anvil-wiki"
 
     ProtonShimFiles: list[str] = ["winhttp.dll"]
+    GameProtonDllOverrides = {"winhttp": "native,builtin"}
 
     ScriptExtenderDir = "SKSE"
 
@@ -166,10 +167,10 @@ class SkyrimSEGame(BaseGame):
         return [
             FrameworkMod(
                 name="SKSE64",
-                pattern=["skse64_loader.exe", "skse64_1_6_1170.dll"],
+                pattern=["skse64_loader.exe", "skse64_*.dll"],
                 target="",
                 description="Skyrim Script Extender 64 — erweitert die Scripting-Engine",
-                detect_installed=["skse64_loader.exe"],
+                detect_installed=["skse64_loader.exe", "skse64_*.dll"],
                 required_by=["SKSE-Plugins", "SkyUI", "MCM", "RaceMenu"],
                 nexus_id=30379,
             ),

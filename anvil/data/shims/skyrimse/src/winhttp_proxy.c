@@ -1,8 +1,8 @@
 /*
- * SKSE64 Proton Shim — winhttp.dll proxy v1.0
+ * SKSE64 Proton Shim — winhttp.dll proxy v1.1
  *
  * Proxies all 32 exports of the real winhttp.dll to the original
- * system DLL, and loads SKSE64 (skse64_1_6_1170.dll) after process init.
+ * system DLL, and loads the installed SKSE64 runtime DLL after process init.
  *
  * IMPORTANT: DllMain does NOTHING that requires the loader lock.
  * All heavy work (LoadLibrary, log, SKSE) happens lazily on first
@@ -16,7 +16,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shlobj.h>
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ── State ────────────────────────────────────────────────── */
@@ -54,7 +56,7 @@ static void open_log(void) {
     snprintf(path, MAX_PATH, "%s\\skse_shim.log", dir);
 
     g_log = fopen(path, "w");
-    shim_log("=== SKSE64 Proton Shim v1.0 ===\n");
+    shim_log("=== SKSE64 Proton Shim v1.1 ===\n");
     shim_log("log: %s\n", path);
 }
 
@@ -77,7 +79,68 @@ static void load_original(void) {
 
 /* ── SKSE64 Loading ───────────────────────────────────────── */
 
-#define SKSE_DLL "skse64_1_6_1170.dll"
+#define SKSE_DLL_PATTERN "skse64_*.dll"
+
+static HMODULE load_skse_runtime(char *loaded_name, size_t loaded_name_size) {
+    char game_dir[MAX_PATH] = {0};
+    DWORD path_length = GetModuleFileNameA(NULL, game_dir, MAX_PATH);
+    if (path_length == 0 || path_length >= MAX_PATH) {
+        shim_log("WARN: could not resolve Skyrim directory (error %lu)\n",
+                 GetLastError());
+        return NULL;
+    }
+    char *separator = strrchr(game_dir, '\\');
+    if (!separator)
+        separator = strrchr(game_dir, '/');
+    if (!separator) {
+        shim_log("WARN: Skyrim executable path has no directory: %s\n", game_dir);
+        return NULL;
+    }
+    *separator = '\0';
+
+    char search_pattern[MAX_PATH];
+    int pattern_length = snprintf(search_pattern, MAX_PATH, "%s\\%s",
+                                  game_dir, SKSE_DLL_PATTERN);
+    if (pattern_length < 0 || pattern_length >= MAX_PATH) {
+        shim_log("WARN: Skyrim directory path is too long\n");
+        return NULL;
+    }
+
+    WIN32_FIND_DATAA find_data;
+    HANDLE search = FindFirstFileA(search_pattern, &find_data);
+    if (search == INVALID_HANDLE_VALUE) {
+        shim_log("WARN: no SKSE runtime DLL matching %s (error %lu)\n",
+                 SKSE_DLL_PATTERN, GetLastError());
+        return NULL;
+    }
+
+    HMODULE skse = NULL;
+    do {
+        if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            continue;
+
+        char candidate[MAX_PATH];
+        int candidate_length = snprintf(candidate, MAX_PATH, "%s\\%s",
+                                        game_dir, find_data.cFileName);
+        if (candidate_length < 0 || candidate_length >= MAX_PATH) {
+            shim_log("WARN: SKSE runtime path is too long: %s\n",
+                     find_data.cFileName);
+            continue;
+        }
+
+        shim_log("trying skse dll: %s\n", candidate);
+        skse = LoadLibraryA(candidate);
+        if (skse) {
+            snprintf(loaded_name, loaded_name_size, "%s", find_data.cFileName);
+            break;
+        }
+        shim_log("WARN: failed to load %s (error %lu)\n",
+                 find_data.cFileName, GetLastError());
+    } while (FindNextFileA(search, &find_data));
+
+    FindClose(search);
+    return skse;
+}
 
 static DWORD WINAPI skse_loader_thread(LPVOID param) {
     (void)param;
@@ -85,15 +148,14 @@ static DWORD WINAPI skse_loader_thread(LPVOID param) {
     /* Wait for process to finish CRT init */
     Sleep(2000);
 
-    shim_log("loading skse dll: %s\n", SKSE_DLL);
-
-    HMODULE skse = LoadLibraryA(SKSE_DLL);
+    char skse_dll[MAX_PATH] = {0};
+    HMODULE skse = load_skse_runtime(skse_dll, sizeof(skse_dll));
     if (!skse) {
-        shim_log("WARN: %s not found (error %lu)\n", SKSE_DLL, GetLastError());
         shim_log("SKSE will not load — game runs without script extender\n");
         return 1;
     }
-    shim_log("skse dll loaded at %p — hooks installed via DllMain\n", (void *)skse);
+    shim_log("skse dll loaded: %s at %p — hooks installed via DllMain\n",
+             skse_dll, (void *)skse);
 
     return 0;
 }
