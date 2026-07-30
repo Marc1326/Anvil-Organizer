@@ -42,9 +42,6 @@ Wiki = "https://github.com/Marc1326/Anvil-Organizer/wiki"
 [project.scripts]
 anvil-organizer = "anvil.__main__:main"
 
-[project.gui-scripts]
-anvil-organizer = "anvil.__main__:main"
-
 [tool.setuptools.package-data]
 anvil = [
     "styles/*.qss",

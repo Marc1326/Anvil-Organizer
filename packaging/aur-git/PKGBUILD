@@ -11,6 +11,8 @@ depends=(
     'python>=3.11'
     'pyside6'
     'python-lz4'
+    'python-keyring'
+    'python-cryptography'
     'qt6-base'
     'hicolor-icon-theme'
 )
