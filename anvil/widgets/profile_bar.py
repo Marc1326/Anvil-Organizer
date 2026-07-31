@@ -517,10 +517,25 @@ class ProfileBar(QWidget):
         self._position_fade_edges()
         self._update_fade_visibility()
 
+    def _is_own_scroll_target(self, obj) -> bool:
+        """Whether *obj* is part of this bar's scrollable tab strip.
+
+        The event filter also runs application-wide, so this has to stay
+        strict — otherwise any wheel event anywhere would scroll the bar.
+        """
+        return (
+            obj is self._tabs_widget
+            or obj is self._tab_container
+            or obj is self._scroll_area
+            or obj is self._scroll_area.viewport()
+            or obj in self._tabs
+        )
+
     def wheelEvent(self, event):
         """Handle mouse wheel for horizontal scrolling."""
         scrollbar = self._scroll_area.horizontalScrollBar()
-        delta = event.angleDelta().y()
+        # Touchpads and tilt wheels report on x, regular wheels on y.
+        delta = event.angleDelta().y() or event.angleDelta().x()
         scrollbar.setValue(scrollbar.value() - delta)
         event.accept()
 
@@ -861,6 +876,14 @@ class ProfileBar(QWidget):
             if self._rename_input is not None and obj is not self._rename_input:
                 self._rename_input.clearFocus()
                 return False
+
+        # Mausrad über der Leiste horizontal scrollen.  Ohne das erreicht
+        # das Event nie ProfileBar.wheelEvent: die QScrollArea verarbeitet
+        # es selbst und ihre vertikale Leiste verschluckt es.  Bei vielen
+        # Profilen ist die Leiste sonst gar nicht bedienbar.
+        if event.type() == QEvent.Type.Wheel and self._is_own_scroll_target(obj):
+            self.wheelEvent(event)
+            return True
 
         # Nur Events von Tabs verarbeiten (für Drag & Drop)
         if obj not in self._tabs:
