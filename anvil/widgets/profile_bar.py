@@ -292,6 +292,7 @@ class ProfileBar(QWidget):
     # New signals for tabs
     profile_changed = Signal(str)
     profile_create_confirmed = Signal(str)  # Emits profile name
+    profile_create_rejected = Signal(str)  # Emits a translation key
     profile_renamed = Signal(str, str)  # (old_name, new_name)
     profile_delete_requested = Signal(str)  # Profilname
     profiles_reordered = Signal(list)  # Neue Reihenfolge
@@ -701,6 +702,15 @@ class ProfileBar(QWidget):
         """Handle Enter press - create the profile."""
         name = edit.text().strip()
         if not is_valid_profile_name(name):
+            # Tell the user why nothing happened instead of just
+            # dropping the input silently.
+            self.profile_create_rejected.emit("toast.profile_invalid_name")
+            self._cancel_inline_create(edit)
+            return
+
+        current_profiles = [tab.text() for tab in self._tabs]
+        if name in current_profiles:
+            self.profile_create_rejected.emit("toast.profile_exists")
             self._cancel_inline_create(edit)
             return
 
@@ -713,11 +723,9 @@ class ProfileBar(QWidget):
         self._update_container_width()
 
         # Add new profile tab
-        current_profiles = [tab.text() for tab in self._tabs]
-        if name not in current_profiles:
-            current_profiles.append(name)
-            self.set_profiles(current_profiles, active=name)
-            self.profile_create_confirmed.emit(name)
+        current_profiles.append(name)
+        self.set_profiles(current_profiles, active=name)
+        self.profile_create_confirmed.emit(name)
 
     def _cancel_inline_create(self, edit: QLineEdit):
         """Handle Escape or focus loss - cancel creation."""

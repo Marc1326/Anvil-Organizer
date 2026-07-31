@@ -257,6 +257,9 @@ class MainWindow(QMainWindow):
         self._profile_bar.disable_all_requested.connect(lambda: self._ctx_enable_all(False))
         # export_import_requested ist oben verbunden
         self._profile_bar.profile_create_confirmed.connect(self._on_profile_created)
+        self._profile_bar.profile_create_rejected.connect(
+            self._on_profile_create_rejected
+        )
         self._profile_bar.profile_renamed.connect(self._on_profile_renamed)
         self._profile_bar.profile_changed.connect(self._on_profile_changed)
         self._profile_bar.profile_delete_requested.connect(self._on_profile_deleted)
@@ -4337,9 +4340,30 @@ class MainWindow(QMainWindow):
         self._do_redeploy()
         Toast(self, tr("toast.backup_restored", name=zip_path.name))
 
+    def _on_profile_create_rejected(self, message_key: str) -> None:
+        """Show why the profile bar refused a name."""
+        Toast(self, tr(message_key))
+
+    def _profile_creation_failed(self, name: str, reason: str) -> None:
+        """Report a failed creation and drop the tab the bar added early.
+
+        The profile bar inserts the new tab before this handler runs, so
+        on failure the bar would keep showing a profile that does not
+        exist on disk.
+        """
+        print(f"[Profiles] Could not create profile {name!r}: {reason}")
+        # Longer than the default so the technical reason stays readable.
+        Toast(self, tr("toast.profile_create_failed", error=reason), duration=8000)
+        active = self._current_profile_path.name if self._current_profile_path else "Default"
+        self._profile_bar.set_profiles(self._get_profile_list(), active=active)
+
     def _on_profile_created(self, name: str) -> None:
         """Handle new profile creation - create folder and copy Default's active_mods."""
-        if not self._current_instance_path or not is_valid_profile_name(name):
+        if not self._current_instance_path:
+            self._profile_creation_failed(name, tr("toast.profile_no_instance"))
+            return
+        if not is_valid_profile_name(name):
+            self._profile_creation_failed(name, tr("toast.profile_invalid_name"))
             return
 
         profiles_dir = _active_instance_paths(self).profiles
@@ -4348,20 +4372,25 @@ class MainWindow(QMainWindow):
                 self._current_instance_path, name,
                 profiles_root=profiles_dir,
             )
-        except ValueError:
+            new_profile_dir.mkdir(parents=True, exist_ok=True)
+        except (ValueError, OSError) as exc:
+            self._profile_creation_failed(name, str(exc))
             return
-        new_profile_dir.mkdir(parents=True, exist_ok=True)
 
         # ── BG3-Weiche: bg3_modstate.json kopieren statt active_mods.json ──
         if self._bg3_installer is not None:
-            state_src = self._bg3_installer._state_file_path()
-            if state_src and state_src.is_file():
-                shutil.copy2(state_src, new_profile_dir / "bg3_modstate.json")
-            # Copy separators too
-            if self._current_profile_path:
-                sep_src = self._current_profile_path / "bg3_separators.json"
-                if sep_src.is_file():
-                    shutil.copy2(sep_src, new_profile_dir / "bg3_separators.json")
+            try:
+                state_src = self._bg3_installer._state_file_path()
+                if state_src and state_src.is_file():
+                    shutil.copy2(state_src, new_profile_dir / "bg3_modstate.json")
+                # Copy separators too
+                if self._current_profile_path:
+                    sep_src = self._current_profile_path / "bg3_separators.json"
+                    if sep_src.is_file():
+                        shutil.copy2(sep_src, new_profile_dir / "bg3_separators.json")
+            except OSError as exc:
+                self._profile_creation_failed(name, str(exc))
+                return
             self._on_profile_changed(name)
             Toast(self, tr("toast.profile_created", name=name))
             return
@@ -4370,17 +4399,21 @@ class MainWindow(QMainWindow):
         # Copy active_mods.json from Default profile (basis template)
         default_profile = profiles_dir / "Default"
         default_active = default_profile / "active_mods.json"
-        if default_active.exists():
-            shutil.copy(default_active, new_profile_dir / "active_mods.json")
-        else:
-            # If Default has no active_mods.json yet, create one with current state
-            active_mods = {e.name for e in self._current_mod_entries if e.enabled}
-            write_active_mods(new_profile_dir, active_mods)
+        try:
+            if default_active.exists():
+                shutil.copy(default_active, new_profile_dir / "active_mods.json")
+            else:
+                # If Default has no active_mods.json yet, create one with current state
+                active_mods = {e.name for e in self._current_mod_entries if e.enabled}
+                write_active_mods(new_profile_dir, active_mods)
 
-        # Plugin activation and order are profile-specific too.
-        default_plugins = default_profile / "plugins.txt"
-        if default_plugins.is_file():
-            shutil.copy2(default_plugins, new_profile_dir / "plugins.txt")
+            # Plugin activation and order are profile-specific too.
+            default_plugins = default_profile / "plugins.txt"
+            if default_plugins.is_file():
+                shutil.copy2(default_plugins, new_profile_dir / "plugins.txt")
+        except OSError as exc:
+            self._profile_creation_failed(name, str(exc))
+            return
 
         # Switch to new profile
         self._on_profile_changed(name)
