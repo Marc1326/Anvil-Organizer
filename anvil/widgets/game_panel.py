@@ -202,6 +202,30 @@ def _cover_size() -> QSize:
     return QSize(140, 140)
 
 
+def localized_write_error(text: str, key: str) -> str:
+    """Resolve a plugins.txt failure into a user-facing message.
+
+    The core reports failures as internal English strings such as
+    "plugins.txt path is unavailable".  Where it also supplies a
+    translation key, resolve that instead so the user gets a localized
+    message.  A missing Proton prefix additionally gets the "run the
+    game once" hint, which is the fix in nearly every case.
+    """
+    if not key:
+        return text
+    resolved = tr(key)
+    if key == "game_panel.plugins_no_prefix":
+        resolved = f"{resolved}\n\n{tr('game_panel.proton_not_found')}"
+    return resolved
+
+
+def _plugin_write_error_text(writer: PluginsTxtWriter) -> str:
+    """Return a user-facing message for a failed write via the writer."""
+    return localized_write_error(
+        writer.last_error, getattr(writer, "last_error_key", "")
+    )
+
+
 class GamePanel(QWidget):
     install_requested = Signal(list)  # list of archive path strings
     start_requested = Signal(str, str)  # (binary_path, working_dir)
@@ -1087,7 +1111,11 @@ class GamePanel(QWidget):
         writer: PluginsTxtWriter,
         message: str = "",
     ) -> None:
-        message = message or writer.last_error or "plugins.txt write failed"
+        message = (
+            message
+            or _plugin_write_error_text(writer)
+            or "plugins.txt write failed"
+        )
         setattr(result, "success", False)
         errors = getattr(result, "errors", None)
         if isinstance(errors, list):
@@ -1096,7 +1124,9 @@ class GamePanel(QWidget):
     @staticmethod
     def _plugin_sort_failure_message(result: PluginSortResult) -> str:
         if result.write_error:
-            return result.write_error
+            return localized_write_error(
+                result.write_error, getattr(result, "write_error_key", "")
+            )
         details: list[str] = []
         if result.missing_masters:
             details.append(f"missing masters: {len(result.missing_masters)}")
@@ -1747,7 +1777,8 @@ class GamePanel(QWidget):
             QMessageBox.warning(
                 self,
                 tr("load_order.write_error_title"),
-                writer.last_error or tr("load_order.sorting_failed"),
+                _plugin_write_error_text(writer)
+                or tr("load_order.sorting_failed"),
             )
             QTimer.singleShot(0, self._refresh_plugins_tab)
 
@@ -1810,7 +1841,8 @@ class GamePanel(QWidget):
             QMessageBox.warning(
                 self,
                 tr("load_order.write_error_title"),
-                writer.last_error or tr("load_order.sorting_failed"),
+                _plugin_write_error_text(writer)
+                or tr("load_order.sorting_failed"),
             )
             return False
         return True

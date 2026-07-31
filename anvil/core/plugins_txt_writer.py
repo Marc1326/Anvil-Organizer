@@ -36,6 +36,8 @@ class PluginSortResult:
     cycles: list[list[str]]
     parse_errors: dict[str, str]
     write_error: str = ""
+    write_error_key: str = ""
+    """Translation key for ``write_error``; see ``PluginsTxtWriter``."""
 
 
 class PluginsTxtWriter:
@@ -65,6 +67,12 @@ class PluginsTxtWriter:
         )
         self._primary: list[str] = getattr(game_plugin, "PRIMARY_PLUGINS", [])
         self.last_error = ""
+        self.last_error_key = ""
+        """Translation key for ``last_error``, empty when none applies.
+
+        The core must not translate; the UI resolves this key and falls
+        back to the plain ``last_error`` text when it is empty.
+        """
 
     @property
     def profile_plugins_path(self) -> Path:
@@ -244,13 +252,19 @@ class PluginsTxtWriter:
     def write_entries(self, entries: list[PluginEntry]) -> Path | None:
         """Persist an exact order to the active Anvil profile and game."""
         self.last_error = ""
+        self.last_error_key = ""
         if not entries:
             self.last_error = "refusing to write an empty plugin state"
             print(f"{_TAG} Refusing to write an empty plugin state")
             return None
         txt_path = self._game_plugin.plugins_txt_path()
         if txt_path is None:
-            self.last_error = "plugins.txt path is unavailable"
+            # Almost always means the Proton prefix does not exist yet
+            # because the game has never been launched.  Hand the UI a
+            # translation key so the user gets an actionable message
+            # instead of this internal string.
+            self.last_error = "plugins.txt path is unavailable (Proton prefix not found)"
+            self.last_error_key = "game_panel.plugins_no_prefix"
             print(f"{_TAG} No plugins_txt_path — skipping write_entries")
             return None
 
@@ -372,6 +386,7 @@ class PluginsTxtWriter:
         if not result.missing_masters and not result.cycles and not result.parse_errors:
             if self.write_entries(result.entries) is None:
                 result.write_error = self.last_error or "plugin state could not be written"
+                result.write_error_key = self.last_error_key
         return result
 
     def plugin_indices(self, entries: list[PluginEntry]) -> dict[str, str]:

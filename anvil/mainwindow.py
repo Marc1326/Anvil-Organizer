@@ -7463,8 +7463,11 @@ class MainWindow(QMainWindow):
             )
 
         if result.write_error:
+            from anvil.widgets.game_panel import localized_write_error
             problems.append(
-                tr("load_order.write_error_title") + ":\n" + result.write_error
+                tr("load_order.write_error_title") + ":\n" + localized_write_error(
+                    result.write_error, getattr(result, "write_error_key", "")
+                )
             )
 
         if problems:
