@@ -77,7 +77,11 @@ class ModIndex:
         on_disk: set[str] = set()
         try:
             for entry in os.scandir(str(self._mods_path)):
-                if entry.is_dir(follow_symlinks=False):
+                # follow symlinks: a mod folder may be a symlink to a
+                # repo checkout.  scan_mods_directory() accepts those,
+                # so the index has to as well -- otherwise the mod shows
+                # up in the list but deploys nothing.
+                if entry.is_dir():
                     on_disk.add(entry.name)
         except OSError as exc:
             print(
