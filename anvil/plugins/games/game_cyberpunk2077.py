@@ -71,9 +71,6 @@ class Cyberpunk2077Game(BaseGame):
         "redscript",
         "Native Settings UI",
         "mod_settings",
-        # Basispaket der Animations-Reihe. Die beiden Addons (Pistol/Melee
-        # Combat) bleiben bewusst Symlinks — nur das Hauptpaket wird kopiert.
-        "Every Animation Redone",
     ]
 
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()
@@ -269,19 +266,6 @@ class Cyberpunk2077Game(BaseGame):
                 description="Third-Person-Perspektive (CET-basiert)",
                 detect_installed=["bin/x64/plugins/cyber_engine_tweaks/mods/jb_third_person_mod/init.lua"],
                 nexus_id=669,
-            ),
-            # Gehoert zu GameDirectInstallMods. Ohne diesen Eintrag faellt die
-            # Mod aus beiden Listen: aus der Mod-Liste, weil direct-install
-            # dort ausgeblendet wird, und aus dem Framework-Panel, weil sie
-            # dort nicht bekannt ist. Erst damit gibt es wieder einen
-            # Schalter -- gesperrt, ueber den Block zu loesen.
-            FrameworkMod(
-                name="Every Animation Redone",
-                pattern=["archive/pc/mod/okayyyyy3333.archive"],
-                target="",
-                description="Animations-Basispaket fuer Third Person (Tylerrrrr)",
-                detect_installed=["archive/pc/mod/okayyyyy3333.archive"],
-                nexus_id=16858,
             ),
         ]
 
