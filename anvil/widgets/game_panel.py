@@ -527,6 +527,8 @@ class GamePanel(QWidget):
         self._separator_deploy_paths: dict[str, str] = {}
         self._mod_index = None  # ModIndex, set from mainwindow
         self._virtual_files: dict = {}  # what the mods would deploy
+        self._watch_binary = ""     # game binary the process watcher looks for
+        self._watch_app_id = None
         # REDmod deploy state
         self._redmod_process = None
         self._redmod_cancel_requested = False
@@ -2680,64 +2682,80 @@ class GamePanel(QWidget):
             )
             return None
 
+    # How long to wait for the game process to show up.  Running out is not
+    # dangerous any more: MainWindow re-checks before removing anything.
+    _GAME_APPEAR_TIMEOUT = 120
+
+    def find_game_pid(self) -> int | None:
+        """Return a running game process, or None.
+
+        Detection priority:
+        1. SteamAppId in /proc/<pid>/environ (reliable for Steam/Proton games)
+        2. binary name in /proc/<pid>/cmdline (fallback)
+        """
+        binary_name = self._watch_binary
+        app_id = self._watch_app_id
+        if not binary_name and not app_id:
+            return None
+        try:
+            for entry in os.scandir("/proc"):
+                if not entry.name.isdigit():
+                    continue
+                pid = entry.name
+                try:
+                    if app_id:
+                        environ = Path(f"/proc/{pid}/environ").read_bytes()
+                        if f"SteamAppId={app_id}".encode() in environ:
+                            return int(pid)
+                    if binary_name:
+                        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes()
+                        if binary_name.encode() in cmdline.lower():
+                            return int(pid)
+                except OSError:
+                    pass
+        except OSError:
+            pass
+        return None
+
+    def is_game_running(self) -> bool:
+        """True while a watched game process is still alive."""
+        return self.find_game_pid() is not None
+
     def _start_process_watcher(
         self, binary_name: str, proc=None, app_id: str | None = None
     ) -> None:
         """Start a background thread that emits game_stopped when the game ends.
 
-        Detection priority:
-        1. SteamAppId in /proc/<pid>/environ (reliable for Steam/Proton games)
-        2. binary_name in /proc/<pid>/cmdline (fallback)
-        If proc is given, it is also used as a fallback when nothing is found.
+        If proc is given, it is used as a fallback when nothing is found.
         """
         import threading
         import time
 
-        def _find_game_pid() -> int | None:
-            """Return first matching PID, or None."""
-            try:
-                for entry in os.scandir("/proc"):
-                    if not entry.name.isdigit():
-                        continue
-                    pid = entry.name
-                    try:
-                        # Primary: match via SteamAppId env var (works for all
-                        # Steam/Proton wrapper processes)
-                        if app_id:
-                            environ = Path(f"/proc/{pid}/environ").read_bytes()
-                            if f"SteamAppId={app_id}".encode() in environ:
-                                return int(pid)
-                        # Fallback: binary name in cmdline
-                        if binary_name:
-                            cmdline = Path(f"/proc/{pid}/cmdline").read_bytes()
-                            if binary_name.encode() in cmdline.lower():
-                                return int(pid)
-                    except OSError:
-                        pass
-            except OSError:
-                pass
-            return None
+        self._watch_binary = binary_name
+        self._watch_app_id = app_id
 
         def _watcher() -> None:
-            # Wait up to 120s for the game process to appear
             appeared = False
-            for _ in range(120):
-                if _find_game_pid():
+            for _ in range(self._GAME_APPEAR_TIMEOUT):
+                if self.find_game_pid():
                     appeared = True
                     break
                 time.sleep(1)
 
             if not appeared:
-                # Game never appeared — wait for proc if we have one, then unlock
+                # Never showed up.  It may still be starting, so unlock the UI
+                # but let MainWindow decide whether anything may be removed.
+                _dlog("[WATCHER] game process never appeared")
                 if proc is not None:
                     proc.wait()
                 self.game_stopped.emit()
                 return
 
-            # Poll every 2s until all matching processes disappear
-            while _find_game_pid():
+            _dlog("[WATCHER] game process running, waiting for it to end")
+            while self.find_game_pid():
                 time.sleep(2)
 
+            _dlog("[WATCHER] game process gone")
             self.game_stopped.emit()
 
         t = threading.Thread(target=_watcher, daemon=True)

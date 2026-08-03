@@ -31,6 +31,20 @@ class _StatusBar:
         self.messages.append((text, timeout))
 
 
+class _Widget:
+    """Stand-in for the Qt widgets _unlock_ui touches."""
+
+    def __init__(self) -> None:
+        self.visible = True
+        self.enabled = False
+
+    def setVisible(self, value: bool) -> None:
+        self.visible = value
+
+    def setEnabled(self, value: bool) -> None:
+        self.enabled = value
+
+
 class PredeployLaunchTests(unittest.TestCase):
     def test_failed_deploy_returns_false_to_block_launch(self) -> None:
         timer = _Timer()
@@ -196,6 +210,107 @@ class PredeployLaunchTests(unittest.TestCase):
         self.assertIs(success, False)
         warning.assert_called_once()
         self.assertFalse(any("deployed" in text.lower() for text, _ in status.messages))
+
+    def test_unlock_keeps_deployment_while_game_runs(self) -> None:
+        """Pulling the mods out from under a running game crashes it."""
+        calls: list[str] = []
+        panel = SimpleNamespace(
+            is_game_running=lambda: True,
+            silent_purge=lambda: calls.append("purge"),
+        )
+        window: Any = SimpleNamespace(
+            _game_panel=panel,
+            _game_running=True,
+            _lock_overlay=_Widget(),
+            _splitter=_Widget(),
+            _log_container=_Widget(),
+            _toolbar=_Widget(),
+            menuBar=lambda: _Widget(),
+            _log_game_dir_state=lambda _phase: None,
+        )
+
+        MainWindow._unlock_ui(window)
+
+        self.assertEqual(calls, [])
+        self.assertIs(window._game_running, False)
+
+    def test_unlock_cleans_up_once_the_game_is_gone(self) -> None:
+        calls: list[str] = []
+        panel = SimpleNamespace(
+            is_game_running=lambda: False,
+            silent_purge=lambda: (
+                calls.append("purge"), SimpleNamespace(success=True, errors=[])
+            )[1],
+        )
+        window: Any = SimpleNamespace(
+            _game_panel=panel,
+            _game_running=True,
+            _lock_overlay=_Widget(),
+            _splitter=_Widget(),
+            _log_container=_Widget(),
+            _toolbar=_Widget(),
+            menuBar=lambda: _Widget(),
+            _log_game_dir_state=lambda _phase: None,
+        )
+
+        MainWindow._unlock_ui(window)
+
+        self.assertEqual(calls, ["purge"])
+
+    def test_full_cycle_against_a_stand_in_process(self) -> None:
+        """Drive the whole cycle against a process that looks like the game.
+
+        The searched name is assembled at runtime so neither this file nor
+        the shell running it carries it in a command line -- the /proc scan
+        would otherwise match the test itself.
+        """
+        import subprocess
+        import time
+
+        binary = "".join(["stand", "in", "game", "42", ".exe"])
+        panel_state: Any = SimpleNamespace(_watch_binary=binary, _watch_app_id=None)
+        panel_state.find_game_pid = lambda: GamePanel.find_game_pid(panel_state)
+        running = lambda: GamePanel.is_game_running(panel_state)
+
+        self.assertFalse(running(), "nothing should match before the process exists")
+
+        stand_in = subprocess.Popen(
+            ["python3", "-c", "import time; time.sleep(30)", "/game/" + binary]
+        )
+        try:
+            deadline = time.monotonic() + 10
+            while not running() and time.monotonic() < deadline:
+                time.sleep(0.2)
+            self.assertTrue(running(), "the stand-in process was not detected")
+
+            purges: list[str] = []
+            window: Any = SimpleNamespace(
+                _game_panel=SimpleNamespace(
+                    is_game_running=running,
+                    silent_purge=lambda: purges.append("purge"),
+                ),
+                _game_running=True,
+                _lock_overlay=_Widget(),
+                _splitter=_Widget(),
+                _log_container=_Widget(),
+                _toolbar=_Widget(),
+                menuBar=lambda: _Widget(),
+                _log_game_dir_state=lambda _phase: None,
+            )
+
+            MainWindow._unlock_ui(window)
+            self.assertEqual(purges, [], "must not purge while the game runs")
+        finally:
+            stand_in.terminate()
+            stand_in.wait()
+
+        deadline = time.monotonic() + 10
+        while running() and time.monotonic() < deadline:
+            time.sleep(0.2)
+        self.assertFalse(running(), "process gone, but still reported as running")
+
+        MainWindow._unlock_ui(window)
+        self.assertEqual(purges, ["purge"], "should clean up once the game is gone")
 
     def test_auto_redeploy_never_deploys(self) -> None:
         """Toggling a mod must not put anything into the game directory."""

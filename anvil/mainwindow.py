@@ -2673,22 +2673,32 @@ class MainWindow(QMainWindow):
         self.menuBar().setEnabled(False)
 
     def _unlock_ui(self) -> None:
-        """Re-enable the UI after a game has stopped or user clicks Unlock."""
+        """Re-enable the UI after a game has stopped or user clicks Unlock.
+
+        Never removes anything while the game is still running — pulling
+        the mods out from under a running game crashes it.  Leftovers are
+        cleaned up on the next Anvil start.
+        """
         self._game_running = False
-        print("[LAUNCH] game stopped — cleaning up", flush=True)
-        self._log_game_dir_state("before cleanup")
-        purge_result = self._game_panel.silent_purge()
-        if purge_result is not None:
-            print(
-                f"[LAUNCH] purge result: success="
-                f"{getattr(purge_result, 'success', None)}, "
-                f"removed={getattr(purge_result, 'links_removed', 0)}, "
-                f"errors={len(getattr(purge_result, 'errors', []))}",
-                flush=True,
-            )
-            for err in getattr(purge_result, "errors", [])[:5]:
-                print(f"[LAUNCH]   ERROR: {err}", flush=True)
-        self._log_game_dir_state("after cleanup")
+        still_running = getattr(self._game_panel, "is_game_running", lambda: False)()
+        if still_running:
+            print("[LAUNCH] unlock requested, but the game is still running "
+                  "— keeping the deployment", flush=True)
+        else:
+            print("[LAUNCH] game stopped — cleaning up", flush=True)
+            self._log_game_dir_state("before cleanup")
+            purge_result = self._game_panel.silent_purge()
+            if purge_result is not None:
+                print(
+                    f"[LAUNCH] purge result: success="
+                    f"{getattr(purge_result, 'success', None)}, "
+                    f"removed={getattr(purge_result, 'links_removed', 0)}, "
+                    f"errors={len(getattr(purge_result, 'errors', []))}",
+                    flush=True,
+                )
+                for err in getattr(purge_result, "errors", [])[:5]:
+                    print(f"[LAUNCH]   ERROR: {err}", flush=True)
+            self._log_game_dir_state("after cleanup")
         self._lock_overlay.setVisible(False)
         self._splitter.setEnabled(True)
         self._log_container.setEnabled(True)
