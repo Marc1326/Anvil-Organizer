@@ -497,6 +497,7 @@
     "instance_info": "Istanza: {game} | Plugin: {plugin} | Negozio: {store}",
     "deploying": "Distribuzione...",
     "deployed": "Mod distribuiti",
+    "pending_launch": "Verrà applicato all'avvio del gioco",
     "deploy_skipped": "Deploy saltato (nessuna istanza)",
     "nexus_query_loading": "Caricamento info Nexus...",
     "nexus_query_success": "Info Nexus aggiornate: {name}",

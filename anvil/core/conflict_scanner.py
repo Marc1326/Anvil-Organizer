@@ -94,6 +94,9 @@ class ConflictScanner:
               and ``winner`` (mod name with highest priority).
             - ``ignored`` — list of filtered-out matches (same format
               but without ``winner``).
+            - ``file_owners`` — every file the active mods provide,
+              mapped to its owning mods in priority order (last wins).
+              This is what the game would see once deployed.
         """
         # 1. Collect ignore patterns from game plugin
         ignore_patterns: list[str] = []
@@ -194,4 +197,8 @@ class ConflictScanner:
                     "winner": owners[-1],  # highest priority = last in list
                 })
 
-        return {"conflicts": conflicts, "ignored": ignored}
+        return {
+            "conflicts": conflicts,
+            "ignored": ignored,
+            "file_owners": file_owners,
+        }

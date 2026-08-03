@@ -497,6 +497,7 @@
     "instance_info": "Instancia: {game} | Plugin: {plugin} | Tienda: {store}",
     "deploying": "Desplegando...",
     "deployed": "Mods desplegados",
+    "pending_launch": "Se aplicará al iniciar el juego",
     "deploy_skipped": "Despliegue omitido (sin instancia)",
     "nexus_query_loading": "Cargando info de Nexus...",
     "nexus_query_success": "Info de Nexus actualizada: {name}",

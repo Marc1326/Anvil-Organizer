@@ -497,6 +497,7 @@
     "instance_info": "Instanz: {game} | Plugin: {plugin} | Store: {store}",
     "deploying": "Wird bereitgestellt...",
     "deployed": "Mods bereitgestellt",
+    "pending_launch": "Wird beim Spielstart übernommen",
     "deploy_skipped": "Deploy übersprungen (keine Instanz)",
     "nexus_query_loading": "Lade Nexus-Info...",
     "nexus_query_success": "Nexus-Info aktualisiert: {name}",

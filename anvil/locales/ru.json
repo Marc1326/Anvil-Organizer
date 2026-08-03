@@ -497,6 +497,7 @@
     "instance_info": "Экземпляр: {game} | Плагин: {plugin} | Магазин: {store}",
     "deploying": "Развёртывание...",
     "deployed": "Моды развёрнуты",
+    "pending_launch": "Будет применено при запуске игры",
     "deploy_skipped": "Развёртывание пропущено (нет экземпляра)",
     "nexus_query_loading": "Загрузка информации Nexus...",
     "nexus_query_success": "Информация Nexus обновлена: {name}",

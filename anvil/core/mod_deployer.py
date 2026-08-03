@@ -122,6 +122,15 @@ class ModDeployer:
         self._copy_deploy_paths = [p.replace("\\", "/") for p in (copy_deploy_paths or [])]
         self._mod_index = mod_index
         self._separator_deploy_paths = separator_deploy_paths or {}
+        self._skipped_mods: set[str] = set()
+
+    def set_skipped_mods(self, names) -> None:
+        """Mod folders to leave out of the next deploy.
+
+        Used for frameworks the user switched off — they stay in
+        ``.mods/`` but never reach the game directory.
+        """
+        self._skipped_mods = {str(n).lower() for n in names}
 
     def is_direct_install(self, mod_name: str) -> bool:
         """Return True if *mod_name* matches a direct-install pattern.
@@ -201,6 +210,17 @@ class ModDeployer:
                         enabled_mods.append((name, idx))
                         seen.add(name)
                         print(f"[DEPLOY] +framework: {name}", flush=True)
+
+        # Frameworks switched off in framework_state.json stay behind
+        if self._skipped_mods:
+            before = len(enabled_mods)
+            enabled_mods = [
+                (name, idx) for name, idx in enabled_mods
+                if name.lower() not in self._skipped_mods
+            ]
+            skipped = before - len(enabled_mods)
+            if skipped:
+                print(f"[DEPLOY] -inactive: {skipped} mod(s)", flush=True)
 
         # Build mod → separator mapping using FULL global order
         # (not just enabled mods — inactive separators must be recognized)
@@ -640,30 +660,39 @@ class ModDeployer:
             link_path = base_path / link_rel
             deploy_type = entry.get("type", "symlink")
 
-            # Direct-install copies are intentionally left in place
-            if deploy_type == "copy":
-                continue
-
-            # Shim copies are removed during purge (unlike framework copies)
-            if deploy_type == "shim_copy":
+            # Copied files (frameworks, shims) go away too — otherwise the
+            # game directory never gets clean again.
+            if deploy_type in {"copy", "shim_copy"}:
                 try:
                     link_path.unlink(missing_ok=True)
                     result.links_removed += 1
                 except OSError as exc:
-                    result.errors.append(f"unlink shim {link_rel}: {exc}")
+                    result.errors.append(f"unlink copy {link_rel}: {exc}")
                 continue
 
             # Every managed symlink must still target the configured mods root.
             if deploy_type in {"symlink", "dir_symlink"} and link_path.is_symlink():
                 try:
-                    real_target = link_path.resolve(strict=False)
+                    # The link as written -- a mod folder may itself be a
+                    # symlink to a checkout elsewhere, and resolve() would
+                    # follow it out of .mods/ and refuse to clean up.
+                    raw_target = Path(os.readlink(link_path))
+                    if not raw_target.is_absolute():
+                        raw_target = link_path.parent / raw_target
+                    candidates = {
+                        Path(os.path.normpath(raw_target)),
+                        link_path.resolve(strict=False),
+                    }
                     mods_root = self._mods_path.resolve(strict=False)
+                    roots = {mods_root, Path(os.path.normpath(self._mods_path))}
                 except OSError as exc:
                     result.errors.append(f"skip {link_rel}: cannot verify target: {exc}")
                     continue
-                if not real_target.is_relative_to(mods_root):
+                if not any(
+                    c.is_relative_to(r) for c in candidates for r in roots
+                ):
                     result.errors.append(
-                        f"skip {link_rel}: target {real_target} "
+                        f"skip {link_rel}: target {raw_target} "
                         f"not inside {mods_root}"
                     )
                     continue
@@ -723,6 +752,55 @@ class ModDeployer:
             pass
 
         return result
+
+    def _points_into_mods(self, link: Path) -> bool:
+        """True if *link* is a symlink aimed at this instance's mods root.
+
+        A mod folder may itself be a symlink to a checkout elsewhere, so
+        the link is checked both as written and fully resolved.
+        """
+        try:
+            raw = Path(os.readlink(link))
+            if not raw.is_absolute():
+                raw = link.parent / raw
+            candidates = {
+                Path(os.path.normpath(raw)),
+                link.resolve(strict=False),
+            }
+            roots = {
+                self._mods_path.resolve(strict=False),
+                Path(os.path.normpath(self._mods_path)),
+            }
+        except OSError:
+            return False
+        return any(c.is_relative_to(r) for c in candidates for r in roots)
+
+    def remove_orphaned_links(self) -> int:
+        """Delete leftover symlinks that point into ``.mods/``.
+
+        Covers links from runs whose manifest is gone — a purge cannot
+        know about those, so the game directory would keep them forever.
+        Only symlinks are touched; real game files are never at risk.
+
+        Returns:
+            Number of links removed.
+        """
+        if not self._game_path.is_dir():
+            return 0
+        removed = 0
+        for root, dirs, files in os.walk(str(self._game_path)):
+            for name in list(dirs) + files:
+                path = Path(root) / name
+                if not path.is_symlink() or not self._points_into_mods(path):
+                    continue
+                try:
+                    path.unlink()
+                    removed += 1
+                except OSError:
+                    continue
+            # Do not descend into symlinked directories we just removed
+            dirs[:] = [d for d in dirs if (Path(root) / d).is_dir()]
+        return removed
 
     def deployed_mod_count(self) -> int:
         """Return the number of mods in the current deployment."""

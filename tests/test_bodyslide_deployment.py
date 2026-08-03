@@ -173,6 +173,7 @@ def _ba2_panel(instance: Path, game: Path, mods: Path) -> Any:
         _current_profile_name="Default",
         _deployer=deployer,
         _apply_proton_dll_overrides=lambda: None,
+        _refresh_skipped_mods=lambda: None,
     )
 
 

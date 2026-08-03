@@ -221,6 +221,7 @@ class BaseGame:
     def __init__(self) -> None:
         self._game_path: Path | None = None
         self._detected_store: str | None = None
+        self._mod_index = None
 
     # ── Store-Erkennung ───────────────────────────────────────────────
 
@@ -269,6 +270,14 @@ class BaseGame:
         """
         self._game_path = Path(path)
         self._detected_store = store
+
+    def setModIndex(self, index) -> None:
+        """Attach the instance's mod index for framework detection.
+
+        Without it, only hand-installed frameworks in the game
+        directory are found.
+        """
+        self._mod_index = index
 
     def looksValid(self, path: Path | str) -> bool:
         """Check whether *path* looks like a valid installation of this game.
@@ -578,18 +587,25 @@ class BaseGame:
         """
         lower_contents = [f.lower().replace("\\", "/") for f in archive_contents]
         for fw in self.all_framework_mods():
-            for pattern in fw.pattern:
-                pat = pattern.lower().replace("\\", "/")
-                if '*' in pat or '?' in pat:
-                    if any(
-                        fnmatch.fnmatch(entry, pat)
-                        or fnmatch.fnmatch(entry.split("/")[-1], pat)
-                        for entry in lower_contents
-                    ):
-                        return fw
-                elif any(pat in entry for entry in lower_contents):
-                    return fw
+            if self._patterns_match(fw, lower_contents):
+                return fw
         return None
+
+    @staticmethod
+    def _patterns_match(fw: FrameworkMod, lower_contents: list[str]) -> bool:
+        """Test *fw*'s patterns against already lowercased file paths."""
+        for pattern in fw.pattern:
+            pat = pattern.lower().replace("\\", "/")
+            if '*' in pat or '?' in pat:
+                if any(
+                    fnmatch.fnmatch(entry, pat)
+                    or fnmatch.fnmatch(entry.split("/")[-1], pat)
+                    for entry in lower_contents
+                ):
+                    return True
+            elif any(pat in entry for entry in lower_contents):
+                return True
+        return False
 
     # ── Heuristik: Unbekannte Frameworks erkennen ──────────────────────
 
@@ -722,37 +738,69 @@ class BaseGame:
         )
 
     def get_installed_frameworks(self) -> list[tuple[FrameworkMod, bool]]:
-        """Check which framework mods are installed in the game directory.
+        """Check which framework mods are present.
 
-        Returns a list of (FrameworkMod, is_installed) tuples.
-        A framework is considered installed if *any* of its
-        ``detect_installed`` paths exist in the game directory.
+        Returns a list of (FrameworkMod, is_installed) tuples.  A
+        framework counts as installed when it sits in the instance's
+        ``.mods/`` folder (managed by Anvil, deployed on game start) or
+        when its ``detect_installed`` paths exist in the game directory
+        (installed by hand — Anvil leaves those alone).
+
         Files with the ``.anvil-disabled`` suffix count as installed
         (deactivated frameworks remain visible in the UI).
         """
-        result: list[tuple[FrameworkMod, bool]] = []
-        for fw in self.all_framework_mods():
-            installed = False
-            if self._game_path is not None:
-                for det_path in fw.detect_installed:
-                    if '*' in det_path or '?' in det_path:
-                        parent = (self._game_path / det_path).parent
-                        pattern = Path(det_path).name
-                        if parent.is_dir() and any(
-                            fnmatch.fnmatch(f.name, pattern)
-                            or fnmatch.fnmatch(f.name, pattern + ".anvil-disabled")
-                            for f in parent.iterdir()
-                        ):
-                            installed = True
-                            break
-                    else:
-                        p = self._game_path / det_path
-                        disabled = p.with_name(p.name + ".anvil-disabled")
-                        if p.exists() or disabled.exists():
-                            installed = True
-                            break
-            result.append((fw, installed))
-        return result
+        managed = self._managed_framework_names()
+        return [
+            (fw, fw.name.lower() in managed or self._is_in_game_dir(fw))
+            for fw in self.all_framework_mods()
+        ]
+
+    def managed_framework_mods(self) -> dict[str, list[str]]:
+        """Map framework name (lowercase) to the mod folders providing it.
+
+        Detection runs on the mod index instead of the game directory,
+        so it works without anything being deployed.
+        """
+        if self._mod_index is None:
+            return {}
+        frameworks = self.all_framework_mods()
+        found: dict[str, list[str]] = {}
+        for mod_name in self._mod_index.mod_names():
+            files = [
+                str(entry.get("rel", "")).lower().replace("\\", "/")
+                for entry in self._mod_index.get_file_list(mod_name)
+            ]
+            if not files:
+                continue
+            for fw in frameworks:
+                if self._patterns_match(fw, files):
+                    found.setdefault(fw.name.lower(), []).append(mod_name)
+        return found
+
+    def _managed_framework_names(self) -> set[str]:
+        """Names (lowercase) of frameworks present in the instance's ``.mods/``."""
+        return set(self.managed_framework_mods())
+
+    def _is_in_game_dir(self, fw: FrameworkMod) -> bool:
+        """True if *fw* was installed into the game directory by hand."""
+        if self._game_path is None:
+            return False
+        for det_path in fw.detect_installed:
+            if '*' in det_path or '?' in det_path:
+                parent = (self._game_path / det_path).parent
+                pattern = Path(det_path).name
+                if parent.is_dir() and any(
+                    fnmatch.fnmatch(f.name, pattern)
+                    or fnmatch.fnmatch(f.name, pattern + ".anvil-disabled")
+                    for f in parent.iterdir()
+                ):
+                    return True
+            else:
+                p = self._game_path / det_path
+                disabled = p.with_name(p.name + ".anvil-disabled")
+                if p.exists() or disabled.exists():
+                    return True
+        return False
 
     # ── Konflikterkennung ───────────────────────────────────────────────
 

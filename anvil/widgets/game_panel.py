@@ -526,6 +526,7 @@ class GamePanel(QWidget):
         self._deployer: _Deployer | None = None
         self._separator_deploy_paths: dict[str, str] = {}
         self._mod_index = None  # ModIndex, set from mainwindow
+        self._virtual_files: dict = {}  # what the mods would deploy
         # REDmod deploy state
         self._redmod_process = None
         self._redmod_cancel_requested = False
@@ -1108,6 +1109,42 @@ class GamePanel(QWidget):
             return ""
         return "plugin auto-sort not applied (" + ", ".join(details) + ")"
 
+    def has_deployment(self) -> bool:
+        """True if mods are currently deployed into the game directory."""
+        check = getattr(self._deployer, "is_deployed", None)
+        return bool(check()) if callable(check) else False
+
+    def _refresh_skipped_mods(self) -> None:
+        """Tell the deployer which mod folders to leave out.
+
+        Frameworks switched off via framework_state.json stay in
+        ``.mods/`` but must not reach the game directory.
+        """
+        setter = getattr(self._deployer, "set_skipped_mods", None)
+        if not callable(setter):
+            return
+        plugin = self._current_plugin
+        if plugin is None or self._instance_path is None:
+            setter(set())
+            return
+        get_managed = getattr(plugin, "managed_framework_mods", None)
+        if not callable(get_managed):
+            setter(set())
+            return
+        from anvil.core import framework_state
+        managed = get_managed()
+        skip: set[str] = set()
+        inactive: list[str] = []
+        for fw in plugin.all_framework_mods():
+            entry = framework_state.get(self._instance_path, fw.name)
+            if entry.get("active", True):
+                continue
+            inactive.append(fw.name)
+            skip.update(managed.get(fw.name.lower(), []))
+        if inactive:
+            _dlog(f"[DEPLOY-CHAIN] inactive frameworks: {inactive} -> skip {sorted(skip)}")
+        setter(skip)
+
     def silent_deploy(self) -> object | None:
         """Deploy mods silently.  Called automatically by MainWindow."""
         if getattr(self._current_plugin, "RequiresForgeDeployment", False):
@@ -1157,6 +1194,7 @@ class GamePanel(QWidget):
             )
             if callable(set_packing):
                 set_packing(needs_ba2 and ba2_available)
+        self._refresh_skipped_mods()
 
         result = None
         if self._deployer:
@@ -1165,6 +1203,15 @@ class GamePanel(QWidget):
             if result.errors:
                 for e in result.errors[:5]:
                     _dlog(f"[DEPLOY-CHAIN]   ERROR: {e}")
+            # Files a real game file is sitting on — those mods stay inert
+            skipped = getattr(result, "skipped_real_files", [])
+            if skipped:
+                print(
+                    f"[DEPLOY] {len(skipped)} file(s) skipped, real game file in the way:",
+                    flush=True,
+                )
+                for rel in skipped[:20]:
+                    print(f"[DEPLOY]   skipped: {rel}", flush=True)
 
         # BA2-Packing for Bethesda games (only if deploy succeeded)
         if (
@@ -1284,6 +1331,7 @@ class GamePanel(QWidget):
             )
             if callable(set_packing):
                 set_packing(False)
+            self._refresh_skipped_mods()
             result = self._deployer.deploy()
 
         # Write plugins.txt for Bethesda games after a successful deploy
@@ -2033,11 +2081,17 @@ class GamePanel(QWidget):
 
         env, proton_script, compat_data, _steam_root = proton_result
 
-        # Use wine64 directly instead of proton run (proton run hangs for CLI tools)
-        wine64 = Path(proton_script).parent / "files" / "bin" / "wine64"
-        if not wine64.exists():
-            print("[REDmod] wine64 not found, falling back to proton run", flush=True)
-            wine64 = None
+        # Use wine directly instead of proton run (proton run hangs for CLI tools).
+        # Older Proton ships wine64, newer builds only wine — both are 64-bit.
+        wine_bin_dir = Path(proton_script).parent / "files" / "bin"
+        wine64 = next(
+            (wine_bin_dir / n for n in ("wine64", "wine") if (wine_bin_dir / n).exists()),
+            None,
+        )
+        if wine64 is None:
+            print("[REDmod] no wine binary found, falling back to proton run", flush=True)
+        else:
+            print(f"[REDmod] wine: {wine64}", flush=True)
         wineprefix = compat_data / "pfx"
 
         # Capture plugin reference before async work (instance switch safety)
@@ -2065,9 +2119,13 @@ class GamePanel(QWidget):
                     cmd = [str(proton_script), "run", str(game_path / redmod_binary), "deploy", "-root", wine_root]
                     run_env = env
                 print(f"[REDmod] CMD: {' '.join(cmd)}", flush=True)
+                # redMod.exe resolves its schema as ..\metadata.json relative to
+                # the working directory, so it has to run from its own bin/.
+                redmod_cwd = (game_path / redmod_binary).parent
+                print(f"[REDmod] CWD: {redmod_cwd}", flush=True)
                 proc = host_popen(
                     cmd,
-                    cwd=str(game_path),
+                    cwd=str(redmod_cwd),
                     env=run_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -2328,11 +2386,17 @@ class GamePanel(QWidget):
 
         env, proton_script, compat_data, _steam_root = proton_result
 
-        # Use wine64 directly instead of proton run (proton run hangs for CLI tools)
-        wine64 = Path(proton_script).parent / "files" / "bin" / "wine64"
-        if not wine64.exists():
-            print("[REDmod] wine64 not found, falling back to proton run", flush=True)
-            wine64 = None
+        # Use wine directly instead of proton run (proton run hangs for CLI tools).
+        # Older Proton ships wine64, newer builds only wine — both are 64-bit.
+        wine_bin_dir = Path(proton_script).parent / "files" / "bin"
+        wine64 = next(
+            (wine_bin_dir / n for n in ("wine64", "wine") if (wine_bin_dir / n).exists()),
+            None,
+        )
+        if wine64 is None:
+            print("[REDmod] no wine binary found, falling back to proton run", flush=True)
+        else:
+            print(f"[REDmod] wine: {wine64}", flush=True)
         wineprefix = compat_data / "pfx"
 
         # Convert Linux path to Windows Z: path for -root argument
@@ -2355,9 +2419,13 @@ class GamePanel(QWidget):
                     cmd = [str(proton_script), "run", str(game_path / redmod_binary), "deploy", "-root", wine_root]
                     run_env = env
                 print(f"[REDmod] CMD: {' '.join(cmd)}", flush=True)
+                # redMod.exe resolves its schema as ..\metadata.json relative to
+                # the working directory, so it has to run from its own bin/.
+                redmod_cwd = (game_path / redmod_binary).parent
+                print(f"[REDmod] CWD: {redmod_cwd}", flush=True)
                 proc = host_popen(
                     cmd,
-                    cwd=str(game_path),
+                    cwd=str(redmod_cwd),
                     env=run_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -2675,30 +2743,85 @@ class GamePanel(QWidget):
         t = threading.Thread(target=_watcher, daemon=True)
         t.start()
 
+    def set_virtual_files(self, file_owners: dict | None) -> None:
+        """Files the active mods would deploy, mapped to their owners.
+
+        Priority order, last entry wins.  Passing None falls back to
+        showing the game directory alone.
+        """
+        self._virtual_files = file_owners or {}
+        self._populate_data_tree(self._current_game_path)
+
     def _populate_data_tree(self, game_path: Path | None) -> None:
-        """Scan game_path and show top-level entries in the data tree."""
+        """Show the game directory plus what the mods would deploy into it."""
         self._data_tree.clear()
 
         if game_path is None or not game_path.is_dir():
-            item = QTreeWidgetItem(self._data_tree, [tr("game_panel.dir_not_available"), "", "", "", ""])
+            QTreeWidgetItem(self._data_tree, [tr("game_panel.dir_not_available"), "", "", "", ""])
             return
 
         try:
             entries = sorted(game_path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
         except OSError:
-            item = QTreeWidgetItem(self._data_tree, [tr("game_panel.read_error"), "", "", "", ""])
+            QTreeWidgetItem(self._data_tree, [tr("game_panel.read_error"), "", "", "", ""])
             return
 
+        # Roll the mods' file lists up to top level: name -> owning mods
+        virtual_dirs: dict[str, set[str]] = {}
+        virtual_files: dict[str, list[str]] = {}
+        for rel, owners in getattr(self, "_virtual_files", {}).items():
+            head, _, tail = str(rel).partition("/")
+            if tail:
+                virtual_dirs.setdefault(head, set()).update(owners)
+            else:
+                virtual_files[head] = list(owners)
+
+        on_disk: set[str] = set()
         for entry in entries:
+            on_disk.add(entry.name)
             try:
                 if entry.is_dir():
-                    QTreeWidgetItem(self._data_tree, [entry.name, "", tr("game_panel.folder"), "-", "-"])
+                    QTreeWidgetItem(self._data_tree, [
+                        entry.name,
+                        self._owner_label(sorted(virtual_dirs.get(entry.name, ()))),
+                        tr("game_panel.folder"), "-", "-",
+                    ])
                 else:
-                    stat = entry.stat()
-                    size = self._format_size(stat.st_size)
-                    QTreeWidgetItem(self._data_tree, [entry.name, tr("game_panel.unmanaged"), "", size, ""])
+                    size = self._format_size(entry.stat().st_size)
+                    owners = virtual_files.get(entry.name, [])
+                    QTreeWidgetItem(self._data_tree, [
+                        entry.name,
+                        self._owner_label(owners) or tr("game_panel.unmanaged"),
+                        "", size, "",
+                    ])
             except OSError:
                 continue
+
+        # Entries that only exist once the mods are deployed
+        pending = sorted(
+            (set(virtual_dirs) | set(virtual_files)) - on_disk,
+            key=str.lower,
+        )
+        for name in pending:
+            is_dir = name in virtual_dirs
+            owners = sorted(virtual_dirs[name]) if is_dir else virtual_files[name]
+            QTreeWidgetItem(self._data_tree, [
+                name,
+                self._owner_label(owners),
+                tr("game_panel.folder") if is_dir else "",
+                "-", "-",
+            ])
+
+    @staticmethod
+    def _owner_label(owners) -> str:
+        """Format the owning mods for the data tree's Mod column."""
+        owners = list(owners)
+        if not owners:
+            return ""
+        if len(owners) == 1:
+            return owners[0]
+        # Highest priority last — that one wins on conflict
+        return f"{owners[-1]} (+{len(owners) - 1})"
 
     def _on_reload_data(self) -> None:
         """Reload the data tree from the current game path."""

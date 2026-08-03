@@ -204,6 +204,10 @@ class ModIndex:
         """Return number of mods in the index."""
         return len(self._index)
 
+    def mod_names(self) -> list[str]:
+        """Return the names of all indexed mods."""
+        return list(self._index.keys())
+
     # ── Internal ──────────────────────────────────────────────────
 
     def _scan_mod(

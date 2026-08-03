@@ -1547,11 +1547,12 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, lambda n=launch_inst: self.launch_instance_shortcut(n))
 
     def _crash_recovery_purge(self) -> None:
-        """Purge stale deploy manifests from all instances.
+        """Clean every game directory before anything is loaded.
 
-        If the app crashed or was killed, symlinks may still exist in
-        the game directory.  Scan all instances for leftover manifests
-        and purge them.
+        Mods only belong in the game directory while the game runs.  If
+        the app crashed or was killed, links may still be sitting there
+        — purge what a manifest covers, then sweep up anything an older
+        run left behind without one.
         """
         from anvil.core.mod_deployer import ModDeployer
         for entry in self.instance_manager.list_instances():
@@ -1559,21 +1560,28 @@ class MainWindow(QMainWindow):
             if not name:
                 continue
             instance_path = self.instance_manager.instances_path() / name
-            manifest = instance_path / ModDeployer.MANIFEST_NAME
-            if manifest.is_file():
-                data = self.instance_manager.load_instance(name)
-                game_path_str = data.get("game_path", "") if data else ""
-                if game_path_str:
-                    game_path = Path(game_path_str)
-                    if game_path.is_dir():
-                        paths = resolve_instance_paths(instance_path, data)
-                        deployer = ModDeployer(
-                            instance_path,
-                            game_path,
-                            mods_path=paths.mods,
-                            profiles_path=paths.profiles,
-                        )
-                        deployer.purge()
+            data = self.instance_manager.load_instance(name)
+            game_path_str = data.get("game_path", "") if data else ""
+            if not game_path_str:
+                continue
+            game_path = Path(game_path_str)
+            if not game_path.is_dir():
+                continue
+            paths = resolve_instance_paths(instance_path, data)
+            deployer = ModDeployer(
+                instance_path,
+                game_path,
+                mods_path=paths.mods,
+                profiles_path=paths.profiles,
+            )
+            if (instance_path / ModDeployer.MANIFEST_NAME).is_file():
+                deployer.purge()
+            orphans = deployer.remove_orphaned_links()
+            if orphans:
+                print(
+                    f"[PURGE] {name}: removed {orphans} leftover link(s)",
+                    flush=True,
+                )
 
     def _teardown_current_instance(self) -> None:
         """Phase 1: Alten Instance-State sichern und leeren.
@@ -1910,6 +1918,8 @@ class MainWindow(QMainWindow):
         # Rebuild mod file index (only re-scans changed mods)
         self._mod_index = ModIndex(instance_path, mods_path=instance_paths.mods)
         self._mod_index.rebuild()
+        if plugin is not None:
+            plugin.setModIndex(self._mod_index)
 
         include_ext = self._settings().value("ModList/show_external_mods", True, type=bool)
         self._current_mod_entries = scan_mods_directory(
@@ -1940,7 +1950,7 @@ class MainWindow(QMainWindow):
         active_count = sum(1 for e in visible_entries if e.enabled)
         self._log_panel.add_log("info", f"{len(visible_entries)} Mods geladen ({active_count} aktiv)")
 
-        # 5. Mod deployer + auto-deploy
+        # 5. Mod deployer — mods are deployed on game start, not here
         from anvil.widgets.game_panel import _dlog
         _dlog(f"[APPLY-INSTANCE] Setting instance path: {instance_path}")
         _dlog(f"[APPLY-INSTANCE] Profile: {profile_name}")
@@ -1949,12 +1959,16 @@ class MainWindow(QMainWindow):
         self._game_panel.set_mod_index(self._mod_index)
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
         self._sync_separator_deploy_paths()
-        deploy_result = self._game_panel.silent_deploy()
         if plugin is not None:
-            fw_list = [
-                self._build_fw_dict(fw, installed)
-                for fw, installed in plugin.get_installed_frameworks()
-            ]
+            detected = plugin.get_installed_frameworks()
+            managed = getattr(plugin, "managed_framework_mods", lambda: {})()
+            for fw, installed in detected:
+                if not installed:
+                    continue
+                folders = managed.get(fw.name.lower(), [])
+                origin = f".mods/ {folders}" if folders else "game directory (hand-installed)"
+                print(f"[FRAMEWORK] {fw.name}: found in {origin}", flush=True)
+            fw_list = [self._build_fw_dict(fw, installed) for fw, installed in detected]
             self._mod_list_view.load_frameworks(fw_list)
         else:
             self._mod_list_view.load_frameworks([])
@@ -2007,7 +2021,7 @@ class MainWindow(QMainWindow):
             if prop_set or cat_set or nexus_set:
                 self._filter_panel.restore_state(prop_set, cat_set, nexus_set)
 
-        return deploy_result is None or bool(getattr(deploy_result, "success", False))
+        return True
 
     def _entry_for_row(self, source_row: int):
         """Resolve a source-model row to the matching ModEntry by folder name.
@@ -2265,21 +2279,28 @@ class MainWindow(QMainWindow):
     # ── Auto-redeploy helpers ────────────────────────────────────────
 
     def _schedule_redeploy(self) -> None:
-        """Schedule a debounced redeploy (500ms)."""
+        """Schedule the debounced cleanup after a mod list change (500ms)."""
         if not self._current_instance_path:
             return
-        self.statusBar().showMessage(tr("status.deploying"), 0)
+        self.statusBar().showMessage(tr("status.pending_launch"), 3000)
         self._redeploy_timer.start()
 
     def _do_redeploy(self) -> bool:
-        """Execute purge + fast deploy and report whether it succeeded."""
+        """Clean up any leftover deployment.
+
+        Mods go into the game directory on game start, so nothing is
+        deployed here — this only removes what an earlier run left
+        behind.
+        """
         self._redeploy_timer.stop()
         if not self._current_instance_path:
             return False
         # BG3: kein Symlink-Deploy — Auto-Deploy läuft über den Installer
         if self._bg3_installer is not None:
             return True
-        print("[PURGE] Auto-redeploy: purging current deployment", flush=True)
+        if not self._game_panel.has_deployment():
+            return True
+        print("[PURGE] Cleaning up leftover deployment", flush=True)
         purge_result = self._game_panel.silent_purge()
         if purge_result is not None and not getattr(purge_result, "success", False):
             errors = getattr(purge_result, "errors", [])
@@ -2290,19 +2311,6 @@ class MainWindow(QMainWindow):
                 tr("error.deploy_failed_message", details=details),
             )
             return False
-        print("[DEPLOY] Auto-redeploy: deploying mods (fast, no BA2)", flush=True)
-        self._sync_separator_deploy_paths()
-        deploy_result = self._game_panel.silent_deploy_fast()
-        if deploy_result is not None and not getattr(deploy_result, "success", False):
-            errors = getattr(deploy_result, "errors", [])
-            details = "\n".join(str(error) for error in errors[:5])
-            QMessageBox.warning(
-                self,
-                tr("error.deploy_failed_title"),
-                tr("error.deploy_failed_message", details=details),
-            )
-            return False
-        self.statusBar().showMessage(tr("status.deployed"), 3000)
         return True
 
     def _on_filter_changed(self) -> None:
@@ -2394,6 +2402,17 @@ class MainWindow(QMainWindow):
             return {"available": False, "conflicts": []}
         return {"available": True, "conflicts": result.get("conflicts", []) if result else []}
 
+    def _push_virtual_files(self, scan_result: dict) -> None:
+        """Feed the Data tab what the mods would deploy.
+
+        BG3 keeps its own installer view — it is left untouched.
+        """
+        if self._bg3_installer is not None:
+            return
+        setter = getattr(self._game_panel, "set_virtual_files", None)
+        if callable(setter):
+            setter((scan_result or {}).get("file_owners", {}))
+
     def _compute_conflict_data(self) -> dict:
         """Run ConflictScanner and return per-mod conflict info.
 
@@ -2402,6 +2421,7 @@ class MainWindow(QMainWindow):
            "win_mods": N, "lose_mods": N}``
         """
         result = self._run_conflict_scan()
+        self._push_virtual_files(result)
         if not result:
             return {}
 
@@ -2511,21 +2531,64 @@ class MainWindow(QMainWindow):
         self._install_archives([Path(p) for p in remaining], insert_at=target_row)
         self._game_panel.refresh_downloads()
 
+    def _log_game_dir_state(self, phase: str) -> None:
+        """Write a headcount of the game directory to the log.
+
+        Makes the deploy-on-launch cycle traceable: empty before the
+        game starts, filled while it runs, empty again afterwards.
+        """
+        game_path = self._current_game_path
+        if game_path is None or not game_path.is_dir():
+            print(f"[LAUNCH] {phase}: no game directory", flush=True)
+            return
+        links = files = 0
+        try:
+            for root, _dirs, names in os.walk(str(game_path)):
+                for name in names:
+                    if (Path(root) / name).is_symlink():
+                        links += 1
+                    else:
+                        files += 1
+        except OSError as exc:
+            print(f"[LAUNCH] {phase}: cannot scan: {exc}", flush=True)
+            return
+        print(
+            f"[LAUNCH] {phase}: {links} symlink(s), {files} real file(s) "
+            f"in {game_path}",
+            flush=True,
+        )
+
     def _predeploy_for_launch(self, reason: str) -> bool:
         """Relock frameworks and return whether purge/deploy succeeded."""
         self._redeploy_timer.stop()
         if self._current_instance_path:
+            print(f"[LAUNCH] pre-launch deploy, reason={reason}", flush=True)
+            self._log_game_dir_state("before deploy")
             # Vor dem Start: alle Frameworks dieser Instanz locken
             self._auto_relock_instance(self._current_instance_path, reason)
             print("[PURGE] Pre-launch purge", flush=True)
             purge_result = self._game_panel.silent_purge()
             if purge_result is not None and not getattr(purge_result, "success", False):
+                errors = getattr(purge_result, "errors", [])
+                print(f"[LAUNCH] pre-launch purge FAILED: {errors[:5]}", flush=True)
                 return False
             print("[DEPLOY] Pre-launch full deploy (with BA2)", flush=True)
             self._sync_separator_deploy_paths()
             deploy_result = self._game_panel.silent_deploy()
+            if deploy_result is not None:
+                print(
+                    f"[LAUNCH] deploy result: success="
+                    f"{getattr(deploy_result, 'success', None)}, "
+                    f"links={getattr(deploy_result, 'links_created', 0)}, "
+                    f"copies={getattr(deploy_result, 'files_copied', 0)}, "
+                    f"errors={len(getattr(deploy_result, 'errors', []))}",
+                    flush=True,
+                )
+                for err in getattr(deploy_result, "errors", [])[:5]:
+                    print(f"[LAUNCH]   ERROR: {err}", flush=True)
             if deploy_result is not None and not getattr(deploy_result, "success", False):
                 return False
+            self._log_game_dir_state("after deploy")
         return True
 
     def _on_start_game(self, binary_path: str, working_dir: str) -> None:
@@ -2612,8 +2675,20 @@ class MainWindow(QMainWindow):
     def _unlock_ui(self) -> None:
         """Re-enable the UI after a game has stopped or user clicks Unlock."""
         self._game_running = False
-        self._game_panel.silent_purge()
-        self._game_panel.silent_deploy()
+        print("[LAUNCH] game stopped — cleaning up", flush=True)
+        self._log_game_dir_state("before cleanup")
+        purge_result = self._game_panel.silent_purge()
+        if purge_result is not None:
+            print(
+                f"[LAUNCH] purge result: success="
+                f"{getattr(purge_result, 'success', None)}, "
+                f"removed={getattr(purge_result, 'links_removed', 0)}, "
+                f"errors={len(getattr(purge_result, 'errors', []))}",
+                flush=True,
+            )
+            for err in getattr(purge_result, "errors", [])[:5]:
+                print(f"[LAUNCH]   ERROR: {err}", flush=True)
+        self._log_game_dir_state("after cleanup")
         self._lock_overlay.setVisible(False)
         self._splitter.setEnabled(True)
         self._log_container.setEnabled(True)
@@ -2663,9 +2738,11 @@ class MainWindow(QMainWindow):
         for companion in self._current_plugin.all_framework_mods():
             if installed_name not in companion.required_by:
                 continue
-            # Check if already installed (any detect_installed file present)
+            # Already there?  Covers both the managed .mods/ copy and a
+            # hand-installed one in the game directory.
             already = any(
-                (game_path / f).exists() for f in companion.detect_installed
+                fw.name == companion.name and installed
+                for fw, installed in self._current_plugin.get_installed_frameworks()
             )
             if already:
                 continue
@@ -4553,12 +4630,11 @@ class MainWindow(QMainWindow):
                 tree._collapsed_separators.clear()
             tree._apply_separator_filter()
 
-        # 6. Redeploy with new profile
+        # 6. Clean up the old profile's deployment — the new one goes out on game start
         self._redeploy_timer.stop()
         self._game_panel.silent_purge()
         self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
         self._sync_separator_deploy_paths()
-        self._game_panel.silent_deploy()
 
     def _apply_active_state(self, active_mods: set[str]) -> None:
         """Update checkbox state for all mods without reloading.
@@ -7797,6 +7873,20 @@ class MainWindow(QMainWindow):
             return
         game_path = self._current_game_path
         removed = 0
+
+        # Managed framework: drop its mod folder from .mods/
+        get_managed = getattr(self._current_plugin, "managed_framework_mods", None)
+        if callable(get_managed) and self._current_instance_path:
+            mods_dir = _active_instance_paths(self).mods
+            for folder in get_managed().get(fw_name.lower(), []):
+                mod_dir = mods_dir / folder
+                if mod_dir.is_dir():
+                    shutil.rmtree(mod_dir, ignore_errors=True)
+                    removed += 1
+                    if self._mod_index is not None:
+                        self._mod_index.invalidate(folder)
+
+        # Hand-installed copy in the game directory
         for det_path in fw_obj.detect_installed:
             full = game_path / det_path
             disabled = full.with_name(full.name + framework_state.DISABLED_SUFFIX)
@@ -7835,6 +7925,15 @@ class MainWindow(QMainWindow):
             for fw in self._current_plugin.all_framework_mods():
                 if fw.name == name:
                     paths = []
+                    get_managed = getattr(
+                        self._current_plugin, "managed_framework_mods", None,
+                    )
+                    if callable(get_managed) and self._current_instance_path:
+                        mods_dir = _active_instance_paths(self).mods
+                        paths.extend(
+                            str(mods_dir / folder)
+                            for folder in get_managed().get(name.lower(), [])
+                        )
                     for det in fw.detect_installed:
                         p = self._current_game_path / det
                         disabled = p.with_name(p.name + framework_state.DISABLED_SUFFIX)
@@ -7935,71 +8034,23 @@ class MainWindow(QMainWindow):
                 framework_state.lock_all(inst)
 
     def _fw_toggle_active(self, fw_name: str) -> None:
-        """Activate/deactivate a framework by renaming its files to .anvil-disabled."""
-        if not self._current_plugin or not self._current_game_path:
+        """Activate/deactivate a framework.
+
+        Only flips the ``active`` flag in framework_state.json — the
+        deployer skips inactive frameworks on the next game start.
+        Frameworks the user installed into the game directory by hand
+        are not touched.
+        """
+        if not self._current_plugin or not self._current_instance_path:
             return
-        fw_obj = None
-        for fw in self._current_plugin.all_framework_mods():
-            if fw.name == fw_name:
-                fw_obj = fw
-                break
-        if not fw_obj:
+        if not any(fw.name == fw_name for fw in self._current_plugin.all_framework_mods()):
             return
-        game_path = self._current_game_path
-        suffix = framework_state.DISABLED_SUFFIX
 
-        def resolve_paths(det: str) -> list[Path]:
-            """Return actual files on disk for a detect pattern (supports globs)."""
-            if '*' in det or '?' in det:
-                parent = (game_path / det).parent
-                pat = Path(det).name
-                if not parent.is_dir():
-                    return []
-                return [
-                    f for f in parent.iterdir()
-                    if fnmatch.fnmatch(f.name, pat)
-                    or fnmatch.fnmatch(f.name, pat + suffix)
-                ]
-            p = game_path / det
-            disabled = p.with_name(p.name + suffix)
-            found = []
-            if p.exists():
-                found.append(p)
-            if disabled.exists():
-                found.append(disabled)
-            return found
-
-        any_active = False
-        for det in fw_obj.detect_installed:
-            for f in resolve_paths(det):
-                if not f.name.endswith(suffix):
-                    any_active = True
-                    break
-            if any_active:
-                break
-
-        if any_active:
-            for det in fw_obj.detect_installed:
-                for f in resolve_paths(det):
-                    if f.name.endswith(suffix):
-                        continue
-                    dst = f.with_name(f.name + suffix)
-                    if not dst.exists():
-                        f.rename(dst)
-            new_active = False
-        else:
-            for det in fw_obj.detect_installed:
-                for f in resolve_paths(det):
-                    if not f.name.endswith(suffix):
-                        continue
-                    target = f.with_name(f.name[:-len(suffix)])
-                    if not target.exists():
-                        f.rename(target)
-            new_active = True
-        if self._current_instance_path:
-            framework_state.set_entry(
-                self._current_instance_path, fw_name, active=new_active,
-            )
+        entry = framework_state.get(self._current_instance_path, fw_name)
+        new_active = not entry.get("active", True)
+        framework_state.set_entry(
+            self._current_instance_path, fw_name, active=new_active,
+        )
         self.statusBar().showMessage(
             tr("status.fw_activated" if new_active else "status.fw_deactivated", name=fw_name),
             3000,
