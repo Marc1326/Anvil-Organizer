@@ -434,3 +434,59 @@ def test_ba2_schalter_wird_durchgereicht(tmp_path: Path, ohne_umgebungspruefung:
 
     assert (deployer.stage_dir / "Data" / "b.esp").is_file()
     assert not (deployer.stage_dir / "Data" / "meshes" / "a.nif").exists()
+
+
+def test_trennerpfade_nach_dem_konstruktor_wirken(
+    tmp_path: Path, ohne_umgebungspruefung: None
+) -> None:
+    """Die Oberflaeche setzt die Trennerpfade erst nach dem Bau des Deployers."""
+    instance, game, mods, profiles = _instance(tmp_path)
+    anderswo = tmp_path / "Anderswo"
+    anderswo.mkdir()
+    _mod(mods, "Woanders", {"archive/a.archive": "x"})
+    write_global_modlist(profiles, ["extern_separator", "Woanders"])
+    write_active_mods(profiles / "Default", {"extern_separator", "Woanders"})
+
+    deployer = OverlayDeployer(instance, game)
+    deployer.set_separator_deploy_paths({"extern_separator": str(anderswo)})
+    deployer.deploy()
+
+    assert str(anderswo) in deployer.stage_dirs()
+    ziele = [str(z) for z, _ in deployer.mounts()]
+    assert str(anderswo) in ziele
+
+
+def test_datei_gegen_ordner_stuerzt_nicht_ab(
+    tmp_path: Path, ohne_umgebungspruefung: None
+) -> None:
+    instance, game, mods, profiles = _instance(tmp_path)
+    _mod(mods, "Unten", {"archive/x/tief.archive": "ordner"})
+    _mod(mods, "Oben", {"archive/x": "datei"})
+    write_global_modlist(profiles, ["Oben", "Unten"])
+    write_active_mods(profiles / "Default", {"Oben", "Unten"})
+
+    result = OverlayDeployer(instance, game).deploy()
+
+    assert not result.success
+    assert any("Ordner" in e or "belegt" in e for e in result.errors), result.errors
+
+
+def test_abschalten_entschaerft_den_wrapper(
+    tmp_path: Path, ohne_umgebungspruefung: None
+) -> None:
+    """Bleibt mount.conf liegen, mountet der Wrapper beim naechsten Start weiter."""
+    instance, game, mods, profiles = _instance(tmp_path)
+    _mod(mods, "M", {"archive/a.archive": "x"})
+    write_global_modlist(profiles, ["M"])
+    write_active_mods(profiles / "Default", {"M"})
+
+    deployer = OverlayDeployer(instance, game)
+    deployer.deploy()
+    assert deployer.mount_conf_path.is_file()
+
+    deployer.purge()
+    deployer.mount_conf_path.unlink(missing_ok=True)
+
+    assert not deployer.mount_conf_path.exists()
+    assert not deployer.is_deployed()
+    assert not deployer.stage_root.exists()

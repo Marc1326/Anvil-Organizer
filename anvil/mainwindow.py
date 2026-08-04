@@ -1895,6 +1895,7 @@ class MainWindow(QMainWindow):
                 instance_paths.downloads,
                 instance_paths.mods,
                 instance_paths.profiles,
+                instance_paths.overwrite,
             )
             self._toolbar.deploy_sep.setVisible(False)
             self._toolbar.deploy_action.setVisible(False)
@@ -1924,6 +1925,7 @@ class MainWindow(QMainWindow):
             downloads_dir,
             mods_dir,
             instance_paths.profiles,
+            instance_paths.overwrite,
         )
         self._game_panel.download_manager().set_downloads_dir(downloads_dir)
 

@@ -104,9 +104,28 @@ def target_rel(
 
 
 def _place(src: Path, dest: Path, result: StageResult) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
+    """Legt *src* als Hardlink unter *dest* ab, hoehere Prioritaet gewinnt.
+
+    Liefert ein Mod einen Pfad als Datei, den ein anderer als Ordner belegt,
+    kann hier nichts abgelegt werden. Der Symlink-Weg meldet das als Fehler
+    statt abzustuerzen -- hier genauso.
+    """
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+    except (OSError, NotADirectoryError) as exc:
+        result.errors.append(f"{dest}: {exc}")
+        return
+
+    if dest.is_dir() and not dest.is_symlink():
+        result.errors.append(f"{dest}: bereits als Ordner belegt")
+        return
+
     if dest.exists() or dest.is_symlink():
-        dest.unlink()
+        try:
+            dest.unlink()
+        except OSError as exc:
+            result.errors.append(f"{dest}: {exc}")
+            return
     try:
         os.link(src, dest)
         result.files_linked += 1
@@ -152,6 +171,9 @@ class OverlayStage:
         self._needs_ba2_packing = needs_ba2_packing
         self._ba2_loose_paths = ba2_loose_paths or []
         self._skipped = {s.lower() for s in (skipped_mods or set())}
+
+    def set_separator_deploy_paths(self, paths: dict[str, str]) -> None:
+        self._separator_deploy_paths = dict(paths or {})
 
     def set_ba2_packing_enabled(self, enabled: bool) -> None:
         self._needs_ba2_packing = bool(enabled)

@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -216,3 +217,44 @@ def test_maskierte_option_wird_ersetzt(tmp_path: Path, steam_aus: None) -> None:
 
     assert read_launch_options("1091500", config) == '"/c d/wrapper" %command%'
     assert config.read_text(encoding="utf-8").count("LaunchOptions") == 1
+
+
+def test_mod_gewinnt_ueber_die_spieldatei(tmp_path: Path) -> None:
+    """Der Fall, der vorher durchgerutscht ist.
+
+    bwrap versteht --overlay-src umgekehrt zur Kernel-Option: die zuletzt
+    genannte Quelle gewinnt. Wird die Liste unveraendert durchgereicht,
+    schlaegt der Spielordner jede Mod -- und zwar lautlos, weil neue Dateien
+    trotzdem auftauchen.
+    """
+    if shutil.which("bwrap") is None:
+        pytest.skip("bubblewrap nicht installiert")
+
+    game = tmp_path / "game"
+    stage = tmp_path / "stage"
+    game.mkdir()
+    stage.mkdir()
+    (game / "konflikt.txt").write_text("vanilla", encoding="utf-8")
+    (stage / "konflikt.txt").write_text("von der mod", encoding="utf-8")
+    (stage / "nur_mod.txt").write_text("neu", encoding="utf-8")
+
+    conf = tmp_path / "mount.conf"
+    conf.write_text(
+        f"MOUNT={game}|{stage}:{game}|{tmp_path / 'upper'}|{tmp_path / 'work'}\n",
+        encoding="utf-8",
+    )
+    target = write_wrapper(tmp_path, conf, tmp_path / "start.log")
+
+    lauf = subprocess.run(
+        [str(target), "/bin/cat", str(game / "konflikt.txt")],
+        capture_output=True,
+    )
+    neu = subprocess.run(
+        [str(target), "/bin/cat", str(game / "nur_mod.txt")],
+        capture_output=True,
+    )
+    force_rmtree(tmp_path / "work")
+
+    assert lauf.stdout.strip() == b"von der mod", "der Spielordner hat die Mod geschlagen"
+    assert neu.stdout.strip() == b"neu"
+    assert (game / "konflikt.txt").read_text(encoding="utf-8") == "vanilla"

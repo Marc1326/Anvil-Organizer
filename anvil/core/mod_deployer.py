@@ -357,6 +357,10 @@ class ModDeployer:
             str(n).lower() for n in (keep_file_name_mods or set())
         }
 
+    def set_separator_deploy_paths(self, paths: dict[str, str]) -> None:
+        """Eigene Zielpfade je Trenner."""
+        self._separator_deploy_paths = dict(paths or {})
+
     def set_skipped_mods(self, names) -> None:
         """Mod folders to leave out of the next deploy.
 
