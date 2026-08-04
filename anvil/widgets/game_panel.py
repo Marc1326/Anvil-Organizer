@@ -108,20 +108,31 @@ class _Deployer(Protocol):
     def is_deployed(self) -> bool: ...
 
 
+def _overlay_stage_root(panel) -> Path | None:
+    """Die Mod-Schicht, wenn diese Instanz per Overlay ausgerollt wird."""
+    if not getattr(panel, "_use_overlay", False):
+        return None
+    stage = getattr(getattr(panel, "_deployer", None), "stage_dir", None)
+    return stage if isinstance(stage, Path) else None
+
+
 def _tune_for_overlay(panel, component) -> None:
-    """Zeigt Packer, Plugin-Leser und ReShade auf die Mod-Schicht.
+    """Zeigt Archiv-Packer und Plugin-Leser auf die Mod-Schicht.
 
     Ohne das wuerden sie am Spielordner arbeiten, und der soll beim
     Overlay-Deploy unberuehrt bleiben. Tut nichts, solange Symlinks laufen.
+
+    Der ReShade-Assistent laeuft bewusst nicht hierueber -- er schreibt auf
+    Wunsch des Nutzers einmalig neben das Spielbinary, unabhaengig vom
+    Deploy-Weg.
     """
     if not getattr(panel, "_use_overlay", False):
         return
-    stage = getattr(getattr(panel, "_deployer", None), "stage_dir", None)
-    if not isinstance(stage, Path):
+    stage = _overlay_stage_root(panel)
+    if stage is None:
         return
     for name, argument in (
         ("set_output_root", stage),
-        ("set_target_root", stage),
         ("set_extra_scan_roots", [stage]),
     ):
         hook = getattr(component, name, None)
@@ -1556,7 +1567,10 @@ class GamePanel(QWidget):
         plugin = self._current_plugin
         short = getattr(plugin, "GameShortName", "").lower() or "unknown"
         shim_dir = get_anvil_base() / "data" / "shims" / short
-        game_path = self._current_game_path
+        # Im Overlay-Betrieb gehen die Shims in die Mod-Schicht. Landen sie im
+        # Spielordner, bleiben sie dort fuer immer liegen -- niemand raeumt sie
+        # ab, weil es kein Symlink-Manifest gibt.
+        game_path = _overlay_stage_root(self) or self._current_game_path
 
         copied = []
         for fname in shim_files:

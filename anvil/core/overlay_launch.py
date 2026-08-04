@@ -80,6 +80,13 @@ if [ "$MOUNTS" -eq 0 ]; then
     exec "$@"
 fi
 
+# Erst trocken einhaengen. Schlaegt das fehl, startet das Spiel lieber ohne
+# Mods als gar nicht -- ein exec bwrap ohne Netz wuerde den Start abbrechen.
+if ! bwrap --dev-bind / / "${{ARGS[@]}}" -- /bin/true >>"$LOG" 2>&1; then
+    echo "[$(date '+%F %T')] Einhaengen fehlgeschlagen -- starte ohne Mods" >> "$LOG"
+    exec "$@"
+fi
+
 echo "[$(date '+%F %T')] uebergebe an das Spiel" >> "$LOG"
 
 exec bwrap \\
@@ -138,17 +145,59 @@ def localconfig_files(steam_root: Path | None = None) -> list[Path]:
     return found
 
 
-def _app_block(text: str, app_id: str) -> re.Match[str] | None:
-    """Findet den App-Eintrag unter Software/Valve/Steam/apps.
+def _block_span(text: str, key: str, von: int = 0, bis: int | None = None) -> tuple[int, int, str] | None:
+    """Grenzen des Blocks ``"key" { ... }`` innerhalb von [von, bis).
 
-    Erkennbar daran, dass direkt darin ``LastPlayed`` oder ``Playtime`` steht --
-    die uebrigen Vorkommen derselben Zahl sind Lizenz- und CDN-Angaben.
+    Liefert (Anfang des Inhalts, Ende des Inhalts, Einrueckung) oder None.
+    Die schliessende Klammer wird ueber die Einrueckung gefunden, damit
+    verschachtelte Bloecke nicht faelschlich beenden.
     """
-    pattern = re.compile(
-        r'"' + re.escape(app_id) + r'"\n(\t+)\{\n'
-        r'(?=(?:.*\n)*?\1\t"(?:LastPlayed|Playtime|LaunchOptions)")'
-    )
-    return pattern.search(text)
+    bis = len(text) if bis is None else bis
+    muster = re.compile(r'"' + re.escape(key) + r'"\n(\t*)\{\n')
+    stelle = von
+    while True:
+        treffer = muster.search(text, stelle, bis)
+        if treffer is None:
+            return None
+        einrueckung = treffer.group(1)
+        schluss = text.find("\n" + einrueckung + "}", treffer.end() - 1, bis)
+        if schluss >= 0:
+            return treffer.end(), schluss + 1, einrueckung
+        stelle = treffer.end()
+
+
+def _app_block(text: str, app_id: str) -> tuple[int, int, str] | None:
+    """Der App-Eintrag unter UserLocalConfigStore/Software/Valve/Steam/apps.
+
+    Die Kennung steht in derselben Datei mehrfach -- in Lizenzangaben, in
+    CDN-Angaben und in einem zweiten apps-Abschnitt. Deshalb wird der Pfad
+    Abschnitt fuer Abschnitt abgestiegen statt frei gesucht. Frei gesucht
+    trifft man die falsche Stelle und ueberschreibt fremde Startoptionen.
+    """
+    spanne = (0, len(text))
+    for abschnitt in ("UserLocalConfigStore", "Software", "Valve", "Steam", "apps"):
+        gefunden = _block_span(text, abschnitt, spanne[0], spanne[1])
+        if gefunden is None:
+            return None
+        spanne = (gefunden[0], gefunden[1])
+    return _block_span(text, app_id, spanne[0], spanne[1])
+
+
+_LAUNCH = r'"LaunchOptions"\t+"((?:[^"\\]|\\.)*)"\n'
+
+
+def _unescape(value: str) -> str:
+    ergebnis = []
+    maskiert = False
+    for zeichen in value:
+        if maskiert:
+            ergebnis.append(zeichen)
+            maskiert = False
+        elif zeichen == "\\":
+            maskiert = True
+        else:
+            ergebnis.append(zeichen)
+    return "".join(ergebnis)
 
 
 def read_launch_options(app_id: str, config: Path) -> str | None:
@@ -156,18 +205,15 @@ def read_launch_options(app_id: str, config: Path) -> str | None:
         text = config.read_text(encoding="utf-8", errors="surrogateescape")
     except OSError:
         return None
-    match = _app_block(text, app_id)
-    if match is None:
+    block = _app_block(text, app_id)
+    if block is None:
         return None
-    depth = match.group(1)
-    block = text[match.end():]
-    found = re.search(
-        r'\n' + depth + r'\t"LaunchOptions"\t+"((?:[^"\\]|\\.)*)"',
-        "\n" + block[:4000],
+    anfang, schluss, einrueckung = block
+    gefunden = re.search(
+        r'\n' + einrueckung + r'\t' + _LAUNCH,
+        "\n" + text[anfang:schluss],
     )
-    if not found:
-        return ""
-    return found.group(1).replace('\\"', '"').replace("\\\\", "\\")
+    return _unescape(gefunden.group(1)) if gefunden else ""
 
 
 def set_launch_options(app_id: str, value: str, config: Path) -> None:
@@ -180,32 +226,30 @@ def set_launch_options(app_id: str, value: str, config: Path) -> None:
         raise RuntimeError("Steam laeuft -- Startoption kann nicht gesetzt werden")
 
     text = config.read_text(encoding="utf-8", errors="surrogateescape")
-    match = _app_block(text, app_id)
-    if match is None:
+    block = _app_block(text, app_id)
+    if block is None:
         raise RuntimeError(f"App {app_id} steht nicht in {config}")
 
-    depth = match.group(1) + "\t"
+    anfang, schluss, einrueckung = block
+    tiefe = einrueckung + "\t"
     # VDF kennt Backslash-Maskierung. Ersetzen durch einfache Anfuehrungs-
     # zeichen wuerde Pfade mit Leerzeichen zerlegen -- und Instanzordner
     # heissen nun mal "Cyberpunk 2077".
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-    line = f'{depth}"LaunchOptions"\t\t"{escaped}"\n'
+    zeile = f'{tiefe}"LaunchOptions"\t\t"{escaped}"\n'
 
-    existing = re.search(
-        r'\n' + re.escape(depth) + r'"LaunchOptions"\t+"(?:[^"\\]|\\.)*"\n',
-        text[match.end() - 1:match.end() + 4000],
-    )
-    if existing:
-        start = match.end() - 1 + existing.start()
-        end = match.end() - 1 + existing.end()
-        updated = text[:start] + "\n" + line + text[end:]
+    inhalt = text[anfang:schluss]
+    vorhanden = re.search(r'^' + re.escape(tiefe) + _LAUNCH, inhalt, re.M)
+    if vorhanden:
+        neuer_inhalt = inhalt[:vorhanden.start()] + zeile + inhalt[vorhanden.end():]
     else:
-        updated = text[:match.end()] + line + text[match.end():]
+        neuer_inhalt = zeile + inhalt
+    aktualisiert = text[:anfang] + neuer_inhalt + text[schluss:]
 
-    backup = config.with_suffix(config.suffix + ".anvil-backup")
-    if not backup.exists():
-        shutil.copy2(config, backup)
+    sicherung = config.with_suffix(config.suffix + ".anvil-backup")
+    if not sicherung.exists():
+        shutil.copy2(config, sicherung)
 
     temporary = config.with_suffix(config.suffix + ".tmp")
-    temporary.write_text(updated, encoding="utf-8", errors="surrogateescape")
+    temporary.write_text(aktualisiert, encoding="utf-8", errors="surrogateescape")
     os.replace(temporary, config)

@@ -258,3 +258,96 @@ def test_mod_gewinnt_ueber_die_spieldatei(tmp_path: Path) -> None:
     assert lauf.stdout.strip() == b"von der mod", "der Spielordner hat die Mod geschlagen"
     assert neu.stdout.strip() == b"neu"
     assert (game / "konflikt.txt").read_text(encoding="utf-8") == "vanilla"
+
+
+# Eine Konfiguration, wie sie wirklich aussieht: dieselbe Kennung taucht
+# mehrfach auf, und andere Spiele haben eigene Startoptionen.
+ECHT = '''"UserLocalConfigStore"
+{
+\t"Licenses"
+\t{
+\t\t"1091500"\t\t"44000000040000002494cd0a"
+\t}
+\t"Software"
+\t{
+\t\t"Valve"
+\t\t{
+\t\t\t"Steam"
+\t\t\t{
+\t\t\t\t"apps"
+\t\t\t\t{
+\t\t\t\t\t"22380"
+\t\t\t\t\t{
+\t\t\t\t\t\t"LaunchOptions"\t\t"PROTON_NO_ESYNC=1 %command%"
+\t\t\t\t\t\t"LastPlayed"\t\t"1"
+\t\t\t\t\t}
+\t\t\t\t\t"1091500"
+\t\t\t\t\t{
+\t\t\t\t\t\t"LastPlayed"\t\t"1785782916"
+\t\t\t\t\t\t"Playtime"\t\t"1167"
+\t\t\t\t\t\t"cloud"
+\t\t\t\t\t\t{
+\t\t\t\t\t\t\t"last_sync_state"\t\t"synchronized"
+\t\t\t\t\t\t}
+\t\t\t\t\t\t"LaunchOptions"\t\t"PROTON_LOG=1 WINEDLLOVERRIDES=\\"winmm,version=n,b\\" %command%"
+\t\t\t\t\t}
+\t\t\t\t}
+\t\t\t}
+\t\t}
+\t}
+\t"depots"
+\t{
+\t\t"1091500"
+\t\t{
+\t\t\t"LaunchOptions"\t\t"nicht anfassen"
+\t\t}
+\t}
+}
+'''
+
+
+def _echt(tmp_path: Path) -> Path:
+    path = tmp_path / "localconfig.vdf"
+    path.write_text(ECHT, encoding="utf-8")
+    return path
+
+
+def test_bestehende_option_wird_gefunden_nicht_die_lizenzangabe(tmp_path: Path) -> None:
+    config = _echt(tmp_path)
+    gelesen = read_launch_options("1091500", config)
+    assert gelesen == 'PROTON_LOG=1 WINEDLLOVERRIDES="winmm,version=n,b" %command%'
+
+
+def test_fremde_app_bleibt_unangetastet(tmp_path: Path, steam_aus: None) -> None:
+    """Der Fehler, der eine echte Konfiguration beschaedigt hat."""
+    config = _echt(tmp_path)
+    set_launch_options("1091500", "/wrapper %command%", config)
+
+    assert read_launch_options("22380", config) == "PROTON_NO_ESYNC=1 %command%"
+    assert read_launch_options("1091500", config) == "/wrapper %command%"
+
+    text = config.read_text(encoding="utf-8")
+    assert text.count('"LaunchOptions"') == 3      # 22380, 1091500, depots
+    assert '"nicht anfassen"' in text              # depots-Block unberuehrt
+    assert text.count("{") == text.count("}")
+
+
+def test_vorhandene_option_wird_ersetzt_nicht_verdoppelt(
+    tmp_path: Path, steam_aus: None
+) -> None:
+    config = _echt(tmp_path)
+    set_launch_options("1091500", "neu %command%", config)
+
+    anfang, schluss, _ = __import__(
+        "anvil.core.overlay_launch", fromlist=["_app_block"]
+    )._app_block(config.read_text(encoding="utf-8"), "1091500")
+    block = config.read_text(encoding="utf-8")[anfang:schluss]
+    assert block.count('"LaunchOptions"') == 1
+
+
+def test_leeren_setzt_nicht_die_falsche_app_zurueck(tmp_path: Path, steam_aus: None) -> None:
+    config = _echt(tmp_path)
+    set_launch_options("1091500", "", config)
+
+    assert read_launch_options("1091500", config) == ""
+    assert read_launch_options("22380", config) == "PROTON_NO_ESYNC=1 %command%"

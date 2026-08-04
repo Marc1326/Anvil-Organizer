@@ -1403,6 +1403,7 @@ class SettingsDialog(QDialog):
         game = self._idata.get("game_path", "")
         problems = environment_problems(upper, Path(game) if game else None)
 
+        self._overlay_locked = False
         if not problems:
             self._lbl_overlay_problems.setVisible(False)
             return
@@ -1411,8 +1412,11 @@ class SettingsDialog(QDialog):
 
         self._lbl_overlay_problems.setText("\n".join(f"• {p}" for p in problems))
         self._lbl_overlay_problems.setVisible(True)
-        self._cb_use_overlay.setChecked(False)
+        # Nur sperren, nicht abhaken. Wer die Einstellungen auf einem Rechner
+        # ohne bwrap oeffnet und mit OK schliesst, soll seine Konfiguration
+        # nicht verlieren.
         self._cb_use_overlay.setEnabled(False)
+        self._overlay_locked = True
 
     def _setting_row(self, cb: QCheckBox) -> QWidget:
         """Modern: Checkbox als Vorlage-Zeile (Text links, Schalter rechts,
@@ -1989,7 +1993,8 @@ class SettingsDialog(QDialog):
                 idata["local_inis"] = self._cb_local_inis.isChecked()
                 idata["local_saves"] = self._cb_local_saves.isChecked()
                 idata["keep_mods_deployed"] = self._cb_keep_deployed.isChecked()
-                idata["use_overlay"] = self._cb_use_overlay.isChecked()
+                if not getattr(self, "_overlay_locked", False):
+                    idata["use_overlay"] = self._cb_use_overlay.isChecked()
                 self._instance_manager.save_instance(cur, idata)
 
         super().accept()

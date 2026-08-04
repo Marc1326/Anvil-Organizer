@@ -490,3 +490,30 @@ def test_abschalten_entschaerft_den_wrapper(
     assert not deployer.mount_conf_path.exists()
     assert not deployer.is_deployed()
     assert not deployer.stage_root.exists()
+
+
+def test_plugin_scan_findet_die_schicht(tmp_path: Path) -> None:
+    """Im Overlay stehen die Plugins nicht im Spielordner, sondern in der Schicht."""
+    from anvil.core.plugins_txt_writer import PluginsTxtWriter
+
+    class Plugin:
+        GameDataPath = "Data"
+        GamePrimaryPlugins: list[str] = []
+
+    game = tmp_path / "Game"
+    stage = tmp_path / "stage"
+    instance = tmp_path / "Instance"
+    (game / "Data").mkdir(parents=True)
+    (stage / "Data").mkdir(parents=True)
+    (instance / ".profiles" / "Default").mkdir(parents=True)
+    (game / "Data" / "Vanilla.esm").write_bytes(b"x")
+    (stage / "Data" / "AusDerMod.esp").write_bytes(b"x")
+
+    writer = PluginsTxtWriter(Plugin(), game, instance, profile_name="Default")
+    ohne = writer.scan_plugins()
+    writer.set_extra_scan_roots([stage])
+    mit = writer.scan_plugins()
+
+    assert "AusDerMod.esp" not in ohne
+    assert "AusDerMod.esp" in mit
+    assert "Vanilla.esm" in mit
