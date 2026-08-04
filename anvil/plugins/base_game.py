@@ -122,6 +122,11 @@ class BaseGame:
     Only deployed when the corresponding framework is installed."""
 
     GameCopyDeployPaths: list[str] = []
+
+    # Unreal-Spiele mit ~mods-Ordner laden Paks alphabetisch nach Dateiname,
+    # die zuletzt eingehaengte gewinnt. Ohne Zaehler im Namen ist die
+    # Reihenfolge in Anvil fuer diese Spiele wirkungslos.
+    GamePakLoadOrderPrefix: bool = False
     """Relative paths (from game root) where files must be deployed as
     copies instead of symlinks.  Used when a tool (e.g. CET's Lua VM)
     cannot follow symlinks through Wine/Proton drive mappings.

@@ -58,6 +58,24 @@ _BA2_SYMLINK_EXTENSIONS = {
 }
 
 
+# Dateiendungen, die zu einer Unreal-Mod gehoeren. Alle drei muessen
+# denselben Namen tragen, sonst findet das Spiel sie nicht zusammen.
+_PAK_EXTENSIONS = {".pak", ".utoc", ".ucas"}
+
+
+def pak_load_order_name(rel: Path, index: int) -> Path:
+    """Stellt dem Dateinamen einen Zaehler voran.
+
+    Unreal haengt die Paks alphabetisch ein und laesst die zuletzt
+    eingehaengte gewinnen. Der Zaehler bildet die Reihenfolge aus Anvil ab:
+    niedrigste Prioritaet bekommt die kleinste Zahl und wird zuerst
+    eingehaengt, die hoechste gewinnt.
+    """
+    if rel.suffix.lower() not in _PAK_EXTENSIONS:
+        return rel
+    return rel.with_name(f"{index:03d}_{rel.name}")
+
+
 @dataclass
 class DeployResult:
     """Result of a deploy or purge operation."""
@@ -100,6 +118,7 @@ class ModDeployer:
         mod_index: ModIndex | None = None,
         redmod_path: str = "",
         separator_deploy_paths: dict[str, str] | None = None,
+        pak_load_order_prefix: bool = False,
         mods_path: Path | None = None,
         profiles_path: Path | None = None,
     ) -> None:
@@ -122,6 +141,7 @@ class ModDeployer:
         self._copy_deploy_paths = [p.replace("\\", "/") for p in (copy_deploy_paths or [])]
         self._mod_index = mod_index
         self._separator_deploy_paths = separator_deploy_paths or {}
+        self._pak_load_order_prefix = pak_load_order_prefix
         self._skipped_mods: set[str] = set()
 
     def set_skipped_mods(self, names) -> None:
@@ -247,7 +267,7 @@ class ModDeployer:
 
         # Process mods from lowest to highest priority.
         # Higher priority mods overwrite lower ones (replace symlink).
-        for mod_name, _priority in enabled_mods:
+        for load_index, (mod_name, _priority) in enumerate(enabled_mods):
             mod_dir = self._mods_path / mod_name
 
             if not mod_dir.is_dir():
@@ -463,6 +483,9 @@ class ModDeployer:
                                 rel = data_prefix / mod_name / rel
                             else:
                                 rel = data_prefix / rel
+
+                if self._pak_load_order_prefix:
+                    rel = pak_load_order_name(rel, load_index)
 
                 # Determine deploy base: custom separator path or global game path
                 mod_separator = mod_to_separator.get(mod_name, "")

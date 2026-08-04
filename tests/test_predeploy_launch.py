@@ -357,5 +357,129 @@ class PredeployLaunchTests(unittest.TestCase):
         warning.assert_not_called()
 
 
+    def test_steam_launch_runs_predeploy_hook(self) -> None:
+        """Steam main-binary launches deploy via the hook, not start_requested."""
+        app = QApplication.instance() or QApplication([])
+        panel = GamePanel()
+        panel._game_label.setText("Steam Game")
+        panel._executables = [{"name": "Steam Game", "binary": "bin/game.exe"}]
+        panel._selected_exe_index = 0
+        panel._current_plugin = SimpleNamespace(
+            GameSteamId=3489700,
+            detectedStore=lambda: "steam",
+            GameBinary="bin/game.exe",
+            NeedsRedmodDeploy=False,
+        )
+        hook = mock.Mock(return_value=True)
+        panel.set_predeploy_hook(hook)
+        panel._do_launch = mock.Mock()
+
+        panel._on_start_clicked()
+
+        hook.assert_called_once_with("game_start")
+        panel._do_launch.assert_called_once()
+        panel.deleteLater()
+        app.processEvents()
+
+    def test_steam_launch_aborts_when_predeploy_fails(self) -> None:
+        app = QApplication.instance() or QApplication([])
+        panel = GamePanel()
+        panel._game_label.setText("Steam Game")
+        panel._executables = [{"name": "Steam Game", "binary": "bin/game.exe"}]
+        panel._selected_exe_index = 0
+        panel._current_plugin = SimpleNamespace(
+            GameSteamId=3489700,
+            detectedStore=lambda: "steam",
+            GameBinary="bin/game.exe",
+            NeedsRedmodDeploy=False,
+        )
+        panel.set_predeploy_hook(mock.Mock(return_value=False))
+        panel._do_launch = mock.Mock()
+
+        with mock.patch(
+            "anvil.widgets.game_panel.QMessageBox.warning"
+        ) as warning:
+            panel._on_start_clicked()
+
+        panel._do_launch.assert_not_called()
+        warning.assert_called_once()
+        panel.deleteLater()
+        app.processEvents()
+
+    def test_non_steam_launch_skips_predeploy_hook(self) -> None:
+        """GOG/Epic starts go through start_requested, which deploys already."""
+        app = QApplication.instance() or QApplication([])
+        panel = GamePanel()
+        panel._game_label.setText("GOG Game")
+        panel._executables = [{"name": "GOG Game", "binary": "bin/game.exe"}]
+        panel._selected_exe_index = 0
+        panel._current_plugin = SimpleNamespace(
+            GameSteamId=0,
+            detectedStore=lambda: "gog",
+            GameBinary="bin/game.exe",
+            NeedsRedmodDeploy=False,
+        )
+        hook = mock.Mock(return_value=True)
+        panel.set_predeploy_hook(hook)
+        panel._do_launch = mock.Mock()
+
+        panel._on_start_clicked()
+
+        hook.assert_not_called()
+        panel._do_launch.assert_called_once()
+        panel.deleteLater()
+        app.processEvents()
+
+    def test_forge_branch_deploys_without_predeploy_hook(self) -> None:
+        """GRB keeps its own deploy branch and never touches the hook."""
+        app = QApplication.instance() or QApplication([])
+        panel = GamePanel()
+        panel._game_label.setText("GRB")
+        panel._executables = [{"name": "GRB", "binary": "grb.exe"}]
+        panel._selected_exe_index = 0
+        panel._current_plugin = SimpleNamespace(
+            GameSteamId=123,
+            detectedStore=lambda: "steam",
+            GameBinary="grb.exe",
+            NeedsRedmodDeploy=False,
+            RequiresForgeDeployment=True,
+        )
+        hook = mock.Mock(return_value=True)
+        panel.set_predeploy_hook(hook)
+        panel.silent_deploy = mock.Mock(
+            return_value=SimpleNamespace(success=True, errors=[])
+        )
+        panel._do_launch = mock.Mock()
+
+        panel._on_start_clicked()
+
+        hook.assert_not_called()
+        panel.silent_deploy.assert_called_once()
+        panel._do_launch.assert_called_once()
+        panel.deleteLater()
+        app.processEvents()
+
+    def test_steam_launch_without_hook_still_launches(self) -> None:
+        """No hook connected (e.g. tests, tools) must not block the launch."""
+        app = QApplication.instance() or QApplication([])
+        panel = GamePanel()
+        panel._game_label.setText("Steam Game")
+        panel._executables = [{"name": "Steam Game", "binary": "bin/game.exe"}]
+        panel._selected_exe_index = 0
+        panel._current_plugin = SimpleNamespace(
+            GameSteamId=3489700,
+            detectedStore=lambda: "steam",
+            GameBinary="bin/game.exe",
+            NeedsRedmodDeploy=False,
+        )
+        panel._do_launch = mock.Mock()
+
+        panel._on_start_clicked()
+
+        panel._do_launch.assert_called_once()
+        panel.deleteLater()
+        app.processEvents()
+
+
 if __name__ == "__main__":
     unittest.main()

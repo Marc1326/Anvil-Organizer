@@ -519,6 +519,9 @@ class GamePanel(QWidget):
         self._mods_path: Path | None = None
         self._profiles_path: Path | None = None
         self._instance_path: Path | None = None
+        # Pre-launch deploy hook (set by MainWindow) — Steam launches
+        # don't pass through start_requested, so they deploy via this.
+        self._predeploy_hook = None
         self._instance_dir: Path | None = None
         self._instance_cover_image: str = ""
         self._instance_cover_color: str = ""
@@ -1865,6 +1868,14 @@ class GamePanel(QWidget):
             return False
         return True
 
+    def set_predeploy_hook(self, hook) -> None:
+        """Set the pre-launch deploy callback (reason: str) -> bool.
+
+        Called before launching Steam games so mods reach the game
+        directory.  Returning False aborts the launch.
+        """
+        self._predeploy_hook = hook
+
     def _on_exe_selected(self, index: int) -> None:
         """Handle executable selection from the menu."""
         if index < 0 or index >= len(self._executables):
@@ -1933,6 +1944,19 @@ class GamePanel(QWidget):
             self.silent_deploy()
             self._run_redmod_deploy_then_launch(plugin, binary, is_steam)
             return
+
+        # Steam launches don't pass through MainWindow's start_requested
+        # hook — run the pre-launch deploy here before handing to Steam.
+        # GRB deployed in its own branch above; REDmod returned already.
+        forge_done = getattr(plugin, "RequiresForgeDeployment", False)
+        if is_steam and not forge_done and self._predeploy_hook is not None:
+            if not self._predeploy_hook("game_start"):
+                QMessageBox.warning(
+                    self,
+                    tr("error.deploy_failed_title"),
+                    tr("error.deploy_failed_message", details=""),
+                )
+                return
 
         self._do_launch(plugin, binary, is_steam)
 
@@ -2929,6 +2953,7 @@ class GamePanel(QWidget):
         ba2_loose_paths = getattr(plugin, "Ba2LoosePaths", []) if plugin else []
         copy_paths = getattr(plugin, "GameCopyDeployPaths", []) if plugin else []
         redmod_path = getattr(plugin, "GameRedmodPath", "") if plugin else ""
+        pak_order = getattr(plugin, "GamePakLoadOrderPrefix", False) if plugin else False
         return ModDeployer(
             instance_path,
             game_path,
@@ -2944,6 +2969,7 @@ class GamePanel(QWidget):
             mod_index=self._mod_index,
             redmod_path=redmod_path,
             separator_deploy_paths=self._separator_deploy_paths,
+            pak_load_order_prefix=pak_order,
             mods_path=self._mods_path,
             profiles_path=self._profiles_path,
         )

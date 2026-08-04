@@ -434,6 +434,7 @@ class MainWindow(QMainWindow):
         self._game_panel.custom_start_requested.connect(self._on_custom_tool_start)
         self._game_panel.game_started.connect(self._on_game_started)
         self._game_panel.game_stopped.connect(self._unlock_ui)
+        self._game_panel.set_predeploy_hook(self._predeploy_for_launch)
 
         self._game_panel.dl_query_info_requested.connect(self._on_dl_query_info)
 
