@@ -29,34 +29,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from anvil.core.archive_packing import is_archive_loose_path
+from anvil.core.deploy_rules import (
+    SKIP_DIRS as _SKIP_DIRS,
+    SKIP_FILES as _SKIP_FILES,
+    SKIP_ROOT_EXTENSIONS as _SKIP_ROOT_EXTENSIONS,
+    ARCHIVE_KEEP_EXTENSIONS as _BA2_SYMLINK_EXTENSIONS,
+    apply_data_path,
+    goes_into_archive,
+    strip_root,
+)
 from anvil.core.mod_list_io import read_global_modlist, read_active_mods
 
 if TYPE_CHECKING:
     from anvil.core.modindex import ModIndex
-
-# Files inside mod folders that are metadata, not game content.
-_SKIP_FILES = {"meta.ini", "codes.txt", "fomod_choices.json"}
-
-# Directories inside mod folders that are installer metadata.
-_SKIP_DIRS = {"fomod"}
-
-# Extensions skipped ONLY in the mod root directory (not in subdirectories).
-# Files in subdirectories (textures/, meshes/, etc.) are game content.
-_SKIP_ROOT_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp",  # Bilder
-    ".txt", ".md", ".pdf", ".log", ".readme",           # Dokumentation
-    ".db",                                               # Thumbs.db
-}
-
-# Extensions always deployed as symlinks even when BA2-packing is active.
-_BA2_SYMLINK_EXTENSIONS = {
-    ".esp", ".esm", ".esl",   # plugins
-    ".dll", ".exe",            # script extenders / binaries
-    ".ini", ".cfg", ".toml",   # config files
-    ".ba2", ".bsa",            # existing archives
-}
-
 
 @dataclass
 class DeployResult:
@@ -425,48 +410,29 @@ class ModDeployer:
                 except ValueError:
                     continue
 
-                # Strip "root/" prefix (RootBuilder pattern)
-                if rel.parts and rel.parts[0].lower() == "root":
-                    rel = Path(*rel.parts[1:]) if len(rel.parts) > 1 else rel
+                rel = strip_root(rel)
 
                 # BA2-Packing: keep tool working data loose, skip only files
                 # that the archive packer will actually consume.
-                if self._needs_ba2_packing:
-                    ext = src_file.suffix.lower()
-                    stays_loose = is_archive_loose_path(
-                        rel,
-                        self._ba2_loose_paths,
-                        self._data_path,
-                    )
-                    if ext not in _BA2_SYMLINK_EXTENSIONS and not stays_loose:
-                        continue
+                if self._needs_ba2_packing and goes_into_archive(
+                    rel,
+                    src_file.suffix,
+                    loose_paths=self._ba2_loose_paths,
+                    data_path=self._data_path,
+                ):
+                    continue
 
                 # Direct-install mods skip data_path (frameworks go into game root)
                 is_direct = self.is_direct_install(mod_name)
 
-                # Prepend data_path (e.g. "Data" for Bethesda games)
-                # Skip for direct-install mods — they deploy into game root
-                if self._data_path and not is_direct:
-                    data_prefix = Path(self._data_path)
-
-                    # Multi-folder routing (e.g. Witcher 3: mods/ → Mods/, dlc/ → DLC/)
-                    routed = False
-                    if self._multi_folder_routes and len(rel.parts) > 1:
-                        first_part = rel.parts[0]
-                        if first_part in self._multi_folder_routes:
-                            target_prefix = self._multi_folder_routes[first_part]
-                            rel = Path(target_prefix) / Path(*rel.parts[1:])
-                            routed = True
-
-                    if not routed:
-                        try:
-                            rel.relative_to(data_prefix)
-                            # rel beginnt bereits mit Data/ → nicht nochmal
-                        except ValueError:
-                            if self._nest_under_mod_name:
-                                rel = data_prefix / mod_name / rel
-                            else:
-                                rel = data_prefix / rel
+                rel = apply_data_path(
+                    rel,
+                    mod_name,
+                    data_path=self._data_path,
+                    is_direct=is_direct,
+                    nest_under_mod_name=self._nest_under_mod_name,
+                    multi_folder_routes=self._multi_folder_routes,
+                )
 
                 # Determine deploy base: custom separator path or global game path
                 mod_separator = mod_to_separator.get(mod_name, "")

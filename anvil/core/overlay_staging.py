@@ -17,30 +17,17 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from anvil.core.archive_packing import is_archive_loose_path
+from anvil.core.deploy_rules import (
+    SKIP_DIRS,
+    apply_data_path,
+    goes_into_archive,
+    is_metadata,
+    strip_root,
+    target_rel,
+)
 from anvil.core.mod_list_io import read_active_mods, read_global_modlist
 
-# Dateien im Mod-Ordner, die zur Verwaltung gehoeren und nicht ins Spiel duerfen.
-SKIP_FILES = {"meta.ini", "codes.txt", "fomod_choices.json"}
-
-# Installer-Verzeichnisse.
-SKIP_DIRS = {"fomod"}
-
-# Endungen, die auch bei aktivem BA2-Packen einzeln liegen bleiben.
-BA2_KEEP_EXTENSIONS = {
-    ".esp", ".esm", ".esl",
-    ".dll", ".exe",
-    ".ini", ".cfg", ".toml",
-    ".ba2", ".bsa",
-}
-
-# Endungen, die nur im Wurzelverzeichnis eines Mods ausgelassen werden --
-# in Unterordnern sind das Spielinhalte.
-SKIP_ROOT_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp",
-    ".txt", ".md", ".pdf", ".log", ".readme",
-    ".db",
-}
+__all__ = ["OverlayStage", "StageResult", "is_metadata", "target_rel"]
 
 
 @dataclass
@@ -54,53 +41,6 @@ class StageResult:
     # Schluessel sind eigene Zielpfade aus den Trenner-Einstellungen und
     # brauchen je einen eigenen Mount.
     layers: dict[str, Path] = field(default_factory=dict)
-
-
-def is_metadata(src: Path, mod_dir: Path, rel: Path) -> bool:
-    """True fuer Dateien, die zur Mod-Verwaltung gehoeren."""
-    if src.name in SKIP_FILES:
-        return True
-    if rel.parts and rel.parts[0].lower() in SKIP_DIRS:
-        return True
-    if src.parent == mod_dir and src.suffix.lower() in SKIP_ROOT_EXTENSIONS:
-        return True
-    return False
-
-
-def target_rel(
-    rel: Path,
-    mod_name: str,
-    *,
-    data_path: str = "",
-    is_direct: bool = False,
-    nest_under_mod_name: bool = False,
-    multi_folder_routes: dict[str, str] | None = None,
-) -> Path:
-    """Rechnet den Pfad im Mod auf den Pfad im Spielordner um.
-
-    Gleiche Regeln wie im Symlink-Deployer: ``root/``-Praefix faellt weg,
-    Frameworks landen in der Spielwurzel, alles andere unter ``data_path``.
-    """
-    if rel.parts and rel.parts[0].lower() == "root":
-        rel = Path(*rel.parts[1:]) if len(rel.parts) > 1 else rel
-
-    if not data_path or is_direct:
-        return rel
-
-    prefix = Path(data_path)
-    routes = multi_folder_routes or {}
-    if routes and len(rel.parts) > 1 and rel.parts[0] in routes:
-        return Path(routes[rel.parts[0]]) / Path(*rel.parts[1:])
-
-    try:
-        rel.relative_to(prefix)
-        return rel
-    except ValueError:
-        pass
-
-    if nest_under_mod_name:
-        return prefix / mod_name / rel
-    return prefix / rel
 
 
 def _place(src: Path, dest: Path, result: StageResult) -> None:
@@ -182,13 +122,16 @@ class OverlayStage:
         """True, wenn der Archiv-Packer die Datei uebernimmt.
 
         Solche Dateien duerfen nicht zusaetzlich lose in der Schicht liegen --
-        sie wuerden das Archiv ueberdecken.
+        sie wuerden das Archiv ueberdecken. Geprueft wird auf dem Pfad ohne
+        Data-Praefix, genau wie im Symlink-Weg.
         """
         if not self._needs_ba2_packing:
             return False
-        if src.suffix.lower() in BA2_KEEP_EXTENSIONS:
-            return False
-        return not is_archive_loose_path(rel, self._ba2_loose_paths, self._data_path)
+        return goes_into_archive(
+            rel, src.suffix,
+            loose_paths=self._ba2_loose_paths,
+            data_path=self._data_path,
+        )
 
     def is_direct_install(self, mod_name: str) -> bool:
         lower = mod_name.lower()
@@ -336,16 +279,17 @@ class OverlayStage:
                 if is_metadata(src, mod_dir, rel):
                     continue
 
-                dest_rel = target_rel(
-                    rel,
+                gestrippt = strip_root(rel)
+                if self._packed_away(src, gestrippt):
+                    continue
+                dest_rel = apply_data_path(
+                    gestrippt,
                     mod_name,
                     data_path=self._data_path,
                     is_direct=is_direct,
                     nest_under_mod_name=self._nest,
                     multi_folder_routes=self._routes,
                 )
-                if self._packed_away(src, dest_rel):
-                    continue
                 _place(src, ziel_schicht / dest_rel, result)
                 staged_any = True
 
