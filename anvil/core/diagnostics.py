@@ -29,6 +29,7 @@ _PATH_KEYS = (
 )
 
 _MANIFEST_NAME = ".deploy_manifest.json"
+_OVERLAY_MANIFEST_NAME = ".overlay_manifest.json"
 
 
 # ── Systeminfo ────────────────────────────────────────────────────────
@@ -175,6 +176,32 @@ def detect_problems(idata: dict, sysinfo: dict, path_checks: list[dict]) -> list
 
 # ── Deploy-Status (Symlink-Prüfung aus dem Manifest) ──────────────────
 
+def _overlay_status(instance_path: Path) -> dict | None:
+    """Deploy-Zustand beim Overlay, oder None wenn dort nichts liegt.
+
+    Es gibt keine Links zu prüfen — die Schicht ist entweder da oder nicht.
+    """
+    manifest_path = instance_path / _OVERLAY_MANIFEST_NAME
+    if not manifest_path.is_file():
+        return None
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"manifest": False}
+    if not isinstance(data, dict):
+        return {"manifest": False}
+
+    lowerdirs = [Path(p) for p in data.get("lowerdirs", []) if isinstance(p, str)]
+    return {
+        "manifest": True,
+        "mode": "overlay",
+        "total": int(data.get("files", 0)),
+        "broken": 0,
+        "missing": sum(1 for p in lowerdirs if not p.is_dir()),
+        "deployed_at": data.get("deployed_at", ""),
+    }
+
+
 def collect_deploy_status(instance_path) -> dict:
     """Liest das Deploy-Manifest und prüft die Symlinks. Wirft nie.
 
@@ -182,6 +209,11 @@ def collect_deploy_status(instance_path) -> dict:
     """
     if instance_path is None:
         return {"manifest": False}
+
+    overlay = _overlay_status(Path(instance_path))
+    if overlay is not None:
+        return overlay
+
     manifest_path = Path(instance_path) / _MANIFEST_NAME
     if not manifest_path.is_file():
         return {"manifest": False}

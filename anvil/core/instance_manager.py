@@ -392,6 +392,8 @@ class InstanceManager:
             s.setValue("local_inis", data["local_inis"])
         if "local_saves" in data:
             s.setValue("local_saves", data["local_saves"])
+        if "use_overlay" in data:
+            s.setValue("use_overlay", data["use_overlay"])
         s.endGroup()
 
         s.beginGroup("Paths")

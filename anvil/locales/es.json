@@ -894,7 +894,9 @@
     "color_role_disabled_text": "Texto desactivado",
     "color_change": "Cambiar…",
     "color_pick_title": "Elegir color",
-    "path_anvil_base_dir": "Anvil base directory"
+    "path_anvil_base_dir": "Anvil base directory",
+    "use_overlay": "Montar los mods como capa superpuesta (experimental)",
+    "use_overlay_hint": "Ya no se escribe en la carpeta del juego. Los mods se superponen al iniciar y desaparecen al salir."
   },
   "mod_detail": {
     "open_in_explorer": "Abrir Mod en el explorador",
@@ -1375,5 +1377,14 @@
     "migration_confirm": "Anvil must restart to move the complete base directory. All game deployments are purged first.\n\nSource: {source}\nTarget: {target}\n\nThe source will not be deleted. Continue?",
     "error_target_exists": "The automatic target already exists: {path}. Choose another parent folder or resume the pending migration.",
     "migration_scheduled": "The base migration is prepared. Anvil will restart now."
+  },
+  "overlay": {
+    "no_userns": "Este nucleo no tiene espacios de nombres de usuario.",
+    "userns_disabled": "Los espacios de nombres de usuario sin privilegios estan desactivados.",
+    "no_bwrap": "bubblewrap (bwrap) no esta instalado.",
+    "bad_filesystem": "La capa de escritura esta en {fs}. Overlay necesita ext4, btrfs o xfs.",
+    "no_game_path": "Carpeta del juego no encontrada: {path}",
+    "requirements_ok": "Se cumplen todos los requisitos.",
+    "launch_option_hint": "Anade esta linea a las opciones de inicio de Steam:"
   }
 }

@@ -894,7 +894,9 @@
     "color_role_disabled_text": "Deaktivierter Text",
     "color_change": "Ändern…",
     "color_pick_title": "Farbe wählen",
-    "path_anvil_base_dir": "Anvil-Basisverzeichnis"
+    "path_anvil_base_dir": "Anvil-Basisverzeichnis",
+    "use_overlay": "Mods per Overlay einbinden (experimentell)",
+    "use_overlay_hint": "Der Spielordner wird nicht mehr beschrieben. Die Mods werden beim Spielstart daruebergelegt und verschwinden wieder, sobald das Spiel endet."
   },
   "mod_detail": {
     "open_in_explorer": "Mod im Explorer öffnen",
@@ -1375,5 +1377,14 @@
     "migration_confirm": "Anvil muss neu starten, um das vollständige Basisverzeichnis zu verschieben. Zuerst werden alle Spiel-Deployments gepurged.\n\nQuelle: {source}\nZiel: {target}\n\nDie Quelle wird nicht gelöscht. Fortfahren?",
     "error_target_exists": "Das automatisch erzeugte Ziel existiert bereits: {path}. Wähle einen anderen übergeordneten Ordner oder setze die offene Migration fort.",
     "migration_scheduled": "Die Basismigration ist vorbereitet. Anvil startet jetzt neu."
+  },
+  "overlay": {
+    "no_userns": "Der Kernel kennt keine User-Namespaces.",
+    "userns_disabled": "Unprivilegierte User-Namespaces sind abgeschaltet.",
+    "no_bwrap": "bubblewrap (bwrap) ist nicht installiert.",
+    "bad_filesystem": "Die Schreibschicht liegt auf {fs}. Overlay braucht ext4, btrfs oder xfs.",
+    "no_game_path": "Spielordner nicht gefunden: {path}",
+    "requirements_ok": "Alle Voraussetzungen erfuellt.",
+    "launch_option_hint": "Diese Zeile gehoert bei Steam in die Startoptionen:"
   }
 }

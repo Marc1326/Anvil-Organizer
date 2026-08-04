@@ -75,6 +75,27 @@ class _Deployer(Protocol):
     def is_deployed(self) -> bool: ...
 
 
+def _tune_for_overlay(panel, component) -> None:
+    """Zeigt Packer, Plugin-Leser und ReShade auf die Mod-Schicht.
+
+    Ohne das wuerden sie am Spielordner arbeiten, und der soll beim
+    Overlay-Deploy unberuehrt bleiben. Tut nichts, solange Symlinks laufen.
+    """
+    if not getattr(panel, "_use_overlay", False):
+        return
+    stage = getattr(getattr(panel, "_deployer", None), "stage_dir", None)
+    if not isinstance(stage, Path):
+        return
+    for name, argument in (
+        ("set_output_root", stage),
+        ("set_target_root", stage),
+        ("set_extra_scan_roots", [stage]),
+    ):
+        hook = getattr(component, name, None)
+        if callable(hook):
+            hook(argument)
+
+
 class _NumericSortItem(QTableWidgetItem):
     """QTableWidgetItem that sorts by UserRole data (numeric) instead of text."""
     def __lt__(self, other):
@@ -525,6 +546,7 @@ class GamePanel(QWidget):
         self._current_profile_name: str = "Default"
         self._deployer: _Deployer | None = None
         self._separator_deploy_paths: dict[str, str] = {}
+        self._use_overlay = False   # overlayfs statt Symlinks, pro Instanz
         self._mod_index = None  # ModIndex, set from mainwindow
         self._virtual_files: dict = {}  # what the mods would deploy
         self._watch_binary = ""     # game binary the process watcher looks for
@@ -1186,6 +1208,7 @@ class GamePanel(QWidget):
                 self._instance_path,
                 mods_path=self._mods_path,
             )
+            _tune_for_overlay(self, packer)
             ba2_available = packer.is_available()
 
         if self._deployer:
@@ -1274,6 +1297,7 @@ class GamePanel(QWidget):
                 profile_name=self._current_profile_name,
                 profiles_path=self._profiles_path,
             )
+            _tune_for_overlay(self, writer)
             result_path = writer.write()
             if result_path is None:
                 self._record_plugin_write_failure(result, writer)
@@ -1353,6 +1377,7 @@ class GamePanel(QWidget):
                 profile_name=self._current_profile_name,
                 profiles_path=self._profiles_path,
             )
+            _tune_for_overlay(self, writer)
             result_path = writer.write()
             if result_path is None:
                 self._record_plugin_write_failure(result, writer)
@@ -1404,6 +1429,7 @@ class GamePanel(QWidget):
                 self._instance_path,
                 mods_path=self._mods_path,
             )
+            _tune_for_overlay(self, packer)
             packer.cleanup_ba2s()
             packer.restore_ini()
 
@@ -1669,6 +1695,7 @@ class GamePanel(QWidget):
             profile_name=self._current_profile_name,
             profiles_path=self._profiles_path,
         )
+        _tune_for_overlay(self, writer)
         result = writer.sort_and_write()
         if (
             not result.missing_masters
@@ -1699,6 +1726,7 @@ class GamePanel(QWidget):
             profile_name=self._current_profile_name,
             profiles_path=self._profiles_path,
         )
+        _tune_for_overlay(self, writer)
         entries = writer.read_entries()
 
         primary_lower = (
@@ -1768,6 +1796,7 @@ class GamePanel(QWidget):
             profile_name=self._current_profile_name,
             profiles_path=self._profiles_path,
         )
+        _tune_for_overlay(self, writer)
         current_entries = writer.read_entries()
         primary_locked = (
             {
@@ -1834,6 +1863,7 @@ class GamePanel(QWidget):
             profile_name=self._current_profile_name,
             profiles_path=self._profiles_path,
         )
+        _tune_for_overlay(self, writer)
         by_key = {entry.name.casefold(): entry for entry in tree_entries}
         locked: list[PluginEntry] = []
         locked_keys: set[str] = set()
@@ -2901,6 +2931,22 @@ class GamePanel(QWidget):
         """Set the ModIndex for cached file lists during deployment."""
         self._mod_index = mod_index
 
+    def set_overlay_enabled(self, enabled: bool) -> None:
+        """Waehlt zwischen overlayfs und Symlinks. Baut den Deployer neu."""
+        enabled = bool(enabled)
+        if enabled == self._use_overlay:
+            return
+        self._use_overlay = enabled
+        if self._instance_path and self._current_game_path:
+            self._deployer = self._create_deployer(
+                self._instance_path,
+                self._current_game_path,
+                self._current_profile_name,
+            )
+
+    def overlay_enabled(self) -> bool:
+        return self._use_overlay
+
     def _create_deployer(
         self,
         instance_path: Path,
@@ -2929,6 +2975,24 @@ class GamePanel(QWidget):
         ba2_loose_paths = getattr(plugin, "Ba2LoosePaths", []) if plugin else []
         copy_paths = getattr(plugin, "GameCopyDeployPaths", []) if plugin else []
         redmod_path = getattr(plugin, "GameRedmodPath", "") if plugin else ""
+
+        if getattr(self, "_use_overlay", False):
+            from anvil.core.overlay_deployer import OverlayDeployer
+
+            return OverlayDeployer(
+                instance_path,
+                game_path,
+                direct_patterns,
+                profile_name=profile_name,
+                data_path=data_path,
+                nest_under_mod_name=nest,
+                lml_path=lml_path,
+                multi_folder_routes=multi_routes,
+                redmod_path=redmod_path,
+                separator_deploy_paths=self._separator_deploy_paths,
+                mods_path=self._mods_path,
+                profiles_path=self._profiles_path,
+            )
         return ModDeployer(
             instance_path,
             game_path,
