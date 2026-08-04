@@ -47,14 +47,6 @@ class ReshadeManager:
         # ReShade files live next to the game binary
         self._binary_dir = game_path / Path(game_binary).parent
 
-    def set_target_root(self, root: Path | None) -> None:
-        """Zielwurzel umlegen, etwa in die Mod-Schicht beim Overlay-Deploy.
-
-        ``None`` stellt auf den Spielordner zurueck.
-        """
-        base = Path(root) if root is not None else self._game_path
-        self._binary_dir = base / Path(self._game_binary).parent
-
     # ── Detection ─────────────────────────────────────────────────────
 
     def detect_installed(self) -> dict | None:

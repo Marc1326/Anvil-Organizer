@@ -298,7 +298,7 @@ class PluginsTxtWriter:
         if creation_path is None:
             creation_file = getattr(self._game_plugin, "CreationClubFile", "")
             if creation_file:
-                creation_path = self._game_path / creation_file
+                creation_path = self._plugin_file(creation_file)
 
         actual = {entry.name.casefold(): entry.name for entry in entries}
         implicit: list[str] = []
@@ -335,9 +335,7 @@ class PluginsTxtWriter:
         """Sort with Anvil's native hard-constraint dependency graph."""
         from anvil.core.plugin_sorter import stable_dependency_sort
 
-        data_dir = self._game_path / getattr(
-            self._game_plugin, "GameDataPath", "Data"
-        )
+        data_dir = self._data_dirs()[0]
         native = stable_dependency_sort(
             (entry.name for entry in entries),
             data_dir,
@@ -361,9 +359,7 @@ class PluginsTxtWriter:
         """Sort the active profile and apply only a fully valid result."""
         entries = self.read_entries()
         if not entries:
-            data_dir = self._game_path / getattr(
-                self._game_plugin, "GameDataPath", "Data"
-            )
+            data_dir = self._data_dirs()[0]
             return PluginSortResult(
                 entries=[],
                 missing_masters={},
@@ -383,9 +379,7 @@ class PluginsTxtWriter:
 
         from anvil.core.plugin_sorter import parse_plugin_header
 
-        data_dir = self._game_path / getattr(
-            self._game_plugin, "GameDataPath", "Data"
-        )
+        data_dir = self._data_dirs()[0]
         regular_index = 0
         light_index = 0
         result: dict[str, str] = {}
@@ -408,21 +402,35 @@ class PluginsTxtWriter:
         """Weitere Wurzeln fuer den Plugin-Scan, etwa die Overlay-Schicht."""
         self._extra_scan_roots = [Path(r) for r in (roots or [])]
 
+    def _data_dirs(self) -> list[Path]:
+        """Alle Verzeichnisse, in denen Plugins liegen koennen.
+
+        Im Overlay-Betrieb steht im Spielordner nichts von den Mods -- wer
+        nur dort nachsieht, findet keine Plugins und sortiert ins Leere.
+        Hoechste Prioritaet zuerst: die Schicht schlaegt den Spielordner.
+        """
+        sub = getattr(self._game_plugin, "GameDataPath", "Data")
+        kandidaten = [extra / sub for extra in self._extra_scan_roots]
+        kandidaten.append(self._game_path / sub)
+        return [d for d in kandidaten if d.is_dir()] or [self._game_path / sub]
+
+    def _plugin_file(self, name: str) -> Path:
+        """Wo eine bestimmte Plugin-Datei liegt -- Schicht vor Spielordner."""
+        for data_dir in self._data_dirs():
+            kandidat = data_dir / name
+            if kandidat.exists():
+                return kandidat
+        return self._data_dirs()[0] / name
+
     def scan_plugins(self) -> list[str]:
         """Scan game_path/Data/ for plugin files.
 
         Returns a sorted list: primary plugins first (only if present
         on disk), then masters (.esm), then normal plugins (.esp/.esl).
         """
-        sub = getattr(self._game_plugin, "GameDataPath", "Data")
-        roots = [self._game_path / sub]
-        # Beim Overlay-Deploy liegen die Plugins der Mods in der Schicht --
-        # im Spielordner selbst stehen sie nicht.
-        roots.extend(extra / sub for extra in self._extra_scan_roots)
-
-        usable = [d for d in roots if d.is_dir()]
+        usable = [d for d in self._data_dirs() if d.is_dir()]
         if not usable:
-            print(f"{_TAG} Data directory not found: {roots[0]}")
+            print(f"{_TAG} Data directory not found: {self._data_dirs()[0]}")
             return []
 
         # Collect all plugin files directly in Data/ (not subdirs)

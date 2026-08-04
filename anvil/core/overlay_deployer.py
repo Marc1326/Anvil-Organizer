@@ -325,7 +325,11 @@ class OverlayDeployer:
         """
         lines = []
         for index, (ziel, unten) in enumerate(self.mounts()):
-            upper = self.upper_dir if index == 0 else self.upper_dir / f"extern-{index}"
+            # Nur der Hauptmount schreibt nach .overwrite. Weitere Schreib-
+            # schichten duerfen nicht darin liegen -- bwrap verbietet, dass
+            # eine Schreibschicht Vorfahre einer anderen ist, und der Ordner
+            # taucht sonst im Spiel auf.
+            upper = self.upper_dir if index == 0 else self._base / f"upper-{index}"
             work = self.work_dir / f"m{index}"
             lines.append(
                 "MOUNT="
