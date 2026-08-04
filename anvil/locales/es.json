@@ -896,7 +896,8 @@
     "color_pick_title": "Elegir color",
     "path_anvil_base_dir": "Anvil base directory",
     "use_overlay": "Montar los mods como capa superpuesta (experimental)",
-    "use_overlay_hint": "Ya no se escribe en la carpeta del juego. Los mods se superponen al iniciar y desaparecen al salir."
+    "use_overlay_hint": "Ya no se escribe en la carpeta del juego. Los mods se superponen al iniciar y desaparecen al salir.",
+    "overlay_set_launch_option": "Escribir la opcion de inicio en Steam"
   },
   "mod_detail": {
     "open_in_explorer": "Abrir Mod en el explorador",
@@ -1385,6 +1386,10 @@
     "bad_filesystem": "La capa de escritura esta en {fs}. Overlay necesita ext4, btrfs o xfs.",
     "no_game_path": "Carpeta del juego no encontrada: {path}",
     "requirements_ok": "Se cumplen todos los requisitos.",
-    "launch_option_hint": "Anade esta linea a las opciones de inicio de Steam:"
+    "launch_option_hint": "Anade esta linea a las opciones de inicio de Steam:",
+    "launch_no_app": "Esta instancia no tiene identificador de Steam. La opcion de inicio debe ponerse a mano.",
+    "launch_steam_running": "Steam esta abierto y sobrescribiria el cambio al cerrarse. Cierra Steam e intentalo de nuevo, o pega esta linea tu mismo:",
+    "launch_no_config": "No se encontro la configuracion de Steam. Pega esta linea tu mismo:",
+    "launch_written": "Opcion de inicio escrita en {count} cuenta(s) de Steam:"
   }
 }

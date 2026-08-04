@@ -29,28 +29,8 @@ set -u
 CONF="{conf}"
 LOG="{log}"
 
-fehler() {{
-    echo "[$(date '+%F %T')] $1" >> "$LOG"
-    exec "$@"
-}}
-
 if [ ! -r "$CONF" ]; then
     echo "[$(date '+%F %T')] keine Mount-Angaben ($CONF) -- starte ohne Mods" >> "$LOG"
-    exec "$@"
-fi
-
-GAME=""; UPPER=""; WORK=""; LOWER=""
-while IFS='=' read -r key value; do
-    case "$key" in
-        GAME) GAME="$value" ;;
-        UPPER) UPPER="$value" ;;
-        WORK) WORK="$value" ;;
-        LOWER) LOWER="$value" ;;
-    esac
-done < "$CONF"
-
-if [ -z "$GAME" ] || [ -z "$LOWER" ]; then
-    echo "[$(date '+%F %T')] Mount-Angaben unvollstaendig -- starte ohne Mods" >> "$LOG"
     exec "$@"
 fi
 
@@ -59,33 +39,47 @@ if ! command -v bwrap >/dev/null 2>&1; then
     exec "$@"
 fi
 
-mkdir -p "$UPPER" "$WORK"
+# Eine MOUNT-Zeile je Ziel:  MOUNT=<ziel>|<schicht>:<schicht>|<upper>|<work>
+ARGS=()
+MOUNTS=0
+while IFS= read -r line; do
+    case "$line" in
+        MOUNT=*) ;;
+        *) continue ;;
+    esac
+    rest="${{line#MOUNT=}}"
+    IFS='|' read -r ziel lower upper work <<< "$rest"
+    [ -n "$ziel" ] && [ -n "$lower" ] && [ -n "$upper" ] && [ -n "$work" ] || continue
+    [ -d "$ziel" ] || continue
 
-SRC=()
-COUNT=0
-IFS=':' read -r -a LAYERS <<< "$LOWER"
-for d in "${{LAYERS[@]}}"; do
-    [ -d "$d" ] || continue
-    SRC+=(--overlay-src "$d")
-    COUNT=$((COUNT + 1))
-done
+    schichten=0
+    teil=()
+    IFS=':' read -r -a LAYERS <<< "$lower"
+    for d in "${{LAYERS[@]}}"; do
+        [ -d "$d" ] || continue
+        teil+=(--overlay-src "$d")
+        schichten=$((schichten + 1))
+    done
 
-# Unter zwei Schichten gibt es nichts zu mischen.
-if [ "$COUNT" -lt 2 ]; then
-    echo "[$(date '+%F %T')] nur $COUNT Schicht -- starte ohne Mods" >> "$LOG"
+    # Unter zwei Schichten gibt es nichts zu mischen.
+    [ "$schichten" -ge 2 ] || continue
+
+    mkdir -p "$upper" "$work"
+    ARGS+=("${{teil[@]}}" --overlay "$upper" "$work" "$ziel")
+    MOUNTS=$((MOUNTS + 1))
+    echo "[$(date '+%F %T')] Mount $MOUNTS: $schichten Schichten -> $ziel" >> "$LOG"
+done < "$CONF"
+
+if [ "$MOUNTS" -eq 0 ]; then
+    echo "[$(date '+%F %T')] kein brauchbarer Mount -- starte ohne Mods" >> "$LOG"
     exec "$@"
 fi
 
-{{
-    echo "=== $(date '+%F %T') Overlay ==="
-    echo "Schichten: $COUNT"
-    echo "Spiel:     $GAME"
-}} >> "$LOG"
+echo "[$(date '+%F %T')] uebergebe an das Spiel" >> "$LOG"
 
 exec bwrap \\
     --dev-bind / / \\
-    "${{SRC[@]}}" \\
-    --overlay "$UPPER" "$WORK" "$GAME" \\
+    "${{ARGS[@]}}" \\
     -- "$@"
 """
 

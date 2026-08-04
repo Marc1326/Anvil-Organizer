@@ -126,6 +126,8 @@ class OverlayDeployer:
         lml_path: str = "",
         multi_folder_routes: dict[str, str] | None = None,
         redmod_path: str = "",
+        needs_ba2_packing: bool = False,
+        ba2_loose_paths: list[str] | None = None,
         separator_deploy_paths: dict[str, str] | None = None,
         mods_path: Path | None = None,
         profiles_path: Path | None = None,
@@ -145,6 +147,7 @@ class OverlayDeployer:
         self._manifest_path = instance_path / self.MANIFEST_NAME
         self._separator_deploy_paths = separator_deploy_paths or {}
         self._skipped_mods: set[str] = set()
+        self._layers: dict[str, Path] = {"": self._base / "stage" / "main"}
 
         self._stage = OverlayStage(
             self._mods_path,
@@ -156,13 +159,25 @@ class OverlayDeployer:
             direct_patterns=direct_install_patterns,
             lml_path=lml_path,
             redmod_path=redmod_path,
+            separator_deploy_paths=separator_deploy_paths,
+            needs_ba2_packing=needs_ba2_packing,
+            ba2_loose_paths=ba2_loose_paths,
         )
 
     # ── Pfade ──────────────────────────────────────────────────────────
 
     @property
     def stage_dir(self) -> Path:
+        """Die Schicht fuer den Spielordner."""
+        return self._base / "stage" / "main"
+
+    @property
+    def stage_root(self) -> Path:
         return self._base / "stage"
+
+    def stage_dirs(self) -> dict[str, Path]:
+        """Zielbasis -> Schicht. Leerer Schluessel ist der Spielordner."""
+        return dict(self._layers)
 
     @property
     def work_dir(self) -> Path:
@@ -199,6 +214,9 @@ class OverlayDeployer:
         self._skipped_mods = {str(n).lower() for n in names}
         self._stage._skipped = self._skipped_mods
 
+    def set_ba2_packing_enabled(self, enabled: bool) -> None:
+        self._stage.set_ba2_packing_enabled(enabled)
+
     def is_direct_install(self, mod_name: str) -> bool:
         return self._stage.is_direct_install(mod_name)
 
@@ -209,9 +227,19 @@ class OverlayDeployer:
         """Was dem Overlay auf diesem System im Weg steht."""
         return environment_problems(self.upper_dir, self._game_path)
 
-    def lowerdirs(self) -> list[Path]:
-        """Untere Schichten, hoechste Prioritaet zuerst."""
-        return [self.stage_dir, self._game_path]
+    def lowerdirs(self, deploy_base: str = "") -> list[Path]:
+        """Untere Schichten fuer eine Zielbasis, hoechste Prioritaet zuerst."""
+        schicht = self._layers.get(deploy_base, self.stage_dir)
+        ziel = Path(deploy_base) if deploy_base else self._game_path
+        return [schicht, ziel]
+
+    def mounts(self) -> list[tuple[Path, list[Path]]]:
+        """Was der Wrapper einhaengen muss: Ziel und seine unteren Schichten."""
+        eintraege = []
+        for basis in self._layers:
+            ziel = Path(basis) if basis else self._game_path
+            eintraege.append((ziel, self.lowerdirs(basis)))
+        return eintraege
 
     def deploy(self) -> DeployResult:
         result = DeployResult()
@@ -222,6 +250,8 @@ class OverlayDeployer:
             result.errors.extend(problems)
             return result
 
+        self._migrate_from_symlinks(result)
+
         if self.is_deployed():
             purged = self.purge()
             if not purged.success:
@@ -229,7 +259,7 @@ class OverlayDeployer:
                 result.errors.extend(purged.errors)
                 return result
 
-        for directory in (self.stage_dir.parent, self.work_dir, self.upper_dir):
+        for directory in (self.stage_root, self.work_dir, self.upper_dir):
             try:
                 directory.mkdir(parents=True, exist_ok=True)
             except OSError as exc:
@@ -237,7 +267,8 @@ class OverlayDeployer:
                 result.errors.append(f"{directory}: {exc}")
                 return result
 
-        staged = self._stage.build(self.stage_dir)
+        staged = self._stage.build(self.stage_root)
+        self._layers = staged.layers or {"": self.stage_dir}
         result.links_created = staged.files_linked
         result.files_copied = staged.files_copied
         result.errors.extend(staged.errors)
@@ -255,7 +286,10 @@ class OverlayDeployer:
             "game_path": str(self._game_path),
             "instance_path": str(self._instance_path),
             "profile": self._profile_name,
-            "lowerdirs": [str(p) for p in self.lowerdirs()],
+            "mounts": [
+                {"target": str(ziel), "lowerdirs": [str(p) for p in unten]}
+                for ziel, unten in self.mounts()
+            ],
             "upperdir": str(self.upper_dir),
             "workdir": str(self.work_dir),
             "mods_staged": staged.mods_staged,
@@ -275,13 +309,48 @@ class OverlayDeployer:
         return result
 
     def _write_mount_conf(self) -> None:
-        lines = [
-            f"GAME={self._game_path}",
-            f"UPPER={self.upper_dir}",
-            f"WORK={self.work_dir}",
-            "LOWER=" + ":".join(str(p) for p in self.lowerdirs()),
-        ]
+        """Eine Zeile je Mount: Ziel, untere Schichten, Schreibschicht, Arbeit.
+
+        Bewusst kein JSON -- der Startwrapper ist ein Shell-Skript und soll
+        ohne Fremdwerkzeug auskommen.
+        """
+        lines = []
+        for index, (ziel, unten) in enumerate(self.mounts()):
+            upper = self.upper_dir if index == 0 else self.upper_dir / f"extern-{index}"
+            work = self.work_dir / f"m{index}"
+            lines.append(
+                "MOUNT="
+                + "|".join([
+                    str(ziel),
+                    ":".join(str(p) for p in unten),
+                    str(upper),
+                    str(work),
+                ])
+            )
         self.mount_conf_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def _migrate_from_symlinks(self, result: DeployResult) -> None:
+        """Raeumt einen alten Symlink-Deploy weg, bevor der Overlay uebernimmt.
+
+        Laeuft nur, wenn wirklich noch ein Symlink-Manifest liegt -- sonst
+        wuerde bei jedem Start der ganze Spielordner abgelaufen.
+        """
+        from anvil.core.mod_deployer import ModDeployer
+
+        altes_manifest = self._instance_path / ModDeployer.MANIFEST_NAME
+        if not altes_manifest.is_file():
+            return
+
+        alt = ModDeployer(
+            self._instance_path,
+            self._game_path,
+            mods_path=self._mods_path,
+            profiles_path=self._profiles_dir,
+        )
+        alt.purge()
+        uebrig = alt.remove_orphaned_links()
+        if uebrig:
+            print(f"[OVERLAY] {uebrig} Symlink(s) aus dem alten Deploy entfernt", flush=True)
 
     def purge(self) -> DeployResult:
         """Raeumt die Mod-Schicht weg.
@@ -291,9 +360,9 @@ class OverlayDeployer:
         """
         result = DeployResult()
 
-        if self.stage_dir.exists():
+        if self.stage_root.exists():
             try:
-                force_rmtree(self.stage_dir)
+                force_rmtree(self.stage_root)
             except OSError as exc:
                 result.success = False
                 result.errors.append(f"Schicht entfernen: {exc}")

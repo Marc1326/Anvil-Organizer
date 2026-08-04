@@ -97,9 +97,9 @@ def test_hoehere_prioritaet_gewinnt(tmp_path: Path) -> None:
 
     assert result.success
     assert result.mods_staged == 2
-    gemeinsam = tmp_path / "stage" / "archive" / "gemeinsam.archive"
+    gemeinsam = tmp_path / "stage" / "main" / "archive" / "gemeinsam.archive"
     assert gemeinsam.read_text(encoding="utf-8") == "oben"
-    assert (tmp_path / "stage" / "archive" / "nur_unten.archive").is_file()
+    assert (tmp_path / "stage" / "main" / "archive" / "nur_unten.archive").is_file()
 
 
 def test_dokumentation_im_wurzelverzeichnis_bleibt_draussen(tmp_path: Path) -> None:
@@ -110,8 +110,8 @@ def test_dokumentation_im_wurzelverzeichnis_bleibt_draussen(tmp_path: Path) -> N
 
     OverlayStage(mods, profiles).build(tmp_path / "stage")
 
-    assert (tmp_path / "stage" / "archive" / "a.archive").is_file()
-    assert not (tmp_path / "stage" / "liesmich.txt").exists()
+    assert (tmp_path / "stage" / "main" / "archive" / "a.archive").is_file()
+    assert not (tmp_path / "stage" / "main" / "liesmich.txt").exists()
 
 
 def test_metadaten_kommen_nicht_in_die_schicht(tmp_path: Path) -> None:
@@ -122,9 +122,9 @@ def test_metadaten_kommen_nicht_in_die_schicht(tmp_path: Path) -> None:
 
     OverlayStage(mods, profiles).build(tmp_path / "stage")
 
-    assert (tmp_path / "stage" / "a.archive").is_file()
-    assert not (tmp_path / "stage" / "meta.ini").exists()
-    assert not (tmp_path / "stage" / "fomod").exists()
+    assert (tmp_path / "stage" / "main" / "a.archive").is_file()
+    assert not (tmp_path / "stage" / "main" / "meta.ini").exists()
+    assert not (tmp_path / "stage" / "main" / "fomod").exists()
 
 
 def test_inaktive_mods_bleiben_draussen(tmp_path: Path) -> None:
@@ -136,8 +136,8 @@ def test_inaktive_mods_bleiben_draussen(tmp_path: Path) -> None:
 
     OverlayStage(mods, profiles).build(tmp_path / "stage")
 
-    assert (tmp_path / "stage" / "archive" / "an.archive").is_file()
-    assert not (tmp_path / "stage" / "archive" / "aus.archive").exists()
+    assert (tmp_path / "stage" / "main" / "archive" / "an.archive").is_file()
+    assert not (tmp_path / "stage" / "main" / "archive" / "aus.archive").exists()
 
 
 def test_frameworks_kommen_auch_ohne_haken_mit(tmp_path: Path) -> None:
@@ -149,7 +149,7 @@ def test_frameworks_kommen_auch_ohne_haken_mit(tmp_path: Path) -> None:
     stage = OverlayStage(mods, profiles, direct_patterns=["RED4ext"])
     stage.build(tmp_path / "stage")
 
-    assert (tmp_path / "stage" / "bin" / "x64" / "winmm.dll").is_file()
+    assert (tmp_path / "stage" / "main" / "bin" / "x64" / "winmm.dll").is_file()
 
 
 def test_trenner_werden_uebersprungen(tmp_path: Path) -> None:
@@ -203,7 +203,9 @@ def test_deploy_baut_schicht_und_manifest(tmp_path: Path, ohne_umgebungspruefung
 
     manifest = json.loads(deployer.manifest_path.read_text(encoding="utf-8"))
     assert manifest["mods_staged"] == 1
-    assert manifest["lowerdirs"] == [str(deployer.stage_dir), str(game)]
+    assert manifest["mounts"] == [
+        {"target": str(game), "lowerdirs": [str(deployer.stage_dir), str(game)]}
+    ]
     assert manifest["upperdir"] == str(instance / ".overwrite")
 
 
@@ -301,14 +303,16 @@ def test_mount_conf_enthaelt_alle_schichten(tmp_path: Path, ohne_umgebungspruefu
     deployer = OverlayDeployer(instance, game)
     deployer.deploy()
 
-    conf = dict(
-        line.split("=", 1)
-        for line in deployer.mount_conf_path.read_text(encoding="utf-8").splitlines()
-        if "=" in line
-    )
-    assert conf["GAME"] == str(game)
-    assert conf["UPPER"] == str(instance / ".overwrite")
-    assert conf["LOWER"].split(":") == [str(deployer.stage_dir), str(game)]
+    zeilen = [
+        z for z in deployer.mount_conf_path.read_text(encoding="utf-8").splitlines()
+        if z.startswith("MOUNT=")
+    ]
+    assert len(zeilen) == 1
+    ziel, lower, upper, work = zeilen[0][len("MOUNT="):].split("|")
+    assert ziel == str(game)
+    assert lower.split(":") == [str(deployer.stage_dir), str(game)]
+    assert upper == str(instance / ".overwrite")
+    assert work.startswith(str(deployer.work_dir))
 
 
 def test_diagnose_erkennt_den_overlay_deploy(tmp_path: Path, ohne_umgebungspruefung: None) -> None:
@@ -374,3 +378,59 @@ def test_purge_raeumt_auch_zugenagelte_arbeitsordner(
 
     assert result.success, result.errors
     assert not deployer.work_dir.exists()
+
+
+def test_alter_symlink_deploy_wird_weggeraeumt(
+    tmp_path: Path, ohne_umgebungspruefung: None
+) -> None:
+    from anvil.core.mod_deployer import ModDeployer
+
+    instance, game, mods, profiles = _instance(tmp_path)
+    _mod(mods, "M", {"archive/a.archive": "x"})
+    write_global_modlist(profiles, ["M"])
+    write_active_mods(profiles / "Default", {"M"})
+
+    symlink = ModDeployer(instance, game)
+    symlink.deploy()
+    assert (game / "archive" / "a.archive").is_symlink()
+
+    OverlayDeployer(instance, game).deploy()
+
+    assert not (game / "archive" / "a.archive").exists()
+    assert not (instance / ModDeployer.MANIFEST_NAME).exists()
+    assert sorted(p.name for p in game.iterdir()) == ["spiel.exe"]
+
+
+def test_ohne_alten_deploy_wird_der_spielordner_nicht_durchsucht(
+    tmp_path: Path, ohne_umgebungspruefung: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from anvil.core import mod_deployer as md
+
+    instance, game, mods, profiles = _instance(tmp_path)
+    _mod(mods, "M", {"archive/a.archive": "x"})
+    write_global_modlist(profiles, ["M"])
+    write_active_mods(profiles / "Default", {"M"})
+
+    gerufen = []
+    monkeypatch.setattr(
+        md.ModDeployer, "remove_orphaned_links",
+        lambda self: gerufen.append(1) or 0,
+    )
+
+    OverlayDeployer(instance, game).deploy()
+
+    assert gerufen == []
+
+
+def test_ba2_schalter_wird_durchgereicht(tmp_path: Path, ohne_umgebungspruefung: None) -> None:
+    instance, game, mods, profiles = _instance(tmp_path)
+    _mod(mods, "M", {"meshes/a.nif": "x", "b.esp": "x"})
+    write_global_modlist(profiles, ["M"])
+    write_active_mods(profiles / "Default", {"M"})
+
+    deployer = OverlayDeployer(instance, game, data_path="Data")
+    deployer.set_ba2_packing_enabled(True)
+    deployer.deploy()
+
+    assert (deployer.stage_dir / "Data" / "b.esp").is_file()
+    assert not (deployer.stage_dir / "Data" / "meshes" / "a.nif").exists()

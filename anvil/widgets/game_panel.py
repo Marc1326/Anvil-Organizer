@@ -2989,6 +2989,8 @@ class GamePanel(QWidget):
                 lml_path=lml_path,
                 multi_folder_routes=multi_routes,
                 redmod_path=redmod_path,
+                needs_ba2_packing=ba2_packing,
+                ba2_loose_paths=ba2_loose_paths,
                 separator_deploy_paths=self._separator_deploy_paths,
                 mods_path=self._mods_path,
                 profiles_path=self._profiles_path,

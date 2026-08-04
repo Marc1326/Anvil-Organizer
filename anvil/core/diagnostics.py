@@ -191,13 +191,23 @@ def _overlay_status(instance_path: Path) -> dict | None:
     if not isinstance(data, dict):
         return {"manifest": False}
 
-    lowerdirs = [Path(p) for p in data.get("lowerdirs", []) if isinstance(p, str)]
+    fehlend = 0
+    for mount in data.get("mounts", []):
+        if not isinstance(mount, dict):
+            continue
+        ziel = mount.get("target", "")
+        if isinstance(ziel, str) and ziel and not Path(ziel).is_dir():
+            fehlend += 1
+        for lower in mount.get("lowerdirs", []):
+            if isinstance(lower, str) and not Path(lower).is_dir():
+                fehlend += 1
+
     return {
         "manifest": True,
         "mode": "overlay",
         "total": int(data.get("files", 0)),
         "broken": 0,
-        "missing": sum(1 for p in lowerdirs if not p.is_dir()),
+        "missing": fehlend,
         "deployed_at": data.get("deployed_at", ""),
     }
 

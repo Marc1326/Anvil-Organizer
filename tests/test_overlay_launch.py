@@ -167,8 +167,7 @@ def test_wrapper_zaehlt_schichten_richtig(tmp_path: Path) -> None:
     game.mkdir()
     conf = tmp_path / "mount.conf"
     conf.write_text(
-        f"GAME={game}\nUPPER={tmp_path / 'upper'}\n"
-        f"WORK={tmp_path / 'work'}\nLOWER={stage}:{game}\n",
+        f"MOUNT={game}|{stage}:{game}|{tmp_path / 'upper'}|{tmp_path / 'work'}\n",
         encoding="utf-8",
     )
     log = tmp_path / "start.log"
@@ -176,7 +175,9 @@ def test_wrapper_zaehlt_schichten_richtig(tmp_path: Path) -> None:
 
     subprocess.run([str(target), "/bin/true"], capture_output=True)
 
-    assert "Schichten: 2" in log.read_text(encoding="utf-8")
+    inhalt = log.read_text(encoding="utf-8")
+    assert "Mount 1: 2 Schichten" in inhalt
+    assert "uebergebe an das Spiel" in inhalt
     force_rmtree(tmp_path / "work")
 
 
@@ -185,8 +186,7 @@ def test_wrapper_startet_bei_einer_schicht_ohne_mods(tmp_path: Path) -> None:
     game.mkdir()
     conf = tmp_path / "mount.conf"
     conf.write_text(
-        f"GAME={game}\nUPPER={tmp_path / 'upper'}\n"
-        f"WORK={tmp_path / 'work'}\nLOWER={tmp_path / 'fehlt'}:{game}\n",
+        f"MOUNT={game}|{tmp_path / 'fehlt'}:{game}|{tmp_path / 'upper'}|{tmp_path / 'work'}\n",
         encoding="utf-8",
     )
     log = tmp_path / "start.log"
@@ -195,4 +195,4 @@ def test_wrapper_startet_bei_einer_schicht_ohne_mods(tmp_path: Path) -> None:
     lauf = subprocess.run([str(target), "/bin/echo", "trotzdem"], capture_output=True)
 
     assert b"trotzdem" in lauf.stdout
-    assert "nur 1 Schicht" in log.read_text(encoding="utf-8")
+    assert "kein brauchbarer Mount" in log.read_text(encoding="utf-8")
