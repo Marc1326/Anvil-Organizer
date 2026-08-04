@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QAbstractItemView,
     QLabel,
+    QMessageBox,
     QListWidget,
     QListWidgetItem,
     QLineEdit,
@@ -237,6 +238,13 @@ class SettingsDialog(QDialog):
         self._lbl_overlay_problems.setWordWrap(True)
         self._lbl_overlay_problems.setVisible(False)
         prof_layout.addWidget(self._lbl_overlay_problems)
+
+        self._btn_overlay_launch = QPushButton(tr("settings.overlay_set_launch_option"))
+        self._btn_overlay_launch.clicked.connect(
+            lambda checked=False: self._set_overlay_launch_option()
+        )
+        prof_layout.addWidget(self._btn_overlay_launch)
+
         self._check_overlay_requirements()
 
         scroll_layout.addWidget(prof_grp)
@@ -1312,6 +1320,80 @@ class SettingsDialog(QDialog):
                 backdrop.dismiss()
         return super().exec()
 
+    def _steam_app_id(self) -> str:
+        """Steam-Kennung des Spiels dieser Instanz, oder leer."""
+        short = str(self._idata.get("game_short_name", ""))
+        if not short or not self._plugin_loader:
+            return ""
+        for plugin in self._plugin_loader.all_plugins():
+            if getattr(plugin, "GameShortName", "") != short:
+                continue
+            app_id = getattr(plugin, "GameSteamId", None)
+            if isinstance(app_id, list):
+                app_id = app_id[0] if app_id else None
+            return str(app_id) if app_id else ""
+        return ""
+
+    def _overlay_launch_option(self) -> str:
+        from anvil.core.overlay_launch import launch_option, wrapper_path
+
+        cur = self._instance_manager.current_instance() if self._instance_manager else None
+        if not cur:
+            return ""
+        instance_path = self._instance_manager.instances_path() / cur
+        return launch_option(wrapper_path(instance_path))
+
+    def _set_overlay_launch_option(self) -> None:
+        """Traegt die Startoption bei Steam ein, oder zeigt sie zum Kopieren."""
+        from anvil.core.overlay_launch import (
+            localconfig_files,
+            set_launch_options,
+            steam_is_running,
+        )
+
+        option = self._overlay_launch_option()
+        app_id = self._steam_app_id()
+        titel = tr("settings.overlay_set_launch_option")
+
+        if not option or not app_id:
+            QMessageBox.warning(self, titel, tr("overlay.launch_no_app"))
+            return
+
+        if steam_is_running():
+            QMessageBox.information(
+                self, titel,
+                tr("overlay.launch_steam_running") + "\n\n" + option,
+            )
+            return
+
+        configs = localconfig_files()
+        if not configs:
+            QMessageBox.warning(
+                self, titel,
+                tr("overlay.launch_no_config") + "\n\n" + option,
+            )
+            return
+
+        gesetzt = []
+        fehler = []
+        for config in configs:
+            try:
+                set_launch_options(app_id, option, config)
+                gesetzt.append(config)
+            except (OSError, RuntimeError) as exc:
+                fehler.append(str(exc))
+
+        if gesetzt:
+            QMessageBox.information(
+                self, titel,
+                tr("overlay.launch_written", count=len(gesetzt)) + "\n\n" + option,
+            )
+        else:
+            QMessageBox.warning(
+                self, titel,
+                "\n".join(fehler) + "\n\n" + option,
+            )
+
     def _check_overlay_requirements(self) -> None:
         """Zeigt an, was dem Overlay im Weg steht, und sperrt notfalls den Schalter."""
         from anvil.core.overlay_deployer import environment_problems
@@ -1324,6 +1406,8 @@ class SettingsDialog(QDialog):
         if not problems:
             self._lbl_overlay_problems.setVisible(False)
             return
+
+        self._btn_overlay_launch.setEnabled(False)
 
         self._lbl_overlay_problems.setText("\n".join(f"• {p}" for p in problems))
         self._lbl_overlay_problems.setVisible(True)

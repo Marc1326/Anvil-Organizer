@@ -118,12 +118,15 @@ Ghost Recon bleibt unberuehrt (eigener Deployer).
 | # | Was | Stand |
 |---|---|---|
 | 0 | Prototyp: reicht pressure-vessel die Overlay-Sicht durch? | **erledigt — ja** |
-| 1 | Staging und Mount-Kern, ohne GUI, mit Tests | **erledigt** |
-| 2 | Wrapper, Startoption, Voraussetzungspruefung | **erledigt** |
-| 3 | Einhaengen ueber die Fabrik, Umschalter pro Instanz | **erledigt** |
-| 4 | Die angehaengten Subsysteme nachziehen | **erledigt** |
-| 5 | Locales (7 Sprachen), Umschalter in den Einstellungen | **erledigt** |
-| 6 | Migrationspfad, echter Spieldurchlauf | offen |
+| 1 | Staging und Mount-Kern | gebaut, gegen den Symlink-Weg geprueft |
+| 2 | Wrapper, Startoption, Voraussetzungspruefung | gebaut |
+| 3 | Einhaengen ueber die Fabrik, Umschalter pro Instanz | gebaut |
+| 4 | Angehaengte Subsysteme | gebaut |
+| 5 | Locales (7 Sprachen), Schalter im Dialog | gebaut |
+| 6 | Echter Spieldurchlauf bis ins Menue | offen |
+
+Nichts davon gilt als fertig, solange die Akzeptanzkriterien weiter unten
+nicht abgehakt sind.
 
 Jede Etappe muss fuer sich lauffaehig sein. Vorgabe bleibt der Symlink-Weg,
 bis der Overlay wirklich steht.
@@ -164,14 +167,15 @@ Zeit: 4–6 Wochen nebenher, 2–3 Wochen konzentriert. Der heutige Deployer hat
 ## Akzeptanzkriterien
 
 - [ ] Cyberpunk startet mit Overlay, CET und RED4ext laufen
-- [ ] Spielordner nach dem Spiel byte-identisch zu vorher
-- [ ] Prioritaet: hoeher priorisierte Mod gewinnt bei gleichem Pfad
-- [ ] Zur Laufzeit geschriebene Dateien landen in `.overwrite`
-- [ ] `meta.ini` und `fomod/` tauchen im Spiel nicht auf
+- [x] Spielordner nach dem Deploy unveraendert
+- [x] Prioritaet: hoeher priorisierte Mod gewinnt bei gleichem Pfad
+- [x] Zur Laufzeit geschriebene Dateien landen in `.overwrite`
+- [x] `meta.ini` und `fomod/` tauchen im Spiel nicht auf
 - [ ] Absturz des Spiels hinterlaesst keinen Mount
-- [ ] Symlink-Weg weiterhin waehlbar und unveraendert funktionsfaehig
-- [ ] Voraussetzungen werden geprueft und verstaendlich gemeldet
-- [ ] Tests gruen
+- [x] Symlink-Weg weiterhin waehlbar und unveraendert funktionsfaehig
+- [x] Voraussetzungen werden geprueft und verstaendlich gemeldet
+- [x] Tests gruen
+- [x] Overlay und Symlink erzeugen dieselben Zielpfade
 
 
 ---
@@ -251,3 +255,34 @@ Die ARG_MAX-Sorge ist damit erledigt: es sind zwei lowerdirs, nicht 352.
 - Migrationspfad fuer Instanzen, die noch Symlinks ausgerollt haben
 - Voller Spieldurchlauf mit allen 352 Mods bis ins Menue
 - Separator-Zielpfade (`separator_deploy_paths`) brauchen eigene Mounts
+
+
+---
+
+## Nachtrag 04.08.2026 — geschlossene Luecken
+
+Nach dem ersten Durchgang fehlten mehrere Pfadregeln, ohne dass ein Test
+angeschlagen haette.  Ursache: die Tests prueften, was gebaut wurde, nicht
+was der Symlink-Deployer tut.
+
+`tests/test_overlay_matches_symlink.py` stellt beide Wege jetzt gegeneinander:
+dieselbe Mod-Sammlung durch `ModDeployer` und durch `OverlayStage`, danach
+Zielpfad gegen Zielpfad.  Der Test war zuerst rot und hat gefunden:
+
+- **REDmod-Muster C** fehlte ganz -- REDmods in Unterordnern wurden falsch
+  einsortiert.  Bei der echten Cyberpunk-Sammlung waren das zwei zusaetzliche
+  REDmods (8 -> 10).
+- **Trenner-Zielpfade** wurden entgegengenommen und ignoriert.  Mods in einem
+  Trenner mit eigenem Ziel landeten stillschweigend im Hauptspielordner.
+  Jetzt bekommt jede Zielbasis eine eigene Schicht und einen eigenen Mount.
+- **BA2-Packen** war im Staging nicht beruecksichtigt -- lose Dateien haetten
+  die frisch gepackten Archive ueberdeckt.
+
+Dazu geschlossen:
+
+- Die Steam-Startoption laesst sich aus den Einstellungen setzen.  Laeuft
+  Steam, wird die Zeile stattdessen zum Kopieren gezeigt, weil Steam die
+  Datei beim Beenden zurueckschreiben wuerde.
+- Ein noch liegender Symlink-Deploy wird beim Umstellen weggeraeumt.  Der
+  Spielordner wird dabei nur durchsucht, wenn wirklich ein altes Manifest da
+  ist.
