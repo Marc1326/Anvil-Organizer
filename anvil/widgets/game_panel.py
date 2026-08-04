@@ -70,6 +70,7 @@ from anvil.styles.dark_theme import theme_color
 class _Deployer(Protocol):
     _separator_deploy_paths: dict[str, str]
 
+    def set_separator_deploy_paths(self, paths: dict[str, str]) -> None: ...
     def deploy(self) -> Any: ...
     def purge(self) -> Any: ...
     def is_deployed(self) -> bool: ...
@@ -539,6 +540,7 @@ class GamePanel(QWidget):
         self._downloads_path: Path | None = None
         self._mods_path: Path | None = None
         self._profiles_path: Path | None = None
+        self._overwrite_path: Path | None = None
         self._instance_path: Path | None = None
         self._instance_dir: Path | None = None
         self._instance_cover_image: str = ""
@@ -1100,9 +1102,14 @@ class GamePanel(QWidget):
                    Empty paths are ignored (fallback to game path).
         """
         self._separator_deploy_paths = {k: v for k, v in paths.items() if v}
-        # Update deployer if already initialized
+        # Update deployer if already initialized. Ueber die Methode, nicht ueber
+        # das Feld -- der Overlay-Deployer haelt eine eigene Kopie im Staging.
         if self._deployer is not None:
-            self._deployer._separator_deploy_paths = self._separator_deploy_paths
+            setter = getattr(self._deployer, "set_separator_deploy_paths", None)
+            if callable(setter):
+                setter(self._separator_deploy_paths)
+            else:
+                self._deployer._separator_deploy_paths = self._separator_deploy_paths
 
     # ── Silent deploy / purge (called from MainWindow) ──────────────
 
@@ -2936,6 +2943,19 @@ class GamePanel(QWidget):
         enabled = bool(enabled)
         if enabled == self._use_overlay:
             return
+        if not enabled and self._deployer is not None:
+            # Ohne das bleibt mount.conf liegen, der Wrapper haengt beim
+            # naechsten Spielstart die eingefrorene alte Schicht ein und
+            # schlaegt damit die frisch gelegten Symlinks.
+            purge = getattr(self._deployer, "purge", None)
+            conf = getattr(self._deployer, "mount_conf_path", None)
+            if callable(purge) and conf is not None:
+                try:
+                    purge()
+                    Path(conf).unlink(missing_ok=True)
+                except OSError as exc:
+                    _dlog(f"[OVERLAY] Abschalten unvollstaendig: {exc}")
+
         self._use_overlay = enabled
         if self._instance_path and self._current_game_path:
             self._deployer = self._create_deployer(
@@ -2994,6 +3014,7 @@ class GamePanel(QWidget):
                 separator_deploy_paths=self._separator_deploy_paths,
                 mods_path=self._mods_path,
                 profiles_path=self._profiles_path,
+                overwrite_path=self._overwrite_path,
             )
         return ModDeployer(
             instance_path,
@@ -3035,12 +3056,15 @@ class GamePanel(QWidget):
         downloads_path: Path,
         mods_path: Path,
         profiles_path: Path | None = None,
+        overwrite_path: Path | None = None,
     ) -> None:
         """Set storage paths and populate the downloads table."""
         self._downloads_path = downloads_path
         self._mods_path = mods_path
         if profiles_path is not None:
             self._profiles_path = profiles_path
+        if overwrite_path is not None:
+            self._overwrite_path = overwrite_path
         self.refresh_downloads()
 
     def _is_separator_row(self, row: int) -> bool:

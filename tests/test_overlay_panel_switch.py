@@ -21,6 +21,7 @@ class FakePanel:
     _mod_index = None
     _mods_path: Path | None = None
     _profiles_path: Path | None = None
+    _overwrite_path: Path | None = None
 
     _create_deployer = GamePanel._create_deployer
 

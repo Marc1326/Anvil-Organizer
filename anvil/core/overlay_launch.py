@@ -55,7 +55,12 @@ while IFS= read -r line; do
     schichten=0
     teil=()
     IFS=':' read -r -a LAYERS <<< "$lower"
-    for d in "${{LAYERS[@]}}"; do
+    # Die Liste steht in Kernel-Reihenfolge: hoechste Prioritaet zuerst.
+    # bwrap versteht --overlay-src andersherum -- die zuletzt genannte Quelle
+    # gewinnt. Also rueckwaerts durchlaufen, sonst schlaegt der Spielordner
+    # jede Mod.
+    for ((i=${{#LAYERS[@]}}-1; i>=0; i--)); do
+        d="${{LAYERS[i]}}"
         [ -d "$d" ] || continue
         teil+=(--overlay-src "$d")
         schichten=$((schichten + 1))

@@ -210,6 +210,15 @@ class OverlayDeployer:
 
     # ── Schnittstelle ──────────────────────────────────────────────────
 
+    def set_separator_deploy_paths(self, paths: dict[str, str]) -> None:
+        """Eigene Zielpfade je Trenner -- auch im Staging nachziehen.
+
+        Die Oberflaeche setzt die Pfade erst nach dem Konstruktor. Ohne das
+        Nachziehen baut das Staging seine Schichten ohne sie.
+        """
+        self._separator_deploy_paths = dict(paths or {})
+        self._stage.set_separator_deploy_paths(self._separator_deploy_paths)
+
     def set_skipped_mods(self, names) -> None:
         self._skipped_mods = {str(n).lower() for n in names}
         self._stage._skipped = self._skipped_mods
