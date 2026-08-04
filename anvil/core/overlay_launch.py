@@ -156,8 +156,13 @@ def read_launch_options(app_id: str, config: Path) -> str | None:
         return None
     depth = match.group(1)
     block = text[match.end():]
-    found = re.search(r'\n' + depth + r'\t"LaunchOptions"\t+"([^"]*)"', "\n" + block[:4000])
-    return found.group(1) if found else ""
+    found = re.search(
+        r'\n' + depth + r'\t"LaunchOptions"\t+"((?:[^"\\]|\\.)*)"',
+        "\n" + block[:4000],
+    )
+    if not found:
+        return ""
+    return found.group(1).replace('\\"', '"').replace("\\\\", "\\")
 
 
 def set_launch_options(app_id: str, value: str, config: Path) -> None:
@@ -175,11 +180,14 @@ def set_launch_options(app_id: str, value: str, config: Path) -> None:
         raise RuntimeError(f"App {app_id} steht nicht in {config}")
 
     depth = match.group(1) + "\t"
-    escaped = value.replace('"', "'")
+    # VDF kennt Backslash-Maskierung. Ersetzen durch einfache Anfuehrungs-
+    # zeichen wuerde Pfade mit Leerzeichen zerlegen -- und Instanzordner
+    # heissen nun mal "Cyberpunk 2077".
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     line = f'{depth}"LaunchOptions"\t\t"{escaped}"\n'
 
     existing = re.search(
-        r'\n' + re.escape(depth) + r'"LaunchOptions"\t+"[^"]*"\n',
+        r'\n' + re.escape(depth) + r'"LaunchOptions"\t+"(?:[^"\\]|\\.)*"\n',
         text[match.end() - 1:match.end() + 4000],
     )
     if existing:
