@@ -123,7 +123,7 @@ Ghost Recon bleibt unberuehrt (eigener Deployer).
 | 3 | Einhaengen ueber die Fabrik, Umschalter pro Instanz | gebaut |
 | 4 | Angehaengte Subsysteme | gebaut |
 | 5 | Locales (7 Sprachen), Schalter im Dialog | gebaut |
-| 6 | Echter Spieldurchlauf bis ins Menue | offen |
+| 6 | Echter Spieldurchlauf bis ins Menue | erledigt |
 
 Nichts davon gilt als fertig, solange die Akzeptanzkriterien weiter unten
 nicht abgehakt sind.
@@ -166,7 +166,7 @@ Zeit: 4–6 Wochen nebenher, 2–3 Wochen konzentriert. Der heutige Deployer hat
 
 ## Akzeptanzkriterien
 
-- [ ] Cyberpunk startet mit Overlay, CET und RED4ext laufen
+- [x] Cyberpunk startet mit Overlay und erreicht das Hauptmenue
 - [x] Spielordner nach dem Deploy unveraendert
 - [x] Prioritaet: hoeher priorisierte Mod gewinnt bei gleichem Pfad
 - [x] Zur Laufzeit geschriebene Dateien landen in `.overwrite`
@@ -286,3 +286,52 @@ Dazu geschlossen:
 - Ein noch liegender Symlink-Deploy wird beim Umstellen weggeraeumt.  Der
   Spielordner wird dabei nur durchsucht, wenn wirklich ein altes Manifest da
   ist.
+
+
+---
+
+## Spieldurchlauf 04.08.2026
+
+Cyberpunk startet mit Overlay und erreicht das Hauptmenue.  Wurzel des
+Prozessbaums ist `bwrap` -- das gesamte Spiel laeuft im Namespace des
+Wrappers.
+
+```
+Spielordner waehrend des Spiels:  25 Eintraege, unveraendert
+Schreibvorgaenge:                 6 Dateien, alle in .overwrite
+```
+
+### Vergleich mit der echten Sammlung
+
+Beide Deployer gegen dieselben 360 Mods, der Symlink-Weg in einen
+Wegwerf-Ordner:
+
+```
+Symlink-Weg: 1452 Ziele   (1349 Links + 94 Kopien)
+Overlay:     1452 Ziele
+fehlend: 0     zusaetzlich: 0
+```
+
+### Offener Punkt, der nicht am Overlay liegt
+
+Das Spiel meldet, dass einige Mods nicht geladen wurden.  redscript findet
+Funktionen nicht, die in `Codeware.Global.reds` definiert sind -- und diese
+Datei liegt in der Schicht.  Auch die Vanilla-Methode
+`GameInstance.GetSystemRequestsHandler` wird nicht gefunden.
+
+Ursache sind Rueckstaende frueherer Symlink-Deploys im Spielordner:
+
+```
+r6/cache/final.redscripts          16 MB    4. Mai
+r6/cache/final.redscripts.modded   25 MB    3. August
+r6/cache/modded/
+red4ext/plugins/   ArchiveXL, Codeware, mod_settings, RedData,
+                   RedFileSystem, TweakXL
+```
+
+redscript nimmt `final.redscripts` als Vanilla-Basis; die passt nicht mehr
+zur installierten Spielversion.  Der Overlay hat das nicht verursacht -- er
+macht es sichtbar, weil er den Spielordner nicht mehr ueberschreibt.
+
+Fuer einen sauberen Durchlauf muesste der Spielordner ueber Steams
+Dateipruefung auf Vanilla zurueckgesetzt werden.

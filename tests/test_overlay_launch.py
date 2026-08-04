@@ -196,3 +196,23 @@ def test_wrapper_startet_bei_einer_schicht_ohne_mods(tmp_path: Path) -> None:
 
     assert b"trotzdem" in lauf.stdout
     assert "kein brauchbarer Mount" in log.read_text(encoding="utf-8")
+
+
+def test_pfad_mit_leerzeichen_bleibt_heil(tmp_path: Path, steam_aus: None) -> None:
+    config = _config(tmp_path)
+    option = '"/home/mob/Anvil/Cyberpunk 2077/.overlay/anvil-overlay-mount" %command%'
+    set_launch_options("1091500", option, config)
+
+    assert read_launch_options("1091500", config) == option
+    roh = config.read_text(encoding="utf-8")
+    assert '\\"' in roh          # als VDF maskiert
+    assert roh.count("{") == roh.count("}")
+
+
+def test_maskierte_option_wird_ersetzt(tmp_path: Path, steam_aus: None) -> None:
+    config = _config(tmp_path)
+    set_launch_options("1091500", '"/a b/wrapper" %command%', config)
+    set_launch_options("1091500", '"/c d/wrapper" %command%', config)
+
+    assert read_launch_options("1091500", config) == '"/c d/wrapper" %command%'
+    assert config.read_text(encoding="utf-8").count("LaunchOptions") == 1
