@@ -398,6 +398,8 @@ class InstanceManager:
             s.setValue("catchall_separator", data["catchall_separator"])
         if "catchall_tidy_asked" in data:
             s.setValue("catchall_tidy_asked", data["catchall_tidy_asked"])
+        if "use_overlay" in data:
+            s.setValue("use_overlay", data["use_overlay"])
         s.endGroup()
 
         s.beginGroup("Paths")

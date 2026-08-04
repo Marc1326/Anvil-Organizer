@@ -935,7 +935,10 @@
     "color_role_disabled_text": "Disabled text",
     "color_change": "Change…",
     "color_pick_title": "Choose color",
-    "path_anvil_base_dir": "Anvil base directory"
+    "path_anvil_base_dir": "Anvil base directory",
+    "use_overlay": "Mount mods as an overlay (experimental)",
+    "use_overlay_hint": "The game folder is no longer written to. Mods are layered on top at launch and disappear once the game exits.",
+    "overlay_set_launch_option": "Write launch option to Steam"
   },
   "mod_detail": {
     "open_in_explorer": "Open Mod in Explorer",
@@ -1486,5 +1489,18 @@
     "not_numbered": "For this game the order only decides about loose files. Packed archives are loaded by the game's own method — so a mod can lose despite being first.",
     "bethesda_plugins": "This list does not apply to plugins (.esp/.esm/.esl): their order lives in the plugins area and is stored separately.",
     "hide": "Hide notice"
+  },
+  "overlay": {
+    "no_userns": "This kernel has no user namespaces.",
+    "userns_disabled": "Unprivileged user namespaces are disabled.",
+    "no_bwrap": "bubblewrap (bwrap) is not installed.",
+    "bad_filesystem": "The write layer sits on {fs}. Overlay needs ext4, btrfs or xfs.",
+    "no_game_path": "Game folder not found: {path}",
+    "requirements_ok": "All requirements met.",
+    "launch_option_hint": "Put this line into Steam's launch options:",
+    "launch_no_app": "This instance has no Steam app id. The launch option has to be set by hand.",
+    "launch_steam_running": "Steam is running and would overwrite the change on exit. Close Steam and try again, or paste this line yourself:",
+    "launch_no_config": "No Steam configuration found. Paste this line yourself:",
+    "launch_written": "Launch option written to {count} Steam account(s):"
   }
 }

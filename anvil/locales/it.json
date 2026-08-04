@@ -935,7 +935,10 @@
     "color_role_disabled_text": "Testo disattivato",
     "color_change": "Cambia…",
     "color_pick_title": "Scegli un colore",
-    "path_anvil_base_dir": "Anvil base directory"
+    "path_anvil_base_dir": "Anvil base directory",
+    "use_overlay": "Monta le mod come overlay (sperimentale)",
+    "use_overlay_hint": "La cartella del gioco non viene piu modificata. Le mod vengono sovrapposte all'avvio e spariscono alla chiusura.",
+    "overlay_set_launch_option": "Scrivi l'opzione di avvio in Steam"
   },
   "mod_detail": {
     "open_in_explorer": "Apri Mod in esplora risorse",
@@ -1486,5 +1489,18 @@
     "not_numbered": "In questo gioco l'ordine decide solo sui file sciolti. Gli archivi compressi vengono caricati dal gioco con un metodo proprio: una mod può quindi perdere pur essendo prima.",
     "bethesda_plugins": "Questa lista non vale per i plugin (.esp/.esm/.esl): il loro ordine si trova nell'area plugin e viene salvato separatamente.",
     "hide": "Nascondi avviso"
+  },
+  "overlay": {
+    "no_userns": "Questo kernel non ha gli spazi dei nomi utente.",
+    "userns_disabled": "Gli spazi dei nomi utente non privilegiati sono disattivati.",
+    "no_bwrap": "bubblewrap (bwrap) non e installato.",
+    "bad_filesystem": "Il livello di scrittura si trova su {fs}. Overlay richiede ext4, btrfs o xfs.",
+    "no_game_path": "Cartella del gioco non trovata: {path}",
+    "requirements_ok": "Tutti i requisiti sono soddisfatti.",
+    "launch_option_hint": "Inserisci questa riga nelle opzioni di avvio di Steam:",
+    "launch_no_app": "Questa istanza non ha un identificativo Steam. L'opzione di avvio va inserita a mano.",
+    "launch_steam_running": "Steam e aperto e sovrascriverebbe la modifica alla chiusura. Chiudi Steam e riprova, oppure incolla tu questa riga:",
+    "launch_no_config": "Nessuna configurazione Steam trovata. Incolla tu questa riga:",
+    "launch_written": "Opzione di avvio scritta in {count} account Steam:"
   }
 }

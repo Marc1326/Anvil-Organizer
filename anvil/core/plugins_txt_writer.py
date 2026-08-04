@@ -55,6 +55,8 @@ class PluginsTxtWriter:
             raise ValueError(f"invalid profile name: {profile_name!r}")
         self._game_plugin = game_plugin
         self._game_path = game_path
+        # Zusaetzliche Wurzeln, die beim Plugin-Scan mitgelesen werden.
+        self._extra_scan_roots: list[Path] = []
         self._instance_path = instance_path
         self._profiles_path = (
             profiles_path if profiles_path is not None else instance_path / ".profiles"
@@ -417,36 +419,44 @@ class PluginsTxtWriter:
                 regular_index += 1
         return result
 
+    def set_extra_scan_roots(self, roots) -> None:
+        """Weitere Wurzeln fuer den Plugin-Scan, etwa die Overlay-Schicht."""
+        self._extra_scan_roots = [Path(r) for r in (roots or [])]
+
     def scan_plugins(self) -> list[str]:
         """Scan game_path/Data/ for plugin files.
 
         Returns a sorted list: primary plugins first (only if present
         on disk), then masters (.esm), then normal plugins (.esp/.esl).
         """
-        data_dir = self._game_path / getattr(
-            self._game_plugin, "GameDataPath", "Data"
-        )
-        if not data_dir.is_dir():
-            print(f"{_TAG} Data directory not found: {data_dir}")
+        sub = getattr(self._game_plugin, "GameDataPath", "Data")
+        roots = [self._game_path / sub]
+        # Beim Overlay-Deploy liegen die Plugins der Mods in der Schicht --
+        # im Spielordner selbst stehen sie nicht.
+        roots.extend(extra / sub for extra in self._extra_scan_roots)
+
+        usable = [d for d in roots if d.is_dir()]
+        if not usable:
+            print(f"{_TAG} Data directory not found: {roots[0]}")
             return []
 
         # Collect all plugin files directly in Data/ (not subdirs)
         found_by_key: dict[str, str] = {}
-        try:
-            with os.scandir(data_dir) as directory_entries:
-                ordered_entries = sorted(
-                    directory_entries,
-                    key=lambda entry: (entry.name.casefold(), entry.name),
-                )
-            for entry in ordered_entries:
-                if entry.is_file() and Path(entry.name).suffix.lower() in _PLUGIN_EXTENSIONS:
-                    found_by_key.setdefault(entry.name.casefold(), entry.name)
-        except OSError as exc:
-            print(f"{_TAG} Error scanning {data_dir}: {exc}")
-            return []
+        for data_dir in usable:
+            try:
+                with os.scandir(data_dir) as directory_entries:
+                    ordered_entries = sorted(
+                        directory_entries,
+                        key=lambda entry: (entry.name.casefold(), entry.name),
+                    )
+                for entry in ordered_entries:
+                    if entry.is_file() and Path(entry.name).suffix.lower() in _PLUGIN_EXTENSIONS:
+                        found_by_key.setdefault(entry.name.casefold(), entry.name)
+            except OSError as exc:
+                print(f"{_TAG} Error scanning {data_dir}: {exc}")
 
         if not found_by_key:
-            print(f"{_TAG} No plugin files found in {data_dir}")
+            print(f"{_TAG} No plugin files found in {usable[0]}")
             return []
 
         # Build primary list (only plugins that actually exist on disk)

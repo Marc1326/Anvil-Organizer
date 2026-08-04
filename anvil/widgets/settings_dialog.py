@@ -226,6 +226,19 @@ class SettingsDialog(QDialog):
             str(self._idata.get("local_saves", "false")).lower() in ("true", "1"))
         prof_layout.addWidget(self._setting_row(self._cb_local_saves))
         prof_layout.addWidget(self._setting_row(_disabled(QCheckBox(tr("settings.auto_archive_invalidation")))))
+
+        self._cb_use_overlay = QCheckBox(tr("settings.use_overlay"))
+        self._cb_use_overlay.setToolTip(tr("settings.use_overlay_hint"))
+        self._cb_use_overlay.setChecked(
+            str(self._idata.get("use_overlay", "false")).lower() in ("true", "1"))
+        prof_layout.addWidget(self._setting_row(self._cb_use_overlay))
+
+        self._lbl_overlay_problems = QLabel("")
+        self._lbl_overlay_problems.setWordWrap(True)
+        self._lbl_overlay_problems.setVisible(False)
+        prof_layout.addWidget(self._lbl_overlay_problems)
+        self._check_overlay_requirements()
+
         scroll_layout.addWidget(prof_grp)
 
         # Gruppe Mods im Spielordner
@@ -1299,6 +1312,24 @@ class SettingsDialog(QDialog):
                 backdrop.dismiss()
         return super().exec()
 
+    def _check_overlay_requirements(self) -> None:
+        """Zeigt an, was dem Overlay im Weg steht, und sperrt notfalls den Schalter."""
+        from anvil.core.overlay_deployer import environment_problems
+
+        overwrite = self._idata.get("path_overwrite_directory", "")
+        upper = Path(overwrite) if overwrite else None
+        game = self._idata.get("game_path", "")
+        problems = environment_problems(upper, Path(game) if game else None)
+
+        if not problems:
+            self._lbl_overlay_problems.setVisible(False)
+            return
+
+        self._lbl_overlay_problems.setText("\n".join(f"• {p}" for p in problems))
+        self._lbl_overlay_problems.setVisible(True)
+        self._cb_use_overlay.setChecked(False)
+        self._cb_use_overlay.setEnabled(False)
+
     def _setting_row(self, cb: QCheckBox) -> QWidget:
         """Modern: Checkbox als Vorlage-Zeile (Text links, Schalter rechts,
         umrandete Karte). Klassisch: Checkbox unverändert."""
@@ -1874,6 +1905,7 @@ class SettingsDialog(QDialog):
                 idata["local_inis"] = self._cb_local_inis.isChecked()
                 idata["local_saves"] = self._cb_local_saves.isChecked()
                 idata["keep_mods_deployed"] = self._cb_keep_deployed.isChecked()
+                idata["use_overlay"] = self._cb_use_overlay.isChecked()
                 self._instance_manager.save_instance(cur, idata)
 
         super().accept()

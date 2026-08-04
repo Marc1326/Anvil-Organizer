@@ -935,7 +935,10 @@
     "color_role_disabled_text": "Texto desativado",
     "color_change": "Alterar…",
     "color_pick_title": "Escolher cor",
-    "path_anvil_base_dir": "Anvil base directory"
+    "path_anvil_base_dir": "Anvil base directory",
+    "use_overlay": "Montar os mods como sobreposicao (experimental)",
+    "use_overlay_hint": "A pasta do jogo deixa de ser alterada. Os mods sao sobrepostos no arranque e desaparecem quando o jogo termina.",
+    "overlay_set_launch_option": "Escrever a opcao de arranque na Steam"
   },
   "mod_detail": {
     "open_in_explorer": "Abrir Mod no explorador",
@@ -1486,5 +1489,18 @@
     "not_numbered": "Neste jogo a ordem só decide sobre ficheiros soltos. Os arquivos compactados são carregados pelo método do próprio jogo — um mod pode perder mesmo estando em primeiro.",
     "bethesda_plugins": "Esta lista não vale para plugins (.esp/.esm/.esl): a ordem deles está na área de plugins e é guardada separadamente.",
     "hide": "Ocultar aviso"
+  },
+  "overlay": {
+    "no_userns": "Este kernel nao tem espacos de nomes de utilizador.",
+    "userns_disabled": "Os espacos de nomes de utilizador sem privilegios estao desativados.",
+    "no_bwrap": "O bubblewrap (bwrap) nao esta instalado.",
+    "bad_filesystem": "A camada de escrita esta em {fs}. O overlay precisa de ext4, btrfs ou xfs.",
+    "no_game_path": "Pasta do jogo nao encontrada: {path}",
+    "requirements_ok": "Todos os requisitos cumpridos.",
+    "launch_option_hint": "Coloque esta linha nas opcoes de arranque da Steam:",
+    "launch_no_app": "Esta instancia nao tem identificador Steam. A opcao de arranque tem de ser colocada a mao.",
+    "launch_steam_running": "A Steam esta aberta e sobrescreveria a alteracao ao fechar. Fecha a Steam e tenta de novo, ou cola tu esta linha:",
+    "launch_no_config": "Nenhuma configuracao da Steam encontrada. Cola tu esta linha:",
+    "launch_written": "Opcao de arranque escrita em {count} conta(s) Steam:"
   }
 }

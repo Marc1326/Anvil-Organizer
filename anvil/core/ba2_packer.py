@@ -123,6 +123,25 @@ class BA2Packer:
         self._data_path = self._game_path / (game_plugin.GameDataPath or "") if self._game_path else None
         self._loose_paths = list(getattr(game_plugin, "Ba2LoosePaths", []))
         self._bsarch_override = bsarch_path
+        # Beim Overlay-Deploy zeigt das hier in die Mod-Schicht statt in den
+        # Spielordner -- sonst bliebe der nicht sauber.
+        self._output_root: Path | None = None
+
+    def set_output_root(self, root: Path | None) -> None:
+        """Legt fest, wohin die Archive geschrieben werden.
+
+        ``None`` bedeutet: in den Spielordner, wie bisher.
+        """
+        self._output_root = Path(root) if root is not None else None
+        base = self._output_root or self._game_path
+        self._data_path = (
+            base / (self._plugin.GameDataPath or "") if base is not None else None
+        )
+
+    @property
+    def _archive_base(self) -> Path | None:
+        """Bezugspunkt fuer die relativen Pfade im Ergebnis."""
+        return self._output_root or self._game_path
 
     # ── BSArch finden ────────────────────────────────────────────────
 
@@ -377,7 +396,7 @@ class BA2Packer:
                     general_dir, out_ba2, wine_bin, env, is_textures=False
                 )
                 if ok:
-                    result.ba2_paths.append(str(out_ba2.relative_to(self._game_path)))
+                    result.ba2_paths.append(str(out_ba2.relative_to(self._archive_base)))
                 else:
                     result.error = err
                     result.success = False
@@ -390,7 +409,7 @@ class BA2Packer:
                     textures_dir, out_tex, wine_bin, env, is_textures=True
                 )
                 if ok:
-                    result.ba2_paths.append(str(out_tex.relative_to(self._game_path)))
+                    result.ba2_paths.append(str(out_tex.relative_to(self._archive_base)))
                 else:
                     if not result.error:
                         result.error = err

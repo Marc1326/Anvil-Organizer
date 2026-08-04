@@ -1,0 +1,327 @@
+"""Deploy per overlayfs statt per Symlink.
+
+Der Spielordner wird nicht mehr beschrieben.  Stattdessen liegt er als
+unterste, nur lesbare Schicht in einem Overlay; darueber die Mods, darueber
+die Schreibschicht.  Das Einhaengen passiert erst beim Spielstart im
+Namespace des Spielprozesses -- endet das Spiel, ist der Mount weg.
+
+``deploy()`` haengt nichts ein.  Es baut die Mod-Schicht und schreibt die
+Mount-Beschreibung, die der Startwrapper spaeter liest.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
+
+from anvil.core.mod_deployer import DeployResult
+from anvil.core.overlay_launch import launch_option, wrapper_path, write_wrapper
+from anvil.core.overlay_staging import OverlayStage
+from anvil.core.translator import tr
+
+# Dateisysteme, die overlayfs nicht als Schreibschicht akzeptiert.
+_UNSUPPORTED_UPPER = {"tmpfs", "overlay", "ramfs"}
+
+
+def filesystem_of(path: Path) -> str:
+    """Dateisystemtyp des naechstgelegenen vorhandenen Elternverzeichnisses."""
+    target = path
+    while not target.exists() and target != target.parent:
+        target = target.parent
+    try:
+        with open("/proc/mounts", encoding="utf-8") as stream:
+            mounts = [line.split() for line in stream if line.strip()]
+    except OSError:
+        return ""
+    resolved = str(target.resolve())
+    best = ""
+    best_len = -1
+    for parts in mounts:
+        if len(parts) < 3:
+            continue
+        point, fstype = parts[1], parts[2]
+        point = point.replace("\\040", " ")
+        if (resolved == point or resolved.startswith(point.rstrip("/") + "/")) \
+                and len(point) > best_len:
+            best, best_len = fstype, len(point)
+    return best
+
+
+def force_rmtree(path: Path) -> None:
+    """Loescht einen Baum auch dann, wenn overlayfs ihn zugenagelt hat.
+
+    Das Arbeitsverzeichnis bekommt vom Kernel ein Unterverzeichnis mit den
+    Rechten 000.  Ohne vorheriges Aufsperren scheitert jedes normale Loeschen.
+    """
+    if not path.exists():
+        return
+
+    for root, dirs, _files in os.walk(path, topdown=True):
+        for name in dirs:
+            try:
+                os.chmod(os.path.join(root, name), 0o700)
+            except OSError:
+                pass
+
+    shutil.rmtree(path)
+
+
+def environment_problems(
+    upper_dir: Path | None = None,
+    game_path: Path | None = None,
+) -> list[str]:
+    """Was dem Overlay auf diesem System im Weg steht.
+
+    Leere Liste heisst: es kann losgehen.  Wird auch von den Einstellungen
+    benutzt, bevor eine Instanz ueberhaupt umgestellt wird.
+    """
+    problems: list[str] = []
+
+    if not Path("/proc/self/uid_map").exists():
+        problems.append(tr("overlay.no_userns"))
+
+    flag = Path("/proc/sys/kernel/unprivileged_userns_clone")
+    if flag.is_file():
+        try:
+            if flag.read_text(encoding="utf-8").strip() == "0":
+                problems.append(tr("overlay.userns_disabled"))
+        except OSError:
+            pass
+
+    if shutil.which("bwrap") is None:
+        problems.append(tr("overlay.no_bwrap"))
+
+    if upper_dir is not None:
+        fstype = filesystem_of(upper_dir)
+        if fstype in _UNSUPPORTED_UPPER:
+            problems.append(tr("overlay.bad_filesystem", fs=fstype))
+
+    if game_path is not None and not game_path.is_dir():
+        problems.append(tr("overlay.no_game_path", path=str(game_path)))
+
+    return problems
+
+
+class OverlayDeployer:
+    """Bereitet einen Overlay-Deploy vor.
+
+    Bedient dieselbe Schnittstelle wie der Symlink-Deployer, damit die
+    Oberflaeche nicht unterscheiden muss.
+    """
+
+    MANIFEST_NAME = ".overlay_manifest.json"
+    STAGE_DIR = ".overlay"
+
+    def __init__(
+        self,
+        instance_path: Path,
+        game_path: Path,
+        direct_install_patterns: list[str] | None = None,
+        profile_name: str = "Default",
+        data_path: str = "",
+        nest_under_mod_name: bool = False,
+        lml_path: str = "",
+        multi_folder_routes: dict[str, str] | None = None,
+        redmod_path: str = "",
+        separator_deploy_paths: dict[str, str] | None = None,
+        mods_path: Path | None = None,
+        profiles_path: Path | None = None,
+        overwrite_path: Path | None = None,
+    ) -> None:
+        self._instance_path = instance_path
+        self._game_path = game_path
+        self._profile_name = profile_name
+        self._mods_path = mods_path if mods_path is not None else instance_path / ".mods"
+        self._profiles_dir = (
+            profiles_path if profiles_path is not None else instance_path / ".profiles"
+        )
+        self._overwrite = (
+            overwrite_path if overwrite_path is not None else instance_path / ".overwrite"
+        )
+        self._base = instance_path / self.STAGE_DIR
+        self._manifest_path = instance_path / self.MANIFEST_NAME
+        self._separator_deploy_paths = separator_deploy_paths or {}
+        self._skipped_mods: set[str] = set()
+
+        self._stage = OverlayStage(
+            self._mods_path,
+            self._profiles_dir,
+            profile_name,
+            data_path=data_path,
+            nest_under_mod_name=nest_under_mod_name,
+            multi_folder_routes=multi_folder_routes,
+            direct_patterns=direct_install_patterns,
+            lml_path=lml_path,
+            redmod_path=redmod_path,
+        )
+
+    # ── Pfade ──────────────────────────────────────────────────────────
+
+    @property
+    def stage_dir(self) -> Path:
+        return self._base / "stage"
+
+    @property
+    def work_dir(self) -> Path:
+        return self._base / "work"
+
+    @property
+    def upper_dir(self) -> Path:
+        return self._overwrite
+
+    @property
+    def manifest_path(self) -> Path:
+        return self._manifest_path
+
+    @property
+    def mount_conf_path(self) -> Path:
+        """Mount-Angaben fuer den Startwrapper, bewusst ohne JSON."""
+        return self._base / "mount.conf"
+
+    @property
+    def start_log_path(self) -> Path:
+        return self._base / "start.log"
+
+    @property
+    def wrapper(self) -> Path:
+        return wrapper_path(self._instance_path)
+
+    def steam_launch_option(self) -> str:
+        """Was bei Steam in die Startoptionen gehoert."""
+        return launch_option(self.wrapper)
+
+    # ── Schnittstelle ──────────────────────────────────────────────────
+
+    def set_skipped_mods(self, names) -> None:
+        self._skipped_mods = {str(n).lower() for n in names}
+        self._stage._skipped = self._skipped_mods
+
+    def is_direct_install(self, mod_name: str) -> bool:
+        return self._stage.is_direct_install(mod_name)
+
+    def is_deployed(self) -> bool:
+        return self._manifest_path.is_file()
+
+    def check_requirements(self) -> list[str]:
+        """Was dem Overlay auf diesem System im Weg steht."""
+        return environment_problems(self.upper_dir, self._game_path)
+
+    def lowerdirs(self) -> list[Path]:
+        """Untere Schichten, hoechste Prioritaet zuerst."""
+        return [self.stage_dir, self._game_path]
+
+    def deploy(self) -> DeployResult:
+        result = DeployResult()
+
+        problems = self.check_requirements()
+        if problems:
+            result.success = False
+            result.errors.extend(problems)
+            return result
+
+        if self.is_deployed():
+            purged = self.purge()
+            if not purged.success:
+                result.success = False
+                result.errors.extend(purged.errors)
+                return result
+
+        for directory in (self.stage_dir.parent, self.work_dir, self.upper_dir):
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                result.success = False
+                result.errors.append(f"{directory}: {exc}")
+                return result
+
+        staged = self._stage.build(self.stage_dir)
+        result.links_created = staged.files_linked
+        result.files_copied = staged.files_copied
+        result.errors.extend(staged.errors)
+        if not staged.success:
+            result.success = False
+            return result
+
+        if staged.mods_staged == 0:
+            result.success = False
+            result.errors.append("Keine aktiven Mods gefunden.")
+            return result
+
+        manifest = {
+            "deployed_at": datetime.now(timezone.utc).isoformat(),
+            "game_path": str(self._game_path),
+            "instance_path": str(self._instance_path),
+            "profile": self._profile_name,
+            "lowerdirs": [str(p) for p in self.lowerdirs()],
+            "upperdir": str(self.upper_dir),
+            "workdir": str(self.work_dir),
+            "mods_staged": staged.mods_staged,
+            "files": staged.files_linked + staged.files_copied,
+        }
+        try:
+            self._manifest_path.write_text(
+                json.dumps(manifest, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            self._write_mount_conf()
+            write_wrapper(self._instance_path, self.mount_conf_path, self.start_log_path)
+        except OSError as exc:
+            result.success = False
+            result.errors.append(f"Manifest schreiben: {exc}")
+
+        return result
+
+    def _write_mount_conf(self) -> None:
+        lines = [
+            f"GAME={self._game_path}",
+            f"UPPER={self.upper_dir}",
+            f"WORK={self.work_dir}",
+            "LOWER=" + ":".join(str(p) for p in self.lowerdirs()),
+        ]
+        self.mount_conf_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def purge(self) -> DeployResult:
+        """Raeumt die Mod-Schicht weg.
+
+        Der Mount selbst muss nicht abgebaut werden -- er lebt nur im
+        Namespace des Spielprozesses und verschwindet mit ihm.
+        """
+        result = DeployResult()
+
+        if self.stage_dir.exists():
+            try:
+                force_rmtree(self.stage_dir)
+            except OSError as exc:
+                result.success = False
+                result.errors.append(f"Schicht entfernen: {exc}")
+
+        try:
+            force_rmtree(self.work_dir)
+        except OSError:
+            pass
+
+        try:
+            self._manifest_path.unlink(missing_ok=True)
+        except OSError as exc:
+            result.success = False
+            result.errors.append(f"Manifest entfernen: {exc}")
+
+        return result
+
+    def deployed_mod_count(self) -> int:
+        return int(self._read_manifest().get("mods_staged", 0))
+
+    def deployed_link_count(self) -> int:
+        return int(self._read_manifest().get("files", 0))
+
+    def _read_manifest(self) -> dict:
+        if not self._manifest_path.is_file():
+            return {}
+        try:
+            data = json.loads(self._manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return data if isinstance(data, dict) else {}

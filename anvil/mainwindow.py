@@ -2091,6 +2091,9 @@ class MainWindow(QMainWindow):
         _dlog(f"[APPLY-INSTANCE] Plugin: {getattr(plugin, 'GameName', None)}")
         _dlog(f"[APPLY-INSTANCE] Game path: {game_path}")
         self._game_panel.set_mod_index(self._mod_index)
+        self._game_panel.set_overlay_enabled(
+            str(data.get("use_overlay", "")).strip().lower() in ("1", "true", "yes")
+        )
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
         self._sync_separator_deploy_paths()
         self._sync_keep_file_name_mods()
