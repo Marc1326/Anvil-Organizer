@@ -260,3 +260,65 @@ def test_ohne_packen_bleibt_alles_lose(tmp_path: Path, ohne_umgebungspruefung: N
         data_path="Data",
         needs_ba2_packing=False,
     )
+
+
+def test_ba2_mit_nest_unter_modname(tmp_path: Path, ohne_umgebungspruefung: None) -> None:
+    """Hier waren die beiden Wege auseinandergelaufen.
+
+    Der Symlink-Weg prueft die Archiv-Regel vor dem Data-Praefix, das Staging
+    pruefte danach -- ein eingeschobener Modname liess die Pruefung ins Leere
+    laufen.
+    """
+    _vergleiche(
+        tmp_path,
+        {"Mein Mod": ["meshes/a.nif", "textures/b.dds", "c.esp", "SKSE/Plugins/d.dll"]},
+        data_path="Data",
+        nest_under_mod_name=True,
+        needs_ba2_packing=True,
+    )
+
+
+def test_ba2_mit_multi_folder_route(tmp_path: Path, ohne_umgebungspruefung: None) -> None:
+    _vergleiche(
+        tmp_path,
+        {"W3": ["mods/modXY/content/blob.bundle", "mods/modXY/content/a.dds", "dlc/x/y.esp"]},
+        data_path="Mods",
+        multi_folder_routes={"mods": "Mods", "dlc": "DLC"},
+        needs_ba2_packing=True,
+    )
+
+
+def test_ba2_mit_loose_pfaden(tmp_path: Path, ohne_umgebungspruefung: None) -> None:
+    _vergleiche(
+        tmp_path,
+        {"M": ["Tools/BodySlide/x.osp", "meshes/a.nif"]},
+        data_path="Data",
+        needs_ba2_packing=True,
+        ba2_loose_paths=["Tools"],
+    )
+
+
+def test_echte_spieldatei_im_weg(tmp_path: Path, ohne_umgebungspruefung: None) -> None:
+    """Der eine Fall, in dem sich die Wege absichtlich unterscheiden.
+
+    Der Symlink-Weg laesst eine echte Spieldatei stehen und die Mod fallen.
+    Der Overlay legt sie in die Schicht -- beim Einhaengen gewinnt die Mod,
+    ohne dass der Spielordner angefasst wird. Genau dafuer wurde er gebaut.
+    """
+    instance, game, mods, profiles = _welt(tmp_path)
+    (game / "archive").mkdir()
+    (game / "archive" / "a.archive").write_text("vanilla", encoding="utf-8")
+    _schreibe(mods / "M", "archive/a.archive", "von der mod")
+    write_global_modlist(profiles, ["M"])
+    write_active_mods(profiles / "Default", {"M"})
+
+    symlink = ModDeployer(instance, game)
+    ergebnis = symlink.deploy()
+    assert "archive/a.archive" in ergebnis.skipped_real_files
+    assert (game / "archive" / "a.archive").read_text(encoding="utf-8") == "vanilla"
+
+    overlay = OverlayDeployer(instance, game)
+    overlay.deploy()
+    schicht = overlay.stage_dir / "archive" / "a.archive"
+    assert schicht.read_text(encoding="utf-8") == "von der mod"
+    assert (game / "archive" / "a.archive").read_text(encoding="utf-8") == "vanilla"
