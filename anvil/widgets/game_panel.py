@@ -1470,8 +1470,8 @@ class GamePanel(QWidget):
         if prefix is None:
             _dlog("[DLL-OVR] Skipped: no Proton prefix found")
             return
-        _dlog("[DLL-OVR] Prefix: {prefix}")
-        _dlog("[DLL-OVR] Overrides to apply: {overrides}")
+        _dlog(f"[DLL-OVR] Prefix: {prefix}")
+        _dlog(f"[DLL-OVR] Overrides to apply: {overrides}")
 
         user_reg = prefix / "user.reg"
         if not user_reg.is_file():
@@ -1488,7 +1488,7 @@ class GamePanel(QWidget):
         try:
             text = user_reg.read_text(encoding="utf-8")
         except OSError as exc:
-            _dlog("[DLL-OVR] Failed to read user.reg: {exc}")
+            _dlog(f"[DLL-OVR] Failed to read user.reg: {exc}")
             return
 
         # Build override lines
@@ -1516,9 +1516,9 @@ class GamePanel(QWidget):
                 text = text[:insert_pos] + "\n" + "\n".join(new_entries) + text[insert_pos:]
                 try:
                     user_reg.write_text(text, encoding="utf-8")
-                    _dlog("[DLL-OVR] Added {len(new_entries)} overrides to existing section")
+                    _dlog(f"[DLL-OVR] Added {len(new_entries)} overrides to existing section")
                 except OSError as exc:
-                    _dlog("[DLL-OVR] Write failed: {exc}")
+                    _dlog(f"[DLL-OVR] Write failed: {exc}")
             else:
                 _dlog("[DLL-OVR] All overrides already present")
         else:
@@ -1533,9 +1533,9 @@ class GamePanel(QWidget):
             text = text.rstrip("\n") + "\n" + new_section
             try:
                 user_reg.write_text(text, encoding="utf-8")
-                _dlog("[DLL-OVR] Created new section with {len(override_lines)} overrides")
+                _dlog(f"[DLL-OVR] Created new section with {len(override_lines)} overrides")
             except OSError as exc:
-                _dlog("[DLL-OVR] Write failed: {exc}")
+                _dlog(f"[DLL-OVR] Write failed: {exc}")
 
     def _remove_proton_dll_overrides(self) -> None:
         """Remove Wine DLL overrides from the Proton prefix user.reg."""
@@ -1594,7 +1594,7 @@ class GamePanel(QWidget):
                 user_reg.write_text(text, encoding="utf-8")
                 _dlog("[DLL-OVR] Removed overrides from user.reg")
             except OSError as exc:
-                _dlog("[DLL-OVR] Write failed: {exc}")
+                _dlog(f"[DLL-OVR] Write failed: {exc}")
 
     def _update_manifest_ba2(self, ba2_paths: list[str], packer) -> None:
         """Update the deploy manifest with BA2 archive info."""
