@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect, Signal, QPoint, QTimer, QItemSelection
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 
-from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
+from anvil.core.mod_installer import is_installable_archive
 from anvil.core.translator import tr
 from anvil.core.persistent_header import PersistentHeader
 from anvil.styles.dark_theme import theme_color
@@ -954,11 +954,11 @@ class _DropTreeView(QTreeView):
     def dragEnterEvent(self, event):
         super().dragEnterEvent(event)
         if event.mimeData().hasUrls():
-            accepted = SUPPORTED_EXTENSIONS | self._extra_extensions
             for url in event.mimeData().urls():
                 if url.isLocalFile():
-                    path = url.toLocalFile()
-                    if any(path.lower().endswith(ext) for ext in accepted):
+                    if is_installable_archive(
+                        url.toLocalFile(), self._extra_extensions,
+                    ):
                         event.acceptProposedAction()
                         return
 
@@ -1036,12 +1036,11 @@ class _DropTreeView(QTreeView):
         self._stop_auto_scroll()
         self._stop_expand_timer()
         if event.mimeData().hasUrls():
-            accepted = SUPPORTED_EXTENSIONS | self._extra_extensions
             paths = []
             for url in event.mimeData().urls():
                 if url.isLocalFile():
                     path = url.toLocalFile()
-                    if any(path.lower().endswith(ext) for ext in accepted):
+                    if is_installable_archive(path, self._extra_extensions):
                         paths.append(path)
             if paths:
                 event.acceptProposedAction()
@@ -1216,7 +1215,7 @@ class _DropFrameworkTree(QTreeWidget):
                 if url.isLocalFile():
                     path = url.toLocalFile()
                     print(f"[FW-TREE] dragEnter url: {path}", flush=True)
-                    if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                    if is_installable_archive(path):
                         event.acceptProposedAction()
                         return
         super().dragEnterEvent(event)
@@ -1235,7 +1234,7 @@ class _DropFrameworkTree(QTreeWidget):
                 if url.isLocalFile():
                     path = url.toLocalFile()
                     print(f"[FW-TREE] drop url: {path}", flush=True)
-                    if any(path.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                    if is_installable_archive(path):
                         paths.append(path)
             if paths:
                 print(f"[FW-TREE] emitting archives_dropped: {paths}", flush=True)

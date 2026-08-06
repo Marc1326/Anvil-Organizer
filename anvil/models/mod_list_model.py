@@ -486,9 +486,9 @@ class ModListModel(QAbstractItemModel):
         if data.hasFormat(MIME_MOD_ROWS):
             return True
         if data.hasUrls():
-            from anvil.core.mod_installer import SUPPORTED_EXTENSIONS
+            from anvil.core.mod_installer import is_installable_archive
             return any(
-                url.toLocalFile().lower().endswith(tuple(SUPPORTED_EXTENSIONS))
+                is_installable_archive(url.toLocalFile())
                 for url in data.urls() if url.isLocalFile()
             )
         return False

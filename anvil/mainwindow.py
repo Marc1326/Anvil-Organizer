@@ -4796,14 +4796,15 @@ class MainWindow(QMainWindow):
 
     def _ctx_install_mod(self) -> None:
         """Install a mod from an archive file."""
-        from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
+        from anvil.core.mod_installer import ModInstaller
 
-        exts = " ".join(f"*{e}" for e in sorted(SUPPORTED_EXTENSIONS))
+        # Mit "Alle Dateien" als zweitem Filter -- Nexus-CDN-Downloads
+        # heissen nach ihrer UUID und tragen keine Endung.
         path, _ = QFileDialog.getOpenFileName(
             self,
             tr("dialog.select_mod_archive_single"),
             str(Path.home()),
-            f"Archive ({exts})",
+            tr("dialog.archive_filter"),
         )
         if not path:
             return

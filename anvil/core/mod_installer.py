@@ -50,6 +50,20 @@ def detect_archive_extension(path: Path) -> str:
     return ""
 
 
+def is_installable_archive(path: str | Path, extra: set[str] | None = None) -> bool:
+    """Prueft, ob eine Datei als Mod-Archiv taugt.
+
+    Nexus liefert ueber das CDN Dateien aus, die nach ihrer UUID heissen
+    und keine Endung tragen. Passt die Endung, wird die Platte nicht
+    angefasst -- sonst entscheidet der Dateikopf.
+    """
+    p = Path(path)
+    endungen = SUPPORTED_EXTENSIONS | (extra or set())
+    if any(p.name.lower().endswith(e) for e in endungen):
+        return True
+    return bool(detect_archive_extension(p))
+
+
 class ModInstaller:
     """Extract archives and install them into an instance's ``.mods/`` folder."""
 
@@ -96,6 +110,10 @@ class ModInstaller:
         else:
             m2 = ModInstaller._SIMPLE_RE.match(archive_path.stem)
             name = m2.group(1) if m2 else archive_path.stem
+            # Bleibt nur ein Buchstabenrest uebrig, hat die Regel den Namen
+            # zerlegt statt ihn zu treffen -- dann taugt der volle Name mehr.
+            if len(name.strip(" -._")) < 3:
+                name = archive_path.stem
         name = name.replace("_", " ").strip(" -.")
         return ModInstaller._sanitize_name(name) if name else "Unnamed Mod"
 
@@ -124,6 +142,7 @@ class ModInstaller:
         _add(best)
 
         # GUESS_META: name from .meta file if available
+        aus_meta: list[str] = []
         meta_path = Path(str(archive_path) + ".meta")
         if meta_path.is_file():
             cp = configparser.ConfigParser()
@@ -131,13 +150,25 @@ class ModInstaller:
                 cp.read(str(meta_path), encoding="utf-8")
                 meta_name = cp.get("General", "modName", fallback="")
                 if meta_name.strip():
-                    _add(meta_name.strip())
+                    aus_meta.append(meta_name.strip())
                 # Also the HTML-stripped "name" field
                 raw_name = cp.get("General", "name", fallback="")
                 if raw_name.strip():
-                    _add(raw_name.strip())
+                    aus_meta.append(raw_name.strip())
             except Exception:
                 pass
+        for name in aus_meta:
+            _add(name)
+
+        # Nexus liefert ueber das CDN Dateien aus, die nach ihrer UUID
+        # heissen. Aus so einem Namen ist nichts zu holen -- dann zaehlt,
+        # was in der .meta steht.
+        if aus_meta and not any(
+            archive_path.name.lower().endswith(e) for e in SUPPORTED_EXTENSIONS
+        ):
+            best = aus_meta[0]
+            variants.remove(best)
+            variants.insert(0, best)
 
         # Similar mods already installed (same base prefix)
         if self.mods_path.is_dir():
