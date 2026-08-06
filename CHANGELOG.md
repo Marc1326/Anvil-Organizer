@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.7.0] — 2026-08-06
+
+### Neu
+- **Stellar Blade wird unterstützt.** Das Spiel kennt vier Mod-Arten mit vier Zielen — gewöhnliche Pak-Mods, Logic-Mods, Filmsequenzen und Beschreibungen für das Custom Nanosuit System. Anvil verteilt sie jetzt einzeln statt alles in einen Ordner zu legen, wo drei der vier Arten wirkungslos bleiben.
+- Blueprint-Mods sind am Dateinamen nicht zu erkennen. Anvil liest deshalb den Mount-Point aus der `.utoc`; `.pak` und `.ucas` folgen ihrem Inhaltsverzeichnis.
+- UE4SS und das Custom Nanosuit System werden als Frameworks erkannt und ins Spielverzeichnis installiert.
+
+### Änderungen
+- **Mods werden erst beim Spielstart ausgerollt** und nach dem Beenden wieder entfernt. Vorher lagen sie dauerhaft im Spielverzeichnis, was Updates und Reparaturen über Steam gestört hat.
+- Solange das Spiel läuft, räumt Anvil nicht mehr auf.
+
+### Fixes
+- **Downloads ohne Dateiendung** ließen sich nicht in die Mod-Liste ziehen. Nexus liefert über sein CDN Dateien aus, die nach ihrer UUID heißen; drei Stellen haben unabhängig voneinander nur die Endung geprüft und sie still verworfen. Jetzt entscheidet der Dateikopf.
+- Bei denselben Dateien schlug Anvil Namen wie `c` oder `fbcf` vor, die im Install-Fenster wie ein leeres Feld aussehen. Der Name kommt jetzt aus der `.meta`.
+- Frameworks, die ihre Zielstruktur selbst mitbringen, wurden unvollständig installiert — alles neben dem Zweig mit der Musterdatei fiel weg.
+- `modindex` hat Mod-Ordner übersprungen, die als Verknüpfung angelegt waren.
+- Meldungen zu den Proton-DLL-Overrides zeigten Platzhalter statt Werten, wodurch Schreibfehler an `user.reg` unauffindbar blieben.
+- Cyberpunk: *Every Animation Redone* gilt wieder als gewöhnliche Mod.
+
 ## [1.0.8] — 2026-03-14
 
 ### Fixes

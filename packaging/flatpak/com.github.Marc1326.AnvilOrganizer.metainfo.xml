@@ -35,6 +35,11 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.7.0" date="2026-08-06">
+      <description>
+        <p>Stellar Blade support with separate targets for pak, logic, movie and cosmetic mods. Mods are now deployed at game start and removed afterwards. Downloads without a file extension are recognised by their file header.</p>
+      </description>
+    </release>
     <release version="1.2.1" date="2026-03-28">
       <description>
         <p>Plugin tab categories, Google Search Console, custom domain.</p>
