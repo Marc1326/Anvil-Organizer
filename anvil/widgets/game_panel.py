@@ -2954,6 +2954,9 @@ class GamePanel(QWidget):
         copy_paths = getattr(plugin, "GameCopyDeployPaths", []) if plugin else []
         redmod_path = getattr(plugin, "GameRedmodPath", "") if plugin else ""
         pak_order = getattr(plugin, "GamePakLoadOrderPrefix", False) if plugin else False
+        deploy_strip = getattr(plugin, "GameDeployStripPrefixes", []) if plugin else []
+        deploy_anchors = getattr(plugin, "GameDeployAnchors", []) if plugin else []
+        deploy_routes = getattr(plugin, "GameDeployRoutes", []) if plugin else []
         return ModDeployer(
             instance_path,
             game_path,
@@ -2972,6 +2975,9 @@ class GamePanel(QWidget):
             pak_load_order_prefix=pak_order,
             mods_path=self._mods_path,
             profiles_path=self._profiles_path,
+            deploy_strip_prefixes=deploy_strip,
+            deploy_anchors=deploy_anchors,
+            deploy_routes=deploy_routes,
         )
 
     def set_instance_path(self, instance_path: Path, profile_name: str = "Default") -> None:

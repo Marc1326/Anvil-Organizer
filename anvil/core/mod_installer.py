@@ -318,17 +318,24 @@ class ModInstaller:
         Returns:
             Dict with installation info, or None on failure.
         """
-        target_dir = game_path / framework.target if framework.target else game_path
+        # Bringt das Archiv den Zielpfad selbst mit, wird ab dessen
+        # Elternebene installiert -- sonst faellt alles weg, was neben dem
+        # Zielzweig liegt (z.B. Content/ neben Binaries/).
+        archive_root = self._root_holding_target(temp_dir, framework.target)
+        if archive_root is not None:
+            install_root = archive_root
+            target_dir = game_path
+        else:
+            target_dir = game_path / framework.target if framework.target else game_path
+            # Find the actual directory containing the framework files.
+            # Archives often wrap files in subdirectories (e.g. bin/ or
+            # ModLoader/) that must be stripped when installing.
+            install_root = self._find_install_root(
+                temp_dir, framework.pattern,
+                detect_installed=framework.detect_installed,
+                target=framework.target,
+            )
         target_dir.mkdir(parents=True, exist_ok=True)
-
-        # Find the actual directory containing the framework files.
-        # Archives often wrap files in subdirectories (e.g. bin/ or
-        # ModLoader/) that must be stripped when installing.
-        install_root = self._find_install_root(
-            temp_dir, framework.pattern,
-            detect_installed=framework.detect_installed,
-            target=framework.target,
-        )
         installed_files: list[str] = []
         for src_item in install_root.rglob("*"):
             rel = src_item.relative_to(install_root)
@@ -394,6 +401,41 @@ class ModInstaller:
                 metadata.write(stream)
         except OSError:
             pass
+
+    @staticmethod
+    def _root_holding_target(temp_dir: Path, target: str) -> Path | None:
+        """Wurzel des Archivs, wenn es den Zielpfad selbst enthaelt.
+
+        Frameworks werden oft ab Spielwurzel gepackt und verteilen sich
+        dabei ueber mehrere Zweige, etwa ``SB/Binaries/Win64/`` **und**
+        ``SB/Content/Paks/``.  Steigt der Installer in den Ordner mit der
+        Musterdatei ein, bleibt alles ausserhalb dieses Zweiges liegen.
+
+        Findet sich der Zielpfad als Ordner im Archiv, wird stattdessen ab
+        dessen Elternebene installiert -- das Ziel ist dann der Spielordner
+        selbst.  Bei mehreren Kandidaten gewinnt der wurzelnaechste.
+
+        Liefert ``None``, wenn kein Zielpfad gesetzt ist oder das Archiv ihn
+        nicht mitbringt; dann bleibt es beim bisherigen Weg.
+        """
+        target_norm = target.replace("\\", "/").strip("/").lower()
+        if not target_norm:
+            return None
+        depth = target_norm.count("/") + 1
+        treffer: list[tuple[int, Path]] = []
+        for item in temp_dir.rglob("*"):
+            if not item.is_dir():
+                continue
+            rel = str(item.relative_to(temp_dir)).replace("\\", "/").lower()
+            if rel != target_norm and not rel.endswith("/" + target_norm):
+                continue
+            # Ueber die echten Pfadteile hochsteigen -- rel ist kleingeschrieben
+            # und taugt nicht zum Zusammenbauen.
+            treffer.append((len(rel.split("/")) - depth, item.parents[depth - 1]))
+        if not treffer:
+            return None
+        treffer.sort(key=lambda t: t[0])
+        return treffer[0][1]
 
     @staticmethod
     def _find_install_root(temp_dir: Path, patterns: list[str],

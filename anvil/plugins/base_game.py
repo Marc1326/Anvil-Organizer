@@ -122,16 +122,43 @@ class BaseGame:
     Only deployed when the corresponding framework is installed."""
 
     GameCopyDeployPaths: list[str] = []
-
-    # Unreal-Spiele mit ~mods-Ordner laden Paks alphabetisch nach Dateiname,
-    # die zuletzt eingehaengte gewinnt. Ohne Zaehler im Namen ist die
-    # Reihenfolge in Anvil fuer diese Spiele wirkungslos.
-    GamePakLoadOrderPrefix: bool = False
     """Relative paths (from game root) where files must be deployed as
     copies instead of symlinks.  Used when a tool (e.g. CET's Lua VM)
     cannot follow symlinks through Wine/Proton drive mappings.
     Files deployed this way use manifest type ``shim_copy`` and are
     removed during purge."""
+
+    # Unreal-Spiele mit ~mods-Ordner laden Paks alphabetisch nach Dateiname,
+    # die zuletzt eingehaengte gewinnt. Ohne Zaehler im Namen ist die
+    # Reihenfolge in Anvil fuer diese Spiele wirkungslos.
+    # Achtung: viele Mod-Autoren verbieten das Umbenennen ausdruecklich --
+    # Loader suchen ihre Dateien am Namen. Nur einschalten, wenn geprueft.
+    GamePakLoadOrderPrefix: bool = False
+
+    # ── Zielverteilung innerhalb des Spielordners ──────────────────────
+    # Spiele mit mehreren Mod-Arten brauchen mehr als ein Ziel. Stellar
+    # Blade unterscheidet Pak-, Logic-, Movie- und CNS-Mods; jede Art
+    # gehoert in einen eigenen Ordner, sonst wirkt sie nicht.
+
+    GameDeployStripPrefixes: list[str] = []
+    """Fuehrende Ordner im Mod-Archiv, die vor dem Einsortieren wegfallen
+    (z.B. ``~mods``, ``LuaMod``).  Sie beschreiben die Mod-Art, gehoeren
+    aber nicht in den Zielpfad."""
+
+    GameDeployAnchors: list[str] = []
+    """Ordnernamen, an denen ein Mod seine Zielstruktur bereits selbst
+    mitbringt (z.B. ``Content``, ``Binaries``).  Beginnt ein Pfad damit,
+    bleibt er unveraendert und wird nicht geroutet."""
+
+    GameDeployRoutes: list[dict] = []
+    """Regeln, die Dateien ohne eigene Struktur einem Ziel zuordnen.
+    Jede Regel ist ein Dict mit ``dest`` und mindestens einem Kriterium:
+
+    - ``suffixes``: Dateiendungen, auch mehrteilig (``.dekcns.json``)
+    - ``folders``:  Ordnernamen, die im Pfad vorkommen (``ue4ss``)
+
+    Die erste passende Regel gewinnt; ohne Treffer bleibt der Pfad, wie
+    er ist."""
 
     GameProtonDllOverrides: dict[str, str] = {}
     """Wine DLL overrides written to the Proton prefix user.reg during deploy.

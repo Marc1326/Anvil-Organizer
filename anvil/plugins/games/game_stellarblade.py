@@ -24,7 +24,10 @@ class StellarBladeGame(BaseGame):
     GameName = "Stellar Blade"
     GameShortName = "StellarBlade"
     GameBinary = "SB/Binaries/Win64/SB-Win64-Shipping.exe"
-    GameDataPath = "SB/Content/Paks/~mods"
+
+    # Basis ist SB, nicht der Pak-Ordner -- das Spiel kennt vier Mod-Arten
+    # mit vier Zielen, die Verteilung macht GameDeployRoutes.
+    GameDataPath = "SB"
 
     GameSteamId = 3489700
 
@@ -37,12 +40,66 @@ class StellarBladeGame(BaseGame):
     GameSupportURL = "https://www.nexusmods.com/stellarblade"
 
     # IO Store: Symlinks funktionieren nicht, Mods muessen kopiert werden
-    GameCopyDeployPaths: list[str] = ["SB/Content/Paks/~mods"]
+    GameCopyDeployPaths: list[str] = [
+        "SB/Content/Paks",
+        "SB/Content/Movies",
+    ]
 
-    # Das Spiel haengt die Paks alphabetisch ein und laesst die letzte
-    # gewinnen. Ohne Zaehler im Dateinamen haette die Reihenfolge in Anvil
-    # keine Wirkung.
-    GamePakLoadOrderPrefix = True
+    # Nicht umbenennen. Die Mod-Autoren verbieten es ausdruecklich
+    # ("Do NOT rename the files"), und die Loader suchen ihre Dateien am
+    # Namen. Ein Zaehler davor macht Logic- und CNS-Mods unbrauchbar.
+    GamePakLoadOrderPrefix = False
+
+    # Diese Ordner benennen im Archiv nur die Mod-Art und gehoeren nicht
+    # in den Zielpfad.
+    GameDeployStripPrefixes: list[str] = ["~mods", "LuaMod", "PakMod"]
+
+    # Faengt ein Mod damit an, bringt er seine Zielstruktur schon mit --
+    # dann wird nichts umsortiert (z.B. Content/Paks/LogicMods/...).
+    GameDeployAnchors: list[str] = ["SB", "Content", "Binaries", "Engine"]
+
+    # Vier Mod-Arten, vier Ziele. Ohne eigene Struktur entscheidet die
+    # Dateiendung, wohin eine Datei gehoert.
+    GameDeployRoutes: list[dict] = [
+        # Blueprint-Mods erkennt man am Mount-Point ihres Containers:
+        # er zeigt auf Content/Mods/. Am Dateinamen ist das nicht zu
+        # sehen -- sie liegen flach im Archiv wie jede andere Pak-Mod.
+        # Im ~mods-Ordner bleiben sie wirkungslos.
+        {"dest": "Content/Paks/LogicMods", "mount_contains": ["/content/mods/"]},
+        # Menue-Hintergruende gehoeren in den Unterordner Menu -- dort
+        # sucht der Video-Randomiser sie, durchnummeriert als menu_0,
+        # menu_1 und so weiter. Direkt in Movies bleiben sie ungenutzt.
+        {
+            "dest": "Content/Movies/Menu",
+            "names": ["menu_*.bk2", "menu_*.webm"],
+            # Der Zielordner steht fest -- bringt das Archiv seinen
+            # eigenen menu-Ordner mit, darf der nicht verdoppelt werden.
+            "flatten": True,
+        },
+        # Alle uebrigen Filmsequenzen ersetzen Zwischensequenzen
+        {"dest": "Content/Movies", "suffixes": [".bk2", ".webm"]},
+        # UE4SS-Zubehoer behaelt seinen Unterbau
+        {"dest": "Binaries/Win64", "folders": ["ue4ss"]},
+        # Bringt eine CNS-Mod ihren Ordner schon mit, bleibt er erhalten
+        {"dest": "Content/Paks/~mods", "folders": ["CustomNanosuitSystem"]},
+        # Sonst gehoeren die Outfit- und Animationsbeschreibungen dorthin,
+        # wo das Framework auch seine eigenen ablegt. Flach in ~mods
+        # findet CNS sie nicht.
+        {
+            "dest": "Content/Paks/~mods/CustomNanosuitSystem",
+            "suffixes": [".dekcns.json", ".dekani.json"],
+            "flatten": True,
+        },
+        # Alles Uebrige: gewoehnliche Pak-Mods
+        {
+            "dest": "Content/Paks/~mods",
+            "suffixes": [".pak", ".utoc", ".ucas"],
+        },
+    ]
+
+    # Ohne diesen Eintrag laedt Proton seine eigene dwmapi.dll und UE4SS
+    # wird nie gestartet -- damit bleiben Logic- und CNS-Mods wirkungslos.
+    GameProtonDllOverrides: dict[str, str] = {"dwmapi": "native,builtin"}
 
     _WIN_DOCUMENTS = (
         "drive_c/users/steamuser/AppData/Local"
@@ -60,14 +117,31 @@ class StellarBladeGame(BaseGame):
         ]
 
     def get_framework_mods(self) -> list[FrameworkMod]:
+        # UE4SS wird an der DLL erkannt, nicht an UE4SS-settings.ini --
+        # die bringen auch Frameworks mit, die auf UE4SS aufsetzen.
+        # Ohne dwmapi.dll laedt Windows den Loader nie, deshalb steht sie
+        # bei detect_installed an erster Stelle.
         return [
             FrameworkMod(
                 name="UE4SS",
-                pattern=["UE4SS.dll", "UE4SS-settings.ini"],
+                pattern=["UE4SS.dll"],
                 target="SB/Binaries/Win64",
                 description="Unreal Engine Scripting System — Lua/C++ Mod-Loader",
-                detect_installed=["SB/Binaries/Win64/UE4SS.dll"],
+                detect_installed=[
+                    "SB/Binaries/Win64/dwmapi.dll",
+                    "SB/Binaries/Win64/ue4ss/UE4SS.dll",
+                ],
                 required_by=["Lua-Mods", "Blueprint-Mods"],
+                nexus_id=2952,
+            ),
+            FrameworkMod(
+                name="Custom Nanosuit System",
+                pattern=["Mods/DekCNS/Scripts/main.lua"],
+                target="SB",
+                description="Outfit- und Kosmetik-Loader, setzt UE4SS voraus",
+                detect_installed=["SB/Content/Paks/LogicMods/DekCNS_P.pak"],
+                required_by=["CNS-Outfits", "CNS-Kosmetik"],
+                nexus_id=1496,
             ),
         ]
 

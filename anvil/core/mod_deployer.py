@@ -20,9 +20,11 @@ Safety rules:
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import shutil
+import struct
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -61,6 +63,108 @@ _BA2_SYMLINK_EXTENSIONS = {
 # Dateiendungen, die zu einer Unreal-Mod gehoeren. Alle drei muessen
 # denselben Namen tragen, sonst findet das Spiel sie nicht zusammen.
 _PAK_EXTENSIONS = {".pak", ".utoc", ".ucas"}
+
+
+def strip_deploy_prefixes(rel: Path, prefixes: list[str]) -> Path:
+    """Entfernt fuehrende Ordner, die nur die Mod-Art benennen.
+
+    ``~mods/Foo_P.pak`` wird zu ``Foo_P.pak``.  Wiederholt sich der
+    Praefix, faellt er mehrfach weg -- manche Archive sind doppelt
+    verpackt.
+    """
+    if not prefixes:
+        return rel
+    unten = {p.strip("/").lower() for p in prefixes if p.strip("/")}
+    teile = list(rel.parts)
+    while len(teile) > 1 and teile[0].lower() in unten:
+        teile.pop(0)
+    return Path(*teile) if teile else rel
+
+
+def has_deploy_anchor(rel: Path, anchors: list[str]) -> bool:
+    """True, wenn der Mod seine Zielstruktur schon selbst mitbringt."""
+    if not anchors or not rel.parts:
+        return False
+    return rel.parts[0].lower() in {a.strip("/").lower() for a in anchors}
+
+
+_MOUNT_MAGIC = b"-==--==--==--==-"
+
+
+def unreal_mount_point(utoc: Path) -> str:
+    """Liest den Mount-Point aus einem IoStore-Container.
+
+    Der Eintrag verraet, wofuer eine Mod gedacht ist: ``/Content/Mods/``
+    kennzeichnet einen Blueprint-Mod, der in den LogicMods-Ordner gehoert,
+    ``/Content/Art/`` eine gewoehnliche Textur- oder Modell-Mod.  Am
+    Dateinamen ist das nicht zu erkennen.
+
+    Liefert einen leeren Text, wenn die Datei kein Container ist oder der
+    Index fehlt.
+    """
+    try:
+        with utoc.open("rb") as f:
+            kopf = f.read(144)
+            if kopf[:16] != _MOUNT_MAGIC:
+                return ""
+            hsize, entries = struct.unpack_from("<II", kopf, 20)
+            blkcnt, blksize, cmcount, cmlen, cblock, diridx = struct.unpack_from(
+                "<6I", kopf, 28,
+            )
+            if not diridx:
+                return ""
+            f.seek(hsize + entries * 12 + entries * 10 + blkcnt * 12 + cmcount * cmlen)
+            roh = f.read(min(diridx, 512))
+    except (OSError, struct.error):
+        return ""
+    if len(roh) < 4:
+        return ""
+    laenge, = struct.unpack_from("<i", roh, 0)
+    if not 0 < laenge <= len(roh) - 4:
+        return ""
+    return roh[4:4 + laenge].split(b"\0")[0].decode("utf-8", "replace")
+
+
+def route_deploy_path(rel: Path, routes: list[dict], mount: str = "") -> Path:
+    """Ordnet eine Datei ohne eigene Struktur ihrem Ziel zu.
+
+    Die erste passende Regel gewinnt.  Ohne Treffer bleibt *rel*
+    unveraendert -- der Aufrufer setzt dann sein Standardziel davor.
+    """
+    if not routes:
+        return rel
+    name = rel.name.lower()
+    ordner = {t.lower() for t in rel.parts[:-1]}
+    mount_unten = mount.lower().replace("\\", "/")
+    for regel in routes:
+        ziel = str(regel.get("dest", "")).strip("/")
+        if not ziel:
+            continue
+        # Der Mount-Point ist das genaueste Kriterium und wird zuerst
+        # geprueft -- er sagt, wofuer der Container gebaut wurde.
+        marken = [str(m).lower() for m in regel.get("mount_contains", [])]
+        if marken:
+            if not (mount_unten and any(m in mount_unten for m in marken)):
+                continue
+            passt = True
+        else:
+            muster = [str(n).lower() for n in regel.get("names", [])]
+            endungen = [str(s).lower() for s in regel.get("suffixes", [])]
+            gesucht = [str(f).strip("/").lower() for f in regel.get("folders", [])]
+            passt = any(fnmatch.fnmatch(name, m) for m in muster)
+            if not passt:
+                passt = any(name.endswith(s) for s in endungen)
+            if not passt and gesucht:
+                passt = bool(ordner.intersection(gesucht))
+        if not passt:
+            continue
+        # Unterordner bleiben erhalten -- ein Mod, der seine Dateien
+        # gruppiert (CustomNanosuitSystem/, ue4ss/Mods/), erwartet das
+        # auch im Spiel. Nur mit "flatten" wird alles flachgelegt.
+        if regel.get("flatten"):
+            return Path(ziel) / rel.name
+        return Path(ziel) / rel
+    return rel
 
 
 def pak_load_order_name(rel: Path, index: int) -> Path:
@@ -121,6 +225,9 @@ class ModDeployer:
         pak_load_order_prefix: bool = False,
         mods_path: Path | None = None,
         profiles_path: Path | None = None,
+        deploy_strip_prefixes: list[str] | None = None,
+        deploy_anchors: list[str] | None = None,
+        deploy_routes: list[dict] | None = None,
     ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
@@ -129,6 +236,10 @@ class ModDeployer:
         self._lml_path = lml_path
         self._redmod_path = redmod_path
         self._multi_folder_routes = multi_folder_routes or {}
+        self._deploy_strip = deploy_strip_prefixes or []
+        self._deploy_anchors = deploy_anchors or []
+        self._deploy_routes = deploy_routes or []
+        self._mount_cache: dict[str, str] = {}
         self._explicit_mods_path = mods_path is not None
         self._explicit_profiles_path = profiles_path is not None
         self._mods_path = mods_path if mods_path is not None else instance_path / ".mods"
@@ -159,6 +270,23 @@ class ModDeployer:
         """
         lower = mod_name.lower()
         return any(pat in lower for pat in self._direct_patterns)
+
+    def _mount_point_of(self, src: Path) -> str:
+        """Mount-Point des Containers, zu dem *src* gehoert.
+
+        Die drei Dateien eines Unreal-Containers tragen denselben Namen;
+        die Auskunft steht nur in der ``.utoc``.  Damit landen ``.pak``
+        und ``.ucas`` beim selben Ziel wie ihr Inhaltsverzeichnis.
+        """
+        if not self._deploy_routes or src.suffix.lower() not in _PAK_EXTENSIONS:
+            return ""
+        utoc = src.with_suffix(".utoc")
+        schluessel = str(utoc)
+        if schluessel not in self._mount_cache:
+            self._mount_cache[schluessel] = (
+                unreal_mount_point(utoc) if utoc.is_file() else ""
+            )
+        return self._mount_cache[schluessel]
 
     def set_ba2_packing_enabled(self, enabled: bool) -> None:
         """Choose whether packable loose files are omitted from symlink deploy."""
@@ -459,6 +587,17 @@ class ModDeployer:
 
                 # Direct-install mods skip data_path (frameworks go into game root)
                 is_direct = self.is_direct_install(mod_name)
+
+                # Zielverteilung: Ordner, die nur die Mod-Art benennen,
+                # fallen weg; danach entscheidet die Struktur des Mods.
+                # Bringt er selbst einen Ankerordner mit, bleibt sein Pfad
+                # unangetastet -- sonst greifen die Regeln des Plugins.
+                if not is_direct and (self._deploy_strip or self._deploy_routes):
+                    rel = strip_deploy_prefixes(rel, self._deploy_strip)
+                    if not has_deploy_anchor(rel, self._deploy_anchors):
+                        rel = route_deploy_path(
+                            rel, self._deploy_routes, self._mount_point_of(src_file),
+                        )
 
                 # Prepend data_path (e.g. "Data" for Bethesda games)
                 # Skip for direct-install mods — they deploy into game root

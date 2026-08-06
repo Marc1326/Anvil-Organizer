@@ -112,11 +112,14 @@ def test_ohne_die_eigenschaft_bleibt_alles_wie_vorher(tmp_path: Path) -> None:
     assert [p.name for p in ordner.iterdir()] == ["FoxEYE_P.pak"]
 
 
-def test_stellar_blade_plugin_hat_es_eingeschaltet() -> None:
+def test_stellar_blade_benennt_nicht_um() -> None:
+    """Die Mod-Autoren verbieten es ("Do NOT rename the files"), und die
+    Loader suchen ihre Dateien am Namen -- ein Zaehler davor macht Logic-
+    und CNS-Mods unbrauchbar."""
     from anvil.plugins.games.game_stellarblade import StellarBladeGame
 
-    assert StellarBladeGame.GamePakLoadOrderPrefix is True
-    assert StellarBladeGame.GameDataPath == "SB/Content/Paks/~mods"
+    assert StellarBladeGame.GamePakLoadOrderPrefix is False
+    assert StellarBladeGame.GameDataPath == "SB"
 
 
 def test_vorgabe_ist_aus() -> None:
