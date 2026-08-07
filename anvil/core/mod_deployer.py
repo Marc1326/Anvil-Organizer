@@ -826,6 +826,30 @@ class ModDeployer:
             # game directory never gets clean again.
             if deploy_type in {"copy", "shim_copy"}:
                 try:
+                    # Reverse-Sync vor dem Entfernen: Ein Framework-Update wird
+                    # direkt in den Spielordner installiert, nicht nach .mods/.
+                    # Lief seither kein Deploy, kennt .mods/ die neue Fassung
+                    # nicht -- und das Aufraeumen wuerde das Update loeschen,
+                    # der naechste Deploy die alte Version wieder ausrollen.
+                    # Der Deploy hat diesen Abgleich, das Aufraeumen bisher nicht.
+                    src = entry.get("target", "")
+                    if (
+                        src
+                        and link_path.is_file()
+                        and not link_path.is_symlink()
+                    ):
+                        src_file = Path(src)
+                        if (
+                            src_file.is_file()
+                            and link_path.stat().st_mtime
+                            > src_file.stat().st_mtime + 1
+                        ):
+                            print(
+                                f"[PURGE] REVERSE-SYNC: {link_rel} — "
+                                f"Game-Version ist neuer, sichere sie nach .mods/",
+                                flush=True,
+                            )
+                            shutil.copy2(link_path, src_file)
                     link_path.unlink(missing_ok=True)
                     result.links_removed += 1
                 except OSError as exc:

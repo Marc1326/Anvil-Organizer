@@ -240,3 +240,57 @@ def test_skipped_mods_matching_is_case_insensitive(tmp_path: Path) -> None:
 
     assert deployer.deploy().success is True
     assert not (game / "bin" / "x64" / "plugins" / "cyber_engine_tweaks.asi").exists()
+
+
+def test_purge_keeps_framework_update_installed_after_deploy(tmp_path: Path) -> None:
+    """Ein Framework-Update im Spielordner darf beim Aufraeumen nicht verloren gehen.
+
+    Frameworks werden direkt in den Spielordner installiert, nicht nach .mods/.
+    Passiert das nach einem Deploy, kennt .mods/ die neue Fassung noch nicht --
+    ohne Abgleich raeumt der Purge das Update weg und der naechste Deploy rollt
+    die alte Version wieder aus.
+    """
+    instance, game, mods, profiles = _library(tmp_path)
+    source = mods / "CET Framework" / "bin" / "x64" / "plugins" / "cyber_engine_tweaks.asi"
+    deployer = ModDeployer(
+        instance,
+        game,
+        ["CET Framework"],
+        profile_name="Default",
+        mods_path=mods,
+        profiles_path=profiles,
+    )
+
+    assert deployer.deploy().success is True
+    copied = game / "bin" / "x64" / "plugins" / "cyber_engine_tweaks.asi"
+    assert copied.read_bytes() == b"fw"
+
+    # Update direkt in den Spielordner, wie es die Framework-Installation tut
+    copied.write_bytes(b"fw-1.30.0")
+    import os as _os
+    stamp = source.stat().st_mtime + 120
+    _os.utime(copied, (stamp, stamp))
+
+    assert deployer.purge().success is True
+
+    assert not copied.exists()
+    assert source.read_bytes() == b"fw-1.30.0"
+
+
+def test_purge_does_not_touch_source_when_game_copy_is_unchanged(tmp_path: Path) -> None:
+    """Ohne externes Update bleibt die Fassung in .mods/ unangetastet."""
+    instance, game, mods, profiles = _library(tmp_path)
+    source = mods / "CET Framework" / "bin" / "x64" / "plugins" / "cyber_engine_tweaks.asi"
+    deployer = ModDeployer(
+        instance,
+        game,
+        ["CET Framework"],
+        profile_name="Default",
+        mods_path=mods,
+        profiles_path=profiles,
+    )
+
+    assert deployer.deploy().success is True
+    assert deployer.purge().success is True
+
+    assert source.read_bytes() == b"fw"
