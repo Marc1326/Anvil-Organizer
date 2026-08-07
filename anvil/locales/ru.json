@@ -1191,6 +1191,7 @@
     "target_hint": "napr. . ili bin/",
     "detect_path": "Put proverki",
     "detect_hint": "Fayl(y) dlya obnaruzheniya, cherez zapyatuyu",
+    "decline_hint": "Yesli otmenit, mod ustanavlivayetsya obychno, a yego fayly svyazyvayutsya ssylkami. Vkhodyashchiye v nego nativnyye biblioteki (.dll, .asi) pod Proton obychno ne zagruzhayutsya — mod ostayetsya bez effekta ili meshayet zapusku igry.",
     "btn_cancel": "Otmena",
     "btn_install": "Ustanovit kak freymvork"
   },

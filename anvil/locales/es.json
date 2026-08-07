@@ -1191,6 +1191,7 @@
     "target_hint": "ej. . o bin/",
     "detect_path": "Ruta de Deteccion",
     "detect_hint": "Archivo(s) para deteccion, separados por coma",
+    "decline_hint": "Si cancelas, el mod se instala de forma normal y sus archivos se enlazan. Las bibliotecas nativas que contenga (.dll, .asi) no suelen cargarse en Proton: el mod queda sin efecto o impide que el juego arranque.",
     "btn_cancel": "Cancelar",
     "btn_install": "Instalar como Framework"
   },

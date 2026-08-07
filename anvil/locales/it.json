@@ -1191,6 +1191,7 @@
     "target_hint": "es. . o bin/",
     "detect_path": "Percorso di Rilevamento",
     "detect_hint": "File per il rilevamento, separati da virgola",
+    "decline_hint": "Se annulli, la mod viene installata normalmente e i suoi file vengono collegati. Le librerie native che contiene (.dll, .asi) di solito non vengono caricate con Proton: la mod resta inefficace o impedisce l'avvio del gioco.",
     "btn_cancel": "Annulla",
     "btn_install": "Installa come Framework"
   },

@@ -57,6 +57,12 @@ class Cyberpunk2077Game(BaseGame):
 
     GameCopyDeployPaths = [
         "bin/x64/plugins/cyber_engine_tweaks",
+        # RED4ext lädt seine Plugins über den Windows-DLL-Loader. Ein Symlink
+        # auf einen Pfad außerhalb des Spielordners kommt dort nicht als
+        # gültige DLL an — das Plugin wird mit "unsupported API version"
+        # abgewiesen. Ruft eine Mod die fehlenden nativen Funktionen dann aus
+        # ihren Skripten auf, bricht RED4ext den Spielstart ab.
+        "red4ext/plugins",
     ]
 
     GameDirectInstallMods = [

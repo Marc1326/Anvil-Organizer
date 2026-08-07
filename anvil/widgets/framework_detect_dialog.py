@@ -93,6 +93,13 @@ class FrameworkDetectDialog(QDialog):
 
         layout.addWidget(edit_group)
 
+        # Was passiert bei "Abbrechen"? Ohne diesen Hinweis ist die Ablehnung
+        # die scheinbar vorsichtige Wahl - dabei ist sie es fuer Mods mit
+        # nativer Bibliothek gerade nicht.
+        decline_hint = QLabel(tr("fw_detect.decline_hint"))
+        decline_hint.setWordWrap(True)
+        layout.addWidget(decline_hint)
+
         # Buttons
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()

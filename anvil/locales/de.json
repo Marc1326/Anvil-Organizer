@@ -1191,6 +1191,7 @@
     "target_hint": "z.B. . oder bin/",
     "detect_path": "Prüf-Pfad",
     "detect_hint": "Datei(en) zur Erkennung, kommagetrennt",
+    "decline_hint": "Wenn du abbrichst, wird die Mod normal installiert und ihre Dateien werden verlinkt. Enthaltene native Bibliotheken (.dll, .asi) werden dann unter Proton meist nicht geladen — die Mod bleibt wirkungslos oder verhindert den Spielstart.",
     "btn_cancel": "Abbrechen",
     "btn_install": "Als Framework installieren"
   },
