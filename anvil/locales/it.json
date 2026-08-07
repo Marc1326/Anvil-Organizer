@@ -272,7 +272,11 @@
     "rename_property_title": "Rinomina proprietà",
     "rename_property_label": "Nuovo nome:",
     "delete_property_title": "Elimina proprietà",
-    "delete_property_confirm": "Eliminare la proprietà \"{name}\"?\n\nLa proprietà verrà rimossa da tutte le mod."
+    "delete_property_confirm": "Eliminare la proprietà \"{name}\"?\n\nLa proprietà verrà rimossa da tutte le mod.",
+    "unlock_purge_title": "Sblocca gioco",
+    "unlock_purge_text": "Le mod sono ancora nella cartella del gioco.\n\nRimuoverle adesso? Se il gioco è ancora in esecuzione, andrà in crash.\nAnvil fa comunque pulizia al prossimo avvio del gioco.",
+    "start_while_running_text": "Sembra che ci sia ancora un gioco in esecuzione.\n\nAvviare lo stesso? Anvil ripulisce la cartella del gioco, e un gioco ancora aperto andrà in crash.",
+    "start_while_unknown_text": "Anvil non riesce a stabilire se un gioco è ancora in esecuzione.\n\nAvviare lo stesso? Anvil ripulisce la cartella del gioco, e un gioco ancora aperto andrà in crash."
   },
   "button": {
     "cancel": "Annulla",
@@ -468,6 +472,7 @@
     "not_installed": "Non installato",
     "deploy_auto": "Deploy: automatico",
     "api_not_logged_in": "API: non connesso",
+    "api_connected": "API: connesso",
     "game_started": "Gioco avviato: {name}",
     "game_lock": {
       "running_label": "Gioco in esecuzione: {name}",
@@ -577,7 +582,8 @@
     "deploy_failed_message": "Non è stato possibile distribuire le mod nel gioco. Il gioco non è stato avviato.\n\n{details}",
     "rename_failed_title": "Rinomina fallita",
     "export_failed_title": "Esportazione fallita",
-    "import_failed_title": "Importazione fallita"
+    "import_failed_title": "Importazione fallita",
+    "game_already_running": "C'è ancora un gioco in esecuzione. Chiudilo prima di riavviare."
   },
   "game_panel": {
     "install": "Installa",

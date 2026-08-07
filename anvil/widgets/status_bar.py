@@ -64,8 +64,16 @@ class StatusBarWidget(QStatusBar):
         - Yellow: 200..500
         - Red: < 200
         """
-        if not logged_in or (daily_remaining < 0 and hourly_remaining < 0):
+        if not logged_in:
             self._api_label.setText(tr("status.api_not_logged_in"))
+            self._api_label.setStyleSheet("QLabel { padding: 2px 6px; }")
+            return
+
+        # Die Zahlen stehen erst nach der ersten Antwort von Nexus fest.
+        # Bis dahin ist der Schluessel trotzdem hinterlegt -- „nicht
+        # angemeldet" waere hier schlicht falsch.
+        if daily_remaining < 0 and hourly_remaining < 0:
+            self._api_label.setText(tr("status.api_connected"))
             self._api_label.setStyleSheet("QLabel { padding: 2px 6px; }")
             return
 

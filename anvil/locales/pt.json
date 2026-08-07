@@ -272,7 +272,11 @@
     "rename_property_title": "Renomear propriedade",
     "rename_property_label": "Novo nome:",
     "delete_property_title": "Excluir propriedade",
-    "delete_property_confirm": "Excluir a propriedade \"{name}\"?\n\nA propriedade será removida de todos os mods."
+    "delete_property_confirm": "Excluir a propriedade \"{name}\"?\n\nA propriedade será removida de todos os mods.",
+    "unlock_purge_title": "Desbloquear jogo",
+    "unlock_purge_text": "Os mods ainda estão na pasta do jogo.\n\nRemover agora? Se o jogo ainda estiver aberto, ele vai fechar com erro.\nO Anvil limpa de qualquer forma no próximo arranque do jogo.",
+    "start_while_running_text": "Parece que ainda está um jogo a correr.\n\nIniciar mesmo assim? O Anvil vai limpar a pasta do jogo, e um jogo ainda aberto vai fechar com erro.",
+    "start_while_unknown_text": "O Anvil não consegue determinar se ainda há um jogo a correr.\n\nIniciar mesmo assim? O Anvil vai limpar a pasta do jogo, e um jogo ainda aberto vai fechar com erro."
   },
   "button": {
     "cancel": "Cancelar",
@@ -468,6 +472,7 @@
     "not_installed": "Não instalado",
     "deploy_auto": "Deploy: automático",
     "api_not_logged_in": "API: não ligado",
+    "api_connected": "API: ligado",
     "game_started": "Jogo iniciado: {name}",
     "game_lock": {
       "running_label": "Jogo a executar: {name}",
@@ -577,7 +582,8 @@
     "deploy_failed_message": "Não foi possível implementar os mods no jogo. O jogo não foi iniciado.\n\n{details}",
     "rename_failed_title": "Renomeação falhou",
     "export_failed_title": "Exportação falhou",
-    "import_failed_title": "Importação falhou"
+    "import_failed_title": "Importação falhou",
+    "game_already_running": "Ainda há um jogo a correr. Fecha-o antes de iniciar de novo."
   },
   "game_panel": {
     "install": "Instalar",

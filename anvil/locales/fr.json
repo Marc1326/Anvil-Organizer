@@ -272,7 +272,11 @@
     "rename_property_title": "Renommer la propriété",
     "rename_property_label": "Nouveau nom :",
     "delete_property_title": "Supprimer la propriété",
-    "delete_property_confirm": "Supprimer la propriété « {name} » ?\n\nLa propriété sera retirée de tous les mods."
+    "delete_property_confirm": "Supprimer la propriété « {name} » ?\n\nLa propriété sera retirée de tous les mods.",
+    "unlock_purge_title": "Déverrouiller le jeu",
+    "unlock_purge_text": "Les mods sont encore dans le dossier du jeu.\n\nLes retirer maintenant ? Si le jeu tourne encore, il plantera.\nAnvil nettoie de toute façon au prochain démarrage du jeu.",
+    "start_while_running_text": "Il semble qu'un jeu soit encore en cours.\n\nLancer quand même ? Anvil va vider le dossier du jeu, et un jeu encore ouvert va planter.",
+    "start_while_unknown_text": "Anvil ne peut pas savoir si un jeu est encore en cours.\n\nLancer quand même ? Anvil va vider le dossier du jeu, et un jeu encore ouvert va planter."
   },
   "button": {
     "cancel": "Annuler",
@@ -468,6 +472,7 @@
     "not_installed": "Non installé",
     "deploy_auto": "Déploiement : automatique",
     "api_not_logged_in": "API : non connecté",
+    "api_connected": "API : connecté",
     "game_started": "Jeu lancé : {name}",
     "game_lock": {
       "running_label": "Jeu en cours : {name}",
@@ -577,7 +582,8 @@
     "deploy_failed_message": "Les mods n’ont pas pu être déployés dans le jeu. Le jeu n’a pas été démarré.\n\n{details}",
     "rename_failed_title": "Renommage échoué",
     "export_failed_title": "Exportation échouée",
-    "import_failed_title": "Importation échouée"
+    "import_failed_title": "Importation échouée",
+    "game_already_running": "Un jeu est encore en cours. Fermez-le avant de relancer."
   },
   "game_panel": {
     "install": "Installer",

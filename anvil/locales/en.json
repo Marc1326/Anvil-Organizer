@@ -272,7 +272,11 @@
     "rename_property_title": "Rename Property",
     "rename_property_label": "New name:",
     "delete_property_title": "Delete Property",
-    "delete_property_confirm": "Really delete property \"{name}\"?\n\nThe property will be removed from all mods."
+    "delete_property_confirm": "Really delete property \"{name}\"?\n\nThe property will be removed from all mods.",
+    "unlock_purge_title": "Unlock game",
+    "unlock_purge_text": "The mods are still in the game directory.\n\nRemove them now? If the game is still running, it will crash.\nAnvil cleans up on the next game start anyway.",
+    "start_while_running_text": "It looks like a game is still running.\n\nStart anyway? Anvil clears the game directory first — a game that is still running will crash.",
+    "start_while_unknown_text": "Anvil cannot tell whether a game is still running.\n\nStart anyway? Anvil clears the game directory first — a game that is still running will crash."
   },
   "button": {
     "cancel": "Cancel",
@@ -468,6 +472,7 @@
     "not_installed": "Not installed",
     "deploy_auto": "Deploy: automatic",
     "api_not_logged_in": "API: not logged in",
+    "api_connected": "API: connected",
     "game_started": "Game started: {name}",
     "game_lock": {
       "running_label": "Game running: {name}",
@@ -577,7 +582,8 @@
     "deploy_failed_message": "The mods could not be deployed into the game. The game was not started.\n\n{details}",
     "rename_failed_title": "Rename Failed",
     "export_failed_title": "Export Failed",
-    "import_failed_title": "Import Failed"
+    "import_failed_title": "Import Failed",
+    "game_already_running": "A game is still running. Close it before starting again."
   },
   "game_panel": {
     "install": "Install",

@@ -272,7 +272,11 @@
     "rename_property_title": "Переименовать свойство",
     "rename_property_label": "Новое имя:",
     "delete_property_title": "Удалить свойство",
-    "delete_property_confirm": "Удалить свойство «{name}»?\n\nСвойство будет удалено у всех модов."
+    "delete_property_confirm": "Удалить свойство «{name}»?\n\nСвойство будет удалено у всех модов.",
+    "unlock_purge_title": "Разблокировать игру",
+    "unlock_purge_text": "Моды всё ещё лежат в папке игры.\n\nУдалить их сейчас? Если игра ещё запущена, она вылетит.\nПри следующем запуске игры Anvil всё равно всё уберёт.",
+    "start_while_running_text": "Похоже, игра ещё запущена.\n\nВсё равно запустить? Anvil очистит папку игры, и запущенная игра вылетит.",
+    "start_while_unknown_text": "Anvil не может определить, запущена ли ещё игра.\n\nВсё равно запустить? Anvil очистит папку игры, и запущенная игра вылетит."
   },
   "button": {
     "cancel": "Отмена",
@@ -468,6 +472,7 @@
     "not_installed": "Не установлено",
     "deploy_auto": "Развёртывание: автоматически",
     "api_not_logged_in": "API: не авторизован",
+    "api_connected": "API: подключено",
     "game_started": "Игра запущена: {name}",
     "game_lock": {
       "running_label": "Игра запущена: {name}",
@@ -577,7 +582,8 @@
     "deploy_failed_message": "Не удалось развернуть моды в игре. Игра не была запущена.\n\n{details}",
     "rename_failed_title": "Переименование не удалось",
     "export_failed_title": "Экспорт не удался",
-    "import_failed_title": "Импорт не удался"
+    "import_failed_title": "Импорт не удался",
+    "game_already_running": "Игра ещё запущена. Закройте её перед повторным запуском."
   },
   "game_panel": {
     "install": "Установить",

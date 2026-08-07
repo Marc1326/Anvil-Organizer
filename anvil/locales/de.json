@@ -272,7 +272,11 @@
     "rename_property_title": "Eigenschaft umbenennen",
     "rename_property_label": "Neuer Name:",
     "delete_property_title": "Eigenschaft löschen",
-    "delete_property_confirm": "Eigenschaft \"{name}\" wirklich löschen?\n\nDie Eigenschaft wird von allen Mods entfernt."
+    "delete_property_confirm": "Eigenschaft \"{name}\" wirklich löschen?\n\nDie Eigenschaft wird von allen Mods entfernt.",
+    "unlock_purge_title": "Spiel entsperren",
+    "unlock_purge_text": "Die Mods liegen noch im Spielordner.\n\nJetzt entfernen? Wenn das Spiel noch läuft, stürzt es dabei ab.\nBeim nächsten Spielstart räumt Anvil ohnehin auf.",
+    "start_while_running_text": "Es sieht so aus, als würde noch ein Spiel laufen.\n\nTrotzdem starten? Anvil räumt dabei den Spielordner auf — ein noch laufendes Spiel stürzt ab.",
+    "start_while_unknown_text": "Anvil kann nicht feststellen, ob noch ein Spiel läuft.\n\nTrotzdem starten? Anvil räumt dabei den Spielordner auf — ein noch laufendes Spiel stürzt ab."
   },
   "button": {
     "cancel": "Abbrechen",
@@ -467,7 +471,8 @@
     "not_connected": "Nicht verbunden.",
     "not_installed": "Nicht installiert",
     "deploy_auto": "Deploy: automatisch",
-    "api_not_logged_in": "API: not logged in",
+    "api_not_logged_in": "API: nicht angemeldet",
+    "api_connected": "API: verbunden",
     "game_started": "Spiel gestartet: {name}",
     "game_lock": {
       "running_label": "Spiel läuft: {name}",
@@ -577,7 +582,8 @@
     "deploy_failed_message": "Die Mods konnten nicht ins Spiel deployed werden. Das Spiel wurde nicht gestartet.\n\n{details}",
     "rename_failed_title": "Umbenennen fehlgeschlagen",
     "export_failed_title": "Export fehlgeschlagen",
-    "import_failed_title": "Import fehlgeschlagen"
+    "import_failed_title": "Import fehlgeschlagen",
+    "game_already_running": "Es läuft noch ein Spiel. Beende es, bevor du neu startest."
   },
   "game_panel": {
     "install": "Installieren",
