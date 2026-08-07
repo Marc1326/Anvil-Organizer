@@ -15,6 +15,15 @@ import os
 
 from anvil.core.subprocess_env import is_flatpak
 
+# Der Suchbegriff endet auf dem Nulltrenner von environ, sonst wuerde
+# SteamAppId=1091500 auch SteamAppId=10915000 treffen.
+#
+# Anvil startet Tools (xEdit, BodySlide, redMod.exe) mit der SteamAppId des
+# Spiels, weil Proton sie braucht. Ohne diese Markierung haelt die Suche
+# jedes laufende Tool fuer das Spiel selbst.
+TOOL_ENV_MARKER = "ANVIL_TOOL"
+_TOOL_NEEDLE = b"ANVIL_TOOL=1"
+
 
 def scan_proc_for_game(app_id: str | None, binary_name: str | None) -> int | None:
     """Search the *local* /proc for the watched game process.
@@ -25,7 +34,7 @@ def scan_proc_for_game(app_id: str | None, binary_name: str | None) -> int | Non
     """
     if not app_id and not binary_name:
         return None
-    needle = f"SteamAppId={app_id}".encode() if app_id else b""
+    needle = f"SteamAppId={app_id}\0".encode() if app_id else b""
     binary = binary_name.lower().encode() if binary_name else b""
     own_pid = str(os.getpid())
     try:
@@ -34,10 +43,12 @@ def scan_proc_for_game(app_id: str | None, binary_name: str | None) -> int | Non
                 continue
             pid = entry.name
             try:
-                if needle:
-                    with open(f"/proc/{pid}/environ", "rb") as f:
-                        if needle in f.read():
-                            return int(pid)
+                with open(f"/proc/{pid}/environ", "rb") as f:
+                    environ = f.read()
+                if _TOOL_NEEDLE in environ:
+                    continue
+                if needle and needle in environ:
+                    return int(pid)
                 if binary:
                     with open(f"/proc/{pid}/cmdline", "rb") as f:
                         if binary in f.read().lower():
@@ -60,18 +71,20 @@ _HOST_SCAN = (
     "import os, sys\n"
     "lines = (sys.stdin.read().split('\\n') + ['', ''])\n"
     "app_id, binary = lines[0].strip(), lines[1].strip()\n"
-    "needle = ('SteamAppId=' + app_id).encode() if app_id else None\n"
+    "needle = ('SteamAppId=' + app_id + chr(0)).encode() if app_id else None\n"
     "name = binary.lower().encode() if binary else None\n"
     "own = str(os.getpid())\n"
     "for entry in os.scandir('/proc'):\n"
     "    if not entry.name.isdigit() or entry.name == own:\n"
     "        continue\n"
     "    try:\n"
-    "        if needle:\n"
-    "            with open('/proc/' + entry.name + '/environ', 'rb') as f:\n"
-    "                if needle in f.read():\n"
-    "                    print(entry.name)\n"
-    "                    break\n"
+    "        with open('/proc/' + entry.name + '/environ', 'rb') as f:\n"
+    "            environ = f.read()\n"
+    "        if b'ANVIL_TOOL=1' in environ:\n"
+    "            continue\n"
+    "        if needle and needle in environ:\n"
+    "            print(entry.name)\n"
+    "            break\n"
     "        if name:\n"
     "            with open('/proc/' + entry.name + '/cmdline', 'rb') as f:\n"
     "                if name in f.read().lower():\n"
@@ -83,6 +96,7 @@ _HOST_SCAN = (
 
 # Distinguishes "scan ran, found nothing" from "scan could not run".
 _SCAN_FAILED = object()
+_SCAN_TIMEOUT = object()
 
 # Der Watcher fragt im Sekundentakt — ein haengender Host-Aufruf darf ihn
 # nicht ausbremsen, sonst wird aus dem Zeitlimit ein Vielfaches davon.
@@ -90,7 +104,11 @@ _HOST_SCAN_TIMEOUT = 3
 
 
 def _host_scan_via_python(app_id: str, binary_name: str):
-    """Run the /proc scan on the host. _SCAN_FAILED if it could not run."""
+    """Run the /proc scan on the host.
+
+    Returns the PID, None if nothing matched, or a sentinel telling the
+    caller why no answer could be produced.
+    """
     import subprocess
     try:
         result = subprocess.run(
@@ -98,7 +116,9 @@ def _host_scan_via_python(app_id: str, binary_name: str):
             input=f"{app_id}\n{binary_name}\n",
             capture_output=True, text=True, timeout=_HOST_SCAN_TIMEOUT,
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except subprocess.TimeoutExpired:
+        return _SCAN_TIMEOUT
+    except OSError:
         return _SCAN_FAILED
     if result.returncode != 0:
         return _SCAN_FAILED
@@ -119,7 +139,9 @@ def _host_scan_via_ps(binary_name: str):
             ["flatpak-spawn", "--host", "ps", "-eo", "pid=,args="],
             capture_output=True, text=True, timeout=_HOST_SCAN_TIMEOUT,
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except subprocess.TimeoutExpired:
+        return _SCAN_TIMEOUT
+    except OSError:
         return _SCAN_FAILED
     if result.returncode != 0:
         return _SCAN_FAILED
@@ -129,6 +151,21 @@ def _host_scan_via_ps(binary_name: str):
         if pid.isdigit() and needle in args.lower():
             return int(pid)
     return None
+
+
+def plugin_watch_target(plugin) -> tuple[str | None, str | None]:
+    """SteamAppId und Binaername eines Plugins als Suchmerkmale.
+
+    Der Spielpfad taugt nicht: er steht in jeder Shell, die ihn erwaehnt,
+    und in Steams verwaisten Hilfsprozessen.
+    """
+    if plugin is None:
+        return None, None
+    app_id = getattr(plugin, "GameSteamId", None)
+    if isinstance(app_id, list):
+        app_id = app_id[0] if app_id else None
+    binary = getattr(plugin, "GameBinary", "") or ""
+    return (str(app_id) if app_id else None), (os.path.basename(binary).lower() or None)
 
 
 def find_game_process(
@@ -147,8 +184,12 @@ def find_game_process(
         return scan_proc_for_game(app_id, binary_name), True
 
     pid = _host_scan_via_python(app_id or "", binary_name or "")
+    if pid is _SCAN_TIMEOUT:
+        # Ein zweiter Anlauf mit anderem Werkzeug hilft nicht, wenn der Host
+        # schon zu langsam war — er verdoppelt nur die Wartezeit.
+        return None, False
     if pid is _SCAN_FAILED:
         pid = _host_scan_via_ps(binary_name or "")
-    if pid is _SCAN_FAILED:
+    if pid in (_SCAN_FAILED, _SCAN_TIMEOUT):
         return None, False
     return pid, True

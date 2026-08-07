@@ -48,7 +48,7 @@ from anvil.widgets.profile_bar import ProfileBar
 from anvil.widgets.mod_list import ModListView
 from anvil.widgets.collapsible_bar import CollapsibleSectionBar
 from anvil.widgets.filter_panel import FilterPanel
-from anvil.widgets.game_panel import GamePanel
+from anvil.widgets.game_panel import GamePanel, GAME_RUNNING
 from anvil.widgets.status_bar import StatusBarWidget
 from anvil.widgets.toast import Toast
 from anvil.dialogs import ModDetailDialog
@@ -327,7 +327,7 @@ class MainWindow(QMainWindow):
         overlay_layout.addWidget(self._lock_label)
         self._unlock_btn = QPushButton(tr("status.game_lock.unlock_button"))
         self._unlock_btn.setFixedWidth(160)
-        self._unlock_btn.clicked.connect(lambda checked=False: self._unlock_ui())
+        self._unlock_btn.clicked.connect(lambda checked=False: self._on_unlock_clicked())
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         btn_layout.addWidget(self._unlock_btn)
@@ -450,6 +450,7 @@ class MainWindow(QMainWindow):
 
         # ── Game Running Lock ─────────────────────────────────────────
         self._game_running: bool = False
+        self._unlock_pending: bool = False
 
         # ── Framework Auto-Re-Lock (5-min unlock-box) ─────────────────
         self._fw_relock_timer = QTimer(self)
@@ -1013,7 +1014,7 @@ class MainWindow(QMainWindow):
             self._storage_dialog = None
 
     def _schedule_base_directory_migration(self, request) -> None:
-        if self._game_running:
+        if self._game_running or self._game_panel.is_game_running():
             self._storage_fail(tr("storage.error_game_running"))
             return
         source = anvil_base_paths().base
@@ -1043,6 +1044,9 @@ class MainWindow(QMainWindow):
             name = str(data["name"])
             if not self.switch_instance(name):
                 self._storage_fail(tr("storage.error_load_instance", name=name))
+                return
+            if self._game_panel.is_game_running():
+                self._storage_fail(tr("storage.error_game_running"))
                 return
             purge_result = self._game_panel.silent_purge()
             if purge_result is not None and not getattr(purge_result, "success", False):
@@ -1075,7 +1079,7 @@ class MainWindow(QMainWindow):
         if request.base_directory:
             self._schedule_base_directory_migration(request)
             return
-        if self._game_running:
+        if self._game_running or self._game_panel.is_game_running():
             self._storage_fail(tr("storage.error_game_running"))
             return
         for name in request.instances:
@@ -1124,6 +1128,9 @@ class MainWindow(QMainWindow):
         self._storage_active_instance = name
         if not self.switch_instance(name):
             self._storage_fail(tr("storage.error_load_instance", name=name))
+            return
+        if self._game_panel.is_game_running():
+            self._storage_fail(tr("storage.error_game_running"))
             return
         purge_result = self._game_panel.silent_purge()
         if purge_result is not None and not getattr(purge_result, "success", False):
@@ -1307,6 +1314,8 @@ class MainWindow(QMainWindow):
         tool = tools[idx]
         exe_path = tool.get("exe_path", "")
         if not exe_path:
+            return
+        if not self._game_panel.confirm_start_while_running():
             return
         if not self._predeploy_for_launch("proton_tool_start"):
             return
@@ -1554,8 +1563,14 @@ class MainWindow(QMainWindow):
         the app crashed or was killed, links may still be sitting there
         — purge what a manifest covers, then sweep up anything an older
         run left behind without one.
+
+        A game started from an earlier Anvil session may still be running,
+        so every directory with a live deployment is checked first: the
+        watch target does not survive a restart, and this purge would
+        otherwise pull the files out from under it.
         """
         from anvil.core.mod_deployer import ModDeployer
+        from anvil.core.game_process import find_game_process, plugin_watch_target
         for entry in self.instance_manager.list_instances():
             name = entry.get("name", "") if isinstance(entry, dict) else str(entry)
             if not name:
@@ -1568,6 +1583,21 @@ class MainWindow(QMainWindow):
             game_path = Path(game_path_str)
             if not game_path.is_dir():
                 continue
+            short_name = data.get("game_short_name", "") if data else ""
+            plugin = self.plugin_loader.get_game(short_name) if short_name else None
+            # Ohne Plugin kann Anvil das Spiel gar nicht gestartet haben —
+            # dann bleibt es beim Aufräumen wie bisher.
+            app_id, binary = plugin_watch_target(plugin)
+            if app_id or binary:
+                pid, reliable = find_game_process(app_id, binary)
+                if pid is not None or not reliable:
+                    print(
+                        f"[PURGE] {name}: game may still be running — "
+                        "deployment kept",
+                        flush=True,
+                    )
+                    continue
+            has_manifest = (instance_path / ModDeployer.MANIFEST_NAME).is_file()
             paths = resolve_instance_paths(instance_path, data)
             deployer = ModDeployer(
                 instance_path,
@@ -1575,7 +1605,7 @@ class MainWindow(QMainWindow):
                 mods_path=paths.mods,
                 profiles_path=paths.profiles,
             )
-            if (instance_path / ModDeployer.MANIFEST_NAME).is_file():
+            if has_manifest:
                 deployer.purge()
             orphans = deployer.remove_orphaned_links()
             if orphans:
@@ -1625,7 +1655,12 @@ class MainWindow(QMainWindow):
 
         # ── Schritt 4: Deploy purgen ──
         # silent_purge() braucht _deployer und _current_plugin (noch nicht None!)
-        self._game_panel.silent_purge()
+        # Läuft das Spiel noch, bleibt alles liegen — der nächste Start räumt auf.
+        if self._game_running or self._game_panel.is_game_running():
+            print("[PURGE] instance switch while the game may run — "
+                  "deployment kept", flush=True)
+        else:
+            self._game_panel.silent_purge()
 
         # ── Schritt 5: Model leeren ──
         self._mod_list_view.clear_mods()
@@ -2301,6 +2336,10 @@ class MainWindow(QMainWindow):
             return True
         if not self._game_panel.has_deployment():
             return True
+        if self._game_running or self._game_panel.is_game_running():
+            print("[PURGE] game may still be running — leftover kept",
+                  flush=True)
+            return True
         print("[PURGE] Cleaning up leftover deployment", flush=True)
         purge_result = self._game_panel.silent_purge()
         if purge_result is not None and not getattr(purge_result, "success", False):
@@ -2559,9 +2598,24 @@ class MainWindow(QMainWindow):
             flush=True,
         )
 
-    def _predeploy_for_launch(self, reason: str) -> bool:
-        """Relock frameworks and return whether purge/deploy succeeded."""
+    def _predeploy_for_launch(self, reason: str) -> bool | None:
+        """Relock frameworks and purge/deploy for a launch.
+
+        Returns True on success, False if the deploy failed, and None if
+        the launch was refused because a game is running — the caller
+        must not show a deploy error on top of the message already shown.
+        """
         self._redeploy_timer.stop()
+        forced = self._game_panel.take_forced_launch()
+        running = self._game_running or self._game_panel.game_state() == GAME_RUNNING
+        if running and not forced:
+            # Purge + Deploy würden dem laufenden Spiel die Dateien wegziehen.
+            print("[LAUNCH] a game is still running — refused", flush=True)
+            QMessageBox.warning(
+                self, tr("game_panel.start"),
+                tr("error.game_already_running"),
+            )
+            return None
         if self._current_instance_path:
             print(f"[LAUNCH] pre-launch deploy, reason={reason}", flush=True)
             self._log_game_dir_state("before deploy")
@@ -2594,12 +2648,15 @@ class MainWindow(QMainWindow):
 
     def _on_start_game(self, binary_path: str, working_dir: str) -> None:
         """Launch the selected game executable."""
-        if not self._predeploy_for_launch("game_start"):
-            QMessageBox.warning(
-                self,
-                tr("error.deploy_failed_title"),
-                tr("error.deploy_failed_message", details=""),
-            )
+        result = self._predeploy_for_launch("game_start")
+        if not result:
+            # None heisst: der Grund wurde schon gemeldet.
+            if result is not None:
+                QMessageBox.warning(
+                    self,
+                    tr("error.deploy_failed_title"),
+                    tr("error.deploy_failed_message", details=""),
+                )
             return
         success, pid = True, -1
         try:
@@ -2628,6 +2685,8 @@ class MainWindow(QMainWindow):
         neben Anvil, man soll währenddessen weiterarbeiten können. Nur das Spiel sperrt
         die UI.
         """
+        if not self._game_panel.confirm_start_while_running():
+            return
         if not self._predeploy_for_launch("custom_tool_start"):
             return
         if use_proton:
@@ -2673,33 +2732,91 @@ class MainWindow(QMainWindow):
         self._toolbar.setEnabled(False)
         self.menuBar().setEnabled(False)
 
-    def _unlock_ui(self) -> None:
+    def _on_unlock_clicked(self) -> None:
+        """Unlock button: ask before removing the deployment.
+
+        Anvil cannot always tell whether the game is still running, so the
+        decision belongs to the user rather than to a guess — and it is
+        carried out as given, without a second opinion from the lookup.
+        """
+        if not self._game_panel.has_deployment():
+            print("[LAUNCH] unlock: nothing deployed", flush=True)
+            self._unlock_ui(False)
+            return
+        # Der Dialog dreht eine eigene Event-Schleife: ohne die Sperre kann
+        # game_stopped dazwischenfunken und schon aufraeumen, waehrend der
+        # Nutzer noch ueberlegt.
+        self._unlock_pending = True
+        try:
+            answer = QMessageBox.question(
+                self,
+                tr("dialog.unlock_purge_title"),
+                tr("dialog.unlock_purge_text"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+        finally:
+            self._unlock_pending = False
+        if answer != QMessageBox.StandardButton.Yes:
+            self._unlock_ui(False)
+            return
+        self._game_running = False
+        print("[LAUNCH] unlock: user asked to remove the deployment",
+              flush=True)
+        self._purge_after_game()
+        self._game_panel.clear_watch_target()
+        self._release_ui_lock()
+
+    def _unlock_ui(self, stopped: bool = True) -> None:
         """Re-enable the UI after a game has stopped or user clicks Unlock.
 
         Never removes anything while the game is still running — pulling
-        the mods out from under a running game crashes it.  Leftovers are
-        cleaned up on the next Anvil start.
+        the mods out from under a running game crashes it.  ``stopped``
+        is False when the game state could not be established; leftovers
+        are then cleaned up on the next game start.
         """
+        if self._unlock_pending:
+            # Der Nutzer entscheidet gerade selbst — seiner Antwort nicht
+            # vorgreifen.
+            return
         self._game_running = False
-        still_running = getattr(self._game_panel, "is_game_running", lambda: False)()
-        if still_running:
-            print("[LAUNCH] unlock requested, but the game is still running "
-                  "— keeping the deployment", flush=True)
+        if not stopped:
+            print("[LAUNCH] game state unknown — keeping the deployment",
+                  flush=True)
+        elif self._game_panel.is_game_running():
+            print("[LAUNCH] unlock requested, but the game is still "
+                  "running — keeping the deployment", flush=True)
         else:
             print("[LAUNCH] game stopped — cleaning up", flush=True)
-            self._log_game_dir_state("before cleanup")
-            purge_result = self._game_panel.silent_purge()
-            if purge_result is not None:
-                print(
-                    f"[LAUNCH] purge result: success="
-                    f"{getattr(purge_result, 'success', None)}, "
-                    f"removed={getattr(purge_result, 'links_removed', 0)}, "
-                    f"errors={len(getattr(purge_result, 'errors', []))}",
-                    flush=True,
-                )
-                for err in getattr(purge_result, "errors", [])[:5]:
-                    print(f"[LAUNCH]   ERROR: {err}", flush=True)
-            self._log_game_dir_state("after cleanup")
+            self._purge_after_game()
+            self._game_panel.clear_watch_target()
+        self._release_ui_lock()
+
+    def _refuse_while_game_runs(self, title: str) -> bool:
+        """Block deletions in the game directory while the game is up."""
+        if not (self._game_running or self._game_panel.is_game_running()):
+            return False
+        QMessageBox.warning(self, title, tr("error.game_already_running"))
+        return True
+
+    def _purge_after_game(self) -> None:
+        """Remove the deployment and log what went out."""
+        self._log_game_dir_state("before cleanup")
+        purge_result = self._game_panel.silent_purge()
+        if purge_result is not None:
+            print(
+                f"[LAUNCH] purge result: success="
+                f"{getattr(purge_result, 'success', None)}, "
+                f"removed={getattr(purge_result, 'links_removed', 0)}, "
+                f"errors={len(getattr(purge_result, 'errors', []))}",
+                flush=True,
+            )
+            for err in getattr(purge_result, "errors", [])[:5]:
+                print(f"[LAUNCH]   ERROR: {err}", flush=True)
+        self._log_game_dir_state("after cleanup")
+
+    def _release_ui_lock(self) -> None:
+        """Hide the lock overlay and hand the UI back to the user."""
         self._lock_overlay.setVisible(False)
         self._splitter.setEnabled(True)
         self._log_container.setEnabled(True)
@@ -4643,7 +4760,11 @@ class MainWindow(QMainWindow):
 
         # 6. Clean up the old profile's deployment — the new one goes out on game start
         self._redeploy_timer.stop()
-        self._game_panel.silent_purge()
+        if self._game_running or self._game_panel.is_game_running():
+            print("[PURGE] profile switch while the game may run — "
+                  "deployment kept", flush=True)
+        else:
+            self._game_panel.silent_purge()
         self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
         self._sync_separator_deploy_paths()
 
@@ -6301,6 +6422,8 @@ class MainWindow(QMainWindow):
 
     def _ctx_remove_mods(self, rows: list[int]) -> None:
         """Remove selected mods (folder + modlist.txt entry)."""
+        if self._refuse_while_game_runs(tr("dialog.remove_mod_title")):
+            return
         entries = []
         for row in rows:
             entry = self._entry_for_row(row)
@@ -7026,10 +7149,20 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self._redeploy_timer.stop()
-        # Purge deployed mods before closing
-        self._game_panel.silent_purge()
+        self._purge_on_close()
         self._save_ui_state()
         super().closeEvent(event)
+
+    def _purge_on_close(self) -> None:
+        """Clean up on exit — never out from under a running game.
+
+        The next start purges instead.
+        """
+        if self._game_running or self._game_panel.is_game_running():
+            print("[LAUNCH] closing while the game runs — keeping the "
+                  "deployment", flush=True)
+            return
+        self._game_panel.silent_purge()
 
     # ── BG3-specific methods ─────────────────────────────────────────
 
@@ -7859,6 +7992,8 @@ class MainWindow(QMainWindow):
     def _fw_uninstall(self, fw_name: str) -> None:
         """Uninstall a framework by removing its detect_installed files from game dir."""
         if not self._current_plugin or not self._current_game_path:
+            return
+        if self._refuse_while_game_runs(tr("dialog.uninstall_framework_title")):
             return
         # Lock-Guard
         if self._current_instance_path:

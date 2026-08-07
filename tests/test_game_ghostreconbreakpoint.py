@@ -169,6 +169,7 @@ class GhostReconBreakpointPluginTests(unittest.TestCase):
                 success=False, errors=["injected deploy failure"]
             ),
             _needs_redmod_deploy=lambda _plugin: False,
+            confirm_start_while_running=lambda: True,
             _do_launch=lambda game, binary, steam: launched.append(
                 (game, binary, steam)
             ),

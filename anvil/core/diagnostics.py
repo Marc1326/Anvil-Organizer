@@ -238,12 +238,19 @@ def log_sources() -> list[dict]:
         bak = log_dir / f"activity.log.{i}"
         if bak.is_file():
             sources.append({"label": f"activity.log.{i}", "path": str(bak)})
-    # debug.log liegt am Projektroot (nur Quellcode-Start über restart.sh)
+    dbg_log = log_dir / "debug.log"
+    if dbg_log.is_file():
+        sources.append({"label": "debug.log", "path": str(dbg_log)})
+    for i in range(1, 3):
+        bak = log_dir / f"debug.log.{i}"
+        if bak.is_file():
+            sources.append({"label": f"debug.log.{i}", "path": str(bak)})
+    # Zusätzlich am Projektroot (Quellcode-Start über restart.sh)
     try:
         project_root = Path(__file__).resolve().parents[2]
         dbg = project_root / "debug.log"
-        if dbg.is_file():
-            sources.append({"label": "debug.log", "path": str(dbg)})
+        if dbg.is_file() and dbg != dbg_log:
+            sources.append({"label": "debug.log (src)", "path": str(dbg)})
     except (OSError, IndexError):
         pass
     return sources

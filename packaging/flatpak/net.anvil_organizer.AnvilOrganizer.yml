@@ -24,6 +24,8 @@ finish-args:
   # Desktop integration
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.kde.StatusNotifierWatcher
+  # Host access (launch Steam, find the running game process)
+  - --talk-name=org.freedesktop.Flatpak
 
 modules:
   - name: python-lz4

@@ -147,6 +147,11 @@ def main():
         # os._exit vermeidet einen Qt-Teardown-Crash im kurzlebigen Forwarder-Prozess
         os._exit(0)
 
+    # Erst ab hier mitschreiben: der kurzlebige Forwarder-Prozess oben würde
+    # sonst die Logdatei der laufenden Instanz unter ihr wegrotieren.
+    from anvil.core.debug_log import start_debug_log
+    start_debug_log(f"v{APP_VERSION}")
+
     # Qt-eigene Übersetzungen laden (für About Qt, Datei-Dialoge, etc.)
     lang = Translator.instance().current_language
     qt_translator = QTranslator(app)

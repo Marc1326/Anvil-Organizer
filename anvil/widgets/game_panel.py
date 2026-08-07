@@ -8,15 +8,43 @@ import os
 import shutil
 import signal
 import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
 from anvil.core.resource_path import get_anvil_base
-from anvil.core.subprocess_env import clean_subprocess_env, clean_env, host_popen, host_open_url, host_open_path
+from anvil.core.subprocess_env import (
+    clean_subprocess_env, clean_env, host_popen, host_open_url, host_open_path,
+)
+from anvil.core.game_process import (
+    find_game_process, plugin_watch_target, TOOL_ENV_MARKER,
+)
 from anvil.widgets.proton_tools_dialog import load_proton_tools, ProtonToolsDialog
 
 _DEPLOY_LOG = Path("/tmp/anvil-deploy.log")
+
+GAME_RUNNING = "running"
+GAME_STOPPED = "stopped"
+GAME_UNKNOWN = "unknown"
+
+# Wie lange die letzte Messung des Watchers als aktuell gilt.
+_GAME_STATE_TTL = 15
+
+# Wie lange ein bestaetigtes "trotzdem starten" gilt. Grosszuegig, weil
+# ein REDmod-Deploy dazwischenliegen kann (Zeitlimit dort: 300 s).
+_FORCED_LAUNCH_TTL = 900
+
+# Eigene Messungen halten kuerzer — ohne Watcher merkt sonst niemand,
+# dass das Spiel inzwischen beendet wurde.
+_QUERY_STATE_TTL = 3
+
+
+def _state_of(pid: int | None, reliable: bool) -> str:
+    if pid is not None:
+        return GAME_RUNNING
+    return GAME_STOPPED if reliable else GAME_UNKNOWN
+
 
 def _dlog(msg: str) -> None:
     """Append a debug line to the deploy log file."""
@@ -207,7 +235,8 @@ class GamePanel(QWidget):
     start_requested = Signal(str, str)  # (binary_path, working_dir)
     custom_start_requested = Signal(str, list, str, bool)  # (exe_path, args, working_dir, use_proton)
     game_started = Signal(str, int)  # (game_name, pid) — pid=-1 if unknown
-    game_stopped = Signal()           # emitted when the game process ends
+    # True = the process was seen and is gone for good, False = state unknown
+    game_stopped = Signal(bool)
 
     dl_query_info_requested = Signal(str)  # archive_path
     _redmod_finished = Signal(int, str, str, str, bool)  # (exit_code, stdout, stderr, binary, is_steam)
@@ -532,6 +561,9 @@ class GamePanel(QWidget):
         self._virtual_files: dict = {}  # what the mods would deploy
         self._watch_binary = ""     # game binary the process watcher looks for
         self._watch_app_id = None
+        self._game_state: tuple[float, str] | None = None
+        self._watch_generation = 0
+        self._forced_launch: float | None = None
         # REDmod deploy state
         self._redmod_process = None
         self._redmod_cancel_requested = False
@@ -608,6 +640,8 @@ class GamePanel(QWidget):
         self._current_game_path = game_path
         self._current_short_name = game_short_name
         self._current_plugin = game_plugin
+        # Der gemerkte Zustand gehoert zum vorigen Spiel
+        self._game_state = None
         self._icon_manager = icon_manager
         self._instance_dir = instance_dir
         self._instance_cover_image = instance_cover_image
@@ -1523,7 +1557,6 @@ class GamePanel(QWidget):
                 _dlog("[DLL-OVR] All overrides already present")
         else:
             # Create new section at end of file
-            import time
             timestamp = int(time.time())
             new_section = (
                 f"\n{section} {timestamp}\n"
@@ -1885,6 +1918,44 @@ class GamePanel(QWidget):
         self._start_btn.setToolTip(tr("game_panel.start_with_name", name=name))
         self._update_exe_hint()
 
+    def confirm_start_while_running(self) -> bool:
+        """Ask before starting on top of a game that may still be alive.
+
+        The lookup can be wrong either way, so this never refuses
+        outright — it asks, and an unknown state counts as reason to ask.
+        """
+        self._forced_launch = None
+        state = self.game_state()
+        if state == GAME_STOPPED:
+            return True
+        key = ("dialog.start_while_running_text" if state == GAME_RUNNING
+               else "dialog.start_while_unknown_text")
+        answer = QMessageBox.question(
+            self,
+            tr("game_panel.start"),
+            tr(key),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            _dlog("[START] refused: a game is still running")
+            return False
+        _dlog("[START] user starts anyway while a game looks running")
+        # Nicht das Watch-Ziel loeschen: der Vorab-Deploy fragt gleich noch
+        # einmal, und ein leeres Ziel wuerde jede weitere Pruefung blenden.
+        self._forced_launch = time.monotonic() + _FORCED_LAUNCH_TTL
+        return True
+
+    def take_forced_launch(self) -> bool:
+        """Whether the user just insisted on starting — reads once.
+
+        Expires on its own: a branch that never reads it must not leave
+        the guards disarmed for the rest of the session.
+        """
+        forced = self._forced_launch is not None and time.monotonic() < self._forced_launch
+        self._forced_launch = None
+        return forced
+
     def _on_start_clicked(self) -> None:
         """Start the currently selected executable (deploy already happened).
 
@@ -1910,6 +1981,11 @@ class GamePanel(QWidget):
 
         binary = exe.get("binary", "")
         if not binary:
+            return
+
+        # Vor allen Deploy-Zweigen: der Vorab-Deploy purgt, und das zieht
+        # einem noch laufenden Spiel die Dateien weg.
+        if not self.confirm_start_while_running():
             return
 
         plugin = self._current_plugin
@@ -1950,12 +2026,15 @@ class GamePanel(QWidget):
         # GRB deployed in its own branch above; REDmod returned already.
         forge_done = getattr(plugin, "RequiresForgeDeployment", False)
         if is_steam and not forge_done and self._predeploy_hook is not None:
-            if not self._predeploy_hook("game_start"):
-                QMessageBox.warning(
-                    self,
-                    tr("error.deploy_failed_title"),
-                    tr("error.deploy_failed_message", details=""),
-                )
+            result = self._predeploy_hook("game_start")
+            if not result:
+                # None heisst: der Hook hat den Grund schon gemeldet.
+                if result is not None:
+                    QMessageBox.warning(
+                        self,
+                        tr("error.deploy_failed_title"),
+                        tr("error.deploy_failed_message", details=""),
+                    )
                 return
 
         self._do_launch(plugin, binary, is_steam)
@@ -2143,7 +2222,8 @@ class GamePanel(QWidget):
                     run_env["WINEDLLOVERRIDES"] = "mscoree=;mshtml="
                 else:
                     cmd = [str(proton_script), "run", str(game_path / redmod_binary), "deploy", "-root", wine_root]
-                    run_env = env
+                    run_env = env.copy()
+                run_env[TOOL_ENV_MARKER] = "1"
                 print(f"[REDmod] CMD: {' '.join(cmd)}", flush=True)
                 # redMod.exe resolves its schema as ..\metadata.json relative to
                 # the working directory, so it has to run from its own bin/.
@@ -2443,7 +2523,8 @@ class GamePanel(QWidget):
                     run_env["WINEDLLOVERRIDES"] = "mscoree=;mshtml="
                 else:
                     cmd = [str(proton_script), "run", str(game_path / redmod_binary), "deploy", "-root", wine_root]
-                    run_env = env
+                    run_env = env.copy()
+                run_env[TOOL_ENV_MARKER] = "1"
                 print(f"[REDmod] CMD: {' '.join(cmd)}", flush=True)
                 # redMod.exe resolves its schema as ..\metadata.json relative to
                 # the working directory, so it has to run from its own bin/.
@@ -2647,9 +2728,12 @@ class GamePanel(QWidget):
             self.game_started.emit(self._game_label.text(), proc.pid)
             # Watch the actual game binary (GameBinary), not the launcher (e.g. f4se_loader.exe),
             # because launchers exit early after spawning the real game process.
-            # app_id=None: SteamAppId-Suche würde wine/proton Prozesse finden die auch zu früh sterben.
+            # Die SteamAppId kommt mit: wo GameBinary selbst nur ein Launcher
+            # ist, findet der Name den echten Prozess nie.  Anvils eigene
+            # Werkzeuge tragen die AppId zwar auch, sind aber markiert.
             game_binary = Path(getattr(plugin, "GameBinary", binary)).name.lower()
-            self._start_process_watcher(game_binary, proc, app_id=None)
+            watch_app_id, _ = plugin_watch_target(plugin)
+            self._start_process_watcher(game_binary, proc, app_id=watch_app_id)
         except OSError as exc:
             QMessageBox.warning(
                 self, tr("game_panel.start"),
@@ -2687,6 +2771,8 @@ class GamePanel(QWidget):
 
         env, proton_script, _compat_data, _steam_root = proton_result
         env["WINEPREFIX"] = str(_compat_data / "pfx")
+        # Kein Spielstart: sonst haelt die Prozesssuche das Werkzeug fuer das Spiel
+        env[TOOL_ENV_MARKER] = "1"
 
         cwd = working_dir or str(exe.parent)
 
@@ -2706,44 +2792,91 @@ class GamePanel(QWidget):
             )
             return None
 
-    # How long to wait for the game process to show up.  Running out is not
+    # Seconds to wait for the game process to show up.  Running out is not
     # dangerous any more: MainWindow re-checks before removing anything.
     _GAME_APPEAR_TIMEOUT = 120
 
-    def find_game_pid(self) -> int | None:
-        """Return a running game process, or None.
+    # Poll interval while the game runs.  Inside Flatpak every check spawns a
+    # host process, so this stays coarse — the game runs for hours.
+    _GAME_POLL_INTERVAL = 5
 
-        Detection priority:
-        1. SteamAppId in /proc/<pid>/environ (reliable for Steam/Proton games)
-        2. binary name in /proc/<pid>/cmdline (fallback)
+    # How long the lookup may keep failing before the watcher gives up.
+    _GAME_LOOKUP_GRACE = 60
+
+    def clear_watch_target(self) -> None:
+        """Forget the launched game after acting on it being gone.
+
+        Retires the running watcher too, or it reads the empty target as
+        "process gone" and reports a stop that never happened.
         """
-        binary_name = self._watch_binary
-        app_id = self._watch_app_id
-        if not binary_name and not app_id:
-            return None
-        try:
-            for entry in os.scandir("/proc"):
-                if not entry.name.isdigit():
-                    continue
-                pid = entry.name
-                try:
-                    if app_id:
-                        environ = Path(f"/proc/{pid}/environ").read_bytes()
-                        if f"SteamAppId={app_id}".encode() in environ:
-                            return int(pid)
-                    if binary_name:
-                        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes()
-                        if binary_name.encode() in cmdline.lower():
-                            return int(pid)
-                except OSError:
-                    pass
-        except OSError:
-            pass
-        return None
+        self._watch_binary = ""
+        self._watch_app_id = None
+        self._game_state = None
+        self._watch_generation += 1
+
+    def watch_generation(self) -> int:
+        """Counter identifying the current launch."""
+        return self._watch_generation
+
+    def _search_terms(self) -> tuple[str | None, str | None]:
+        """What to look for: the running launch, else the current game.
+
+        The watch target does not survive an Anvil restart — without the
+        fallback a game from an earlier session would look stopped.
+        """
+        if self._watch_binary or self._watch_app_id:
+            return self._watch_app_id, self._watch_binary
+        return plugin_watch_target(self._current_plugin)
+
+    def lookup_game_pid(self) -> tuple[int | None, bool]:
+        """Return ``(pid, reliable)`` for the watched game process.
+
+        ``reliable`` is False when the lookup itself failed — that must
+        never be mistaken for "the game has stopped".
+        """
+        app_id, binary = self._search_terms()
+        if not app_id and not binary:
+            return None, True
+        return find_game_process(app_id, binary)
+
+    def game_state(self) -> str:
+        """RUNNING, STOPPED or UNKNOWN.
+
+        Purges treat UNKNOWN as running so nothing is deleted on a guess;
+        decisions that could lock the user out act only on a definite
+        RUNNING.  Answers from the last reading while that is fresh — in
+        Flatpak every lookup costs a host process.
+        """
+        app_id, binary = self._search_terms()
+        if not app_id and not binary:
+            return GAME_STOPPED
+        cached = self._game_state
+        # STOPPED wird nie aus dem Zwischenspeicher beantwortet: es ist die
+        # einzige Antwort, auf die hin gelöscht wird, und muss aktuell sein.
+        if (
+            cached is not None
+            and cached[1] != GAME_STOPPED
+            and time.monotonic() < cached[0]
+        ):
+            return cached[1]
+        pid, reliable = self.lookup_game_pid()
+        return self._note_game_state(pid, reliable, _QUERY_STATE_TTL)
+
+    def _note_game_state(
+        self, pid: int | None, reliable: bool, ttl: float = _GAME_STATE_TTL
+    ) -> str:
+        """Record what was just seen, so queries need no host call."""
+        state = _state_of(pid, reliable)
+        self._game_state = (time.monotonic() + ttl, state)
+        return state
 
     def is_game_running(self) -> bool:
-        """True while a watched game process is still alive."""
-        return self.find_game_pid() is not None
+        """True unless the game is known to have stopped.
+
+        Unknown counts as running: better a leftover deployment than
+        files pulled out from under a running game.
+        """
+        return self.game_state() != GAME_STOPPED
 
     def _start_process_watcher(
         self, binary_name: str, proc=None, app_id: str | None = None
@@ -2753,34 +2886,80 @@ class GamePanel(QWidget):
         If proc is given, it is used as a fallback when nothing is found.
         """
         import threading
-        import time
 
         self._watch_binary = binary_name
         self._watch_app_id = app_id
+        self._game_state = None
+        self._watch_generation += 1
+        generation = self._watch_generation
 
         def _watcher() -> None:
+            def outdated() -> bool:
+                # A newer launch has taken over — this thread must not touch
+                # the shared state or report on the new game's behalf.
+                return self._watch_generation != generation
+
+            def observe(pid, reliable) -> None:
+                if not outdated():
+                    self._note_game_state(pid, reliable)
+
             appeared = False
-            for _ in range(self._GAME_APPEAR_TIMEOUT):
-                if self.find_game_pid():
+            blind_since = None
+            deadline = time.monotonic() + self._GAME_APPEAR_TIMEOUT
+            while time.monotonic() < deadline:
+                if outdated():
+                    return
+                pid, reliable = self.lookup_game_pid()
+                observe(pid, reliable)
+                if pid:
                     appeared = True
                     break
+                blind_since = None if reliable else (blind_since or time.monotonic())
                 time.sleep(1)
 
             if not appeared:
-                # Never showed up.  It may still be starting, so unlock the UI
-                # but let MainWindow decide whether anything may be removed.
-                _dlog("[WATCHER] game process never appeared")
+                # Never showed up.  It may be a slow first start behind a
+                # shader cache or a fresh Proton prefix, so this is not
+                # evidence that the game is gone — unlock the UI and leave
+                # the files alone.  The next launch purges anyway.
+                if blind_since is not None:
+                    _dlog("[WATCHER] cannot read the host process list — "
+                          "game state unknown, keeping the deployment")
+                else:
+                    _dlog("[WATCHER] game process never appeared — "
+                          "keeping the deployment")
                 if proc is not None:
                     proc.wait()
-                self.game_stopped.emit()
+                if not outdated():
+                    self.game_stopped.emit(False)
                 return
 
             _dlog("[WATCHER] game process running, waiting for it to end")
-            while self.find_game_pid():
-                time.sleep(2)
+            blind_since = None
+            while True:
+                if outdated():
+                    return
+                pid, reliable = self.lookup_game_pid()
+                observe(pid, reliable)
+                if reliable:
+                    if pid is None:
+                        break
+                    blind_since = None
+                else:
+                    # A single failed lookup means nothing — the host call can
+                    # time out under load.  Only give up once it stays broken.
+                    blind_since = blind_since or time.monotonic()
+                    if time.monotonic() - blind_since > self._GAME_LOOKUP_GRACE:
+                        _dlog("[WATCHER] process lookup keeps failing — "
+                              "keeping the deployment")
+                        if not outdated():
+                            self.game_stopped.emit(False)
+                        return
+                time.sleep(self._GAME_POLL_INTERVAL)
 
             _dlog("[WATCHER] game process gone")
-            self.game_stopped.emit()
+            if not outdated():
+                self.game_stopped.emit(True)
 
         t = threading.Thread(target=_watcher, daemon=True)
         t.start()

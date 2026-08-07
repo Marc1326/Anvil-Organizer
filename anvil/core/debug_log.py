@@ -89,6 +89,15 @@ class _Tee:
     def isatty(self) -> bool:
         return bool(self._stream is not None and self._stream.isatty())
 
+    def close(self) -> None:
+        # Der Originalstream gehoert dem Interpreter, die Logdatei bleibt
+        # bis zum Prozessende offen — hier ist nichts zu schliessen.
+        self.flush()
+
+    @property
+    def buffer(self):
+        return getattr(self._stream, "buffer", None)
+
     def fileno(self) -> int:
         # Subprozesse erben weiterhin den echten Descriptor, nicht die Datei.
         if self._stream is None:
@@ -97,7 +106,11 @@ class _Tee:
 
 
 def start_debug_log(version: str = "") -> Path | None:
-    """stdout/stderr in die Logdatei spiegeln. Wirft nie."""
+    """stdout/stderr in die Logdatei spiegeln. Wirft nie.
+
+    Laeuft erst nach der Basisverzeichnis-Auswahl — vorher steht der
+    Zielpfad nicht fest, Fehler davor landen nur auf der Konsole.
+    """
     global _log_path, _handle
     if _handle is not None:
         return _log_path
@@ -112,11 +125,17 @@ def start_debug_log(version: str = "") -> Path | None:
         print(f"debug_log: cannot write: {exc}", file=sys.stderr)
         return None
 
+    try:
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        handle.write(f"\n===== {stamp}  Anvil {version} =====\n")
+        handle.flush()
+    except (OSError, ValueError) as exc:
+        print(f"debug_log: cannot write: {exc}", file=sys.stderr)
+        handle.close()
+        return None
+
     _log_path = path
     _handle = handle
-    stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    handle.write(f"\n===== {stamp}  Anvil {version} =====\n")
-    handle.flush()
     sys.stdout = _Tee(sys.__stdout__, handle)
     sys.stderr = _Tee(sys.__stderr__, handle)
     return path
