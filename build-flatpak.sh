@@ -11,8 +11,19 @@
 #
 set -euo pipefail
 
+# Setzt BUILDER auf den Aufruf, mit dem gebaut wird. Der Flatpak des Builders
+# hat Vorrang vor sudo: Er ist auf vielen Systemen der einzige Weg, und eine
+# Passwortabfrage mitten im Build ist das, was man am wenigsten braucht.
+BUILDER=""
+
 ensure_flatpak_builder() {
   if command -v flatpak-builder >/dev/null 2>&1; then
+    BUILDER="flatpak-builder"
+    return 0
+  fi
+  if flatpak info org.flatpak.Builder >/dev/null 2>&1; then
+    BUILDER="flatpak run org.flatpak.Builder"
+    echo "Nutze org.flatpak.Builder (Flatpak)."
     return 0
   fi
   echo "flatpak-builder nicht gefunden, installiere..."
@@ -26,9 +37,11 @@ ensure_flatpak_builder() {
   elif command -v zypper >/dev/null 2>&1; then
     sudo zypper install -y flatpak-builder
   else
-    echo "Paketmanager nicht erkannt. Bitte flatpak-builder manuell installieren." >&2
+    echo "Paketmanager nicht erkannt. Bitte flatpak-builder manuell installieren" >&2
+    echo "oder: flatpak install flathub org.flatpak.Builder" >&2
     exit 1
   fi
+  BUILDER="flatpak-builder"
 }
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -51,7 +64,7 @@ echo ""
 
 ensure_flatpak_builder
 
-flatpak-builder \
+$BUILDER \
   --verbose \
   --user \
   --install-deps-from=flathub \

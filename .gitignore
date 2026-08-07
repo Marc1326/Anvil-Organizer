@@ -31,3 +31,8 @@ docs/workflow/
 
 # Build/Dist-Kopie
 Anvil-Organizer/
+
+# Flatpak-Build-Ausgabe (lokales OSTree-Repo, aendert sich bei jedem Build)
+packaging/flatpak/repo/
+packaging/flatpak/build/
+packaging/flatpak/.flatpak-builder/
