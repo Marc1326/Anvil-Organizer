@@ -2,7 +2,8 @@
 
 import os
 
-from PySide6.QtGui import (QIcon, QAction, QPainter, QLinearGradient, QColor, QPixmap, QPen)
+from PySide6.QtGui import (QIcon, QAction, QPainter, QLinearGradient, QColor, QPixmap,
+                           QPen, QKeyEvent)
 from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
@@ -26,6 +27,10 @@ from anvil.core.profile_name import is_valid_profile_name
 from anvil.styles.dark_theme import theme_color
 
 ICON_DIR = str(get_anvil_base() / "styles" / "icons" / "files")
+
+# Mindestbreite der Inline-Eingabefelder. 140 schnitt den längsten
+# Platzhalter (es) ab.
+INLINE_INPUT_WIDTH = 200
 
 
 # Styles als Funktionen: modernes Theme baut aus der Palette,
@@ -257,12 +262,17 @@ class FadeEdge(QWidget):
 
 
 class _FocusOutLineEdit(QLineEdit):
-    """QLineEdit that emits focus_lost when focus leaves (click anywhere else)."""
+    """QLineEdit, das focus_lost meldet, wenn der Fokus weggeht.
+
+    Ausgenommen der Fensterwechsel — sonst ist die halb getippte Eingabe weg.
+    """
     focus_lost = Signal()
 
     def focusOutEvent(self, event):
         super().focusOutEvent(event)
-        self.focus_lost.emit()
+        # Ein Fensterwechsel darf die halb getippte Eingabe nicht verwerfen.
+        if event.reason() != Qt.FocusReason.ActiveWindowFocusReason:
+            self.focus_lost.emit()
 
 
 class ProfileBar(QWidget):
@@ -292,7 +302,7 @@ class ProfileBar(QWidget):
     # New signals for tabs
     profile_changed = Signal(str)
     profile_create_confirmed = Signal(str)  # Emits profile name
-    profile_create_rejected = Signal(str)  # Emits a translation key
+    profile_create_rejected = Signal(str, str)  # Übersetzungsschlüssel, Name
     profile_renamed = Signal(str, str)  # (old_name, new_name)
     profile_delete_requested = Signal(str)  # Profilname
     profiles_reordered = Signal(list)  # Neue Reihenfolge
@@ -307,6 +317,7 @@ class ProfileBar(QWidget):
         self._button_group = QButtonGroup(self)
         self._button_group.setExclusive(True)
         self._inline_input: QLineEdit | None = None
+        self._scroll_before_input = 0
         self._inline_confirmed = False
         self._rename_input: QLineEdit | None = None
         self._rename_tab: QPushButton | None = None
@@ -516,9 +527,12 @@ class ProfileBar(QWidget):
         super().resizeEvent(event)
         self._position_fade_edges()
         self._update_fade_visibility()
+        field = self._inline_input or self._rename_input
+        if field is not None:
+            self._reveal_input(field)
 
     def _is_own_scroll_target(self, obj) -> bool:
-        """Whether *obj* is part of this bar's scrollable tab strip.
+        """Whether *obj* is the scrollable tab strip or the "+" next to it.
 
         The event filter also runs application-wide, so this has to stay
         strict — otherwise any wheel event anywhere would scroll the bar.
@@ -528,8 +542,27 @@ class ProfileBar(QWidget):
             or obj is self._tab_container
             or obj is self._scroll_area
             or obj is self._scroll_area.viewport()
+            or obj is self._btn_add
             or obj in self._tabs
         )
+
+    def _handle_scroll_key(self, event: QKeyEvent) -> bool:
+        """Pos1/Ende springen an den Anfang bzw. das Ende der Leiste."""
+        modifiers = event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
+        if modifiers != Qt.KeyboardModifier.NoModifier:
+            return False
+        if self._inline_input is not None or self._rename_input is not None:
+            return False
+
+        scrollbar = self._scroll_area.horizontalScrollBar()
+        if event.key() == Qt.Key.Key_Home:
+            scrollbar.setValue(scrollbar.minimum())
+        elif event.key() == Qt.Key.Key_End:
+            scrollbar.setValue(scrollbar.maximum())
+        else:
+            return False
+        event.accept()
+        return True
 
     def wheelEvent(self, event):
         """Handle mouse wheel for horizontal scrolling."""
@@ -558,6 +591,16 @@ class ProfileBar(QWidget):
 
     def set_profiles(self, profiles: list[str], active: str = ""):
         """Set available profiles and optionally select one."""
+        # Vor den Tabs aufräumen: ein Feld ohne Layout-Platz legt den
+        # "+"-Knopf lahm, und tab.show() träfe sonst ein totes Objekt.
+        for field in (self._inline_input, self._rename_input):
+            if field is not None:
+                field.setParent(None)
+                field.deleteLater()
+        self._inline_input = None
+        self._rename_input = None
+        self._rename_tab = None
+
         # Clear existing tabs
         for tab in self._tabs:
             self._button_group.removeButton(tab)
@@ -665,6 +708,8 @@ class ProfileBar(QWidget):
 
     def _scroll_to_tab(self, tab: QPushButton):
         """Ensure tab is visible in scroll area."""
+        if self._inline_input is not None or self._rename_input is not None:
+            return  # ein offenes Feld gehört ins Bild, nicht der Tab
         self._scroll_area.ensureWidgetVisible(tab, 50, 0)
 
     def update_active_count(self, active: int, total: int | None = None) -> None:
@@ -686,17 +731,23 @@ class ProfileBar(QWidget):
         w = self._tabs_widget.sizeHint().width() + 8  # Container-Padding
         self._tab_container.setMaximumWidth(max(60, w))
 
+        # Mit der Breite wandert das Sichtfenster.
+        field = self._inline_input or self._rename_input
+        if field is not None:
+            self._reveal_input(field)
+
     def _start_inline_create(self):
         """Show inline input for new profile name."""
         if self._inline_input is not None:
             return  # Already open
 
         self._inline_confirmed = False
+        self._scroll_before_input = self._scroll_area.horizontalScrollBar().value()
 
         edit = _FocusOutLineEdit()
         edit.setObjectName("profileInlineInput")
         edit.setPlaceholderText(tr("placeholder.profile_name"))
-        edit.setFixedWidth(140)
+        edit.setFixedWidth(INLINE_INPUT_WIDTH)
         edit.setStyleSheet(_inline_input_style())
 
         # Vor dem "+" einfügen (modern) bzw. vor dem Stretch (klassisch)
@@ -705,6 +756,7 @@ class ProfileBar(QWidget):
         else:
             insert_index = self._tabs_layout.count() - 1
         self._tabs_layout.insertWidget(insert_index, edit)
+        edit.show()  # unsichtbar zählt es im sizeHint nicht mit
         self._update_container_width()
 
         edit.setFocus()
@@ -712,6 +764,28 @@ class ProfileBar(QWidget):
         edit.focus_lost.connect(lambda: self._cancel_inline_create(edit))
 
         self._inline_input = edit
+        # Erst im nächsten Zyklus — die QScrollArea kennt ihren Bereich
+        # nach insertWidget noch nicht.
+        QTimer.singleShot(0, self, lambda: self._reveal_input(edit))
+
+    def _reveal_input(self, edit: QLineEdit) -> None:
+        """Leiste schieben, bis das ganze Eingabefeld sichtbar ist.
+
+        ensureWidgetVisible nimmt bei einem QLineEdit nur das Cursor-Rechteck.
+        """
+        if edit is not self._inline_input and edit is not self._rename_input:
+            return  # zwischenzeitlich abgebrochen oder bestätigt
+
+        scrollbar = self._scroll_area.horizontalScrollBar()
+        visible = self._scroll_area.viewport().width()
+        left = edit.mapTo(self._tabs_widget, QPoint(0, 0)).x()
+        right = left + edit.width()
+
+        # Passt das Feld nicht ins Sichtfenster, zählt die linke Kante.
+        if edit.width() > visible or left < scrollbar.value():
+            scrollbar.setValue(max(scrollbar.minimum(), left))
+        elif right > scrollbar.value() + visible:
+            scrollbar.setValue(min(scrollbar.maximum(), right - visible))
 
     def _finish_inline_create(self, edit: QLineEdit):
         """Handle Enter press - create the profile."""
@@ -719,13 +793,13 @@ class ProfileBar(QWidget):
         if not is_valid_profile_name(name):
             # Tell the user why nothing happened instead of just
             # dropping the input silently.
-            self.profile_create_rejected.emit("toast.profile_invalid_name")
+            self.profile_create_rejected.emit("toast.profile_invalid_name", name)
             self._cancel_inline_create(edit)
             return
 
         current_profiles = [tab.text() for tab in self._tabs]
         if name in current_profiles:
-            self.profile_create_rejected.emit("toast.profile_exists")
+            self.profile_create_rejected.emit("toast.profile_exists", name)
             self._cancel_inline_create(edit)
             return
 
@@ -754,6 +828,11 @@ class ProfileBar(QWidget):
         edit.deleteLater()
         self._inline_input = None
         self._update_container_width()
+        self._restore_scroll()
+
+    def _restore_scroll(self) -> None:
+        """Ansicht dorthin zurueckstellen, wo sie vor dem Feld stand."""
+        self._scroll_area.horizontalScrollBar().setValue(self._scroll_before_input)
 
     def _start_inline_rename(self, tab: QPushButton):
         """Show inline input for renaming a profile."""
@@ -777,11 +856,13 @@ class ProfileBar(QWidget):
         edit = _FocusOutLineEdit()
         edit.setObjectName("profileInlineInput")
         edit.setText(old_name)
-        edit.setFixedWidth(max(140, tab.width()))
+        edit.setFixedWidth(max(INLINE_INPUT_WIDTH, tab.width()))
         edit.setStyleSheet(_inline_input_style())
 
         # Insert at the tab's position
         self._tabs_layout.insertWidget(tab_index, edit)
+        edit.show()  # unsichtbar zählt es im sizeHint nicht mit
+        self._update_container_width()
 
         edit.setFocus()
         edit.selectAll()
@@ -790,6 +871,7 @@ class ProfileBar(QWidget):
 
         self._rename_input = edit
         self._rename_tab = tab
+        QTimer.singleShot(0, self, lambda: self._reveal_input(edit))
 
     def _finish_inline_rename(self, edit: QLineEdit, tab: QPushButton, old_name: str):
         """Handle Enter press - rename the profile."""
@@ -822,6 +904,9 @@ class ProfileBar(QWidget):
         if self._active_profile == old_name:
             self._active_profile = new_name
 
+        self._update_container_width()
+        self._scroll_to_tab(tab)  # langer Name: der Tab ist breiter als das Feld
+
         # Emit signal
         self.profile_renamed.emit(old_name, new_name)
 
@@ -838,6 +923,7 @@ class ProfileBar(QWidget):
         tab.show()
         self._rename_input = None
         self._rename_tab = None
+        self._update_container_width()
 
     # ── Drag & Drop ──────────────────────────────────────────────────
 
@@ -883,6 +969,12 @@ class ProfileBar(QWidget):
         # Profilen ist die Leiste sonst gar nicht bedienbar.
         if event.type() == QEvent.Type.Wheel and self._is_own_scroll_target(obj):
             self.wheelEvent(event)
+            return True
+
+        # Pos1/Ende auf der Leiste: an den Anfang bzw. das Ende springen.
+        if (event.type() == QEvent.Type.KeyPress
+                and self._is_own_scroll_target(obj)
+                and self._handle_scroll_key(event)):
             return True
 
         # Nur Events von Tabs verarbeiten (für Drag & Drop)

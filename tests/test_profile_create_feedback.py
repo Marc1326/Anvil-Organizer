@@ -70,3 +70,28 @@ def test_profile_bar_emits_a_rejection_signal() -> None:
     from anvil.widgets.profile_bar import ProfileBar
 
     assert hasattr(ProfileBar, "profile_create_rejected")
+
+
+def test_the_rejection_carries_the_name_the_message_needs() -> None:
+    """Without it the toast reads a literal '{name}' back to the user."""
+    from PySide6.QtWidgets import QApplication
+
+    from anvil.core.translator import tr
+    from anvil.widgets.profile_bar import ProfileBar
+
+    QApplication.instance() or QApplication([])
+    bar = ProfileBar()
+    bar.set_profiles(["Default", "Vanilla"], active="Default")
+    seen = []
+    bar.profile_create_rejected.connect(lambda key, name: seen.append((key, name)))
+
+    bar._start_inline_create()
+    bar._inline_input.setText("Vanilla")  # duplicate
+    bar._finish_inline_create(bar._inline_input)
+
+    assert seen, "the bar stayed silent about the duplicate"
+    key, name = seen[-1]
+    assert name == "Vanilla"
+    message = tr(key, name=name)
+    assert "Vanilla" in message
+    assert "{" not in message, f"placeholder left unfilled: {message!r}"

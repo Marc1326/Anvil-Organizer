@@ -4340,9 +4340,9 @@ class MainWindow(QMainWindow):
         self._do_redeploy()
         Toast(self, tr("toast.backup_restored", name=zip_path.name))
 
-    def _on_profile_create_rejected(self, message_key: str) -> None:
+    def _on_profile_create_rejected(self, message_key: str, name: str) -> None:
         """Show why the profile bar refused a name."""
-        Toast(self, tr(message_key))
+        Toast(self, tr(message_key, name=name))
 
     def _profile_creation_failed(self, name: str, reason: str) -> None:
         """Report a failed creation and drop the tab the bar added early.
