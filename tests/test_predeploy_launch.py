@@ -76,6 +76,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,
             _log_game_dir_state=lambda _phase: None,
+            keeps_mods_deployed=lambda: False,
         )
 
         success = MainWindow._predeploy_for_launch(window, "game_start")
@@ -233,6 +234,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _redeploy_timer=timer,
             _current_instance_path=Path("/tmp/instance"),
             _bg3_installer=None,
+            keeps_mods_deployed=lambda: False,
             _game_running=False,
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,
@@ -263,6 +265,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _toolbar=_Widget(),
             menuBar=lambda: _Widget(),
             _log_game_dir_state=lambda _phase: None,
+            keeps_mods_deployed=lambda: False,
         )
 
         MainWindow._unlock_ui(_bind_unlock_helpers(window))
@@ -288,6 +291,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _toolbar=_Widget(),
             menuBar=lambda: _Widget(),
             _log_game_dir_state=lambda _phase: None,
+            keeps_mods_deployed=lambda: False,
         )
 
         MainWindow._unlock_ui(_bind_unlock_helpers(window))
@@ -343,6 +347,7 @@ class PredeployLaunchTests(unittest.TestCase):
                 _toolbar=_Widget(),
                 menuBar=lambda: _Widget(),
                 _log_game_dir_state=lambda _phase: None,
+                keeps_mods_deployed=lambda: False,
             )
 
             MainWindow._unlock_ui(_bind_unlock_helpers(window))
@@ -375,6 +380,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _redeploy_timer=_Timer(),
             _current_instance_path=Path("/tmp/instance"),
             _bg3_installer=None,
+            keeps_mods_deployed=lambda: False,
             _game_running=False,
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,
@@ -395,6 +401,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _redeploy_timer=_Timer(),
             _current_instance_path=Path("/tmp/instance"),
             _bg3_installer=None,
+            keeps_mods_deployed=lambda: False,
             _game_running=False,
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,
@@ -550,6 +557,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             _toolbar=_Widget(),
             menuBar=lambda: _Widget(),
             _log_game_dir_state=lambda _phase: None,
+            keeps_mods_deployed=lambda: False,
         )
 
     def test_unknown_state_keeps_the_deployment(self) -> None:
@@ -689,6 +697,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             _auto_relock_instance=lambda _p, _r: None,
             _sync_separator_deploy_paths=lambda: None,
             _log_game_dir_state=lambda _phase: None,
+            keeps_mods_deployed=lambda: False,
         )
 
         with mock.patch("anvil.mainwindow.QMessageBox.warning") as warning:
@@ -705,6 +714,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             _redeploy_timer=_Timer(),
             _current_instance_path=Path("/tmp/instance"),
             _bg3_installer=None,
+            keeps_mods_deployed=lambda: False,
             _game_running=False,
             _game_panel=SimpleNamespace(
                 has_deployment=lambda: True,
@@ -972,6 +982,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             _auto_relock_instance=lambda _p, _r: None,
             _sync_separator_deploy_paths=lambda: None,
             _log_game_dir_state=lambda _phase: None,
+            keeps_mods_deployed=lambda: False,
         )
 
         with mock.patch("anvil.mainwindow.QMessageBox.warning"):
@@ -991,6 +1002,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
                 silent_purge=lambda: calls.append("purge"),
             ),
             _log_game_dir_state=lambda _phase: None,
+            keeps_mods_deployed=lambda: False,
         )
 
         MainWindow._unlock_ui(window, True)

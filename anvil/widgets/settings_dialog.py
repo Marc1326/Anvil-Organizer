@@ -228,6 +228,16 @@ class SettingsDialog(QDialog):
         prof_layout.addWidget(self._setting_row(_disabled(QCheckBox(tr("settings.auto_archive_invalidation")))))
         scroll_layout.addWidget(prof_grp)
 
+        # Gruppe Mods im Spielordner
+        keep_grp = QGroupBox(tr("settings.deploy_group"))
+        keep_layout = QVBoxLayout(keep_grp)
+        self._cb_keep_deployed = QCheckBox(tr("settings.keep_mods_deployed"))
+        self._cb_keep_deployed.setChecked(
+            str(self._idata.get("keep_mods_deployed", "false")).lower()
+            in ("true", "1"))
+        keep_layout.addWidget(self._setting_row(self._cb_keep_deployed))
+        scroll_layout.addWidget(keep_grp)
+
         # Gruppe Sonstiges
         misc_grp = QGroupBox(tr("settings.misc"))
         misc_layout = QVBoxLayout(misc_grp)
@@ -1848,6 +1858,7 @@ class SettingsDialog(QDialog):
                 idata["game_path"] = self._le_game_path.text()
                 idata["local_inis"] = self._cb_local_inis.isChecked()
                 idata["local_saves"] = self._cb_local_saves.isChecked()
+                idata["keep_mods_deployed"] = self._cb_keep_deployed.isChecked()
                 self._instance_manager.save_instance(cur, idata)
 
         super().accept()

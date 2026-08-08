@@ -905,7 +905,10 @@ class MainWindow(QMainWindow):
             on_locate_storage=self._on_locate_storage,
         )
         _center_on_parent(dlg)
+        was_keeping = self.keeps_mods_deployed()
         accepted = dlg.exec() == SettingsDialog.DialogCode.Accepted
+        if accepted:
+            self._apply_keep_deployed_change(was_keeping)
         # Re-read API key (SSO/manual entry saves immediately, even before OK)
         new_key = SettingsDialog.load_api_key()
         if new_key:
@@ -1665,7 +1668,12 @@ class MainWindow(QMainWindow):
             print("[PURGE] instance switch while the game may run — "
                   "deployment kept", flush=True)
         else:
+            # Keep-deployed belongs to one game only: the mods go out and the
+            # flag drops, so the choice has to be made again per game.
+            leaving = self.instance_manager.current_instance()
             self._game_panel.silent_purge()
+            if leaving:
+                self._lift_keep_deployed(leaving)
 
         # ── Schritt 5: Model leeren ──
         self._mod_list_view.clear_mods()
@@ -2331,7 +2339,9 @@ class MainWindow(QMainWindow):
 
         Mods go into the game directory on game start, so nothing is
         deployed here — this only removes what an earlier run left
-        behind.
+        behind.  The exception is keep-deployed: there the game directory
+        has to follow every change right away, because the user may never
+        launch through Anvil again.
         """
         self._redeploy_timer.stop()
         if not self._current_instance_path:
@@ -2339,7 +2349,8 @@ class MainWindow(QMainWindow):
         # BG3: kein Symlink-Deploy — Auto-Deploy läuft über den Installer
         if self._bg3_installer is not None:
             return True
-        if not self._game_panel.has_deployment():
+        keep = self.keeps_mods_deployed()
+        if not keep and not self._game_panel.has_deployment():
             return True
         if self._game_running or self._game_panel.is_game_running():
             print("[PURGE] game may still be running — leftover kept",
@@ -2347,6 +2358,21 @@ class MainWindow(QMainWindow):
             return True
         print("[PURGE] Cleaning up leftover deployment", flush=True)
         purge_result = self._game_panel.silent_purge()
+        if keep and (purge_result is None
+                     or getattr(purge_result, "success", False)):
+            print("[PURGE] keep-deployed is on — putting the mods back out",
+                  flush=True)
+            deploy_result = self._game_panel.silent_deploy()
+            if deploy_result is not None and not getattr(
+                    deploy_result, "success", False):
+                errors = getattr(deploy_result, "errors", [])
+                QMessageBox.warning(
+                    self,
+                    tr("error.deploy_failed_title"),
+                    tr("error.deploy_failed_message",
+                       details="\n".join(str(e) for e in errors[:5])),
+                )
+                return False
         if purge_result is not None and not getattr(purge_result, "success", False):
             errors = getattr(purge_result, "errors", [])
             details = "\n".join(str(error) for error in errors[:5])
@@ -2817,8 +2843,93 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, title, tr("error.game_already_running"))
         return True
 
+    def keeps_mods_deployed(self) -> bool:
+        """Whether the current instance leaves its mods in the game directory.
+
+        Off by default, and only ever on for one instance: switching games
+        lifts it again (see ``_lift_keep_deployed``).
+        """
+        name = self.instance_manager.current_instance()
+        if not name:
+            return False
+        data = self.instance_manager.load_instance(name) or {}
+        return str(data.get("keep_mods_deployed", "false")).lower() in ("true", "1")
+
+    def set_keeps_mods_deployed(self, enabled: bool) -> None:
+        """Write the flag back to the current instance."""
+        name = self.instance_manager.current_instance()
+        if not name:
+            return
+        data = self.instance_manager.load_instance(name)
+        if not data:
+            return
+        data["keep_mods_deployed"] = bool(enabled)
+        self.instance_manager.save_instance(name, data)
+
+    def _apply_keep_deployed_change(self, was_keeping: bool) -> None:
+        """Act on the keep-deployed switch right after the settings close.
+
+        Switching it on has to put the mods out now and switching it off has
+        to take them back — otherwise the game directory would only catch up
+        on the next launch, which in this mode may never come.
+        """
+        keeping = self.keeps_mods_deployed()
+        if keeping == was_keeping:
+            return
+        if self._game_running or self._game_panel.is_game_running():
+            print("[PURGE] keep-deployed changed while the game runs — "
+                  "game directory left alone", flush=True)
+            return
+
+        if keeping:
+            answer = QMessageBox.warning(
+                self,
+                tr("game_panel.keep_on_title"),
+                tr("game_panel.keep_on_text"),
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+            )
+            if answer != QMessageBox.StandardButton.Ok:
+                self.set_keeps_mods_deployed(False)
+                print("[PURGE] keep-deployed cancelled by user", flush=True)
+                return
+            print("[PURGE] keep-deployed switched on — deploying now", flush=True)
+            if self._game_panel.has_deployment():
+                self._game_panel.silent_purge()
+            self._game_panel.silent_deploy()
+            return
+
+        print("[PURGE] keep-deployed switched off — cleaning up", flush=True)
+        self._game_panel.silent_purge()
+
+    def _lift_keep_deployed(self, instance_name: str) -> None:
+        """Turn the flag off for the instance being left behind and say so.
+
+        Anvil manages one game at a time; mods left in a game directory it no
+        longer watches would go stale without anybody noticing.
+        """
+        data = self.instance_manager.load_instance(instance_name)
+        if not data:
+            return
+        if str(data.get("keep_mods_deployed", "false")).lower() not in ("true", "1"):
+            return
+        data["keep_mods_deployed"] = False
+        self.instance_manager.save_instance(instance_name, data)
+        print(f"[PURGE] keep-deployed lifted for {instance_name}", flush=True)
+        game = data.get("game_name") or instance_name
+        # The switch is still running and the overlay is up — the message
+        # waits for the new instance to be on screen.
+        QTimer.singleShot(0, lambda: QMessageBox.information(
+            self,
+            tr("game_panel.keep_lifted_title"),
+            tr("game_panel.keep_lifted_text", game=game),
+        ))
+
     def _purge_after_game(self) -> None:
         """Remove the deployment and log what went out."""
+        if self.keeps_mods_deployed():
+            print("[LAUNCH] keep-deployed is on — mods stay in the game dir",
+                  flush=True)
+            return
         self._log_game_dir_state("before cleanup")
         purge_result = self._game_panel.silent_purge()
         if purge_result is not None:
@@ -4815,6 +4926,15 @@ class MainWindow(QMainWindow):
             self._game_panel.silent_purge()
         self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
         self._sync_separator_deploy_paths()
+        # The new profile has to reach the game directory now: with
+        # keep-deployed on, the user may never launch through Anvil again.
+        # Runs after the separator routes are synced, or it would deploy
+        # the new profile along the old paths.
+        if self.keeps_mods_deployed() and not (
+                self._game_running or self._game_panel.is_game_running()):
+            print("[PURGE] keep-deployed is on — deploying the new profile",
+                  flush=True)
+            self._game_panel.silent_deploy()
 
     def _apply_active_state(self, active_mods: set[str]) -> None:
         """Update checkbox state for all mods without reloading.
@@ -7209,6 +7329,17 @@ class MainWindow(QMainWindow):
         if self._game_running or self._game_panel.is_game_running():
             print("[LAUNCH] closing while the game runs — keeping the "
                   "deployment", flush=True)
+            return
+        if self.keeps_mods_deployed():
+            # Closing is the last chance to put the current mod list out —
+            # without Anvil running, nothing else will.
+            if not self._game_panel.has_deployment():
+                print("[PURGE] keep-deployed is on — deploying before exit",
+                      flush=True)
+                self._game_panel.silent_deploy()
+            else:
+                print("[PURGE] keep-deployed is on — deployment stays",
+                      flush=True)
             return
         self._game_panel.silent_purge()
 
