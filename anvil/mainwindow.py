@@ -1320,7 +1320,9 @@ class MainWindow(QMainWindow):
             return
         if not self._game_panel.confirm_start_while_running():
             return
-        if not self._predeploy_for_launch("proton_tool_start"):
+        predeploy = self._predeploy_for_launch("proton_tool_start")
+        if not predeploy:
+            self._report_predeploy_failure(predeploy)
             return
         args = tool.get("args", [])
         wdir = tool.get("working_dir", "")
@@ -2609,6 +2611,7 @@ class MainWindow(QMainWindow):
         must not show a deploy error on top of the message already shown.
         """
         self._redeploy_timer.stop()
+        self._last_deploy_errors: list[str] = []
         forced = self._game_panel.take_forced_launch()
         running = self._game_running or self._game_panel.game_state() == GAME_RUNNING
         if running and not forced:
@@ -2629,6 +2632,7 @@ class MainWindow(QMainWindow):
             if purge_result is not None and not getattr(purge_result, "success", False):
                 errors = getattr(purge_result, "errors", [])
                 print(f"[LAUNCH] pre-launch purge FAILED: {errors[:5]}", flush=True)
+                self._last_deploy_errors = list(errors)[:3]
                 return False
             print("[DEPLOY] Pre-launch full deploy (with BA2)", flush=True)
             self._sync_separator_deploy_paths()
@@ -2645,21 +2649,30 @@ class MainWindow(QMainWindow):
                 for err in getattr(deploy_result, "errors", [])[:5]:
                     print(f"[LAUNCH]   ERROR: {err}", flush=True)
             if deploy_result is not None and not getattr(deploy_result, "success", False):
+                self._last_deploy_errors = list(getattr(deploy_result, "errors", []))[:3]
                 return False
             self._log_game_dir_state("after deploy")
         return True
+
+    def _report_predeploy_failure(self, result: bool | None) -> None:
+        """Sagen, warum der Start nicht zustande kam.
+
+        Bei None ist der Grund schon gemeldet (Spiel laeuft noch).
+        """
+        if result is None:
+            return
+        QMessageBox.warning(
+            self,
+            tr("error.deploy_failed_title"),
+            tr("error.deploy_failed_message",
+               details="\n".join(self._last_deploy_errors)),
+        )
 
     def _on_start_game(self, binary_path: str, working_dir: str) -> None:
         """Launch the selected game executable."""
         result = self._predeploy_for_launch("game_start")
         if not result:
-            # None heisst: der Grund wurde schon gemeldet.
-            if result is not None:
-                QMessageBox.warning(
-                    self,
-                    tr("error.deploy_failed_title"),
-                    tr("error.deploy_failed_message", details=""),
-                )
+            self._report_predeploy_failure(result)
             return
         success, pid = True, -1
         try:
@@ -2690,7 +2703,9 @@ class MainWindow(QMainWindow):
         """
         if not self._game_panel.confirm_start_while_running():
             return
-        if not self._predeploy_for_launch("custom_tool_start"):
+        predeploy = self._predeploy_for_launch("custom_tool_start")
+        if not predeploy:
+            self._report_predeploy_failure(predeploy)
             return
         if use_proton:
             self._game_panel.run_with_proton(exe_path, list(args), working_dir or None)

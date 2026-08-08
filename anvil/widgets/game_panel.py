@@ -1156,7 +1156,11 @@ class GamePanel(QWidget):
             or _plugin_write_error_text(writer)
             or "plugins.txt write failed"
         )
-        setattr(result, "success", False)
+        # Ein fehlendes Proton-Prefix ist kein gescheitertes Deploy: das
+        # Prefix entsteht erst beim ersten Spielstart. Wer den Start dann
+        # sperrt, sperrt den einzigen Weg heraus (Issue #103).
+        if getattr(writer, "last_error_key", "") != "game_panel.plugins_no_prefix":
+            setattr(result, "success", False)
         errors = getattr(result, "errors", None)
         if isinstance(errors, list):
             errors.append(message)

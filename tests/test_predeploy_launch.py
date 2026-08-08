@@ -86,6 +86,10 @@ class PredeployLaunchTests(unittest.TestCase):
     def test_direct_launch_stops_when_predeploy_fails(self) -> None:
         window: Any = SimpleNamespace(
             _predeploy_for_launch=lambda _reason: False,
+            _last_deploy_errors=["injected deploy failure"],
+        )
+        window._report_predeploy_failure = (
+            lambda result: MainWindow._report_predeploy_failure(window, result)
         )
 
         with mock.patch("anvil.mainwindow.host_popen") as popen, mock.patch(
@@ -103,6 +107,8 @@ class PredeployLaunchTests(unittest.TestCase):
         )
         window: Any = SimpleNamespace(
             _predeploy_for_launch=lambda _reason: False,
+            _last_deploy_errors=[],
+            _report_predeploy_failure=lambda _result: None,
             _game_panel=panel,
         )
 
@@ -127,6 +133,8 @@ class PredeployLaunchTests(unittest.TestCase):
         window: Any = SimpleNamespace(
             _current_instance_path=Path("/tmp/instance"),
             _predeploy_for_launch=predeploy,
+            _last_deploy_errors=[],
+            _report_predeploy_failure=lambda _result: None,
             _game_panel=panel,
         )
         tools = [
@@ -157,6 +165,8 @@ class PredeployLaunchTests(unittest.TestCase):
             panel._game_label.setText("Test Game")
             window: Any = SimpleNamespace(
                 _predeploy_for_launch=lambda _reason: False,
+                _last_deploy_errors=[],
+                _report_predeploy_failure=lambda _result: None,
             )
             panel.start_requested.connect(
                 lambda binary, working: MainWindow._on_start_game(
@@ -185,6 +195,8 @@ class PredeployLaunchTests(unittest.TestCase):
             panel._game_label.setText("Test Game")
             window: Any = SimpleNamespace(
                 _predeploy_for_launch=lambda _reason: True,
+                _last_deploy_errors=[],
+                _report_predeploy_failure=lambda _result: None,
                 _game_panel=panel,
             )
             panel.start_requested.connect(

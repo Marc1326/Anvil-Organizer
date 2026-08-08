@@ -12,6 +12,12 @@ finish-args:
   - --device=dri
   # File access (home for mod instances, game dirs)
   - --filesystem=home
+  # --filesystem=home laesst ~/.var/app absichtlich aus, damit Flatpaks
+  # sich nicht gegenseitig in die Daten sehen. Steam und Heroic liegen
+  # dort, wenn sie selbst als Flatpak installiert sind - ohne diese
+  # beiden Zeilen findet Anvil weder Spiele noch Proton-Prefix.
+  - --filesystem=~/.var/app/com.valvesoftware.Steam
+  - --filesystem=~/.var/app/com.heroicgameslauncher.hgl
   # Removable media (USB drives with mods)
   - --filesystem=/media
   - --filesystem=/mnt
