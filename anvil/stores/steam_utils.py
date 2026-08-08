@@ -28,6 +28,13 @@ _STEAM_PATHS: list[Path] = [
     Path.home() / "snap" / "steam" / "common" / ".local" / "share" / "Steam",
 ]
 
+# Written by the client on startup, left behind when it exits.
+_STEAM_PID_FILES: list[Path] = [
+    Path.home() / ".steam" / "steam.pid",
+    Path.home() / ".var" / "app" / "com.valvesoftware.Steam"
+    / ".steam" / "steam.pid",
+]
+
 # Regex: captures one or two quoted strings per line.
 # Matches both  "key"  "value"  and  "key"  (section name) lines.
 _RE_TOKENS = re.compile(r'"([^"]*)"')
@@ -96,6 +103,59 @@ def find_steam_path() -> Path | None:
         if candidate.is_dir():
             return candidate
     return None
+
+
+def _read_steam_pid() -> int | None:
+    """Read the PID the running Steam client wrote to its pid file."""
+    for pid_file in _STEAM_PID_FILES:
+        try:
+            pid = int(pid_file.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            continue
+        if pid > 0:
+            return pid
+    return None
+
+
+def _pid_is_steam(pid: int) -> bool:
+    """Check whether *pid* belongs to a live Steam process.
+
+    Inside Flatpak the host PID namespace is hidden, so /proc cannot answer
+    this — the check is handed to the host. If that fails for any reason the
+    answer is "yes": a wrong "no" would put a start dialog in front of a
+    launch that works today.
+    """
+    from anvil.core.subprocess_env import is_flatpak
+
+    if is_flatpak():
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["flatpak-spawn", "--host", "kill", "-0", str(pid)],
+                capture_output=True, timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return True
+        return result.returncode == 0
+
+    try:
+        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:
+        return False
+    # The pid file survives a crash, and the number can be reused by then.
+    return b"steam" in cmdline.lower()
+
+
+def is_steam_running() -> bool:
+    """Return True if a Steam client is currently running.
+
+    Steam games load ``steam_api*.dll`` at startup and refuse to run without
+    a client to talk to, so this gates the launch.
+    """
+    pid = _read_steam_pid()
+    if pid is None:
+        return False
+    return _pid_is_steam(pid)
 
 
 def _parse_library_folders(vdf_path: Path) -> list[Path]:
