@@ -1,4 +1,11 @@
+"""Tests laufen ohne sichtbare Fenster.
+
+Mehrere Tests bauen echte Qt-Widgets und rufen show(). Ohne diese Zeile
+poppen sie waehrend der Suite auf dem Desktop auf und stoeren die Arbeit.
+Zum Debuggen mit sichtbaren Fenstern: ANVIL_TEST_SHOW_WINDOWS=1 setzen.
+"""
+
 import os
 
-# Ohne Display laufen die Qt-Tests sonst gar nicht erst an.
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+if os.environ.get("ANVIL_TEST_SHOW_WINDOWS") != "1":
+    os.environ["QT_QPA_PLATFORM"] = "offscreen"
