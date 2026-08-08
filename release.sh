@@ -95,6 +95,7 @@ sleep 10
 
 WORKFLOWS=("Build AppImage" "Build .rpm Package" "Build & Publish Snap" "Build Flatpak")
 ALL_DONE=false
+FAILED_BUILDS=()
 
 while [ "$ALL_DONE" = false ]; do
     ALL_DONE=true
@@ -110,6 +111,7 @@ while [ "$ALL_DONE" = false ]; do
                 echo "  ✓ $WF"
             else
                 echo "  ✗ $WF (fehlgeschlagen)"
+                FAILED_BUILDS+=("$WF")
             fi
         elif [ "$STATUS" = "in_progress" ] || [ "$STATUS" = "queued" ] || [ "$STATUS" = "waiting" ]; then
             echo "  ⏳ $WF ($STATUS)"
@@ -130,6 +132,24 @@ echo ""
 
 # --- 5. Release publizieren ---
 echo ""
+if [ ${#FAILED_BUILDS[@]} -gt 0 ]; then
+    echo "ABBRUCH: ${#FAILED_BUILDS[@]} Build(s) fehlgeschlagen:"
+    for WF in "${FAILED_BUILDS[@]}"; do
+        echo "  ✗ $WF"
+    done
+    echo ""
+    echo "Das Release $TAG bleibt als Draft stehen. Sobald ein Release"
+    echo "veroeffentlicht ist, laesst GitHub keine Assets mehr nachladen —"
+    echo "ein fehlendes Paket waere dann nur mit einer neuen Version zu"
+    echo "beheben. install-flatpak.sh zieht die Datei aus dem NEUESTEN"
+    echo "Release und bricht ohne sie ab."
+    echo ""
+    echo "Build wiederholen, dann erneut publizieren:"
+    echo "  gh run rerun <ID> --failed"
+    echo "  gh release edit $TAG --draft=false"
+    exit 1
+fi
+
 echo "[5/7] Draft-Release publizieren ..."
 gh release edit "$TAG" --draft=false
 echo "  ✓ Release $TAG ist live!"
