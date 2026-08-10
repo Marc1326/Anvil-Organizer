@@ -112,6 +112,67 @@ class Cyberpunk2077Game(BaseGame):
         "r6/tweaks",
     ]
 
+    def get_preset_kinds(self) -> list:
+        """Charakter-Presets, die dieses Spiel kennt.
+
+        Eine ``.preset``-Datei von ACU ist eine Liste ``LocKey#<Zahl>:<Wert>``
+        ohne Geschlechtsangabe. Die Schluessel unterscheiden sich aber: elf
+        kommen nur bei weiblichen, achtzehn nur bei maennlichen Presets vor.
+        Ermittelt aus den sechs mitgelieferten Presets von ACU 2.x, dort an
+        allen sechs gegengeprueft und ohne Fehltreffer.
+
+        Reicht das nicht, wird gefragt -- die Zeichen sind eine Abkuerzung,
+        keine Garantie.
+        """
+        from anvil.core.character_presets import FEMALE, MALE, PresetKind
+
+        return [
+            PresetKind(
+                name="ACU-Preset",
+                suffix=".preset",
+                target=(
+                    "bin/x64/plugins/cyber_engine_tweaks/mods"
+                    "/AppearanceChangeUnlocker/character-presets"
+                ),
+                variants=[FEMALE, MALE],
+                markers={
+                    FEMALE: [
+                        "LocKey#14413106849035572218",
+                        "LocKey#14444638123505366956",
+                        "LocKey#16755396525998114880",
+                        "LocKey#1741780623366758979",
+                        "LocKey#1742638242436574334",
+                        "LocKey#2149255562299693265",
+                        "LocKey#4311284794113424988",
+                        "LocKey#5901792339822971396",
+                        "LocKey#6131936511989184869",
+                        "LocKey#6273276747880532262",
+                        "LocKey#9222375131461895478",
+                    ],
+                    MALE: [
+                        "LocKey#11868211319013669770",
+                        "LocKey#13707137814640364864",
+                        "LocKey#13707143312198505919",
+                        "LocKey#13707144411710134130",
+                        "LocKey#14413099152454174741",
+                        "LocKey#14413101351477431163",
+                        "LocKey#16223900489692860646",
+                        "LocKey#1741788319948156456",
+                        "LocKey#1741791618483041089",
+                        "LocKey#1742636043413317912",
+                        "LocKey#2149256661811321476",
+                        "LocKey#2149257761322949687",
+                        "LocKey#5229311434501341836",
+                        "LocKey#5939674011469594817",
+                        "LocKey#6270481789322187575",
+                        "LocKey#6272437820508396494",
+                        "LocKey#7053978468823785611",
+                        "LocKey#7487713073032863221",
+                    ],
+                },
+            ),
+        ]
+
     # ── REDmod ─────────────────────────────────────────────────────────
 
     GameRedmodPath: str = "mods"

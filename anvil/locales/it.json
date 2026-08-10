@@ -1407,5 +1407,15 @@
     "marker": "installata a mano",
     "tooltip": "Si trova direttamente nella cartella di gioco e non è stata installata da Anvil.\nSi carica a ogni avvio. La casella rinomina il file, non viene eliminato nulla.",
     "rename_failed": "Rinomina non riuscita: {error}"
+  },
+  "preset": {
+    "separator_title": "Ordina i preset",
+    "separator_prompt": "Come deve chiamarsi il separatore dei tuoi preset?",
+    "separator_default": "Preset",
+    "variant_title": "Per quale personaggio?",
+    "variant_prompt": "Per «{name}» non è chiaro a chi sia destinato.\nScegli:",
+    "variant_female": "Femminile",
+    "variant_male": "Maschile",
+    "installed": "{count} preset da {name} configurati"
   }
 }

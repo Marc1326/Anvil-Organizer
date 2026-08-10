@@ -860,6 +860,13 @@ class BaseGame:
         """
         return {}
 
+    def get_preset_kinds(self) -> list:
+        """Charakter-Presets, die dieses Spiel kennt.
+
+        Leer = das Spiel hat keine. Siehe ``anvil.core.character_presets``.
+        """
+        return []
+
     def get_default_categories(self) -> list[dict] | None:
         """Return game-specific default categories, or None to use global defaults.
 

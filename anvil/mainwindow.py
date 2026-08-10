@@ -2094,6 +2094,148 @@ class MainWindow(QMainWindow):
                 paths[entry.name] = entry.deploy_path
         self._game_panel.set_separator_deploy_paths(paths)
 
+    # ── Charakter-Presets ────────────────────────────────────────────
+
+    _PRESET_SEP_KEY = "preset_separator"
+
+    def _preset_separator(self) -> str:
+        """Der vom Benutzer benannte Trenner, oder leer.
+
+        Wurde er inzwischen geloescht oder umbenannt, gilt er als nicht
+        vorhanden -- dann wird beim naechsten Preset neu gefragt.
+        """
+        inst = self.instance_manager.current_instance()
+        if not inst:
+            return ""
+        data = self.instance_manager.load_instance(inst) or {}
+        name = str(data.get(self._PRESET_SEP_KEY, ""))
+        if not name:
+            return ""
+        vorhanden = any(
+            e.name == name for e in self._current_mod_entries if e.is_separator
+        )
+        return name if vorhanden else ""
+
+    def _ask_preset_separator(self) -> str:
+        """Fragt einmalig nach dem Namen und legt den Trenner ganz unten an.
+
+        Ganz unten, weil Presets in der Ladereihenfolge nichts zu suchen
+        haben -- sie werden nur als Datei gelesen.
+        """
+        name, ok = get_text_input(
+            self,
+            tr("preset.separator_title"),
+            tr("preset.separator_prompt"),
+            text=tr("preset.separator_default"),
+        )
+        if not ok or not name.strip():
+            return ""
+
+        folder = f"{name.strip()}_separator"
+        profiles_dir = _active_instance_paths(self).profiles
+        mods_dir = _active_instance_paths(self).mods
+
+        (mods_dir / folder).mkdir(parents=True, exist_ok=True)
+
+        order = read_global_modlist(profiles_dir)
+        if folder not in order:
+            order.append(folder)
+            write_global_modlist(profiles_dir, order)
+
+        if self._current_profile_path:
+            aktiv = read_active_mods(self._current_profile_path)
+            aktiv.add(folder)
+            write_active_mods(self._current_profile_path, aktiv)
+
+        inst = self.instance_manager.current_instance()
+        if inst:
+            data = self.instance_manager.load_instance(inst) or {}
+            data[self._PRESET_SEP_KEY] = folder
+            self.instance_manager.save_instance(inst, data)
+
+        return folder
+
+    def _ask_preset_variant(self, dateiname: str, kind) -> str:
+        """Fragt, fuer welche Figur das Preset ist. Leer = abgebrochen."""
+        from anvil.core.character_presets import FEMALE
+
+        box = QMessageBox(self)
+        box.setWindowTitle(tr("preset.variant_title"))
+        box.setText(tr("preset.variant_prompt", name=dateiname))
+        knoepfe = {}
+        for variante in kind.variants:
+            schl = tr(f"preset.variant_{variante}")
+            knoepfe[box.addButton(schl, QMessageBox.ButtonRole.AcceptRole)] = variante
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.exec()
+        return knoepfe.get(box.clickedButton(), "" if kind.variants else FEMALE)
+
+    def _install_presets_from(self, temp_dir: Path, archive: Path) -> bool:
+        """Legt gefundene Presets als eigene Mods an.
+
+        Returns:
+            True, wenn das Archiv als Preset-Paket behandelt wurde. Dann
+            laeuft der gewoehnliche Installationsweg nicht mehr an.
+        """
+        from anvil.core import character_presets as cp
+
+        plugin = self._current_plugin
+        if plugin is None or self._current_instance_path is None:
+            return False
+
+        arten = plugin.get_preset_kinds()
+        if not arten:
+            return False
+
+        mods_dir = _active_instance_paths(self).mods
+        profiles_dir = _active_instance_paths(self).profiles
+        angelegt: list[str] = []
+        separator = ""
+
+        for kind in arten:
+            for datei in cp.find_presets(temp_dir, kind):
+                variante = cp.detect_variant(datei, kind)
+                if not variante and kind.variants:
+                    variante = self._ask_preset_variant(datei.name, kind)
+                    if not variante:
+                        continue  # abgebrochen, dieses Preset ueberspringen
+
+                if not separator:
+                    separator = self._preset_separator() or self._ask_preset_separator()
+                    if not separator:
+                        return bool(angelegt)
+
+                name = cp.suggest_mod_name(datei, variante, kind)
+                if (mods_dir / name).exists():
+                    name = f"{name} ({datei.stat().st_size})"
+                try:
+                    cp.build_mod(datei, mods_dir, name, kind, variante)
+                except (OSError, FileExistsError) as exc:
+                    self._log_panel.add_log("warn", f"{datei.name}: {exc}")
+                    continue
+
+                # Direkt hinter den Trenner, damit alle Presets beisammen
+                # bleiben statt ans Listenende zu rutschen.
+                order = read_global_modlist(profiles_dir)
+                if name not in order:
+                    pos = order.index(separator) + 1 if separator in order else len(order)
+                    order.insert(pos, name)
+                    write_global_modlist(profiles_dir, order)
+                if self._current_profile_path:
+                    aktiv = read_active_mods(self._current_profile_path)
+                    aktiv.add(name)
+                    write_active_mods(self._current_profile_path, aktiv)
+                angelegt.append(name)
+
+        if not angelegt:
+            return False
+
+        self._reload_mod_list()
+        self.statusBar().showMessage(
+            tr("preset.installed", count=len(angelegt), name=archive.name), 6000,
+        )
+        return True
+
     # ── Frameworks: Schloss auf = gewoehnliche Mod ───────────────────
 
     def _framework_mod_folders(self) -> dict[str, str]:
@@ -3246,6 +3388,15 @@ class MainWindow(QMainWindow):
                 )
                 continue
             print(f"DEBUG _install_archives: temp_dir={temp_dir}", flush=True)
+
+            # 1b. Charakter-Presets: keine gewoehnliche Mod, sondern eine
+            # Einstellungsdatei. Aus jeder wird eine eigene kleine Mod mit
+            # dem Zielpfad im Ordner -- dann traegt der normale Deploy-Weg
+            # sie an die richtige Stelle, und ein Update des Frameworks
+            # wirft sie nicht weg.
+            if self._install_presets_from(temp_dir, archive):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                continue
 
             # 2. Check if this is a framework mod
             if self._current_plugin is not None:

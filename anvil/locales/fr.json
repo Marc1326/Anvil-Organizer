@@ -1407,5 +1407,15 @@
     "marker": "installé à la main",
     "tooltip": "Se trouve directement dans le dossier du jeu et n'a pas été installé par Anvil.\nIl se charge à chaque démarrage. La case renomme le fichier, rien n'est supprimé.",
     "rename_failed": "Échec du renommage : {error}"
+  },
+  "preset": {
+    "separator_title": "Classer les préréglages",
+    "separator_prompt": "Quel nom donner au séparateur de vos préréglages ?",
+    "separator_default": "Préréglages",
+    "variant_title": "Pour quel personnage ?",
+    "variant_prompt": "Pour « {name} », le destinataire n'est pas clair.\nVeuillez choisir :",
+    "variant_female": "Féminin",
+    "variant_male": "Masculin",
+    "installed": "{count} préréglage(s) de {name} configurés"
   }
 }

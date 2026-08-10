@@ -1407,5 +1407,15 @@
     "marker": "instalado à mão",
     "tooltip": "Está diretamente na pasta do jogo e não foi instalado pelo Anvil.\nCarrega a cada início. A caixa renomeia o ficheiro, nada é apagado.",
     "rename_failed": "Falha ao renomear: {error}"
+  },
+  "preset": {
+    "separator_title": "Organizar predefinições",
+    "separator_prompt": "Como se deve chamar o separador das tuas predefinições?",
+    "separator_default": "Predefinições",
+    "variant_title": "Para que personagem?",
+    "variant_prompt": "Em «{name}» não é claro a quem se destina.\nEscolhe:",
+    "variant_female": "Feminino",
+    "variant_male": "Masculino",
+    "installed": "{count} predefinição(ões) de {name} configuradas"
   }
 }

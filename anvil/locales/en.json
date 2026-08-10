@@ -1407,5 +1407,15 @@
     "marker": "installed by hand",
     "tooltip": "Sits directly in the game folder and was not installed by Anvil.\nIt loads on every start. The checkbox renames the file, nothing is deleted.",
     "rename_failed": "Rename failed: {error}"
+  },
+  "preset": {
+    "separator_title": "Sort presets",
+    "separator_prompt": "What should the separator for your presets be called?",
+    "separator_default": "Presets",
+    "variant_title": "For which character?",
+    "variant_prompt": "For “{name}” it is not clear who it is meant for.\nPlease choose:",
+    "variant_female": "Female",
+    "variant_male": "Male",
+    "installed": "{count} preset(s) from {name} set up"
   }
 }

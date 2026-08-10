@@ -1407,5 +1407,15 @@
     "marker": "von Hand installiert",
     "tooltip": "Liegt direkt im Spielordner und wurde nicht von Anvil installiert.\nSie lädt bei jedem Start mit. Der Haken benennt die Datei um, gelöscht wird nichts.",
     "rename_failed": "Umbenennen fehlgeschlagen: {error}"
+  },
+  "preset": {
+    "separator_title": "Presets einsortieren",
+    "separator_prompt": "Wie soll der Trenner für deine Presets heißen?",
+    "separator_default": "Presets",
+    "variant_title": "Für welche Figur?",
+    "variant_prompt": "Bei „{name}“ ist nicht eindeutig, für wen es gedacht ist.\nBitte auswählen:",
+    "variant_female": "Weiblich",
+    "variant_male": "Männlich",
+    "installed": "{count} Preset(s) aus {name} eingerichtet"
   }
 }

@@ -1407,5 +1407,15 @@
     "marker": "instalado a mano",
     "tooltip": "Está directamente en la carpeta del juego y no lo instaló Anvil.\nSe carga en cada inicio. La casilla renombra el archivo, no se borra nada.",
     "rename_failed": "Error al renombrar: {error}"
+  },
+  "preset": {
+    "separator_title": "Ordenar preajustes",
+    "separator_prompt": "¿Cómo debe llamarse el separador de tus preajustes?",
+    "separator_default": "Preajustes",
+    "variant_title": "¿Para qué personaje?",
+    "variant_prompt": "En «{name}» no está claro para quién es.\nElige:",
+    "variant_female": "Femenino",
+    "variant_male": "Masculino",
+    "installed": "{count} preajuste(s) de {name} configurados"
   }
 }
