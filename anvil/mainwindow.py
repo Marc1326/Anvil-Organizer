@@ -107,6 +107,9 @@ sonst zeigt die Liste eine gewoehnliche Mod und der Deployer rollt sie
 trotzdem aus. Genau das war jahrelang der Fall. """
 from anvil.core.mod_deployer import matches_direct_install as _matches_direct_install
 
+# Farbe des Trenners, den Anvil beim ersten Preset selbst anlegt.
+_PRESET_SEP_COLOR = "#ffd700"
+
 
 def _path_matches(base: Path, rel: str) -> bool:
     """True wenn *rel* unter *base* existiert — mit Wildcard-Support."""
@@ -2136,6 +2139,11 @@ class MainWindow(QMainWindow):
         mods_dir = _active_instance_paths(self).mods
 
         (mods_dir / folder).mkdir(parents=True, exist_ok=True)
+
+        # Gelb, damit der Trenner sich von den uebrigen abhebt. Der
+        # Benutzer kann die Farbe hinterher wie bei jedem anderen aendern.
+        from anvil.core.mod_metadata import write_meta_ini
+        write_meta_ini(mods_dir / folder, {"color": _PRESET_SEP_COLOR})
 
         order = read_global_modlist(profiles_dir)
         if folder not in order:
@@ -4442,10 +4450,11 @@ class MainWindow(QMainWindow):
 
     def _ctx_select_separator_color(self, source_row: int) -> None:
         """Open QColorDialog for separator and save chosen color."""
-        if source_row >= len(self._current_mod_entries):
-            return
-        entry = self._current_mod_entries[source_row]
-        if not entry.is_separator:
+        # Ueber den Namen suchen, nicht ueber die Zeilennummer: die Liste
+        # blendet gesperrte Frameworks aus, dadurch zeigen beide Zaehlungen
+        # auf verschiedene Mods.
+        entry = self._entry_for_row(source_row)
+        if entry is None or not entry.is_separator:
             return
 
         from PySide6.QtWidgets import QColorDialog
@@ -4486,10 +4495,8 @@ class MainWindow(QMainWindow):
 
     def _ctx_reset_separator_color(self, source_row: int) -> None:
         """Remove custom color from separator."""
-        if source_row >= len(self._current_mod_entries):
-            return
-        entry = self._current_mod_entries[source_row]
-        if not entry.is_separator:
+        entry = self._entry_for_row(source_row)
+        if entry is None or not entry.is_separator:
             return
 
         # Persist empty color to meta.ini

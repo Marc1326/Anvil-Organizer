@@ -190,6 +190,29 @@ def test_trenner_kommt_ans_ende_der_liste() -> None:
     assert "order.append(folder)" in block
 
 
+def test_neuer_trenner_ist_gelb() -> None:
+    # Der Trenner legt sich selbst an, ohne dass jemand ihn sieht --
+    # deshalb bekommt er gleich eine Farbe statt grau unterzugehen.
+    from anvil.mainwindow import _PRESET_SEP_COLOR
+
+    assert _PRESET_SEP_COLOR.lower() == "#ffd700"
+
+    start = QUELLE.index("def _ask_preset_separator")
+    block = QUELLE[start:start + 1800]
+    assert 'write_meta_ini(mods_dir / folder, {"color": _PRESET_SEP_COLOR})' in block
+
+
+def test_farbe_waehlen_zaehlt_nicht_in_der_falschen_liste() -> None:
+    # Die Liste blendet gesperrte Frameworks aus. Wer die Zeilennummer
+    # direkt als Index nimmt, landet auf einer anderen Mod und bricht
+    # kommentarlos ab -- genau so war die Farbe nicht zu aendern.
+    for name in ("_ctx_select_separator_color", "_ctx_reset_separator_color"):
+        start = QUELLE.index(f"def {name}")
+        block = QUELLE[start:start + 500]
+        assert "self._current_mod_entries[source_row]" not in block, name
+        assert "self._entry_for_row(source_row)" in block, name
+
+
 def test_geloeschter_trenner_wird_neu_erfragt() -> None:
     start = QUELLE.index("def _preset_separator")
     block = QUELLE[start:QUELLE.index("def _ask_preset_separator")]
