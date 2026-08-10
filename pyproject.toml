@@ -54,6 +54,7 @@ anvil = [
     "resources/*.png",
     "resources/*.svg",
     "assets/icons/**/*.png",
+    "assets/icons/**/*.jpg",
     "locales/*.json",
     "data/shims/**/*.dll",
     "data/shims/**/*.c",
