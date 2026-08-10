@@ -45,6 +45,12 @@ class SkyrimSEGame(BaseGame):
     GameBinary = "SkyrimSE.exe"
     GameDataPath = "Data"  # Mods go into <GameDir>/Data/
 
+    # Reine Mod-Ordner. Was dort ohne Anvil auftaucht, wurde von Hand
+    # hineinkopiert und laedt an der Mod-Liste vorbei.
+    GameModDirs: list[str] = [
+        "Data/SKSE/Plugins",
+    ]
+
     GameSteamId = 489830
     # GOG: SE (1711230643) + Anniversary Upgrade (1162721350)
     GameGogId = [1711230643, 1162721350]

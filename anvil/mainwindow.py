@@ -102,22 +102,10 @@ from anvil.core import framework_state
 from anvil.core.translator import tr
 
 
-def _matches_direct_install(name_lower: str, patterns: list[str]) -> bool:
-    """Check if a mod name matches any direct-install pattern.
-
-    The name must start with the pattern AND the character after the
-    pattern (if any) must be non-alphabetic (space, digit, dash, dot, etc.).
-    This prevents 'CET' from matching 'CET NPC Body Tweaks' while still
-    matching 'CET 1.37.1 - Scripting fixes'.
-    """
-    for pat in patterns:
-        if not name_lower.startswith(pat):
-            continue
-        # Exact match or rest starts with a non-alpha char (version, suffix)
-        rest = name_lower[len(pat):]
-        if not rest or not rest[0].isalpha():
-            return True
-    return False
+""" Anzeige und Deployer muessen dieselbe Frage gleich beantworten --
+sonst zeigt die Liste eine gewoehnliche Mod und der Deployer rollt sie
+trotzdem aus. Genau das war jahrelang der Fall. """
+from anvil.core.mod_deployer import matches_direct_install as _matches_direct_install
 
 
 def _path_matches(base: Path, rel: str) -> bool:
@@ -1986,9 +1974,22 @@ class MainWindow(QMainWindow):
                 name_lower = (entry.display_name or entry.name).lower()
                 if _matches_direct_install(name_lower, lp):
                     entry.is_direct_install = True
+        # Von Hand in den Spielordner kopierte Mods anhaengen. Sie laden
+        # bei jedem Start mit, stehen aber in keiner Liste -- deshalb
+        # gehoeren sie sichtbar dorthin, wo man Mods sucht.
+        self._current_mod_entries += self._scan_foreign_entries(plugin, instance_path)
+
         conflict_data = self._compute_conflict_data()
-        # Filter out framework (direct-install) mods from the main list
-        visible_entries = [e for e in self._current_mod_entries if not e.is_direct_install]
+        # Nur GESPERRTE Frameworks bleiben aus der Liste heraus. Genau dafuer
+        # gibt es das Schloss: gesperrt heisst unantastbar. Ist es offen, ist
+        # das Framework eine gewoehnliche Mod und muss sich verschieben,
+        # umbenennen und loeschen lassen -- vorher war es dauerhaft
+        # ausgeblendet und damit gar nicht zu bearbeiten.
+        offen = self._unlocked_framework_mods()
+        visible_entries = [
+            e for e in self._current_mod_entries
+            if not e.is_direct_install or e.name in offen
+        ]
         mod_rows = [mod_entry_to_row(e, conflict_data, self._group_manager) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         # Provide visible entries to proxy for filter logic
@@ -2093,6 +2094,127 @@ class MainWindow(QMainWindow):
                 paths[entry.name] = entry.deploy_path
         self._game_panel.set_separator_deploy_paths(paths)
 
+    # ── Frameworks: Schloss auf = gewoehnliche Mod ───────────────────
+
+    def _framework_mod_folders(self) -> dict[str, str]:
+        """Ordnet jedem verwalteten Mod-Ordner seinen Framework-Namen zu."""
+        plugin = self._current_plugin
+        if plugin is None:
+            return {}
+        get_managed = getattr(plugin, "managed_framework_mods", None)
+        if not callable(get_managed):
+            return {}
+        # Einmal abfragen. Der Aufruf laeuft ueber die Dateilisten aller
+        # Mods -- in der Schleife waere er pro Framework einmal faellig.
+        managed = get_managed()
+        zuordnung: dict[str, str] = {}
+        for fw in plugin.all_framework_mods():
+            for ordner in managed.get(fw.name.lower(), []):
+                zuordnung[ordner] = fw.name
+        return zuordnung
+
+    def _unlocked_framework_mods(self) -> set[str]:
+        """Mod-Ordner, deren Framework offen ist -- nur die kommen in die Liste.
+
+        Bewusst andersherum gedacht: aufgezaehlt wird, was sichtbar sein
+        darf. Laesst sich die Zuordnung nicht bilden, bleibt ein Framework
+        verborgen. Lieber unsichtbar als versehentlich veraenderbar.
+
+        Ein Framework ohne Eintrag im Zustand gilt als gesperrt. ``get()``
+        wuerde dort ``locked=False`` liefern, und ``lock_all()`` fasst nur
+        vorhandene Eintraege an -- ArchiveXL, TweakXL und CET haben naemlich
+        gar keinen. Die waeren sonst von sich aus offen.
+        """
+        if self._current_instance_path is None:
+            return set()
+
+        # Einmal laden statt pro Framework -- get() liest jedes Mal die Datei.
+        zustand = framework_state.load(self._current_instance_path)
+
+        offen: set[str] = set()
+        for ordner, fw_name in self._framework_mod_folders().items():
+            eintrag = zustand.get(fw_name)
+            if isinstance(eintrag, dict) and not eintrag.get("locked", False):
+                offen.add(ordner)
+        return offen
+
+    def _framework_for_mod(self, mod_name: str) -> str:
+        """Framework-Name zu einem Mod-Ordner, oder leer."""
+        return self._framework_mod_folders().get(mod_name, "")
+
+    def _sync_framework_active(self, mod_name: str, enabled: bool) -> None:
+        """Haelt den Framework-Schalter mit dem Haken in der Liste gleich."""
+        if self._current_instance_path is None:
+            return
+        fw_name = self._framework_for_mod(mod_name)
+        if fw_name:
+            framework_state.set_entry(
+                self._current_instance_path, fw_name, active=enabled,
+            )
+
+    # ── Von Hand installierte Mods ───────────────────────────────────
+
+    def _scan_foreign_entries(self, plugin, instance_path) -> list:
+        """Sucht Mods, die ohne Anvil im Spielordner gelandet sind.
+
+        Anvil entfernt beim Aufraeumen nur Eigenes -- handkopierte Mods
+        bleiben dauerhaft aktiv und tauchen in keiner Liste auf. Genau
+        das hat schon einen Fehler tagelang verschleiert.
+        """
+        from anvil.core import foreign_mods
+
+        mod_dirs = getattr(plugin, "GameModDirs", []) if plugin else []
+        if not mod_dirs:
+            return []
+
+        game_dir = plugin.gameDirectory() if plugin else None
+        if game_dir is None:
+            return []
+
+        try:
+            funde = foreign_mods.scan_instance(
+                game_dir, mod_dirs, instance_path / ".deploy_manifest.json",
+            )
+        except OSError:
+            return []
+
+        if not funde:
+            return []
+
+        self._log_panel.add_log(
+            "warn",
+            tr("foreign.found", count=len(funde)),
+        )
+        return foreign_mods.to_entries(funde, len(self._current_mod_entries))
+
+    def _toggle_foreign_mod(self, row_data, enabled: bool) -> None:
+        """Schaltet eine handkopierte Mod ueber ihren Dateinamen um."""
+        from anvil.core import foreign_mods
+
+        eintrag = next(
+            (e for e in self._current_mod_entries
+             if e.is_foreign and e.name == row_data.folder_name),
+            None,
+        )
+        if eintrag is None or eintrag.foreign_path is None:
+            return
+
+        try:
+            eintrag.foreign_path = foreign_mods.set_enabled(
+                eintrag.foreign_path, enabled,
+            )
+        except OSError as exc:
+            QMessageBox.warning(
+                self,
+                tr("foreign.title"),
+                tr("foreign.rename_failed", error=str(exc)),
+            )
+            self._reload_mod_list()
+            return
+
+        eintrag.enabled = enabled
+        self._update_active_count()
+
     # ── Mod list persistence ─────────────────────────────────────────
 
     def _write_current_modlist(self) -> None:
@@ -2106,12 +2228,17 @@ class MainWindow(QMainWindow):
 
         profiles_dir = _active_instance_paths(self).profiles
 
+        # Fremde Eintraege liegen ausserhalb von .mods/ und werden ueber
+        # ihren Dateinamen geschaltet. Kaemen sie hier mit hinein, wuerde
+        # Anvil Mods verwalten wollen, die es gar nicht besitzt.
+        eigene = [e for e in self._current_mod_entries if not e.is_foreign]
+
         # 1. Write global load order (all mod names)
-        mod_names = [e.name for e in self._current_mod_entries]
+        mod_names = [e.name for e in eigene]
         write_global_modlist(profiles_dir, mod_names)
 
         # 2. Write active mods to current profile
-        active_mods = {e.name for e in self._current_mod_entries if e.enabled}
+        active_mods = {e.name for e in eigene if e.enabled}
         write_active_mods(self._current_profile_path, active_mods)
 
     def _on_mod_toggled(self, row: int, enabled: bool) -> None:
@@ -2147,12 +2274,23 @@ class MainWindow(QMainWindow):
             )
             return
 
+        # ── Fremde Mods: nicht speichern, sondern umbenennen ──
+        if getattr(row_data, "is_foreign", False):
+            self._toggle_foreign_mod(row_data, enabled)
+            return
+
         # ── Standard path ──
         # Find matching entry by unique folder name
         for entry in self._current_mod_entries:
             if entry.name == row_data.folder_name:
                 entry.enabled = enabled
                 break
+
+        # Frameworks werden unabhaengig von active_mods ausgerollt -- ueber
+        # sie entscheidet allein der Schalter im Framework-Zustand. Ohne
+        # diesen Abgleich waere der Haken in der Liste wirkungslos.
+        self._sync_framework_active(row_data.folder_name, enabled)
+
         self._write_current_modlist()
         self._update_active_count()
         self._schedule_redeploy()
@@ -2452,7 +2590,7 @@ class MainWindow(QMainWindow):
             return {}
         all_mods = [
             {"name": e.name, "path": str(_active_instance_paths(self).mods / e.name)}
-            for e in self._current_mod_entries if e.enabled
+            for e in self._current_mod_entries if e.enabled and not e.is_foreign
         ]
         if not all_mods:
             return {}
@@ -3607,7 +3745,7 @@ class MainWindow(QMainWindow):
             mod_path = str(_active_instance_paths(self).mods / mod_name)
             all_mods = [
                 {"name": e.name, "path": str(_active_instance_paths(self).mods / e.name)}
-                for e in self._current_mod_entries if e.enabled
+                for e in self._current_mod_entries if e.enabled and not e.is_foreign
             ]
             mod_entry = next(
                 (e for e in self._current_mod_entries if e.name == mod_name),
@@ -4735,7 +4873,7 @@ class MainWindow(QMainWindow):
                 shutil.copy(default_active, new_profile_dir / "active_mods.json")
             else:
                 # If Default has no active_mods.json yet, create one with current state
-                active_mods = {e.name for e in self._current_mod_entries if e.enabled}
+                active_mods = {e.name for e in self._current_mod_entries if e.enabled and not e.is_foreign}
                 write_active_mods(new_profile_dir, active_mods)
 
             # Plugin activation and order are profile-specific too.
@@ -4863,7 +5001,7 @@ class MainWindow(QMainWindow):
         # ── Standard path ──
         # 1. Save current active mods to OLD profile before switching
         if self._current_profile_path and self._current_profile_path != new_profile_path:
-            active_mods = {e.name for e in self._current_mod_entries if e.enabled}
+            active_mods = {e.name for e in self._current_mod_entries if e.enabled and not e.is_foreign}
             write_active_mods(self._current_profile_path, active_mods)
 
         # 1b. Save collapsed separators to OLD profile before switching
@@ -5297,7 +5435,7 @@ class MainWindow(QMainWindow):
                     changed += 1
 
             if changed > 0:
-                active_mods = {e.name for e in self._current_mod_entries if e.enabled}
+                active_mods = {e.name for e in self._current_mod_entries if e.enabled and not e.is_foreign}
                 write_active_mods(self._current_profile_path, active_mods)
                 self._reload_mod_list()
                 self._do_redeploy()
@@ -5533,6 +5671,14 @@ class MainWindow(QMainWindow):
             if 0 <= row < len(model._rows):
                 r = model._rows[row]
                 if r.is_separator:
+                    continue
+                # Fremde Mods liegen im Spielordner und werden ueber ihren
+                # Dateinamen geschaltet. Ohne das hier wuerde der Haken
+                # umspringen, die Datei aber aktiv bleiben -- und beim
+                # naechsten Laden stuende wieder der alte Stand da.
+                if getattr(r, "is_foreign", False):
+                    self._toggle_foreign_mod(r, enabled)
+                    r.enabled = enabled
                     continue
                 r.enabled = enabled
                 # BG3: persist via installer (skip frameworks + data-overrides)
@@ -6639,13 +6785,23 @@ class MainWindow(QMainWindow):
             return
 
         profiles_dir = _active_instance_paths(self).profiles
+        # Einmal vor der Schleife: die Zuordnung liest die Dateilisten aller
+        # Mods, und nach dem ersten rmtree stimmt sie ohnehin nicht mehr.
+        fw_zuordnung = self._framework_mod_folders()
         for name in names:
             # Remove from group before deleting
             self._group_manager.remove_member(name)
+            # Gehoerte die Mod zu einem Framework, muss auch dessen Eintrag
+            # weg. Sonst steht das Framework weiter im Zustand, waehrend der
+            # Ordner laengst geloescht ist -- und Anvil meldet es als
+            # installiert, obwohl nichts mehr da ist.
+            fw_name = fw_zuordnung.get(name, "")
             mod_path = _active_instance_paths(self).mods / name
             if mod_path.is_dir():
                 shutil.rmtree(mod_path)
             remove_mod_globally(profiles_dir, name)
+            if fw_name and self._current_instance_path:
+                framework_state.remove(self._current_instance_path, fw_name)
             self._clear_install_meta(name)
             # Remove deleted mod from index cache
             if self._mod_index is not None:
@@ -6755,7 +6911,12 @@ class MainWindow(QMainWindow):
                 existing_folders = {d.name for d in mods_dir.iterdir() if d.is_dir()}
                 self._group_manager.cleanup_orphans(existing_folders)
         conflict_data = self._compute_conflict_data()
-        visible_entries = [e for e in self._current_mod_entries if not e.is_direct_install]
+        # Wie oben: nur gesperrte Frameworks bleiben verborgen.
+        offen = self._unlocked_framework_mods()
+        visible_entries = [
+            e for e in self._current_mod_entries
+            if not e.is_direct_install or e.name in offen
+        ]
         mod_rows = [mod_entry_to_row(e, conflict_data, self._group_manager) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)

@@ -44,6 +44,12 @@ class Fallout4Game(BaseGame):
     GameBinary = "Fallout4.exe"
     GameDataPath = "Data"  # Mods go into <GameDir>/Data/
 
+    # Reine Mod-Ordner. Was dort ohne Anvil auftaucht, wurde von Hand
+    # hineinkopiert und laedt an der Mod-Liste vorbei.
+    GameModDirs: list[str] = [
+        "Data/F4SE/Plugins",
+    ]
+
     GameSteamId = 377160
     GameGogId = 1998527297  # Fallout 4: Game of the Year Edition
 

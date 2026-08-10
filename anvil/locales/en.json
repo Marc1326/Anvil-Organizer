@@ -1400,5 +1400,12 @@
     "migration_confirm": "Anvil must restart to move the complete base directory. All game deployments are purged first.\n\nSource: {source}\nTarget: {target}\n\nThe source will not be deleted. Continue?",
     "error_target_exists": "The automatic target already exists: {path}. Choose another parent folder or resume the pending migration.",
     "migration_scheduled": "The base migration is prepared. Anvil will restart now."
+  },
+  "foreign": {
+    "title": "Manually installed mod",
+    "found": "{count} mod(s) in the game folder were not installed by Anvil",
+    "marker": "installed by hand",
+    "tooltip": "Sits directly in the game folder and was not installed by Anvil.\nIt loads on every start. The checkbox renames the file, nothing is deleted.",
+    "rename_failed": "Rename failed: {error}"
   }
 }

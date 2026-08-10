@@ -29,6 +29,14 @@ class StellarBladeGame(BaseGame):
     # mit vier Zielen, die Verteilung macht GameDeployRoutes.
     GameDataPath = "SB"
 
+    # Reine Mod-Ordner. Was dort ohne Anvil auftaucht, wurde von Hand
+    # hineinkopiert und laedt an der Mod-Liste vorbei.
+    GameModDirs: list[str] = [
+        "SB/Content/Paks/~mods",
+        "SB/Content/Paks/LogicMods",
+        "SB/Binaries/Win64/ue4ss/Mods",
+    ]
+
     GameSteamId = 3489700
 
     GameLauncher = "SB.exe"

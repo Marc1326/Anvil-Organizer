@@ -38,6 +38,12 @@ class RDR2Game(BaseGame):
     GameBinary = "RDR2.exe"
     GameDataPath = ""  # Mods go into the game root directory
 
+    # Reine Mod-Ordner. Was dort ohne Anvil auftaucht, wurde von Hand
+    # hineinkopiert und laedt an der Mod-Liste vorbei.
+    GameModDirs: list[str] = [
+        "lml",
+    ]
+
     GameSteamId = 1174180
 
     GameDocumentsDirectory = ""  # resolved dynamically via gameDocumentsDirectory()

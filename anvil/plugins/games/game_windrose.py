@@ -34,6 +34,12 @@ class WindroseGame(BaseGame):
     GameBinary = "Windrose.exe"  # Launcher im Spiel-Root
     GameDataPath = "R5/Content/Paks/~mods"
 
+    # Reine Mod-Ordner. Was dort ohne Anvil auftaucht, wurde von Hand
+    # hineinkopiert und laedt an der Mod-Liste vorbei.
+    GameModDirs: list[str] = [
+        "R5/Content/Paks/~mods",
+    ]
+
     GameSteamId = 3041230
 
     GameSaveExtension = ""  # RocksDB-Storage, kein Single-File-Save

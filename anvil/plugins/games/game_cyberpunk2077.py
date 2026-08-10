@@ -99,6 +99,19 @@ class Cyberpunk2077Game(BaseGame):
         "/CD Projekt Red/Cyberpunk 2077"
     )
 
+    # Reine Mod-Ordner. Keiner davon gehoert zur Auslieferung -- das Spiel
+    # legt sie nicht an, sie entstehen erst durch Mods. Was dort ohne
+    # Anvil auftaucht, wurde von Hand hineinkopiert, laedt bei jedem Start
+    # und ueberschreibt notfalls verwaltete Mods.
+    GameModDirs: list[str] = [
+        "archive/pc/mod",
+        "mods",
+        "bin/x64/plugins/cyber_engine_tweaks/mods",
+        "red4ext/plugins",
+        "r6/scripts",
+        "r6/tweaks",
+    ]
+
     # ── REDmod ─────────────────────────────────────────────────────────
 
     GameRedmodPath: str = "mods"

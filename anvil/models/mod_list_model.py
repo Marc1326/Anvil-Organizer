@@ -56,9 +56,9 @@ ROLE_CONFLICT_TYPE = Qt.ItemDataRole.UserRole + 8 # 'win' | 'lose' | 'both' | ''
 
 
 class ModRow:
-    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "is_data_override", "folder_name", "color", "file_count", "child_count", "group_name", "is_group_head", "deploy_path")
+    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "is_data_override", "folder_name", "color", "file_count", "child_count", "group_name", "is_group_head", "deploy_path", "is_foreign")
 
-    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, is_data_override=False, folder_name="", color="", file_count=0, child_count=0, group_name="", is_group_head=False, deploy_path=""):
+    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, is_data_override=False, folder_name="", color="", file_count=0, child_count=0, group_name="", is_group_head=False, deploy_path="", is_foreign=False):
         self.enabled = enabled
         self.name = name
         self.conflicts = conflicts
@@ -77,6 +77,7 @@ class ModRow:
         self.group_name = group_name
         self.is_group_head = is_group_head
         self.deploy_path = deploy_path
+        self.is_foreign = is_foreign
 
 
 def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_manager=None) -> ModRow:
@@ -117,6 +118,7 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_m
         group_name=group_name,
         is_group_head=is_group_head,
         deploy_path=getattr(entry, "deploy_path", ""),
+        is_foreign=getattr(entry, "is_foreign", False),
     )
 
 
@@ -386,6 +388,8 @@ class ModListModel(QAbstractItemModel):
                         return tr("tooltip.conflict_both", wins=wins, losses=losses)
             if r.is_framework and c == COL_NAME:
                 return tr("tooltip.direct_install")
+            if getattr(r, "is_foreign", False) and c == COL_NAME:
+                return tr("foreign.tooltip")
             # Separator with custom deploy path shows path as tooltip
             if r.is_separator and c == COL_NAME and getattr(r, "deploy_path", ""):
                 return f"Deploy \u2192 {r.deploy_path}"
@@ -424,6 +428,12 @@ class ModListModel(QAbstractItemModel):
                 if modern:
                     return _tinted(theme_color("ok", "#4cae7d"), 28)
                 return QBrush(QColor("#143a14"))
+            # Fremde Mods gehoeren Anvil nicht -- sie sollen sich auch so
+            # lesen und nicht mit den verwalteten verschwimmen.
+            if getattr(r, "is_foreign", False):
+                if modern:
+                    return _tinted(theme_color("warn", "#b8923f"), 40)
+                return QBrush(QColor("#3a2e14"))
         if role == ROLE_IS_SEPARATOR:
             return r.is_separator
         if role == ROLE_FOLDER_NAME:

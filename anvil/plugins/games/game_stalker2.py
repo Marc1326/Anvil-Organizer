@@ -54,6 +54,15 @@ class Stalker2Game(BaseGame):
     # umbenannt findet er ihn nicht mehr.
     GamePakLoadOrderPrefix = False
 
+    # Diese drei Ordner legt erst das Modden an, das Spiel selbst bringt
+    # sie nicht mit. Was dort ohne Anvil auftaucht, wurde von Hand
+    # hineinkopiert und laedt an der Mod-Liste vorbei.
+    GameModDirs: list[str] = [
+        "Stalker2/Content/Paks/~mods",
+        "Stalker2/Content/Paks/LogicMods",
+        "Stalker2/Binaries/Win64/plugins",
+    ]
+
     # Dieser Ordner benennt im Archiv nur die Mod-Art und gehoert nicht
     # in den Zielpfad. LogicMods bleibt stehen -- er ist das einzige
     # Kennzeichen, an dem ein Blueprint-Mod ohne Container zu erkennen ist.

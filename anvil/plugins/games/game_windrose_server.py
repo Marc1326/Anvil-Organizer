@@ -38,6 +38,12 @@ class WindroseServerGame(BaseGame):
     GameBinary = "WindroseServer.exe"
     GameDataPath = "R5/Content/Paks/~mods"
 
+    # Reine Mod-Ordner. Was dort ohne Anvil auftaucht, wurde von Hand
+    # hineinkopiert und laedt an der Mod-Liste vorbei.
+    GameModDirs: list[str] = [
+        "R5/Content/Paks/~mods",
+    ]
+
     GameSteamId = 4129620  # Free dedicated server tool
 
     GameSaveExtension = ""

@@ -46,6 +46,12 @@ class StarfieldGame(BaseGame):
     GameBinary = "Starfield.exe"
     GameDataPath = "Data"  # Mods go into <GameDir>/Data/
 
+    # Reine Mod-Ordner. Was dort ohne Anvil auftaucht, wurde von Hand
+    # hineinkopiert und laedt an der Mod-Liste vorbei.
+    GameModDirs: list[str] = [
+        "Data/SFSE/Plugins",
+    ]
+
     GameSteamId = 1716740
     # Starfield has no GOG or Epic release as of 2025
     GameGogId = 0

@@ -55,6 +55,12 @@ class ModEntry:
     is_direct_install: bool = False        # True for framework mods (copy, not symlink)
     is_data_override: bool = False         # True for BG3 data-override mods (loose files in Data/)
 
+    # Von Hand in den Spielordner kopiert, nicht von Anvil verwaltet.
+    # Solche Eintraege gehoeren NICHT in modlist.txt oder active_mods.json --
+    # sie liegen ausserhalb und werden ueber ihren Dateinamen geschaltet.
+    is_foreign: bool = False
+    foreign_path: Path | None = None       # Die Datei im Spielordner
+
     # Separator color (from meta.ini, compatible with common meta.ini format)
     color: str = ""                        # Hex color e.g. "#FF0000", empty = no custom color
 

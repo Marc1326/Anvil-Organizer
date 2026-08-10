@@ -1400,5 +1400,12 @@
     "migration_confirm": "Anvil muss neu starten, um das vollständige Basisverzeichnis zu verschieben. Zuerst werden alle Spiel-Deployments gepurged.\n\nQuelle: {source}\nZiel: {target}\n\nDie Quelle wird nicht gelöscht. Fortfahren?",
     "error_target_exists": "Das automatisch erzeugte Ziel existiert bereits: {path}. Wähle einen anderen übergeordneten Ordner oder setze die offene Migration fort.",
     "migration_scheduled": "Die Basismigration ist vorbereitet. Anvil startet jetzt neu."
+  },
+  "foreign": {
+    "title": "Von Hand installierte Mod",
+    "found": "{count} Mod(s) im Spielordner stammen nicht von Anvil",
+    "marker": "von Hand installiert",
+    "tooltip": "Liegt direkt im Spielordner und wurde nicht von Anvil installiert.\nSie lädt bei jedem Start mit. Der Haken benennt die Datei um, gelöscht wird nichts.",
+    "rename_failed": "Umbenennen fehlgeschlagen: {error}"
   }
 }

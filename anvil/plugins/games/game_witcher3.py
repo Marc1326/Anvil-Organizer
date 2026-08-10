@@ -43,6 +43,12 @@ class Witcher3Game(BaseGame):
     GameBinary = "bin/x64/witcher3.exe"
     GameDataPath = "Mods"  # Mods go into <GameDir>/Mods/
 
+    # Reine Mod-Ordner. Was dort ohne Anvil auftaucht, wurde von Hand
+    # hineinkopiert und laedt an der Mod-Liste vorbei.
+    GameModDirs: list[str] = [
+        "Mods",
+    ]
+
     # Steam: 292030 (Standard), 499450 (GOTY)
     GameSteamId = [292030, 499450]
     # GOG: Multiple editions (Standard, GOTY, Enhanced, etc.)

@@ -81,6 +81,27 @@ def strip_deploy_prefixes(rel: Path, prefixes: list[str]) -> Path:
     return Path(*teile) if teile else rel
 
 
+def matches_direct_install(name_lower: str, patterns: list[str]) -> bool:
+    """True, wenn *name_lower* eines der Direktinstall-Muster ist.
+
+    Der Name muss mit dem Muster **beginnen**, und das Zeichen danach darf
+    kein Buchstabe sein -- so passt "CET 1.37.1" noch auf "CET", aber
+    "CET NPC Body Tweaks" nicht mehr.
+
+    Frueher stand hier ein blosses "enthaelt". Damit galt jede Mod mit
+    "ArchiveXL" im Namen als Framework und wurde ausgerollt, obwohl sie im
+    Profil abgeschaltet war -- sichtbar war das nirgends. Die Anzeige
+    prueft laengst so wie hier; nur der Deployer war zurueckgeblieben.
+    """
+    for pat in patterns:
+        if not name_lower.startswith(pat):
+            continue
+        rest = name_lower[len(pat):]
+        if not rest or not rest[0].isalpha():
+            return True
+    return False
+
+
 def has_deploy_anchor(rel: Path, anchors: list[str]) -> bool:
     """True, wenn der Mod seine Zielstruktur schon selbst mitbringt."""
     if not anchors or not rel.parts:
@@ -264,12 +285,8 @@ class ModDeployer:
         self._skipped_mods = {str(n).lower() for n in names}
 
     def is_direct_install(self, mod_name: str) -> bool:
-        """Return True if *mod_name* matches a direct-install pattern.
-
-        Matching is case-insensitive and uses 'contains' logic.
-        """
-        lower = mod_name.lower()
-        return any(pat in lower for pat in self._direct_patterns)
+        """Return True if *mod_name* matches a direct-install pattern."""
+        return matches_direct_install(mod_name.lower(), self._direct_patterns)
 
     def _mount_point_of(self, src: Path) -> str:
         """Mount-Point des Containers, zu dem *src* gehoert.

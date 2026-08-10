@@ -128,6 +128,18 @@ class BaseGame:
     Files deployed this way use manifest type ``shim_copy`` and are
     removed during purge."""
 
+    GameModDirs: list[str] = []
+    """Ordner im Spiel, die ausschliesslich Mods enthalten.
+
+    Was dort liegt und nicht im Deploy-Manifest steht, wurde von Hand
+    installiert: es laedt bei jedem Start und ist ueber die Mod-Liste
+    nicht abschaltbar. Anvil zeigt solche Funde als fremde Eintraege an
+    (siehe ``anvil.core.foreign_mods``).
+
+    Nur Ordner eintragen, in denen keine echten Spieldateien liegen --
+    sonst wird jede Vanilla-Datei als Fund gemeldet. Leer = Pruefung aus.
+    """
+
     # Unreal-Spiele mit ~mods-Ordner laden Paks alphabetisch nach Dateiname,
     # die zuletzt eingehaengte gewinnt. Ohne Zaehler im Namen ist die
     # Reihenfolge in Anvil fuer diese Spiele wirkungslos.
