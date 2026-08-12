@@ -1313,7 +1313,8 @@
     "clear": "Clear",
     "update_available": "Update available",
     "download_done": "Download finished",
-    "download_error": "Download failed"
+    "download_error": "Download failed",
+    "deploy_gaps": "Not everything reached the game ({count})"
   },
   "install": {
     "title": "Install Mod",

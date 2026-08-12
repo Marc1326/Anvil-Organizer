@@ -2,8 +2,12 @@
 
 Stores file lists for every mod in a JSON cache file
 (``.modindex.json``) inside the instance directory.  On subsequent
-loads only mods whose directory ``st_mtime`` changed are re-scanned,
-making startup and deploy dramatically faster for large mod setups.
+loads only mods whose directory tree changed are re-scanned: the tree
+is fingerprinted over every directory, the per-file ``stat`` calls and
+the JSON rebuild are what the cache saves.
+
+Note: overwriting a file in place leaves every directory timestamp
+untouched.  The file list stays correct, but the cached size does not.
 
 Usage::
 
@@ -21,19 +25,56 @@ from __future__ import annotations
 import json
 import os
 import sys
+import hashlib
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 
-_CACHE_VERSION = 1
+_CACHE_VERSION = 2
 _CACHE_FILENAME = ".modindex.json"
+
+
+def _fingerprint(mod_dir: Path) -> str | None:
+    """Abdruck ueber alle Ordner einer Mod, oder ``None`` bei Lesefehler.
+
+    Die Wurzelzeit allein reicht nicht (eine Aenderung im Unterordner
+    bliebe unsichtbar), das Maximum aller Zeiten auch nicht (ein falsch
+    datierter Ordner aus der Zukunft nagelt es fest). Deshalb eine
+    Pruefsumme -- sie schlaegt in jede Richtung an.
+
+    Ein an Ort und Stelle ueberschriebener Dateiinhalt bleibt unsichtbar.
+    """
+    h = hashlib.blake2b(digest_size=8)
+    leer = True
+    fehler: list[OSError] = []
+    try:
+        # Ein unlesbarer Unterordner darf nicht einfach uebersprungen werden:
+        # seine Dateien fehlen dann im Index, ohne dass es jemand merkt.
+        for ordner, unter, _dateien in os.walk(str(mod_dir), onerror=fehler.append):
+            unter.sort()  # gleiche Reihenfolge bei jedem Lauf
+            rel = os.path.relpath(ordner, str(mod_dir))
+            h.update(f"{rel}\x00{os.stat(ordner).st_mtime_ns}\x01".encode(
+                "utf-8", "surrogateescape"))
+            leer = False
+    except OSError:
+        return None
+
+    return None if leer or fehler else h.hexdigest()
+
+
+def _als_zahl(wert) -> int:
+    """Groessenangabe aus einer moeglicherweise beschaedigten Datei."""
+    try:
+        return max(0, int(wert))
+    except (TypeError, ValueError):
+        return 0
 
 
 @dataclass
 class _ModCache:
     """Cached data for a single mod directory."""
-    mtime: float = 0.0
+    fingerprint: str = ""
     files: list[dict] = field(default_factory=list)
     # Aggregates (pre-computed for fast access)
     file_count: int = 0
@@ -99,17 +140,16 @@ class ModIndex:
         # Check each mod for changes
         for name in on_disk:
             mod_dir = self._mods_path / name
-            try:
-                current_mtime = os.stat(str(mod_dir)).st_mtime
-            except OSError:
+            abdruck = _fingerprint(mod_dir)
+            if abdruck is None:
                 continue
 
             cached = self._index.get(name)
-            if cached is not None and cached.mtime == current_mtime:
+            if cached is not None and cached.fingerprint == abdruck:
                 continue  # Cache hit -- skip re-scan
 
             # Cache miss -- re-scan this mod
-            self._scan_mod(name, mod_dir, current_mtime)
+            self._scan_mod(name, mod_dir, abdruck)
             self._dirty = True
 
         if self._dirty:
@@ -149,16 +189,19 @@ class ModIndex:
             return 0, 0
         return cached.file_count, cached.total_size
 
-    def invalidate(self, mod_name: str) -> None:
+    def invalidate(self, mod_name: str, save: bool = True) -> None:
         """Remove *mod_name* from the cache.
 
-        The next :meth:`rebuild` will re-scan this mod.
+        The next :meth:`rebuild` will re-scan this mod. Mit ``save=False``
+        bleibt das Schreiben :meth:`flush` ueberlassen -- fuer Aufrufer in
+        einer Schleife, die sonst die ganze Datei pro Mod neu schrieben.
         """
         if mod_name in self._index:
             del self._index[mod_name]
             self._dirty = True
-            self._save_cache()
-            self._dirty = False
+            if save:
+                self._save_cache()
+                self._dirty = False
 
     def invalidate_and_rescan(self, mod_name: str) -> None:
         """Immediately invalidate and re-scan *mod_name*.
@@ -167,18 +210,56 @@ class ModIndex:
         needs up-to-date data right away.
         """
         mod_dir = self._mods_path / mod_name
-        if mod_dir.is_dir():
-            try:
-                mtime = os.stat(str(mod_dir)).st_mtime
-            except OSError:
-                self.invalidate(mod_name)
-                return
-            self._scan_mod(mod_name, mod_dir, mtime)
-            self._dirty = True
+        if not mod_dir.is_dir():
+            self.invalidate(mod_name)
+            return
+        abdruck = _fingerprint(mod_dir)
+        if abdruck is None:
+            self.invalidate(mod_name)
+            return
+        self._scan_mod(mod_name, mod_dir, abdruck)
+        self._dirty = True
+        self._save_cache()
+        self._dirty = False
+
+    def refresh(self, mod_name: str) -> bool | None:
+        """Liest *mod_name* neu ein, falls sich der Ordner geaendert hat.
+
+        Fuer Aufrufer, die mitten in einer Schleife stehen: gespeichert
+        wird hier nicht, das erledigt :meth:`flush` einmal am Ende. Sonst
+        schriebe der Deployer die ganze Cache-Datei pro Mod neu.
+
+        Returns:
+            True, wenn neu eingelesen wurde. False, wenn unveraendert.
+            ``None``, wenn der Ordner nicht lesbar war -- dann weiss
+            niemand, ob die Liste noch stimmt, und der Aufrufer muss es
+            melden statt stillschweigend weiterzumachen.
+        """
+        mod_dir = self._mods_path / mod_name
+        if not mod_dir.is_dir():
+            if mod_name in self._index:
+                del self._index[mod_name]
+                self._dirty = True
+                return True
+            return False
+
+        abdruck = _fingerprint(mod_dir)
+        if abdruck is None:
+            return None
+
+        cached = self._index.get(mod_name)
+        if cached is not None and cached.fingerprint == abdruck:
+            return False
+
+        self._scan_mod(mod_name, mod_dir, abdruck)
+        self._dirty = True
+        return True
+
+    def flush(self) -> None:
+        """Schreibt ausstehende Aenderungen einmal auf die Platte."""
+        if self._dirty:
             self._save_cache()
             self._dirty = False
-        else:
-            self.invalidate(mod_name)
 
     def rename(self, old_name: str, new_name: str) -> None:
         """Update the cache after a mod rename."""
@@ -211,7 +292,7 @@ class ModIndex:
     # ── Internal ──────────────────────────────────────────────────
 
     def _scan_mod(
-        self, name: str, mod_dir: Path, mtime: float,
+        self, name: str, mod_dir: Path, fingerprint: str,
     ) -> None:
         """Scan *mod_dir* and update the index entry."""
         files: list[dict] = []
@@ -235,7 +316,7 @@ class ModIndex:
             )
 
         self._index[name] = _ModCache(
-            mtime=mtime,
+            fingerprint=fingerprint,
             files=files,
             file_count=file_count,
             total_size=total_size,
@@ -283,15 +364,35 @@ class ModIndex:
             self._dirty = True
             return
 
-        mods = data.get("mods", {})
+        mods = data.get("mods")
+        if not isinstance(mods, dict):
+            self._index.clear()
+            self._dirty = True
+            return
         for name, info in mods.items():
             if not isinstance(info, dict):
                 continue
+            # Unbrauchbare Eintraege hier wegwerfen und nicht bei jedem
+            # Leser einzeln: der Konfliktscanner griff blank auf ``rel``
+            # zu und riss an einer beschaedigten Datei komplett ab.
+            roh = info.get("files")
+            dateien = [
+                {"rel": f["rel"], "size": _als_zahl(f.get("size"))}
+                for f in (roh if isinstance(roh, list) else [])
+                if isinstance(f, dict) and isinstance(f.get("rel"), str) and f["rel"]
+            ]
+            if not isinstance(roh, list) or len(dateien) != len(roh):
+                # Die Datei war beschaedigt. Der gemerkte Abdruck taugt
+                # dann nicht mehr -- sonst gilt die lueckenhafte Liste als
+                # aktuell und die fehlenden Dateien kaemen nie ins Spiel.
+                self._index[name] = _ModCache()
+                self._dirty = True
+                continue
             self._index[name] = _ModCache(
-                mtime=info.get("mtime", 0.0),
-                files=info.get("files", []),
-                file_count=info.get("file_count", 0),
-                total_size=info.get("total_size", 0),
+                fingerprint=str(info.get("fingerprint", "")),
+                files=dateien,
+                file_count=len(dateien),
+                total_size=sum(f["size"] for f in dateien),
             )
 
     def _save_cache(self) -> None:
@@ -299,7 +400,7 @@ class ModIndex:
         mods = {}
         for name, cached in self._index.items():
             mods[name] = {
-                "mtime": cached.mtime,
+                "fingerprint": cached.fingerprint,
                 "files": cached.files,
                 "file_count": cached.file_count,
                 "total_size": cached.total_size,

@@ -1313,7 +1313,8 @@
     "clear": "Limpar",
     "update_available": "Atualização disponível",
     "download_done": "Download concluído",
-    "download_error": "Falha no download"
+    "download_error": "Falha no download",
+    "deploy_gaps": "Nem tudo chegou ao jogo ({count})"
   },
   "install": {
     "title": "Instalar mod",

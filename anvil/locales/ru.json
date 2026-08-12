@@ -1313,7 +1313,8 @@
     "clear": "Очистить",
     "update_available": "Доступно обновление",
     "download_done": "Загрузка завершена",
-    "download_error": "Ошибка загрузки"
+    "download_error": "Ошибка загрузки",
+    "deploy_gaps": "В игру попало не всё ({count})"
   },
   "install": {
     "title": "Установить мод",

@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unveröffentlicht]
+
+### Änderungen
+- Die Plugins für **Windrose** und den Windrose-Server sind entfernt. Für das Spiel gibt es keine Mods, damit war auch nichts zu verwalten.
+
+### Fixes
+- **Mods konnten stillschweigend aus dem Spiel verschwinden.** Anvil merkt sich die Dateiliste jeder Mod, prüfte auf Änderungen aber nur den obersten Ordner. Wurde eine Datei eine Ebene tiefer umbenannt, hinzugefügt oder gelöscht, galt die Mod als unverändert — ausgerollt wurde die alte, nicht mehr vorhandene Datei. Die Mod fehlte im Spiel, im Log stand trotzdem null Fehler. Geprüft wird jetzt der ganze Ordnerbaum.
+- Landet eine Mod nicht vollständig im Spiel, sagt Anvil das über die Benachrichtigungen. Der Spielstart wird dadurch nicht verhindert.
+- Ein fehlender Mod-Ordner — etwa weil ein Laufwerk nicht eingehängt ist — wird gemeldet statt übersprungen.
+- Eine beschädigte `.modindex.json` ließ die Konfliktanzeige abstürzen und konnte den Programmstart verhindern. Unbrauchbare Einträge werden jetzt beim Einlesen verworfen und neu eingelesen.
+- **Anvil startete nicht mehr**, sobald es fremde Dateien im Spielordner fand. Eine Meldung mit unbekannter Dringlichkeitsstufe riss das Fenster mitten im Aufbau um. Betroffen war, wer Anvil bei laufendem Spiel geschlossen hat.
+
 ## [1.7.0] — 2026-08-06
 
 ### Neu

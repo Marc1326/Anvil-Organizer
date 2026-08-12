@@ -228,6 +228,25 @@ def pak_order_allows(rel: Path, dirs: list[str]) -> bool:
     return False
 
 
+def _luecke(result, name: str, grund: str) -> None:
+    """Vermerkt, dass *name* nicht im Spiel gelandet ist.
+
+    In der Liste steht nur der Name -- der Grund geht ins Log. Die Liste
+    wird dem Benutzer angezeigt und muss uebersetzbar bleiben.
+    """
+    result.missing_sources.append(name)
+    print(f"[DEPLOY]   missing ({grund}): {name}", flush=True)
+
+
+def _index_rel_paths(mod_index, mod_name: str) -> list[str]:
+    """Relative Pfade einer Mod aus dem Index.
+
+    Beschaedigte Eintraege sortiert der Index beim Laden aus, hier wird
+    nur noch abgebildet.
+    """
+    return [eintrag["rel"] for eintrag in mod_index.get_file_list(mod_name)]
+
+
 @dataclass
 class DeployResult:
     """Result of a deploy or purge operation."""
@@ -239,6 +258,12 @@ class DeployResult:
     dirs_created: int = 0
     dirs_removed: int = 0
     skipped_real_files: list[str] = field(default_factory=list)
+    # Mods, deren Dateiliste veraltet war und neu eingelesen werden musste.
+    stale_index_mods: list[str] = field(default_factory=list)
+    # Pfade, die es nicht mehr gibt -- meist eine Umbenennung, kein Ausfall.
+    changed_sources: list[str] = field(default_factory=list)
+    # Echte Ausfaelle: Ordner fehlt, ist unlesbar, oder liefert nichts mehr.
+    missing_sources: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
 
@@ -447,15 +472,29 @@ class ModDeployer:
 
         # Process mods from lowest to highest priority.
         # Higher priority mods overwrite lower ones (replace symlink).
+        # Mods, deren Dateiliste sich als falsch erwiesen hat -- der Abdruck
+        # hat es nicht bemerkt, also muss der Eintrag weg.
+        nachlesen: set[str] = set()
+
         for load_index, (mod_name, _priority) in enumerate(enabled_mods):
             mod_dir = self._mods_path / mod_name
-
-            if not mod_dir.is_dir():
-                continue
 
             # Skip separators (they are organizational, not deployable)
             if mod_name.endswith("_separator"):
                 continue
+
+            if not mod_dir.is_dir():
+                # Kein Normalfall -- das passiert, wenn ein Laufwerk
+                # nicht eingehaengt ist.
+                _luecke(result, mod_name, "folder missing")
+                continue
+
+            # Wie viele Dateien diese Mod anbietet und wie viele davon
+            # tatsaechlich im Spiel landen. Bleibt der Zaehler bei null,
+            # obwohl es Kandidaten gab, faellt die Mod stumm aus.
+            kandidaten = 0
+            vorher_links = result.links_created
+            vorher_kopien = result.files_copied
 
             # LML-Mod? (hat install.xml im Mod-Root) → Ordner-Symlink
             if self._lml_path and (mod_dir / "install.xml").is_file():
@@ -589,14 +628,35 @@ class ModDeployer:
                 continue  # Keine Einzel-Dateien symlinken
 
             # Walk all files in this mod (use cache when available)
-            if self._mod_index is not None:
-                cached_files = self._mod_index.get_file_list(mod_name)
-                file_iter = (mod_dir / finfo["rel"] for finfo in cached_files)
+            aus_cache = self._mod_index is not None
+            if aus_cache:
+                alt = _index_rel_paths(self._mod_index, mod_name)
+                # Der Index kann aus drei Gruenden nicht mehr stimmen: der
+                # Ordner hat sich seit dem Einlesen geaendert, die Mod stand
+                # nie drin, oder er liess sich nicht lesen.
+                zustand = self._mod_index.refresh(mod_name)
+                if zustand is None:
+                    _luecke(result, mod_name, "folder unreadable")
+                elif zustand:
+                    neu = _index_rel_paths(self._mod_index, mod_name)
+                    if alt and set(neu) != set(alt):
+                        result.stale_index_mods.append(mod_name)
+                    # Kam gleichzeitig etwas dazu, war es eine Umbenennung
+                    # -- die Datei ist unter neuem Namen im Spiel. Kam
+                    # nichts dazu, ist jeder Pfad ein echter Verlust.
+                    ziel = (
+                        result.changed_sources
+                        if set(neu) - set(alt)
+                        else result.missing_sources
+                    )
+                    for weg in sorted(set(alt) - set(neu)):
+                        ziel.append(f"{mod_name}/{weg}")
+                    alt = neu
+                file_iter = iter([mod_dir / rel for rel in alt])
             else:
                 file_iter = (f for f in mod_dir.rglob("*") if f.is_file())
             for src_file in file_iter:
-                if not src_file.is_file():
-                    continue
+                fehlt = aus_cache and not src_file.is_file()
 
                 # Skip metadata files
                 if src_file.name in _SKIP_FILES:
@@ -620,6 +680,17 @@ class ModDeployer:
                     rel = src_file.relative_to(mod_dir)
                 except ValueError:
                     continue
+
+                if fehlt:
+                    # Letzte Sicherung: verschwindet eine Datei, ohne dass
+                    # sich eine Ordnerzeit aendert (zurueckgesetzte
+                    # Zeitstempel, totes Symlink), merkt es der Neuscan
+                    # nicht -- hier faellt es garantiert auf.
+                    _luecke(result, f"{mod_name}/{rel.as_posix()}", "source gone")
+                    nachlesen.add(mod_name)
+                    continue
+
+                kandidaten += 1
 
                 # Strip "root/" prefix (RootBuilder pattern)
                 if rel.parts and rel.parts[0].lower() == "root":
@@ -823,6 +894,21 @@ class ModDeployer:
                             f"symlink {rel} -> {src_file}: {exc}"
                         )
 
+            # Die Mod hatte Dateien anzubieten, im Spiel kam nichts an.
+            # Genau dieser Fall blieb frueher voellig unbemerkt.
+            beigetragen = (
+                result.links_created - vorher_links
+                + result.files_copied - vorher_kopien
+            )
+            if kandidaten and not beigetragen:
+                _luecke(result, mod_name, "nothing deployed")
+        # Der neu eingelesene Stand geht einmal auf die Platte, nicht
+        # pro Mod -- die Cache-Datei ist bei vielen Mods gross.
+        for name in nachlesen:
+            self._mod_index.invalidate(name, save=False)
+        if self._mod_index is not None:
+            self._mod_index.flush()
+
         symlinks.extend(self._write_archive_load_order(symlinks, result))
 
         # Save manifest
@@ -845,9 +931,26 @@ class ModDeployer:
 
         result.dirs_created = len(created_dirs)
 
+        # Neu eingelesene Dateilisten gehoeren ins Log.
+        if self._mod_index is not None:
+            self._mod_index.flush()
+        if result.stale_index_mods:
+            print(
+                f"[DEPLOY] stale file list, re-read: "
+                f"{', '.join(result.stale_index_mods[:10])}",
+                flush=True,
+            )
+
+        # Gemeldet, aber kein Abbruch: eine fehlende Textur darf den
+        # Spielstart nicht verhindern.
+        for eintrag in result.changed_sources[:20]:
+            print(f"[DEPLOY]   path gone: {eintrag}", flush=True)
+
         print(
             f"[DEPLOY] Result: {result.links_created} symlinks, "
-            f"{result.files_copied} copies, {len(result.errors)} errors",
+            f"{result.files_copied} copies, "
+            f"{len(result.missing_sources)} missing, "
+            f"{len(result.errors)} errors",
             flush=True,
         )
 

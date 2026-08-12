@@ -1313,7 +1313,8 @@
     "clear": "Leeren",
     "update_available": "Update verfügbar",
     "download_done": "Download abgeschlossen",
-    "download_error": "Download fehlgeschlagen"
+    "download_error": "Download fehlgeschlagen",
+    "deploy_gaps": "Nicht alles ist im Spiel angekommen ({count})"
   },
   "install": {
     "title": "Mod installieren",

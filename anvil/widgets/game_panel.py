@@ -261,6 +261,7 @@ class GamePanel(QWidget):
     game_started = Signal(str, int)  # (game_name, pid) — pid=-1 if unknown
     # True = the process was seen and is gone for good, False = state unknown
     game_stopped = Signal(bool)
+    deploy_gaps = Signal(list)  # Mods/Dateien, die nicht im Spiel gelandet sind
 
     dl_query_info_requested = Signal(str)  # archive_path
     _redmod_finished = Signal(int, str, str, str, bool)  # (exit_code, stdout, stderr, binary, is_steam)
@@ -1230,6 +1231,7 @@ class GamePanel(QWidget):
                 f"[DEPLOY-CHAIN] GRB Forge deploy result: "
                 f"success={result.success}, errors={len(result.errors)}"
             )
+            GamePanel._melde_deploy_luecken(self, result)
             return result
         _dlog("[DEPLOY-CHAIN] silent_deploy() called")
         _dlog(f"[DEPLOY-CHAIN]   deployer={self._deployer is not None}")
@@ -1383,7 +1385,22 @@ class GamePanel(QWidget):
         _dlog("[DEPLOY-CHAIN] About to apply DLL overrides...")
         self._apply_proton_dll_overrides()
         _dlog("[DEPLOY-CHAIN] silent_deploy() DONE")
+        GamePanel._melde_deploy_luecken(self, result)
         return result
+
+    def _melde_deploy_luecken(self, result: object | None) -> None:
+        """Reicht Mods weiter, die nicht im Spiel gelandet sind.
+
+        Ohne diesen Weg steht so etwas nur im Log und geht dort unter.
+        ``skipped_real_files`` bleibt aussen vor -- dafuer gibt es schon
+        die Meldung ueber von Hand kopierte Mods.
+        """
+        signal = getattr(self, "deploy_gaps", None)
+        if result is None or signal is None:
+            return
+        luecken = list(getattr(result, "missing_sources", []))
+        if luecken:
+            signal.emit(luecken)
 
     def silent_deploy_fast(self) -> object | None:
         """Deploy mods without BA2 packing.  Used for quick redeploy after toggle."""
@@ -1397,6 +1414,7 @@ class GamePanel(QWidget):
                 f"[DEPLOY-CHAIN] Fast GRB Forge deploy result: "
                 f"success={result.success}, errors={len(result.errors)}"
             )
+            GamePanel._melde_deploy_luecken(self, result)
             return result
         result = None
         if self._deployer:
@@ -1442,6 +1460,7 @@ class GamePanel(QWidget):
                         result, writer, sort_error
                     )
             self._refresh_plugins_tab()
+        GamePanel._melde_deploy_luecken(self, result)
         return result
 
     def silent_purge(self) -> object | None:

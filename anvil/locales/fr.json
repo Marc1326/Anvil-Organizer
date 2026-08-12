@@ -1313,7 +1313,8 @@
     "clear": "Vider",
     "update_available": "Mise à jour disponible",
     "download_done": "Téléchargement terminé",
-    "download_error": "Échec du téléchargement"
+    "download_error": "Échec du téléchargement",
+    "deploy_gaps": "Tout n'est pas arrivé dans le jeu ({count})"
   },
   "install": {
     "title": "Installer le mod",

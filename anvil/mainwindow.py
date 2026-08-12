@@ -484,6 +484,7 @@ class MainWindow(QMainWindow):
         # ── Benachrichtigungen (Glocken-Button) ─────────────────────
         self._notification_center = NotificationCenter(self)
         self._notification_center.changed.connect(self._on_notifications_changed)
+        self._game_panel.deploy_gaps.connect(self._on_deploy_gaps)
         # Download-Ereignisse als Quellen anbinden (zusätzlich zur game_panel-Logik)
         dm = self._game_panel.download_manager()
         dm.download_finished.connect(self._on_notify_download_finished)
@@ -8993,6 +8994,26 @@ class MainWindow(QMainWindow):
         if self.instance_manager.current_instance():
             self.switch_instance(self.instance_manager.current_instance())
         self._update_title_theme_btn()
+
+    def _on_deploy_gaps(self, luecken: list) -> None:
+        """Meldet Mods, die nicht vollstaendig im Spiel gelandet sind.
+
+        Ueber die Glocke, weil ein Ausfall im Log untergeht: bei mehreren
+        hundert Mods steht die eine Zeile zwischen tausenden.
+        """
+        if not luecken:
+            return
+        text = "\n".join(str(e) for e in luecken[:10])
+        if len(luecken) > 10:
+            text += f"\n… ({len(luecken) - 10})"
+        self._notification_center.add(
+            "warning",
+            tr("notifications.deploy_gaps", count=len(luecken)),
+            text,
+        )
+        self._log_panel.add_log(
+            "warning", tr("notifications.deploy_gaps", count=len(luecken)),
+        )
 
     def _on_notify_download_finished(self, download_id: int, save_path: str) -> None:
         name = Path(save_path).name if save_path else ""

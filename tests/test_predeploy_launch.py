@@ -1011,13 +1011,16 @@ class SandboxedProcessLookupTests(unittest.TestCase):
         self.assertIs(window._game_running, True, "state stays until they answer")
 
     def test_appid_match_stops_at_the_value_boundary(self) -> None:
-        """SteamAppId=1091500 must not match SteamAppId=10915000."""
+        """A short SteamAppId must not match a longer one starting with it."""
         import os
         import subprocess
         import sys
         from anvil.core.game_process import scan_proc_for_game
 
-        short = "10" + "91500"
+        # A made-up id: a real one would make the second assertion claim
+        # that game is not running, and the test breaks once someone plays
+        # it.  The pid keeps two concurrent test runs apart.
+        short = f"99{os.getpid()}"
         longer = short + "0"
         proc = subprocess.Popen(
             [sys.executable, "-c", "import time; time.sleep(30)"],
