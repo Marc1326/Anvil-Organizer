@@ -7067,9 +7067,14 @@ class MainWindow(QMainWindow):
         entry = self._entry_for_row(row)
         if not entry:
             return
-        old_name = entry.name
-        display = entry.display_name or old_name
+        self._rename_mod_folder(entry.name, entry.display_name or entry.name)
 
+    def _rename_mod_folder(self, old_name: str, display: str) -> None:
+        """Ordner und alle Listeneintraege umbenennen.
+
+        Ueber den Namen und nicht ueber die Zeilennummer: der
+        Presets-Bereich hat keine Zeilen in der Mod-Liste.
+        """
         new_name, ok = get_text_input(
             self, tr("dialog.rename_mod_title"), tr("dialog.rename_mod_prompt"), text=display,
         )
@@ -7255,11 +7260,20 @@ class MainWindow(QMainWindow):
 
     def _on_preset_context_menu(self, pos, folder: str) -> None:
         """Rechtsklick im Presets-Bereich."""
+        from anvil.core import character_presets as cp
+
         menu = QMenu(self)
+        act_rename = menu.addAction(tr("context.rename_preset"))
+        menu.addSeparator()
         act_open = menu.addAction(tr("context.open_explorer"))
         act_remove = menu.addAction(tr("context.remove_preset"))
         chosen = menu.exec(pos)
-        if chosen == act_open:
+        if chosen == act_rename:
+            arten = self._preset_kinds(self._current_plugin)
+            variante = self._preset_variant(folder, arten)
+            self._rename_mod_folder(
+                folder, cp.display_name(folder, arten, variante))
+        elif chosen == act_open:
             pfad = _active_instance_paths(self).mods / folder
             if pfad.is_dir():
                 host_open_path(str(pfad))

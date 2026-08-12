@@ -130,7 +130,8 @@
     "fw_lock": "Blocca framework",
     "fw_unlock": "Sblocca framework",
     "properties": "Proprietà",
-    "remove_preset": "Rimuovi preimpostazione..."
+    "remove_preset": "Rimuovi preimpostazione...",
+    "rename_preset": "Rinomina preimpostazione..."
   },
   "toolbar": {
     "deploy": "Deploy",

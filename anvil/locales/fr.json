@@ -130,7 +130,8 @@
     "fw_lock": "Verrouiller le framework",
     "fw_unlock": "Déverrouiller le framework",
     "properties": "Propriétés",
-    "remove_preset": "Supprimer le préréglage..."
+    "remove_preset": "Supprimer le préréglage...",
+    "rename_preset": "Renommer le préréglage..."
   },
   "toolbar": {
     "deploy": "Deploy",

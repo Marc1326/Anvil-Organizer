@@ -156,6 +156,21 @@ class BaseGame:
     oder ``Binaries/Win64`` gehoeren nicht hinein: dort suchen die Loader
     ihre Dateien am Namen und finden sie mit Zaehler nicht mehr."""
 
+    GamePakLoadOrderExtensions: list[str] = []
+    """Dateiendungen, die den Zaehler bekommen (z.B. ``[".archive"]``).
+
+    Leer = die Pak-Endungen der Unreal-Spiele. REDengine legt seine Mods
+    nicht als Pak ab, braucht denselben Zaehler aber genauso."""
+
+    GamePakLoadOrderFirstWins: bool = False
+    """True, wenn die alphabetisch ERSTE Datei den Konflikt gewinnt.
+
+    Unreal haengt seine Paks der Reihe nach ein und laesst das letzte
+    gewinnen -- dort bekommt die niedrigste Prioritaet die kleinste Zahl.
+    REDengine macht es umgekehrt (an drei Spielstarts gemessen, siehe
+    ARCHITEKTUR): dort muss die hoechste Prioritaet die kleinste Zahl
+    bekommen, sonst dreht der Zaehler Marcs Reihenfolge genau um."""
+
     GameArchiveLoadOrderFile: str = ""
     """Datei im Spielordner, in der das Spiel seine Ladereihenfolge fuer
     Archiv-Mods liest (z.B. ``archive/pc/mod/modlist.txt``).

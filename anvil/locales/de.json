@@ -130,7 +130,8 @@
     "fw_lock": "Framework sperren",
     "fw_unlock": "Framework entsperren",
     "properties": "Eigenschaften",
-    "remove_preset": "Preset entfernen..."
+    "remove_preset": "Preset entfernen...",
+    "rename_preset": "Preset umbenennen..."
   },
   "toolbar": {
     "deploy": "Deploy",

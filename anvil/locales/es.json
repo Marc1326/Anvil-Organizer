@@ -130,7 +130,8 @@
     "fw_lock": "Bloquear framework",
     "fw_unlock": "Desbloquear framework",
     "properties": "Propiedades",
-    "remove_preset": "Eliminar preajuste..."
+    "remove_preset": "Eliminar preajuste...",
+    "rename_preset": "Renombrar preajuste..."
   },
   "toolbar": {
     "deploy": "Deploy",

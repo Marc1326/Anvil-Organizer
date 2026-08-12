@@ -130,7 +130,8 @@
     "fw_lock": "Lock framework",
     "fw_unlock": "Unlock framework",
     "properties": "Properties",
-    "remove_preset": "Remove preset..."
+    "remove_preset": "Remove preset...",
+    "rename_preset": "Rename preset..."
   },
   "toolbar": {
     "deploy": "Deploy",

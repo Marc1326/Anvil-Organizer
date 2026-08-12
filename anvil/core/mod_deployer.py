@@ -198,17 +198,43 @@ def route_deploy_path(rel: Path, routes: list[dict], mount: str = "") -> Path:
     return rel
 
 
-def pak_load_order_name(rel: Path, index: int) -> Path:
+def pak_load_order_name(
+    rel: Path,
+    index: int,
+    extensions: set[str] | None = None,
+    breite: int = 3,
+) -> Path:
     """Stellt dem Dateinamen einen Zaehler voran.
 
-    Die Spiele-Engines haengen diese Dateien alphabetisch ein und lassen
-    die zuletzt eingehaengte gewinnen. Der Zaehler bildet die Reihenfolge
-    aus Anvil ab: niedrigste Prioritaet bekommt die kleinste Zahl und
-    wird zuerst eingehaengt, die hoechste gewinnt.
+    Die Spiele-Engines haengen diese Dateien alphabetisch ein. Der Zaehler
+    bildet die Reihenfolge aus Anvil ab. Welche Zahl die hoechste
+    Prioritaet bekommt, entscheidet der Aufrufer -- die Engines sind sich
+    darin nicht einig (siehe ``GamePakLoadOrderFirstWins``).
+
+    Args:
+        rel: Zielpfad im Spiel.
+        index: Bereits fertig gerechnete Zahl.
+        extensions: Endungen, die umbenannt werden. None = Pak-Endungen.
+        breite: Stellen des Zaehlers. Zu schmal waere fatal -- "1000_"
+            sortiert vor "999_" und kehrt die Reihenfolge um.
     """
-    if rel.suffix.lower() not in _PAK_ORDER_EXTENSIONS:
+    erlaubt = extensions if extensions is not None else _PAK_ORDER_EXTENSIONS
+    if rel.suffix.lower() not in erlaubt:
         return rel
-    return rel.with_name(f"{index:03d}_{rel.name}")
+    return rel.with_name(f"{index:0{breite}d}_{rel.name}")
+
+
+def load_order_index(load_index: int, gesamt: int, first_wins: bool) -> int:
+    """Zaehler fuer eine Mod, je nachdem welche Datei gewinnt.
+
+    Der Deploy laeuft von der niedrigsten zur hoechsten Prioritaet, also
+    ist ``load_index`` 0 die schwaechste Mod. Gewinnt die alphabetisch
+    letzte Datei (Unreal), passt das direkt. Gewinnt die erste
+    (REDengine), muss gespiegelt werden.
+    """
+    if not first_wins:
+        return load_index
+    return max(gesamt - 1 - load_index, 0)
 
 
 def pak_order_allows(rel: Path, dirs: list[str]) -> bool:
@@ -297,6 +323,8 @@ class ModDeployer:
         separator_deploy_paths: dict[str, str] | None = None,
         pak_load_order_prefix: bool = False,
         pak_load_order_dirs: list[str] | None = None,
+        pak_load_order_extensions: list[str] | None = None,
+        pak_load_order_first_wins: bool = False,
         archive_load_order_file: str = "",
         mods_path: Path | None = None,
         profiles_path: Path | None = None,
@@ -329,6 +357,11 @@ class ModDeployer:
         self._separator_deploy_paths = separator_deploy_paths or {}
         self._pak_load_order_prefix = pak_load_order_prefix
         self._pak_load_order_dirs = pak_load_order_dirs or []
+        self._pak_load_order_extensions = (
+            {str(e).lower() for e in pak_load_order_extensions}
+            if pak_load_order_extensions else None
+        )
+        self._pak_load_order_first_wins = pak_load_order_first_wins
         self._archive_load_order_file = archive_load_order_file.replace("\\", "/").strip("/")
         self._skipped_mods: set[str] = set()
 
@@ -475,6 +508,9 @@ class ModDeployer:
         # Mods, deren Dateiliste sich als falsch erwiesen hat -- der Abdruck
         # hat es nicht bemerkt, also muss der Eintrag weg.
         nachlesen: set[str] = set()
+
+        # Zu schmal waere fatal: "1000_" sortiert vor "999_".
+        zaehler_breite = max(3, len(str(max(len(enabled_mods) - 1, 0))))
 
         for load_index, (mod_name, _priority) in enumerate(enabled_mods):
             mod_dir = self._mods_path / mod_name
@@ -746,9 +782,24 @@ class ModDeployer:
                             else:
                                 rel = data_prefix / rel
 
+                rel_ohne_zaehler = ""
                 if self._pak_load_order_prefix or self._pak_load_order_dirs:
                     if pak_order_allows(rel, self._pak_load_order_dirs):
-                        rel = pak_load_order_name(rel, load_index)
+                        vorher = rel
+                        rel = pak_load_order_name(
+                            rel,
+                            load_order_index(
+                                load_index, len(enabled_mods),
+                                self._pak_load_order_first_wins,
+                            ),
+                            self._pak_load_order_extensions,
+                            zaehler_breite,
+                        )
+                        # Nur merken, wenn wirklich umbenannt wurde. Am
+                        # Namen liesse es sich nicht sicher ablesen: eine
+                        # fremde Datei kann selbst "00_" heissen.
+                        if rel != vorher:
+                            rel_ohne_zaehler = str(vorher)
 
                 # Determine deploy base: custom separator path or global game path
                 mod_separator = mod_to_separator.get(mod_name, "")
@@ -848,6 +899,8 @@ class ModDeployer:
                                     "mod": mod_name,
                                     "type": deploy_type,
                                 }
+                                if rel_ohne_zaehler:
+                                    entry_data["unnumbered"] = rel_ohne_zaehler
                                 if sep_path:
                                     entry_data["deploy_base"] = sep_path
                                 symlinks.append(entry_data)
@@ -867,6 +920,8 @@ class ModDeployer:
                             "mod": mod_name,
                             "type": deploy_type,
                         }
+                        if rel_ohne_zaehler:
+                            entry_data["unnumbered"] = rel_ohne_zaehler
                         if sep_path:
                             entry_data["deploy_base"] = sep_path
                         symlinks.append(entry_data)
@@ -885,6 +940,8 @@ class ModDeployer:
                             "mod": mod_name,
                             "type": "symlink",
                         }
+                        if rel_ohne_zaehler:
+                            entry_data["unnumbered"] = rel_ohne_zaehler
                         if sep_path:
                             entry_data["deploy_base"] = sep_path
                         symlinks.append(entry_data)
@@ -909,6 +966,7 @@ class ModDeployer:
         if self._mod_index is not None:
             self._mod_index.flush()
 
+        symlinks = self._drop_superseded_numbered(symlinks, result)
         symlinks.extend(self._write_archive_load_order(symlinks, result))
 
         # Save manifest
@@ -958,6 +1016,65 @@ class ModDeployer:
             result.success = False
 
         return result
+
+    def _drop_superseded_numbered(
+        self,
+        symlinks: list[dict[str, str]],
+        result: DeployResult,
+    ) -> list[dict[str, str]]:
+        """Raeumt gleichnamige Dateien weg, die der Zaehler nicht mehr trifft.
+
+        Ohne Zaehler ueberschrieb die hoehere Mod die niedrigere im
+        Spielordner -- es lag genau eine Datei da. Mit Zaehler heissen
+        beide anders und lagen beide da, und die schwaechere brachte
+        zusaetzlich ihre eigenen Inhalte mit. Hier gewinnt wieder die
+        hoehere Mod, und zwar allein.
+        """
+        if not (self._pak_load_order_prefix or self._pak_load_order_dirs):
+            return symlinks
+
+        beste: dict[str, int] = {}
+        nummer: dict[int, int] = {}
+        for nr, eintrag in enumerate(symlinks):
+            if eintrag.get("type") not in {"symlink", "copy", "shim_copy"}:
+                continue
+            # Der Originalname steht im Eintrag. Am Dateinamen liesse er
+            # sich nicht sicher ablesen -- eine fremde Datei kann selbst
+            # mit Ziffern und Unterstrich beginnen.
+            schluessel = str(eintrag.get("unnumbered", "")).lower()
+            if not schluessel:
+                continue
+            kopf = Path(str(eintrag.get("link", ""))).name.partition("_")[0]
+            if not kopf.isdigit():
+                continue
+            zahl = int(kopf)
+            nummer[nr] = zahl
+            vorher = beste.get(schluessel)
+            # Kleinste Zahl gewinnt, wenn die erste Datei gewinnt.
+            if vorher is None or (
+                zahl < nummer[vorher] if self._pak_load_order_first_wins
+                else zahl > nummer[vorher]
+            ):
+                beste[schluessel] = nr
+
+        behalten = set(beste.values())
+        bleibt: list[dict[str, str]] = []
+        for nr, eintrag in enumerate(symlinks):
+            if nr in nummer and nr not in behalten:
+                link = Path(str(eintrag.get("link", "")))
+                basis = Path(eintrag.get("deploy_base") or self._game_path)
+                ziel = basis / link
+                try:
+                    if ziel.is_symlink() or ziel.is_file():
+                        ziel.unlink()
+                except OSError as exc:
+                    result.errors.append(f"remove {link}: {exc}")
+                    bleibt.append(eintrag)
+                    continue
+                print(f"[DEPLOY]   superseded: {link}", flush=True)
+                continue
+            bleibt.append(eintrag)
+        return bleibt
 
     def _write_archive_load_order(
         self,

@@ -3254,6 +3254,12 @@ class GamePanel(QWidget):
         redmod_path = getattr(plugin, "GameRedmodPath", "") if plugin else ""
         pak_order = getattr(plugin, "GamePakLoadOrderPrefix", False) if plugin else False
         pak_order_dirs = getattr(plugin, "GamePakLoadOrderDirs", []) if plugin else []
+        pak_order_ext = (
+            getattr(plugin, "GamePakLoadOrderExtensions", []) if plugin else []
+        )
+        pak_order_first = (
+            getattr(plugin, "GamePakLoadOrderFirstWins", False) if plugin else False
+        )
         archive_order_file = (
             getattr(plugin, "GameArchiveLoadOrderFile", "") if plugin else ""
         )
@@ -3277,6 +3283,8 @@ class GamePanel(QWidget):
             separator_deploy_paths=self._separator_deploy_paths,
             pak_load_order_prefix=pak_order,
             pak_load_order_dirs=pak_order_dirs,
+            pak_load_order_extensions=pak_order_ext,
+            pak_load_order_first_wins=pak_order_first,
             archive_load_order_file=archive_order_file,
             mods_path=self._mods_path,
             profiles_path=self._profiles_path,

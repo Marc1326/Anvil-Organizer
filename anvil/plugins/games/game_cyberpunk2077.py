@@ -65,10 +65,21 @@ class Cyberpunk2077Game(BaseGame):
         "red4ext/plugins",
     ]
 
-    # Ohne diese Datei haengt das Spiel die Archive alphabetisch nach
-    # Dateiname ein -- die Reihenfolge aus Anvil waere reine Anzeige.
-    # Liegt sie im Ordner, laedt das Spiel genau in dieser Reihenfolge.
+    # Die Liste wird weiter geschrieben, entscheidet aber nichts: an drei
+    # Spielstarts gemessen laedt REDengine die Archive nach Dateinamen und
+    # ignoriert sie. Sie bleibt, weil Werkzeuge und andere Manager sie lesen.
     GameArchiveLoadOrderFile = "archive/pc/mod/modlist.txt"
+
+    # Deshalb bekommen die Archive beim Ausrollen einen Zaehler im Namen.
+    # Nur im Archiv-Ordner und nur die .archive selbst: die .xl daneben
+    # heissen bei 38 von 85 Faellen ohnehin anders als ihr Archiv, eine
+    # Namensbindung gibt es also nicht. REDmod-Archive liegen unter
+    # mods/<name>/archives/ und bleiben ebenfalls unberuehrt.
+    GamePakLoadOrderDirs: list[str] = ["archive/pc/mod"]
+    GamePakLoadOrderExtensions: list[str] = [".archive"]
+    # Bei REDengine gewinnt das alphabetisch ERSTE Archiv -- umgekehrt zu
+    # Unreal. Ohne diesen Schalter dreht der Zaehler die Reihenfolge um.
+    GamePakLoadOrderFirstWins = True
 
     # Ordner, an denen eine Mod ihre Zielstruktur schon selbst mitbringt.
     # Beginnt ihr Pfad damit, bleibt er unangetastet.
