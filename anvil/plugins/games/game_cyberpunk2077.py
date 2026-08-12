@@ -65,6 +65,38 @@ class Cyberpunk2077Game(BaseGame):
         "red4ext/plugins",
     ]
 
+    # Ohne diese Datei haengt das Spiel die Archive alphabetisch nach
+    # Dateiname ein -- die Reihenfolge aus Anvil waere reine Anzeige.
+    # Liegt sie im Ordner, laedt das Spiel genau in dieser Reihenfolge.
+    GameArchiveLoadOrderFile = "archive/pc/mod/modlist.txt"
+
+    # Ordner, an denen eine Mod ihre Zielstruktur schon selbst mitbringt.
+    # Beginnt ihr Pfad damit, bleibt er unangetastet.
+    GameDeployAnchors = [
+        "archive", "bin", "engine", "mods", "r6", "red4ext", "tools",
+    ]
+
+    # Manche Pakete enthalten nur die nackte .archive, ohne Ordner drumherum.
+    # Ohne Regel landet sie im Spielhauptverzeichnis, wo das Spiel sie nie
+    # liest -- die Mod schien dann spurlos zu verschwinden.
+    GameDeployRoutes: list[dict] = [
+        {
+            "dest": "archive/pc/mod",
+            "suffixes": [".archive", ".xl", ".archive.xl"],
+            "flatten": True,
+        },
+        # redscript, TweakXL, Tastenbelegungen und Skript-Einstellungen
+        # wohnen unter r6. Viele Pakete bringen diesen Ordner aber nicht
+        # mit und beginnen direkt mit scripts/ oder tweaks/ -- ohne die
+        # Regel landet der Inhalt im Spielhauptverzeichnis und wird von
+        # keinem Loader gelesen. Unterordner bleiben erhalten, die
+        # Skripte referenzieren sich gegenseitig ueber ihren Pfad.
+        {
+            "dest": "r6",
+            "first_folder": ["scripts", "tweaks", "input", "config"],
+        },
+    ]
+
     GameDirectInstallMods = [
         "TweakXL",
         "ArchiveXL",

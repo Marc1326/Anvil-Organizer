@@ -110,6 +110,27 @@ from anvil.core.mod_deployer import matches_direct_install as _matches_direct_in
 # Farbe des Trenners, den Anvil beim ersten Preset selbst anlegt.
 _PRESET_SEP_COLOR = "#ffd700"
 
+# Beipack, aus dem allein keine Mod wird.
+_NUR_BEIWERK = {".txt", ".md", ".pdf", ".url", ".nfo", ".ds_store"}
+_NUR_BEIWERK_NAMEN = {"thumbs.db", ".ds_store", "desktop.ini"}
+
+
+def _has_installable_content(root: Path) -> bool:
+    """True, wenn unter *root* noch etwas liegt, das eine Mod ergibt.
+
+    Nach dem Herausloesen der Presets bleiben oft nur noch Liesmich-Dateien
+    uebrig. Daraus eine leere Mod zu bauen waere nur Ballast.
+    """
+    for pfad in root.rglob("*"):
+        if not pfad.is_file():
+            continue
+        if pfad.name.lower() in _NUR_BEIWERK_NAMEN:
+            continue
+        if pfad.suffix.lower() in _NUR_BEIWERK:
+            continue
+        return True
+    return False
+
 
 def _path_matches(base: Path, rel: str) -> bool:
     """True wenn *rel* unter *base* existiert — mit Wildcard-Support."""
@@ -2181,9 +2202,16 @@ class MainWindow(QMainWindow):
     def _install_presets_from(self, temp_dir: Path, archive: Path) -> bool:
         """Legt gefundene Presets als eigene Mods an.
 
+        Gesichts-Presets bringen fast immer ein ``.archive`` mit -- das
+        Gesicht selbst. Deshalb wird der Rest des Pakets nicht
+        weggeworfen, sondern ganz gewoehnlich weiterinstalliert. Die
+        uebernommenen ``.preset``-Dateien verschwinden vorher aus dem
+        Temp-Ordner, sonst laege dieselbe Datei zweimal auf der Platte
+        und Anvil meldete einen Konflikt mit sich selbst.
+
         Returns:
-            True, wenn das Archiv als Preset-Paket behandelt wurde. Dann
-            laeuft der gewoehnliche Installationsweg nicht mehr an.
+            True, wenn das Archiv **nur** Presets enthielt. Dann laeuft
+            der gewoehnliche Installationsweg nicht mehr an.
         """
         from anvil.core import character_presets as cp
 
@@ -2198,7 +2226,9 @@ class MainWindow(QMainWindow):
         mods_dir = _active_instance_paths(self).mods
         profiles_dir = _active_instance_paths(self).profiles
         angelegt: list[str] = []
+        uebernommen: list[Path] = []
         separator = ""
+        abgebrochen = False
 
         for kind in arten:
             for datei in cp.find_presets(temp_dir, kind):
@@ -2211,7 +2241,8 @@ class MainWindow(QMainWindow):
                 if not separator:
                     separator = self._preset_separator() or self._ask_preset_separator()
                     if not separator:
-                        return bool(angelegt)
+                        abgebrochen = True
+                        break
 
                 name = cp.suggest_mod_name(datei, variante, kind)
                 if (mods_dir / name).exists():
@@ -2219,8 +2250,10 @@ class MainWindow(QMainWindow):
                 try:
                     cp.build_mod(datei, mods_dir, name, kind, variante)
                 except (OSError, FileExistsError) as exc:
-                    self._log_panel.add_log("warn", f"{datei.name}: {exc}")
+                    self._log_panel.add_log("warning", f"{datei.name}: {exc}")
                     continue
+
+                self._write_preset_origin(mods_dir / name, archive)
 
                 # Direkt hinter den Trenner, damit alle Presets beisammen
                 # bleiben statt ans Listenende zu rutschen.
@@ -2234,15 +2267,57 @@ class MainWindow(QMainWindow):
                     aktiv.add(name)
                     write_active_mods(self._current_profile_path, aktiv)
                 angelegt.append(name)
+                uebernommen.append(datei)
+            if abgebrochen:
+                break
 
         if not angelegt:
             return False
+
+        # Uebernommene Presets aus dem Temp-Ordner nehmen, sonst wandern
+        # sie gleich nochmal als Teil der gewoehnlichen Mod mit.
+        for datei in uebernommen:
+            datei.unlink(missing_ok=True)
 
         self._reload_mod_list()
         self.statusBar().showMessage(
             tr("preset.installed", count=len(angelegt), name=archive.name), 6000,
         )
-        return True
+        return not _has_installable_content(temp_dir)
+
+    def _write_preset_origin(self, mod_dir: Path, archive: Path) -> None:
+        """Vermerkt, aus welchem Nexus-Paket das Preset stammt.
+
+        Ohne diesen Vermerk hat die selbstgebaute Preset-Mod keinerlei
+        Herkunft -- und damit auch keine Liste der Mods, die der Autor
+        verwendet hat.
+        """
+        from anvil.core.mod_metadata import write_meta_ini
+        from anvil.core.nexus_filename_parser import extract_nexus_mod_id
+
+        mod_id = extract_nexus_mod_id(archive.name)
+        if not mod_id:
+            return
+
+        slug = ""
+        if self._current_plugin is not None:
+            slug = (
+                getattr(self._current_plugin, "GameNexusName", "")
+                or getattr(self._current_plugin, "GameShortName", "")
+            )
+
+        daten = {
+            "modid": str(mod_id),
+            "installationFile": archive.name,
+            "repository": "Nexus",
+        }
+        if slug:
+            daten["gameName"] = slug
+            daten["nexusURL"] = f"https://www.nexusmods.com/{slug}/mods/{mod_id}"
+        try:
+            write_meta_ini(mod_dir, daten)
+        except OSError as exc:
+            self._log_panel.add_log("warning", f"{mod_dir.name}: {exc}")
 
     # ── Frameworks: Schloss auf = gewoehnliche Mod ───────────────────
 
@@ -2332,7 +2407,7 @@ class MainWindow(QMainWindow):
             return []
 
         self._log_panel.add_log(
-            "warn",
+            "warning",
             tr("foreign.found", count=len(funde)),
         )
         return foreign_mods.to_entries(funde, len(self._current_mod_entries))
@@ -2712,6 +2787,22 @@ class MainWindow(QMainWindow):
             result[uuid] = normalized
         return result
 
+    def _conflict_mod_list(self) -> list[dict]:
+        """Aktive Mods so aufbereiten, wie der ConflictScanner sie erwartet.
+
+        Der Scanner laesst den letzten Eintrag gewinnen, in der Mod-Liste
+        steht die staerkste Mod aber oben — also umdrehen.
+        BG3 behaelt seine bisherige Reihenfolge.
+        """
+        mods_root = _active_instance_paths(self).mods
+        all_mods = [
+            {"name": e.name, "path": str(mods_root / e.name)}
+            for e in self._current_mod_entries if e.enabled and not e.is_foreign
+        ]
+        if self._bg3_installer is None:
+            all_mods.reverse()
+        return all_mods
+
     def _run_conflict_scan(self) -> dict:
         """Gemeinsamer roher Konflikt-Scan (BG3 + normale Spiele).
 
@@ -2738,10 +2829,7 @@ class MainWindow(QMainWindow):
         # Regular games: filesystem-based scan
         if not self._current_instance_path:
             return {}
-        all_mods = [
-            {"name": e.name, "path": str(_active_instance_paths(self).mods / e.name)}
-            for e in self._current_mod_entries if e.enabled and not e.is_foreign
-        ]
+        all_mods = self._conflict_mod_list()
         if not all_mods:
             return {}
         return ConflictScanner().scan_conflicts(
@@ -3391,8 +3479,15 @@ class MainWindow(QMainWindow):
             # 1. Extract to temp
             temp_dir = installer.extract_to_temp(archive)
             if temp_dir is None:
+                # Nur die Statuszeile war zu wenig: die Meldung verschwand,
+                # und die Mod fehlte danach kommentarlos in der Liste.
                 self.statusBar().showMessage(
                     tr("error.extract_failed", name=archive.name), 8000,
+                )
+                QMessageBox.warning(
+                    self,
+                    tr("error.extract_failed_title"),
+                    tr("error.extract_failed_detail", name=archive.name),
                 )
                 continue
             print(f"DEBUG _install_archives: temp_dir={temp_dir}", flush=True)
@@ -3902,19 +3997,30 @@ class MainWindow(QMainWindow):
 
         while mod_name:
             mod_path = str(_active_instance_paths(self).mods / mod_name)
-            all_mods = [
-                {"name": e.name, "path": str(_active_instance_paths(self).mods / e.name)}
-                for e in self._current_mod_entries if e.enabled and not e.is_foreign
-            ]
+            all_mods = self._conflict_mod_list()
             mod_entry = next(
                 (e for e in self._current_mod_entries if e.name == mod_name),
                 None
+            )
+            # Fuer den Voraussetzungs-Tab: welche Nexus-Mods liegen schon hier?
+            # Aus den Eintraegen statt aus den meta.ini-Dateien -- die
+            # Nummer steht dort bereits.
+            nexus_ids = {
+                e.nexus_id: e.name
+                for e in self._current_mod_entries
+                if getattr(e, "nexus_id", 0) > 0
+            }
+            cache = (
+                self._current_instance_path / "nexus_requirements.json"
+                if self._current_instance_path else None
             )
             dlg = ModDetailDialog(
                 self, mod_name=mod_name, mod_path=mod_path,
                 all_mods=all_mods, game_plugin=self._current_plugin,
                 category_manager=self._category_manager,
                 mod_entry=mod_entry,
+                installed_nexus_ids=nexus_ids,
+                requirements_cache=cache,
             )
             _center_on_parent(dlg)
             result = dlg.exec()

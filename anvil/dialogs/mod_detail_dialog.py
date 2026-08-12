@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QMenu,
 )
-from PySide6.QtCore import Qt, QRect, QSize, QTimer
+from PySide6.QtCore import Qt, QRect, QSize, QThread, QTimer, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QFontDatabase, QIcon, QPixmap
 
 from anvil.core.conflict_scanner import ConflictScanner
@@ -1153,6 +1153,190 @@ def _build_filetree_tab(mod_path: str):
     return page
 
 
+def mod_has_presets(mod_path: str, game_plugin) -> bool:
+    """Ob unter *mod_path* eine Preset-Datei des Spiels liegt.
+
+    Danach richtet sich, ob der Voraussetzungs-Tab ueberhaupt erscheint.
+    """
+    if not mod_path or not os.path.isdir(mod_path):
+        return False
+    arten = getattr(game_plugin, "get_preset_kinds", None)
+    if not callable(arten):
+        return False
+    from pathlib import Path
+    for kind in arten():
+        if any(Path(mod_path).rglob(f"*{kind.suffix}")):
+            return True
+    return False
+
+
+class _RequirementsLoader(QThread):
+    """Holt die Liste, ohne die Oberflaeche einzufrieren."""
+
+    fertig = Signal(list)
+    schiefgegangen = Signal(str)
+
+    def __init__(self, domain: str, mod_id: int, parent=None):
+        super().__init__(parent)
+        self._domain = domain
+        self._mod_id = mod_id
+
+    def run(self) -> None:
+        from anvil.core import nexus_requirements as nr
+        try:
+            self.fertig.emit(nr.fetch(self._domain, self._mod_id))
+        except nr.RequirementsError as exc:
+            self.schiefgegangen.emit(str(exc))
+
+
+def _build_presets_tab(mod_path: str, game_plugin, installed_ids: dict,
+                       cache_path=None):
+    """Voraussetzungen: welche Mods der Autor fuer sein Preset benutzt hat.
+
+    Ein Preset beschreibt nur Zahlenwerte. Fehlt die Haar- oder Hautmod,
+    auf die sich diese Werte beziehen, sieht die Figur anders aus als auf
+    den Bildern des Autors -- ohne dass irgendwo ein Fehler erschiene.
+    Deshalb zaehlt hier nicht nur die Liste, sondern vor allem, was davon
+    fehlt.
+    """
+    from pathlib import Path
+
+    from anvil.core.mod_metadata import read_meta_ini
+    from anvil.core.translator import tr as _tr
+    from anvil.styles.dark_theme import theme_color as _tc
+
+    page = QWidget()
+    page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(6)
+
+    meta = read_meta_ini(Path(mod_path)) if mod_path and os.path.isdir(mod_path) else {}
+    try:
+        mod_id = int(meta.get("modid", "0") or 0)
+    except ValueError:
+        mod_id = 0
+    domain = (
+        getattr(game_plugin, "GameNexusName", "")
+        or getattr(game_plugin, "GameShortName", "")
+    )
+
+    kopf = QHBoxLayout()
+    kopf.setSpacing(8)
+    status = QLabel("")
+    status.setWordWrap(True)
+    kopf.addWidget(status, 1)
+    btn = QPushButton(_tr("preset_reqs.refresh"))
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    kopf.addWidget(btn)
+    layout.addLayout(kopf)
+
+    tree = QTreeWidget()
+    tree.setRootIsDecorated(False)
+    tree.setAlternatingRowColors(True)
+    tree.setHeaderLabels([
+        _tr("preset_reqs.col_state"),
+        _tr("preset_reqs.col_mod"),
+        _tr("preset_reqs.col_note"),
+    ])
+    tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    tree.header().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    tree.header().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    layout.addWidget(tree, 1)
+
+    hinweis = QLabel(_tr("preset_reqs.open_hint"))
+    hinweis.setWordWrap(True)
+    layout.addWidget(hinweis)
+
+    farbe_ok = QColor(_tc("ok", "#4CAF50"))
+    farbe_fehlt = QColor(_tc("warn", "#E0A030"))
+
+    def _zeigen(eintraege: list) -> None:
+        tree.clear()
+        fehlend = 0
+        for req in eintraege:
+            da = req.mod_id in installed_ids
+            if not da:
+                fehlend += 1
+            item = QTreeWidgetItem([
+                _tr("preset_reqs.state_installed") if da
+                else _tr("preset_reqs.state_missing"),
+                req.name or str(req.mod_id),
+                req.notes,
+            ])
+            item.setForeground(0, farbe_ok if da else farbe_fehlt)
+            if da:
+                item.setToolTip(1, installed_ids[req.mod_id])
+            item.setData(0, Qt.ItemDataRole.UserRole, req.url)
+            if req.required and not da:
+                schrift = item.font(1)
+                schrift.setBold(True)
+                item.setFont(1, schrift)
+            tree.addTopLevelItem(item)
+
+        if not eintraege:
+            status.setText(_tr("preset_reqs.none"))
+        elif fehlend:
+            status.setText(_tr("preset_reqs.summary_missing",
+                               count=len(eintraege), missing=fehlend))
+        else:
+            status.setText(_tr("preset_reqs.summary_complete", count=len(eintraege)))
+
+    def _oeffnen(item, _spalte):
+        adresse = item.data(0, Qt.ItemDataRole.UserRole)
+        if adresse:
+            from anvil.core.subprocess_env import host_open_url
+            host_open_url(adresse, page)
+
+    tree.itemDoubleClicked.connect(_oeffnen)
+
+    if not mod_id or not domain:
+        status.setText(_tr("preset_reqs.no_nexus"))
+        btn.setEnabled(False)
+        return page
+
+    from anvil.core import nexus_requirements as nr
+
+    zwischen = (
+        nr.load_cache(Path(cache_path), domain, mod_id)
+        if cache_path is not None else None
+    )
+
+    def _laden():
+        btn.setEnabled(False)
+        status.setText(_tr("preset_reqs.loading"))
+        lader = _RequirementsLoader(domain, mod_id, page)
+
+        def _ok(eintraege):
+            if cache_path is not None:
+                nr.save_cache(Path(cache_path), domain, mod_id, eintraege)
+            _zeigen(eintraege)
+            btn.setEnabled(True)
+
+        def _fehler(text):
+            status.setText(_tr("preset_reqs.error", error=text))
+            btn.setEnabled(True)
+
+        lader.fertig.connect(_ok)
+        lader.schiefgegangen.connect(_fehler)
+        # Referenz halten, sonst raeumt Python den Thread waehrend des
+        # Laufs ab und Qt beendet ihn hart.
+        page._lader = lader
+        lader.start()
+
+    btn.clicked.connect(lambda _checked=False: _laden())
+
+    # Beim ersten Mal von selbst holen. Wer ein Preset oeffnet, will die
+    # Liste sehen und nicht erst einen Knopf suchen. Danach kommt sie aus
+    # dem Zwischenspeicher, ohne das Netz zu bemuehen.
+    if zwischen is not None:
+        _zeigen(zwischen)
+    else:
+        QTimer.singleShot(0, _laden)
+
+    return page
+
+
 def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
     """Konflikte-Tab: Gewinnt/Verliert-Bereiche mit ConflictScanner.
 
@@ -1615,7 +1799,8 @@ class ModDetailDialog(QDialog):
 
     def __init__(self, parent=None, mod_name="", mod_path="",
                  all_mods=None, game_plugin=None,
-                 category_manager=None, mod_entry=None):
+                 category_manager=None, mod_entry=None,
+                 installed_nexus_ids=None, requirements_cache=None):
         super().__init__(parent)
         self._all_mods = all_mods or []
         self.setWindowTitle(mod_name or tr("dialog.mod_details"))
@@ -1703,6 +1888,17 @@ class ModDetailDialog(QDialog):
 
         # Tab 6: Nexus Info
         self.tab_widget.addTab(_build_nexus_tab(mod_path), tr("mod_detail.tab_nexus"))
+
+        # Voraussetzungen eines Charakter-Presets. Nur bei Presets sichtbar --
+        # bei jeder anderen Mod waere der Reiter leer.
+        if mod_has_presets(mod_path, game_plugin):
+            self.tab_widget.addTab(
+                _build_presets_tab(
+                    mod_path, game_plugin, installed_nexus_ids or {},
+                    requirements_cache,
+                ),
+                tr("mod_detail.tab_preset_reqs"),
+            )
 
         # Tab 7: Verzeichnisbaum
         self.tab_widget.addTab(_build_filetree_tab(mod_path), tr("mod_detail.tab_filetree"))

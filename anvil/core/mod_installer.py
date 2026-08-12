@@ -3,8 +3,13 @@
 Supported formats:
 
 - ZIP  — ``zipfile`` (stdlib, always available)
-- RAR  — ``unrar`` CLI tool
-- 7-Zip — ``7z`` CLI tool (p7zip)
+- RAR  — ``unrar``, ersatzweise ``bsdtar``
+- 7-Zip — ``7z`` (p7zip), ersatzweise ``bsdtar``
+
+``bsdtar`` gehoert zu libarchive und liest beide Formate ebenfalls. Es ist
+die Rueckfallebene fuer abgeschottete Umgebungen: im Flatpak liegt weder
+``unrar`` noch ``7z``, wohl aber ``bsdtar`` -- ohne diesen Weg liesse sich
+dort ueberhaupt kein RAR und kein 7z installieren.
 """
 
 from __future__ import annotations
@@ -597,52 +602,63 @@ class ModInstaller:
             return False
 
     @staticmethod
-    def _extract_rar(archive: Path, dest: Path) -> bool:
-        if not shutil.which("unrar"):
-            print(
-                "mod_installer: 'unrar' not found — install it to extract RAR files",
-                file=sys.stderr,
-            )
-            return False
+    def _run_extractor(befehl: list[str], dest: Path, fmt: str) -> bool:
+        """Fuehrt einen Entpacker aus und meldet, ob es geklappt hat."""
         try:
             subprocess.run(
-                ["unrar", "x", "-o+", "-y", str(archive), str(dest) + "/"],
+                befehl,
                 check=True,
                 capture_output=True,
                 env=clean_subprocess_env(),
             )
-            ModInstaller._validate_extracted_paths(dest, "RAR")
-            return True
-        except subprocess.CalledProcessError as exc:
+        except (subprocess.CalledProcessError, OSError) as exc:
+            grund = getattr(exc, "stderr", None)
+            text = grund.decode(errors="replace") if grund else str(exc)
             print(
-                f"mod_installer: unrar failed: {exc.stderr.decode(errors='replace')}",
+                f"mod_installer: {befehl[0]} failed on {fmt}: {text}",
                 file=sys.stderr,
             )
             return False
+        ModInstaller._validate_extracted_paths(dest, fmt)
+        return True
+
+    @staticmethod
+    def _extract_rar(archive: Path, dest: Path) -> bool:
+        if shutil.which("unrar"):
+            return ModInstaller._run_extractor(
+                ["unrar", "x", "-o+", "-y", str(archive), str(dest) + "/"],
+                dest, "RAR",
+            )
+        if shutil.which("bsdtar"):
+            return ModInstaller._run_extractor(
+                ["bsdtar", "-x", "-f", str(archive), "-C", str(dest)],
+                dest, "RAR",
+            )
+        print(
+            "mod_installer: neither 'unrar' nor 'bsdtar' found — "
+            "cannot extract RAR files",
+            file=sys.stderr,
+        )
+        return False
 
     @staticmethod
     def _extract_7z(archive: Path, dest: Path) -> bool:
-        if not shutil.which("7z"):
-            print(
-                "mod_installer: '7z' not found — install p7zip to extract 7z files",
-                file=sys.stderr,
-            )
-            return False
-        try:
-            subprocess.run(
+        if shutil.which("7z"):
+            return ModInstaller._run_extractor(
                 ["7z", "x", str(archive), f"-o{dest}", "-y"],
-                check=True,
-                capture_output=True,
-                env=clean_subprocess_env(),
+                dest, "7z",
             )
-            ModInstaller._validate_extracted_paths(dest, "7z")
-            return True
-        except subprocess.CalledProcessError as exc:
-            print(
-                f"mod_installer: 7z failed: {exc.stderr.decode(errors='replace')}",
-                file=sys.stderr,
+        if shutil.which("bsdtar"):
+            return ModInstaller._run_extractor(
+                ["bsdtar", "-x", "-f", str(archive), "-C", str(dest)],
+                dest, "7z",
             )
-            return False
+        print(
+            "mod_installer: neither '7z' nor 'bsdtar' found — "
+            "cannot extract 7z files",
+            file=sys.stderr,
+        )
+        return False
 
     # ── Helpers ────────────────────────────────────────────────────────
 

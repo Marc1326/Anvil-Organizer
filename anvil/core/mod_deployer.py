@@ -64,6 +64,10 @@ _BA2_SYMLINK_EXTENSIONS = {
 # denselben Namen tragen, sonst findet das Spiel sie nicht zusammen.
 _PAK_EXTENSIONS = {".pak", ".utoc", ".ucas"}
 
+# Beim Durchnummerieren zaehlt die Signatur mit: sie wird ueber den
+# Basisnamen zugeordnet und liefe sonst neben ihrem Pak ins Leere.
+_PAK_ORDER_EXTENSIONS = _PAK_EXTENSIONS | {".sig"}
+
 
 def strip_deploy_prefixes(rel: Path, prefixes: list[str]) -> Path:
     """Entfernt fuehrende Ordner, die nur die Mod-Art benennen.
@@ -172,11 +176,17 @@ def route_deploy_path(rel: Path, routes: list[dict], mount: str = "") -> Path:
             muster = [str(n).lower() for n in regel.get("names", [])]
             endungen = [str(s).lower() for s in regel.get("suffixes", [])]
             gesucht = [str(f).strip("/").lower() for f in regel.get("folders", [])]
+            kopf = [str(f).strip("/").lower() for f in regel.get("first_folder", [])]
             passt = any(fnmatch.fnmatch(name, m) for m in muster)
             if not passt:
                 passt = any(name.endswith(s) for s in endungen)
             if not passt and gesucht:
                 passt = bool(ordner.intersection(gesucht))
+            # Nur der oberste Ordner zaehlt: dem Mod fehlt genau ein
+            # Elternordner. "folders" wuerde auch tief unten anschlagen
+            # und den Pfad dann an der falschen Stelle verbiegen.
+            if not passt and kopf:
+                passt = len(rel.parts) > 1 and rel.parts[0].lower() in kopf
         if not passt:
             continue
         # Unterordner bleiben erhalten -- ein Mod, der seine Dateien
@@ -191,14 +201,31 @@ def route_deploy_path(rel: Path, routes: list[dict], mount: str = "") -> Path:
 def pak_load_order_name(rel: Path, index: int) -> Path:
     """Stellt dem Dateinamen einen Zaehler voran.
 
-    Unreal haengt die Paks alphabetisch ein und laesst die zuletzt
-    eingehaengte gewinnen. Der Zaehler bildet die Reihenfolge aus Anvil ab:
-    niedrigste Prioritaet bekommt die kleinste Zahl und wird zuerst
-    eingehaengt, die hoechste gewinnt.
+    Die Spiele-Engines haengen diese Dateien alphabetisch ein und lassen
+    die zuletzt eingehaengte gewinnen. Der Zaehler bildet die Reihenfolge
+    aus Anvil ab: niedrigste Prioritaet bekommt die kleinste Zahl und
+    wird zuerst eingehaengt, die hoechste gewinnt.
     """
-    if rel.suffix.lower() not in _PAK_EXTENSIONS:
+    if rel.suffix.lower() not in _PAK_ORDER_EXTENSIONS:
         return rel
     return rel.with_name(f"{index:03d}_{rel.name}")
+
+
+def pak_order_allows(rel: Path, dirs: list[str]) -> bool:
+    """True, wenn fuer den Zielordner von *rel* umbenannt werden darf.
+
+    Ohne Angabe gilt keine Begrenzung. Sonst muss die Datei unterhalb
+    eines freigegebenen Ordners liegen -- LogicMods, CNS und die Loader
+    suchen ihre Dateien am Namen und bleiben so unangetastet.
+    """
+    if not dirs:
+        return True
+    pfad = str(rel).replace("\\", "/").lower()
+    for eintrag in dirs:
+        ordner = str(eintrag).replace("\\", "/").strip("/").lower()
+        if ordner and pfad.startswith(ordner + "/"):
+            return True
+    return False
 
 
 @dataclass
@@ -244,6 +271,8 @@ class ModDeployer:
         redmod_path: str = "",
         separator_deploy_paths: dict[str, str] | None = None,
         pak_load_order_prefix: bool = False,
+        pak_load_order_dirs: list[str] | None = None,
+        archive_load_order_file: str = "",
         mods_path: Path | None = None,
         profiles_path: Path | None = None,
         deploy_strip_prefixes: list[str] | None = None,
@@ -274,6 +303,8 @@ class ModDeployer:
         self._mod_index = mod_index
         self._separator_deploy_paths = separator_deploy_paths or {}
         self._pak_load_order_prefix = pak_load_order_prefix
+        self._pak_load_order_dirs = pak_load_order_dirs or []
+        self._archive_load_order_file = archive_load_order_file.replace("\\", "/").strip("/")
         self._skipped_mods: set[str] = set()
 
     def set_skipped_mods(self, names) -> None:
@@ -409,6 +440,10 @@ class ModDeployer:
         # Track what we create
         symlinks: list[dict[str, str]] = []
         created_dirs: set[str] = set()
+        # Ziele, die dieser Lauf selbst geschrieben hat. Ohne diese Liste
+        # gilt die Kopie einer schwaecheren Mod als echte Spieldatei und
+        # die staerkere wird uebersprungen -- die Reihenfolge kehrt sich um.
+        written_targets: set[str] = set()
 
         # Process mods from lowest to highest priority.
         # Higher priority mods overwrite lower ones (replace symlink).
@@ -640,8 +675,9 @@ class ModDeployer:
                             else:
                                 rel = data_prefix / rel
 
-                if self._pak_load_order_prefix:
-                    rel = pak_load_order_name(rel, load_index)
+                if self._pak_load_order_prefix or self._pak_load_order_dirs:
+                    if pak_order_allows(rel, self._pak_load_order_dirs):
+                        rel = pak_load_order_name(rel, load_index)
 
                 # Determine deploy base: custom separator path or global game path
                 mod_separator = mod_to_separator.get(mod_name, "")
@@ -650,12 +686,14 @@ class ModDeployer:
 
                 target = deploy_base / rel
 
-                # Safety: never overwrite a real (non-symlink) game file
-                # Exception: direct-install (framework) mods MUST overwrite
+                # Safety: never overwrite a real (non-symlink) game file.
+                # Ausnahmen: Frameworks duerfen das, und was dieser Lauf
+                # selbst geschrieben hat, ist keine Spieldatei -- dort
+                # kommt gerade eine hoeher stehende Mod ueber eine
+                # niedrigere.
                 if target.exists() and not target.is_symlink():
-                    if is_direct:
-                        pass  # frameworks are allowed to overwrite real files
-                    else:
+                    already_ours = str(target) in written_targets
+                    if not is_direct and not already_ours:
                         result.skipped_real_files.append(str(rel))
                         continue
 
@@ -713,7 +751,15 @@ class ModDeployer:
                     # Framework reverse-sync: wenn die Datei im Game-Verzeichnis
                     # neuer ist als in .mods/, wurde sie extern aktualisiert.
                     # → .mods/ mit der neueren Version aktualisieren.
-                    if is_direct and target.is_file() and not target.is_symlink():
+                    # Stammt sie aus diesem Lauf, ist sie die Kopie einer
+                    # schwaecheren Mod -- dann waere der Abgleich falsch
+                    # herum und wuerde die staerkere Mod ueberschreiben.
+                    if (
+                        is_direct
+                        and target.is_file()
+                        and not target.is_symlink()
+                        and str(target) not in written_targets
+                    ):
                         try:
                             src_mtime = src_file.stat().st_mtime
                             tgt_mtime = target.stat().st_mtime
@@ -734,6 +780,7 @@ class ModDeployer:
                                 if sep_path:
                                     entry_data["deploy_base"] = sep_path
                                 symlinks.append(entry_data)
+                                written_targets.add(str(target))
                                 result.files_copied += 1
                                 continue
                         except OSError:
@@ -752,6 +799,7 @@ class ModDeployer:
                         if sep_path:
                             entry_data["deploy_base"] = sep_path
                         symlinks.append(entry_data)
+                        written_targets.add(str(target))
                     except OSError as exc:
                         result.errors.append(
                             f"copy {rel}: {exc}"
@@ -769,10 +817,13 @@ class ModDeployer:
                         if sep_path:
                             entry_data["deploy_base"] = sep_path
                         symlinks.append(entry_data)
+                        written_targets.add(str(target))
                     except OSError as exc:
                         result.errors.append(
                             f"symlink {rel} -> {src_file}: {exc}"
                         )
+
+        symlinks.extend(self._write_archive_load_order(symlinks, result))
 
         # Save manifest
         manifest = {
@@ -804,6 +855,118 @@ class ModDeployer:
             result.success = False
 
         return result
+
+    def _write_archive_load_order(
+        self,
+        symlinks: list[dict[str, str]],
+        result: DeployResult,
+    ) -> list[dict[str, str]]:
+        """Schreibt die Ladeliste fuer Archiv-Mods in den Spielordner.
+
+        Ohne die Liste haengt das Spiel seine Archive alphabetisch nach
+        Dateiname ein -- die Reihenfolge aus Anvil waere wirkungslos. Die
+        Liste bildet sie ab: unterste Mod zuerst, oberste zuletzt, denn
+        das zuletzt geladene Archiv gewinnt.
+
+        Von Hand hineingelegte fremde Archive stehen mit in der Liste und
+        zwar vorn, sonst wuerden sie mit der Datei stillschweigend nicht
+        mehr geladen.
+
+        Returns:
+            Manifest-Eintraege fuer die geschriebenen Dateien.
+        """
+        if not self._archive_load_order_file:
+            return []
+
+        rel_datei = Path(self._archive_load_order_file)
+        ordner_rel = str(rel_datei.parent).replace("\\", "/").strip("/").lower()
+        ordner = self._game_path / rel_datei.parent
+        if not ordner.is_dir():
+            return []
+
+        # Reihenfolge steckt schon in den Manifest-Eintraegen: sie
+        # entstehen von der niedrigsten zur hoechsten Prioritaet.
+        verwaltet: list[str] = []
+        for eintrag in symlinks:
+            if eintrag.get("deploy_base"):
+                continue
+            if eintrag.get("type") not in {"symlink", "copy", "shim_copy"}:
+                continue
+            link = Path(str(eintrag.get("link", "")))
+            if link.suffix.lower() != ".archive":
+                continue
+            if str(link.parent).replace("\\", "/").strip("/").lower() != ordner_rel:
+                continue
+            verwaltet.append(link.name)
+
+        # Doppelte Namen: der spaetere Eintrag stammt von der hoeheren
+        # Mod und liegt tatsaechlich im Ordner.
+        gesehen: set[str] = set()
+        eindeutig: list[str] = []
+        for name in reversed(verwaltet):
+            if name.lower() in gesehen:
+                continue
+            gesehen.add(name.lower())
+            eindeutig.append(name)
+        eindeutig.reverse()
+
+        try:
+            vorhanden = sorted(
+                (p.name for p in ordner.iterdir()
+                 if p.is_file() and p.suffix.lower() == ".archive"),
+                key=str.lower,
+            )
+        except OSError as exc:
+            result.errors.append(f"read {ordner}: {exc}")
+            return []
+
+        fremd = [n for n in vorhanden if n.lower() not in gesehen]
+        zeilen = fremd + eindeutig
+        if not zeilen:
+            return []
+
+        ziel = self._game_path / rel_datei
+        sicherung = ziel.with_name(ziel.name + ".anvil_backup")
+        eintraege: list[dict[str, str]] = []
+
+        # Eine vorgefundene fremde Liste wird nie einfach ueberschrieben.
+        # Liegt schon eine Sicherung, stammt sie aus einem frueheren Lauf
+        # und bleibt unangetastet -- sonst ginge das Original verloren.
+        if ziel.exists() and not sicherung.exists():
+            try:
+                os.replace(ziel, sicherung)
+            except OSError as exc:
+                result.errors.append(f"backup {rel_datei}: {exc}")
+                return []
+
+        try:
+            ziel.write_text("\n".join(zeilen) + "\n", encoding="utf-8")
+        except OSError as exc:
+            result.errors.append(f"write {rel_datei}: {exc}")
+            return []
+
+        eintrag_liste: dict[str, str] = {
+            "link": str(rel_datei),
+            "target": "",
+            "mod": "",
+            "type": "archive_order",
+        }
+        if sicherung.is_file():
+            eintrag_liste["backup"] = str(sicherung.relative_to(self._game_path))
+            eintraege.append({
+                "link": str(sicherung.relative_to(self._game_path)),
+                "target": "",
+                "mod": "",
+                "type": "archive_order_backup",
+            })
+        eintraege.insert(0, eintrag_liste)
+
+        print(
+            f"[DEPLOY] Archiv-Ladeliste: {len(zeilen)} Eintrag/Eintraege "
+            f"-> {ziel}",
+            flush=True,
+        )
+        return eintraege
 
     def purge(self) -> DeployResult:
         """Remove all deployed symlinks and clean up empty directories.
@@ -838,6 +1001,26 @@ class ModDeployer:
             base_path = Path(entry_deploy_base) if entry_deploy_base else game_path
             link_path = base_path / link_rel
             deploy_type = entry.get("type", "symlink")
+
+            # Die Archiv-Ladeliste stammt von Anvil und verschwindet
+            # wieder. Lag vorher eine fremde Liste da, kommt sie aus der
+            # Sicherung zurueck.
+            if deploy_type == "archive_order":
+                backup_rel = entry.get("backup", "")
+                backup_path = base_path / backup_rel if backup_rel else None
+                try:
+                    if backup_path is not None and backup_path.is_file():
+                        os.replace(backup_path, link_path)
+                    else:
+                        link_path.unlink(missing_ok=True)
+                    result.links_removed += 1
+                except OSError as exc:
+                    result.errors.append(f"remove {link_rel}: {exc}")
+                continue
+
+            # Die Sicherung wird vom Eintrag der Ladeliste behandelt.
+            if deploy_type == "archive_order_backup":
+                continue
 
             # Copied files (frameworks, shims) go away too — otherwise the
             # game directory never gets clean again.
@@ -1028,6 +1211,13 @@ class ModDeployer:
         try:
             text = self._manifest_path.read_text(encoding="utf-8")
             manifest = json.loads(text)
-            return len(manifest.get("symlinks", []))
+            # Die Archiv-Ladeliste steht mit im Manifest, ist aber keine
+            # ausgerollte Mod-Datei und zaehlt darum nicht mit.
+            return sum(
+                1 for entry in manifest.get("symlinks", [])
+                if entry.get("type", "symlink") in {
+                    "symlink", "dir_symlink", "copy", "shim_copy",
+                }
+            )
         except (OSError, json.JSONDecodeError):
             return 0

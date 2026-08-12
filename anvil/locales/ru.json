@@ -587,7 +587,9 @@
     "rename_failed_title": "Переименование не удалось",
     "export_failed_title": "Экспорт не удался",
     "import_failed_title": "Импорт не удался",
-    "game_already_running": "Игра ещё запущена. Закройте её перед повторным запуском."
+    "game_already_running": "Игра ещё запущена. Закройте её перед повторным запуском.",
+    "extract_failed_title": "Установка не удалась",
+    "extract_failed_detail": "Не удалось распаковать «{name}».\n\nМод не установлен. Для файлов RAR и 7z обычно не хватает нужной программы — установите unrar или p7zip. Подробности в журнале."
   },
   "game_panel": {
     "install": "Установить",
@@ -961,7 +963,8 @@
     "nexus_category": "Категория:",
     "nexus_last_query": "Последний запрос:",
     "nexus_description": "Описание:",
-    "error_loading": "Ошибка загрузки: {error}"
+    "error_loading": "Ошибка загрузки: {error}",
+    "tab_preset_reqs": "Пресет"
   },
   "filetree": {
     "name": "Имя",
@@ -1417,5 +1420,20 @@
     "variant_female": "Женский",
     "variant_male": "Мужской",
     "installed": "Настроено пресетов из {name}: {count}"
+  },
+  "preset_reqs": {
+    "refresh": "Загрузить с Nexus",
+    "col_state": "Состояние",
+    "col_mod": "Мод",
+    "col_note": "Примечание автора",
+    "state_installed": "есть",
+    "state_missing": "отсутствует",
+    "loading": "Загрузка …",
+    "none": "Автор не указал ни одного мода.",
+    "no_nexus": "Для этого мода не сохранён номер Nexus.",
+    "summary_missing": "Указано модов: {count}, отсутствует: {missing}.",
+    "summary_complete": "Все указанные моды ({count}) на месте.",
+    "error": "Запрос не удался: {error}",
+    "open_hint": "Двойной щелчок по строке открывает страницу мода на Nexus."
   }
 }

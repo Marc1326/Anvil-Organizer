@@ -587,7 +587,9 @@
     "rename_failed_title": "Rename Failed",
     "export_failed_title": "Export Failed",
     "import_failed_title": "Import Failed",
-    "game_already_running": "A game is still running. Close it before starting again."
+    "game_already_running": "A game is still running. Close it before starting again.",
+    "extract_failed_title": "Installation failed",
+    "extract_failed_detail": "“{name}” could not be extracted.\n\nThe mod was not installed. For RAR and 7z files the matching tool is usually missing — install unrar or p7zip. See the log for details."
   },
   "game_panel": {
     "install": "Install",
@@ -961,7 +963,8 @@
     "nexus_category": "Category:",
     "nexus_last_query": "Last query:",
     "nexus_description": "Description:",
-    "error_loading": "Error loading file: {error}"
+    "error_loading": "Error loading file: {error}",
+    "tab_preset_reqs": "Preset"
   },
   "filetree": {
     "name": "Name",
@@ -1417,5 +1420,20 @@
     "variant_female": "Female",
     "variant_male": "Male",
     "installed": "{count} preset(s) from {name} set up"
+  },
+  "preset_reqs": {
+    "refresh": "Load from Nexus",
+    "col_state": "Status",
+    "col_mod": "Mod",
+    "col_note": "Author's note",
+    "state_installed": "present",
+    "state_missing": "missing",
+    "loading": "Loading …",
+    "none": "The author did not list any mods.",
+    "no_nexus": "No Nexus ID is stored for this mod.",
+    "summary_missing": "{count} mods listed, {missing} still missing.",
+    "summary_complete": "All {count} listed mods are present.",
+    "error": "Request failed: {error}",
+    "open_hint": "Double-click a row to open the mod page on Nexus."
   }
 }

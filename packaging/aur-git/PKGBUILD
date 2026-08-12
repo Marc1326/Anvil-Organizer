@@ -15,6 +15,11 @@ depends=(
     'python-cryptography'
     'qt6-base'
     'hicolor-icon-theme'
+    'libarchive'
+)
+optdepends=(
+    'unrar: faster RAR extraction'
+    'p7zip: faster 7z extraction'
 )
 makedepends=(
     'git'

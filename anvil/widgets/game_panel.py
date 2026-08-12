@@ -1308,7 +1308,10 @@ class GamePanel(QWidget):
                 active_mods = read_active_mods(profile_path)
                 enabled = [n for n in global_order if n in active_mods]
 
-                pack_result = packer.pack_all_mods(enabled)
+                # In sResourceArchiveList2 gewinnt der letzte Eintrag. Die
+                # Mod-Liste hat die staerkste Mod oben, also von unten nach
+                # oben packen — das Archiv der obersten Mod steht dann hinten.
+                pack_result = packer.pack_all_mods(list(reversed(enabled)))
                 if not pack_result.success:
                     packer.cleanup_ba2s()
                     result.success = False
@@ -3231,6 +3234,10 @@ class GamePanel(QWidget):
         copy_paths = getattr(plugin, "GameCopyDeployPaths", []) if plugin else []
         redmod_path = getattr(plugin, "GameRedmodPath", "") if plugin else ""
         pak_order = getattr(plugin, "GamePakLoadOrderPrefix", False) if plugin else False
+        pak_order_dirs = getattr(plugin, "GamePakLoadOrderDirs", []) if plugin else []
+        archive_order_file = (
+            getattr(plugin, "GameArchiveLoadOrderFile", "") if plugin else ""
+        )
         deploy_strip = getattr(plugin, "GameDeployStripPrefixes", []) if plugin else []
         deploy_anchors = getattr(plugin, "GameDeployAnchors", []) if plugin else []
         deploy_routes = getattr(plugin, "GameDeployRoutes", []) if plugin else []
@@ -3250,6 +3257,8 @@ class GamePanel(QWidget):
             redmod_path=redmod_path,
             separator_deploy_paths=self._separator_deploy_paths,
             pak_load_order_prefix=pak_order,
+            pak_load_order_dirs=pak_order_dirs,
+            archive_load_order_file=archive_order_file,
             mods_path=self._mods_path,
             profiles_path=self._profiles_path,
             deploy_strip_prefixes=deploy_strip,

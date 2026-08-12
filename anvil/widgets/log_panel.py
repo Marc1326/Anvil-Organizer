@@ -31,6 +31,20 @@ LEVEL_CONFIG = {
 
 MAX_ENTRIES = 1000
 
+# Schreibweisen, die im Code vorkommen, aber keine eigene Stufe sind.
+LEVEL_ALIASES = {"warn": "warning", "err": "error", "critical": "error"}
+
+
+def normalize_level(level: str) -> str:
+    """Bringt eine Stufe auf eine, die es wirklich gibt.
+
+    Eine unbekannte Stufe hat frueher einen ``KeyError`` ausgeloest --
+    beim Start, mitten im Aufbau des Fensters, mit Absturz. Eine
+    Log-Meldung darf die Anwendung nicht umbringen.
+    """
+    level = LEVEL_ALIASES.get(level, level)
+    return level if level in LEVEL_CONFIG else "info"
+
 
 def _modern() -> bool:
     return bool(theme_color("panel2", ""))
@@ -258,6 +272,7 @@ class LogPanel(QWidget):
 
     def add_log(self, level: LogLevel, message: str):
         """Add a new log entry."""
+        level = normalize_level(level)
         timestamp = datetime.now().strftime("%H:%M:%S")
 
         # Store entry data

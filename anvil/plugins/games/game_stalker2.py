@@ -49,10 +49,16 @@ class Stalker2Game(BaseGame):
         "Stalker2/Binaries/Win64",
     ]
 
-    # Nicht umbenennen. Der Zaehler wuerde auch die Paks in LogicMods
-    # treffen, und dort sucht UE4SS seinen Blueprint am Dateinamen --
-    # umbenannt findet er ihn nicht mehr.
+    # Nicht ohne Begrenzung umbenennen: der Zaehler wuerde auch die Paks
+    # in LogicMods treffen, und dort sucht UE4SS seinen Blueprint am
+    # Dateinamen -- umbenannt findet er ihn nicht mehr.
     GamePakLoadOrderPrefix = False
+
+    # In ~mods dagegen zaehlt nur die alphabetische Reihenfolge: das Spiel
+    # haengt die Paks der Reihe nach ein und laesst die letzte gewinnen.
+    # Ohne Zaehler waere die Reihenfolge aus Anvil hier wirkungslos.
+    # LogicMods und Binaries/Win64 stehen bewusst nicht mit drin.
+    GamePakLoadOrderDirs: list[str] = ["Stalker2/Content/Paks/~mods"]
 
     # Diese drei Ordner legt erst das Modden an, das Spiel selbst bringt
     # sie nicht mit. Was dort ohne Anvil auftaucht, wurde von Hand

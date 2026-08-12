@@ -145,7 +145,24 @@ class BaseGame:
     # Reihenfolge in Anvil fuer diese Spiele wirkungslos.
     # Achtung: viele Mod-Autoren verbieten das Umbenennen ausdruecklich --
     # Loader suchen ihre Dateien am Namen. Nur einschalten, wenn geprueft.
+    # Diese Schalter benennt jede Pak-Datei um, unabhaengig vom Zielordner.
     GamePakLoadOrderPrefix: bool = False
+
+    GamePakLoadOrderDirs: list[str] = []
+    """Ordner ab Spielwurzel, in denen der Zaehler gesetzt werden darf
+    (z.B. ``Stalker2/Content/Paks/~mods``).
+
+    Leer = aus, es wird nichts umbenannt. Ordner wie ``LogicMods``, ``CNS``
+    oder ``Binaries/Win64`` gehoeren nicht hinein: dort suchen die Loader
+    ihre Dateien am Namen und finden sie mit Zaehler nicht mehr."""
+
+    GameArchiveLoadOrderFile: str = ""
+    """Datei im Spielordner, in der das Spiel seine Ladereihenfolge fuer
+    Archiv-Mods liest (z.B. ``archive/pc/mod/modlist.txt``).
+
+    Ist sie gesetzt, schreibt der Deployer die Liste beim Ausrollen und
+    entfernt sie beim Aufraeumen wieder. Leer = das Spiel kennt keine
+    solche Datei."""
 
     # ── Zielverteilung innerhalb des Spielordners ──────────────────────
     # Spiele mit mehreren Mod-Arten brauchen mehr als ein Ziel. Stellar
@@ -166,8 +183,11 @@ class BaseGame:
     """Regeln, die Dateien ohne eigene Struktur einem Ziel zuordnen.
     Jede Regel ist ein Dict mit ``dest`` und mindestens einem Kriterium:
 
-    - ``suffixes``: Dateiendungen, auch mehrteilig (``.dekcns.json``)
-    - ``folders``:  Ordnernamen, die im Pfad vorkommen (``ue4ss``)
+    - ``suffixes``:     Dateiendungen, auch mehrteilig (``.dekcns.json``)
+    - ``folders``:      Ordnernamen, die im Pfad vorkommen (``ue4ss``)
+    - ``first_folder``: der oberste Ordner des Mods (``scripts``).  Fuer
+      Pakete, denen nur der Elternordner fehlt -- ``dest`` kommt davor,
+      der Rest des Pfades bleibt erhalten.
 
     Die erste passende Regel gewinnt; ohne Treffer bleibt der Pfad, wie
     er ist."""

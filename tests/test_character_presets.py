@@ -220,6 +220,58 @@ def test_geloeschter_trenner_wird_neu_erfragt() -> None:
     assert 'return name if vorhanden else ""' in block
 
 
+def test_trennername_ueberlebt_den_neustart(tmp_path: Path) -> None:
+    # save_instance schreibt nur bekannte Schluessel. Fehlte der hier,
+    # ginge bei jedem Preset erneut das Trenner-Fenster auf.
+    from anvil.core.instance_manager import InstanceManager
+
+    basis = tmp_path / "instances"
+    (basis / "Spiel").mkdir(parents=True)
+    (basis / "Spiel" / ".anvil.ini").write_text(
+        "[%General]\ngame_path=/irgendwo\n", encoding="utf-8",
+    )
+
+    im = InstanceManager(basis)
+    im.save_instance("Spiel", {"preset_separator": "Meine Presets_separator"})
+
+    assert im.load_instance("Spiel").get("preset_separator") == "Meine Presets_separator"
+
+
+def test_beiwerk_zaehlt_nicht_als_mod(tmp_path: Path) -> None:
+    # Bleibt nach dem Herausloesen der Presets nur noch eine Liesmich-Datei
+    # uebrig, waere eine Mod daraus reiner Ballast.
+    from anvil.mainwindow import _has_installable_content
+
+    (tmp_path / "readme.txt").write_text("hallo", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "anleitung.md").write_text("x", encoding="utf-8")
+    assert _has_installable_content(tmp_path) is False
+
+    (tmp_path / "archive").mkdir()
+    (tmp_path / "archive" / "gesicht.archive").write_bytes(b"\x00")
+    assert _has_installable_content(tmp_path) is True
+
+
+def test_gemischtes_paket_verliert_seinen_inhalt_nicht() -> None:
+    # Gesichts-Presets bringen fast immer ein .archive mit -- das Gesicht
+    # selbst. Frueher warf Anvil es weg.
+    start = QUELLE.index("def _install_presets_from")
+    block = QUELLE[start:QUELLE.index("def _write_preset_origin")]
+    assert "return not _has_installable_content(temp_dir)" in block
+    assert "datei.unlink(missing_ok=True)" in block, (
+        "uebernommene Presets muessen aus dem Temp-Ordner verschwinden, "
+        "sonst liegt dieselbe Datei zweimal da"
+    )
+
+
+def test_preset_mod_merkt_sich_ihre_herkunft() -> None:
+    # Ohne Nexus-Nummer gaebe es bei den Voraussetzungen nichts abzufragen.
+    assert "self._write_preset_origin(mods_dir / name, archive)" in QUELLE
+    start = QUELLE.index("def _write_preset_origin")
+    block = QUELLE[start:start + 1200]
+    assert "extract_nexus_mod_id(archive.name)" in block
+
+
 def test_alle_dialogtexte_in_allen_sprachen() -> None:
     import glob
     import json as _json

@@ -587,7 +587,9 @@
     "rename_failed_title": "Renomeação falhou",
     "export_failed_title": "Exportação falhou",
     "import_failed_title": "Importação falhou",
-    "game_already_running": "Ainda há um jogo a correr. Fecha-o antes de iniciar de novo."
+    "game_already_running": "Ainda há um jogo a correr. Fecha-o antes de iniciar de novo.",
+    "extract_failed_title": "Falha na instalação",
+    "extract_failed_detail": "Não foi possível extrair «{name}».\n\nA mod não foi instalada. Em ficheiros RAR e 7z costuma faltar a ferramenta adequada — instala unrar ou p7zip. Detalhes no registo."
   },
   "game_panel": {
     "install": "Instalar",
@@ -961,7 +963,8 @@
     "nexus_category": "Categoria:",
     "nexus_last_query": "Última consulta:",
     "nexus_description": "Descrição:",
-    "error_loading": "Erro ao carregar: {error}"
+    "error_loading": "Erro ao carregar: {error}",
+    "tab_preset_reqs": "Preset"
   },
   "filetree": {
     "name": "Nome",
@@ -1417,5 +1420,20 @@
     "variant_female": "Feminino",
     "variant_male": "Masculino",
     "installed": "{count} predefinição(ões) de {name} configuradas"
+  },
+  "preset_reqs": {
+    "refresh": "Carregar do Nexus",
+    "col_state": "Estado",
+    "col_mod": "Mod",
+    "col_note": "Nota do autor",
+    "state_installed": "presente",
+    "state_missing": "em falta",
+    "loading": "A carregar …",
+    "none": "O autor não indicou nenhuma mod.",
+    "no_nexus": "Não há número do Nexus guardado para esta mod.",
+    "summary_missing": "{count} mods indicadas, faltam {missing}.",
+    "summary_complete": "Todas as {count} mods indicadas estão presentes.",
+    "error": "Falha ao consultar: {error}",
+    "open_hint": "Duplo clique numa linha abre a página da mod no Nexus."
   }
 }
