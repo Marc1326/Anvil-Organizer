@@ -8,7 +8,7 @@ des Frameworks wirft sie nicht weg -- was passieren wuerde, schriebe man sie
 in dessen Ordner hinein.
 
 Welche Dateiendung ein Preset hat und wohin es gehoert, weiss das
-Spiel-Plugin (``GamePresetKinds``). Dieses Modul kennt nur die Regeln.
+Spiel-Plugin (``get_preset_kinds()``). Dieses Modul kennt nur die Regeln.
 """
 
 from __future__ import annotations
@@ -34,6 +34,10 @@ class PresetKind:
         variants:    Unterordner je Geschlecht. Leer = keine Aufteilung.
         markers:     Erkennungszeichen je Variante. Kommt eines davon in der
                      Datei vor, gilt die Variante als erkannt.
+        short:       Kuerzel fuer die Bereichsueberschrift, z.B. "ACU". Die
+                     Sprachen bauen den Satz selbst -- ein angehaengtes "s"
+                     waere im Russischen und Italienischen falsch. Leer =
+                     ``name`` wird genommen.
     """
 
     name: str
@@ -41,6 +45,12 @@ class PresetKind:
     target: str
     variants: list[str] = field(default_factory=list)
     markers: dict[str, list[str]] = field(default_factory=dict)
+    short: str = ""
+
+    @property
+    def label(self) -> str:
+        """Kuerzel fuer die Ueberschrift, sonst der Anzeigename."""
+        return self.short or self.name
 
 
 def find_presets(root: Path, kind: PresetKind) -> list[Path]:
@@ -115,6 +125,46 @@ def target_path(kind: PresetKind, variant: str, dateiname: str) -> Path:
     return ziel / dateiname
 
 
+# Von Anvil selbst angelegt, sagt nichts ueber den Inhalt der Mod aus.
+# Muss zu ``mod_deployer._SKIP_FILES`` passen -- was der Deployer nicht
+# ausrollt, darf hier auch nicht ueber die Einordnung entscheiden. Ein Test
+# haelt beide Mengen gleich.
+_NEBENSACHE = {"meta.ini", "codes.txt", "fomod_choices.json"}
+
+
+def _gehoert_zu(rel: str, kind: PresetKind) -> bool:
+    """Passt ein relativer Pfad zu dieser Preset-Art?"""
+    pfad = rel.replace("\\", "/").lstrip("/").lower()
+    ziel = kind.target.replace("\\", "/").strip("/").lower()
+    return pfad.startswith(f"{ziel}/") and pfad.endswith(kind.suffix.lower())
+
+
+def is_preset_mod(rel_paths, kinds: list[PresetKind]) -> bool:
+    """Enthaelt die Mod ausschliesslich Presets?
+
+    Entscheidet ueber den Inhalt, nicht ueber den Trenner oder den Namen --
+    beide lassen sich von Hand aendern und liegen dann falsch. Eine Mod, die
+    neben dem Preset noch ein ``.archive`` mitbringt, ist eine gewoehnliche
+    Mod: sie greift ins Spiel ein und gehoert in die Mod-Liste.
+
+    Args:
+        rel_paths: Relative Pfade der Mod-Dateien, wie sie im Index stehen.
+        kinds: Preset-Arten des Spiels. Leer = das Spiel kennt keine.
+    """
+    if not kinds:
+        return False
+
+    treffer = False
+    for rel in rel_paths:
+        name = str(rel).replace("\\", "/").rsplit("/", 1)[-1].lower()
+        if name.startswith(".") or name in _NEBENSACHE:
+            continue
+        if not any(_gehoert_zu(str(rel), k) for k in kinds):
+            return False
+        treffer = True
+    return treffer
+
+
 def build_mod(
     quelle: Path,
     mods_dir: Path,
@@ -154,3 +204,22 @@ def suggest_mod_name(quelle: Path, variant: str, kind: PresetKind) -> str:
     if variant:
         return f"{kind.name} - {basis} ({variant})"
     return f"{kind.name} - {basis}"
+
+
+def display_name(mod_name: str, kinds: list[PresetKind], variant: str) -> str:
+    """Kehrt ``suggest_mod_name`` fuer die Anzeige um.
+
+    Aus "ACU-Preset - Grace (female)" wird "Grace": die Art steht schon in
+    der Ueberschrift des Bereichs, das Geschlecht in einer eigenen Spalte.
+    Steht hier neben ``suggest_mod_name``, weil beide dasselbe Namensschema
+    beschreiben und sonst leise auseinanderlaufen.
+    """
+    kurz = mod_name
+    for kind in kinds:
+        vorsatz = f"{kind.name} - "
+        if kurz.startswith(vorsatz):
+            kurz = kurz[len(vorsatz):]
+            break
+    if variant and kurz.lower().endswith(f" ({variant.lower()})"):
+        kurz = kurz[: -(len(variant) + 3)]
+    return kurz.strip() or mod_name

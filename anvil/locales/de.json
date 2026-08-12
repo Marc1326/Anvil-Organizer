@@ -129,7 +129,8 @@
     "fw_deactivate": "Deaktivieren",
     "fw_lock": "Framework sperren",
     "fw_unlock": "Framework entsperren",
-    "properties": "Eigenschaften"
+    "properties": "Eigenschaften",
+    "remove_preset": "Preset entfernen..."
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -276,7 +277,10 @@
     "unlock_purge_title": "Spiel entsperren",
     "unlock_purge_text": "Die Mods liegen noch im Spielordner.\n\nJetzt entfernen? Wenn das Spiel noch läuft, stürzt es dabei ab.\nBeim nächsten Spielstart räumt Anvil ohnehin auf.",
     "start_while_running_text": "Es sieht so aus, als würde noch ein Spiel laufen.\n\nTrotzdem starten? Anvil räumt dabei den Spielordner auf — ein noch laufendes Spiel stürzt ab.",
-    "start_while_unknown_text": "Anvil kann nicht feststellen, ob noch ein Spiel läuft.\n\nTrotzdem starten? Anvil räumt dabei den Spielordner auf — ein noch laufendes Spiel stürzt ab."
+    "start_while_unknown_text": "Anvil kann nicht feststellen, ob noch ein Spiel läuft.\n\nTrotzdem starten? Anvil räumt dabei den Spielordner auf — ein noch laufendes Spiel stürzt ab.",
+    "remove_preset_title": "Preset entfernen",
+    "remove_preset_single": "Preset \"{name}\" wirklich löschen? Der Ordner wird unwiderruflich gelöscht.",
+    "warning": "Warnung"
   },
   "button": {
     "cancel": "Abbrechen",
@@ -426,7 +430,13 @@
     "diag_problem_game_path": "Spielpfad existiert nicht: {path}",
     "diag_problem_dir_missing": "Verzeichnis fehlt: {label}",
     "diag_problem_dir_not_writable": "Verzeichnis nicht beschreibbar: {label}",
-    "diag_problem_sandbox": "Läuft als {mode}"
+    "diag_problem_sandbox": "Läuft als {mode}",
+    "presets": "Presets",
+    "presets_active_count": "{x} von {n} aktiv",
+    "header_variant": "Variante",
+    "variant_female": "weiblich",
+    "variant_male": "männlich",
+    "presets_of_kind": "{kind}-Presets"
   },
   "placeholder": {
     "no_file_selected": "Keine Datei ausgewählt",

@@ -129,7 +129,8 @@
     "fw_deactivate": "Désactiver",
     "fw_lock": "Verrouiller le framework",
     "fw_unlock": "Déverrouiller le framework",
-    "properties": "Propriétés"
+    "properties": "Propriétés",
+    "remove_preset": "Supprimer le préréglage..."
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -276,7 +277,10 @@
     "unlock_purge_title": "Déverrouiller le jeu",
     "unlock_purge_text": "Les mods sont encore dans le dossier du jeu.\n\nLes retirer maintenant ? Si le jeu tourne encore, il plantera.\nAnvil nettoie de toute façon au prochain démarrage du jeu.",
     "start_while_running_text": "Il semble qu'un jeu soit encore en cours.\n\nLancer quand même ? Anvil va vider le dossier du jeu, et un jeu encore ouvert va planter.",
-    "start_while_unknown_text": "Anvil ne peut pas savoir si un jeu est encore en cours.\n\nLancer quand même ? Anvil va vider le dossier du jeu, et un jeu encore ouvert va planter."
+    "start_while_unknown_text": "Anvil ne peut pas savoir si un jeu est encore en cours.\n\nLancer quand même ? Anvil va vider le dossier du jeu, et un jeu encore ouvert va planter.",
+    "remove_preset_title": "Supprimer le préréglage",
+    "remove_preset_single": "Supprimer vraiment le préréglage \"{name}\" ? Le dossier sera définitivement effacé.",
+    "warning": "Avertissement"
   },
   "button": {
     "cancel": "Annuler",
@@ -426,7 +430,13 @@
     "diag_problem_game_path": "Le chemin du jeu n'existe pas : {path}",
     "diag_problem_dir_missing": "Dossier manquant : {label}",
     "diag_problem_dir_not_writable": "Dossier non inscriptible : {label}",
-    "diag_problem_sandbox": "Exécution en tant que {mode}"
+    "diag_problem_sandbox": "Exécution en tant que {mode}",
+    "presets": "Préréglages",
+    "presets_active_count": "{x} sur {n} actifs",
+    "header_variant": "Variante",
+    "variant_female": "féminin",
+    "variant_male": "masculin",
+    "presets_of_kind": "Préréglages {kind}"
   },
   "placeholder": {
     "no_file_selected": "Aucun fichier sélectionné",

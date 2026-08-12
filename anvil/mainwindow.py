@@ -79,6 +79,7 @@ from anvil.core.mod_list_io import (
     rename_mod_in_modlist, read_active_mods, write_active_mods,
     read_global_modlist, write_global_modlist, migrate_to_global_modlist,
     migrate_modlist_order, insert_mod_in_modlist, rename_mod_globally, remove_mod_globally,
+    merge_hidden_order,
 )
 from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
 from anvil.version import APP_VERSION
@@ -411,6 +412,7 @@ class MainWindow(QMainWindow):
 
         # ── Mod state ─────────────────────────────────────────────────
         self._current_mod_entries = []
+        self._preset_namen: set[str] = set()
         self._pending_query_path: Path | None = None
         self._pending_dl_query_path: str | None = None
         self._fw_query_queue: list[tuple[str, int]] = []
@@ -444,6 +446,9 @@ class MainWindow(QMainWindow):
         self._mod_list_view.fw_context_menu_requested.connect(self._on_fw_context_menu)
         self._mod_list_view.fw_archives_dropped.connect(self._on_fw_archives_dropped)
         self._mod_list_view.fw_active_toggle.connect(self._on_fw_active_toggle)
+        self._mod_list_view.preset_toggled.connect(self._on_preset_toggled)
+        self._mod_list_view.preset_context_menu_requested.connect(
+            self._on_preset_context_menu)
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
         self._game_panel.custom_start_requested.connect(self._on_custom_tool_start)
@@ -1690,6 +1695,10 @@ class MainWindow(QMainWindow):
 
         # ── Schritt 5: Model leeren ──
         self._mod_list_view.clear_mods()
+        # Auch der Presets-Bereich, sonst stehen beim Spielwechsel die
+        # Presets der alten Instanz unter der neuen Liste.
+        self._mod_list_view.load_presets([])
+        self._preset_namen = set()
 
         # Collapsed Separators leeren (KERN-FIX fuer den gemeldeten Bug)
         self._mod_list_view._tree._collapsed_separators.clear()
@@ -2015,6 +2024,8 @@ class MainWindow(QMainWindow):
             e for e in self._current_mod_entries
             if not e.is_direct_install or e.name in offen
         ]
+        # Presets wandern in den eigenen Bereich unter der Liste.
+        visible_entries = self._split_presets(plugin, visible_entries)
         mod_rows = [mod_entry_to_row(e, conflict_data, self._group_manager) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         # Provide visible entries to proxy for filter logic
@@ -2199,6 +2210,145 @@ class MainWindow(QMainWindow):
         box.addButton(QMessageBox.StandardButton.Cancel)
         box.exec()
         return knoepfe.get(box.clickedButton(), "" if kind.variants else FEMALE)
+
+    def _preset_kinds(self, plugin) -> list:
+        """Preset-Arten des Spiels, leer wenn es keine kennt."""
+        if plugin is None:
+            return []
+        return plugin.get_preset_kinds() or []
+
+    def _preset_mod_names(self, plugin, entries) -> set[str]:
+        """Namen der Mods, die ausschliesslich Presets enthalten.
+
+        Gefragt wird der Dateiindex, nicht die Platte -- der ist beim
+        Aufbau der Liste ohnehin schon eingelesen.
+        """
+        from anvil.core.character_presets import is_preset_mod
+
+        arten = self._preset_kinds(plugin)
+        if not arten or self._mod_index is None:
+            return set()
+
+        namen = set()
+        for eintrag in entries:
+            if getattr(eintrag, "is_separator", False) or getattr(eintrag, "is_foreign", False):
+                continue
+            # Generator: bei einer gewoehnlichen Mod steigt die Pruefung
+            # nach der ersten Datei aus, statt erst alle einzusammeln.
+            pfade = (d["rel"] for d in self._mod_index.get_file_list(eintrag.name))
+            if is_preset_mod(pfade, arten):
+                namen.add(eintrag.name)
+        return namen
+
+    def _preset_variant(self, mod_name: str, arten: list) -> str:
+        """Geschlechts-Unterordner eines Presets, leer wenn ohne.
+
+        Vergleicht ohne Ruecksicht auf Gross- und Kleinschreibung, sonst
+        faellt ein von Hand angelegtes ``Female/`` durchs Raster, waehrend
+        die Erkennung es laengst als Preset zaehlt.
+        """
+        if self._mod_index is None:
+            return ""
+        for eintrag in self._mod_index.get_file_list(mod_name):
+            pfad = str(eintrag["rel"]).replace("\\", "/").lstrip("/")
+            for art in arten:
+                ziel = art.target.replace("\\", "/").strip("/")
+                if not pfad.lower().startswith(f"{ziel.lower()}/"):
+                    continue
+                rest = pfad[len(ziel) + 1:].split("/")
+                if len(rest) < 2:
+                    continue
+                for variante in art.variants:
+                    if rest[0].lower() == variante.lower():
+                        return variante
+        return ""
+
+    def _separator_insert_pos(self, global_list: list[str]) -> int:
+        """Wohin ein neuer Trenner in der modlist.txt gehoert.
+
+        Vor die Auswahl. Ueber den Ordnernamen und nicht ueber die
+        Zeilennummer: die Liste blendet gesperrte Frameworks und Presets aus,
+        dadurch zeigen beide Zaehlungen auf verschiedene Stellen. Steht die
+        gewaehlte Zeile selbst nicht in der Liste -- fremde Mods tun das nie
+        --, zaehlt der naechste Eintrag darueber.
+        """
+        gewaehlte = self._mod_list_view._tree.selectionModel().selectedRows()
+        if not gewaehlte:
+            return 0
+        quelle = self._mod_list_view._proxy_model.mapToSource(gewaehlte[0])
+        zeilen = self._mod_list_view.source_model()._rows
+        for nr in range(min(quelle.row(), len(zeilen) - 1), -1, -1):
+            name = zeilen[nr].folder_name
+            if name in global_list:
+                return global_list.index(name)
+        return 0
+
+    def _split_presets(self, plugin, visible_entries: list) -> list:
+        """Presets aus der Anzeige nehmen und in ihren Bereich stellen.
+
+        Die Eintraege selbst bleiben in ``_current_mod_entries`` -- nur so
+        stehen sie weiter in der modlist.txt und werden ausgerollt.
+
+        Returns:
+            Die Eintraege, die in der Mod-Liste bleiben.
+        """
+        namen = self._preset_mod_names(plugin, visible_entries)
+        self._load_preset_section(plugin, namen)
+        if not namen:
+            return visible_entries
+        return [e for e in visible_entries if e.name not in namen]
+
+    def _load_preset_section(self, plugin, namen: set[str]) -> None:
+        """Fuellt den Presets-Bereich unter der Mod-Liste."""
+        from anvil.core import character_presets as cp
+
+        arten = self._preset_kinds(plugin)
+        self._preset_namen = set(namen)
+        if not arten or not namen:
+            self._mod_list_view.load_presets([])
+            return
+
+        beschriftung = {
+            cp.FEMALE: tr("label.variant_female"),
+            cp.MALE: tr("label.variant_male"),
+        }
+        eintraege = []
+        for e in self._current_mod_entries:
+            if e.name not in namen:
+                continue
+            variante = self._preset_variant(e.name, arten)
+            eintraege.append({
+                "folder": e.name,
+                "name": cp.display_name(
+                    e.display_name or e.name, arten, variante),
+                "variant": beschriftung.get(variante, variante),
+                "enabled": bool(e.enabled),
+            })
+        eintraege.sort(key=lambda d: d["name"].lower())
+        titel = (tr("label.presets_of_kind", kind=arten[0].label)
+                 if len(arten) == 1 else tr("label.presets"))
+        self._mod_list_view.load_presets(eintraege, titel)
+
+    def _on_preset_toggled(self, folder: str, enabled: bool) -> None:
+        """Preset im eigenen Bereich an- oder abgeschaltet."""
+        for e in self._current_mod_entries:
+            if e.name == folder:
+                e.enabled = enabled
+                break
+        else:
+            self._log_panel.add_log(
+                "warning", f"Preset nicht gefunden: {folder}")
+            return
+        self._write_current_modlist()
+        self._update_active_count()
+        # Wie bei den Mods: liegt das Deployment dauerhaft im Spiel, muss
+        # der Schalter dort auch ankommen.
+        self._schedule_redeploy()
+        # Der Baum wird gerade abgearbeitet -- erst danach neu aufbauen,
+        # sonst faellt das Element unter dem laufenden Signal weg.
+        QTimer.singleShot(
+            0, lambda: self._load_preset_section(
+                self._current_plugin, self._preset_namen))
 
     def _install_presets_from(self, temp_dir: Path, archive: Path) -> bool:
         """Legt gefundene Presets als eigene Mods an.
@@ -2585,9 +2735,32 @@ class MainWindow(QMainWindow):
                     entry.priority = i
                     new_entries.append(entry)
                     break
-        # Preserve framework/direct-install mods (not in model)
-        framework_entries = [e for e in self._current_mod_entries if e.is_direct_install]
-        self._current_mod_entries = new_entries + framework_entries
+        # Alles retten, was nicht in der Liste steht -- gesperrte Frameworks
+        # und Presets. Wuerde es hier wegfallen, verschwaende es beim
+        # naechsten Schreiben auch aus der modlist.txt und damit aus dem Spiel.
+        # Anhaengen reicht nicht: ein Preset wuerde unter den letzten Trenner
+        # rutschen. Es muss an seinen alten Platz zurueck.
+        gerettet = {id(e) for e in new_entries}
+        versteckt = {e.name for e in self._current_mod_entries
+                     if id(e) not in gerettet}
+        reihenfolge = merge_hidden_order(
+            [e.name for e in new_entries],
+            [e.name for e in self._current_mod_entries],
+            versteckt,
+        )
+        # Nach Namen gruppiert, damit zwei gleichnamige Eintraege nicht
+        # zu einem verschmelzen -- fruehe Rettung war objektweise.
+        nach_name: dict[str, list] = {}
+        for e in self._current_mod_entries:
+            nach_name.setdefault(e.name, []).append(e)
+        sortiert = []
+        for n in reihenfolge:
+            gruppe = nach_name.get(n)
+            if gruppe:
+                sortiert.append(gruppe.pop(0))
+        self._current_mod_entries = sortiert
+        for platz, eintrag in enumerate(self._current_mod_entries):
+            eintrag.priority = platz
         self._write_current_modlist()
         self._update_active_count()
         # Recompute conflict icons (priorities changed → winner may differ)
@@ -4536,15 +4709,11 @@ class MainWindow(QMainWindow):
         # Globale Modlist aktualisieren (nicht Legacy per-Profile)
         profiles_dir = _active_instance_paths(self).profiles
         global_list = read_global_modlist(profiles_dir)
-        # Position: vor der aktuellen Auswahl, oder ganz oben
-        tree = self._mod_list_view._tree
-        sel_indexes = tree.selectionModel().selectedRows()
-        if sel_indexes:
-            source_idx = self._mod_list_view._proxy_model.mapToSource(sel_indexes[0])
-            insert_pos = source_idx.row()
-        else:
-            insert_pos = 0
-        global_list.insert(insert_pos, folder_name)
+        # Position: vor der aktuellen Auswahl, oder ganz oben. Ueber den
+        # Ordnernamen, nicht ueber die Zeilennummer -- die Liste blendet
+        # gesperrte Frameworks und Presets aus, dadurch zeigen beide
+        # Zaehlungen auf verschiedene Stellen.
+        global_list.insert(self._separator_insert_pos(global_list), folder_name)
         write_global_modlist(profiles_dir, global_list)
 
         # Separator als aktiv markieren
@@ -7049,6 +7218,13 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
+        self._delete_mod_folders(names)
+
+    def _delete_mod_folders(self, names: list[str]) -> None:
+        """Ordner, Listeneintrag und Zwischenspeicher der Mods entfernen.
+
+        Ohne Rueckfrage -- die stellt der Aufrufer.
+        """
         profiles_dir = _active_instance_paths(self).profiles
         # Einmal vor der Schleife: die Zuordnung liest die Dateilisten aller
         # Mods, und nach dem ersten rmtree stimmt sie ohnehin nicht mehr.
@@ -7076,6 +7252,32 @@ class MainWindow(QMainWindow):
         self._do_redeploy()
         self._game_panel.refresh_downloads()
         self.statusBar().showMessage(tr("status.removed", names=", ".join(names)), 5000)
+
+    def _on_preset_context_menu(self, pos, folder: str) -> None:
+        """Rechtsklick im Presets-Bereich."""
+        menu = QMenu(self)
+        act_open = menu.addAction(tr("context.open_explorer"))
+        act_remove = menu.addAction(tr("context.remove_preset"))
+        chosen = menu.exec(pos)
+        if chosen == act_open:
+            pfad = _active_instance_paths(self).mods / folder
+            if pfad.is_dir():
+                host_open_path(str(pfad))
+        elif chosen == act_remove:
+            self._remove_preset(folder)
+
+    def _remove_preset(self, folder: str) -> None:
+        """Ein Preset loeschen -- Ordner und Listeneintrag."""
+        if self._refuse_while_game_runs(tr("dialog.remove_preset_title")):
+            return
+        reply = QMessageBox.question(
+            self, tr("dialog.remove_preset_title"),
+            tr("dialog.remove_preset_single", name=folder),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        self._delete_mod_folders([folder])
 
     def _ctx_open_explorer(self, row: int) -> None:
         """Open the mod folder in the file manager."""
@@ -7182,6 +7384,7 @@ class MainWindow(QMainWindow):
             e for e in self._current_mod_entries
             if not e.is_direct_install or e.name in offen
         ]
+        visible_entries = self._split_presets(self._current_plugin, visible_entries)
         mod_rows = [mod_entry_to_row(e, conflict_data, self._group_manager) for e in visible_entries]
         self._mod_list_view.source_model().set_mods(mod_rows)
         self._mod_list_view._proxy_model.set_mod_entries(visible_entries)
@@ -7718,6 +7921,7 @@ class MainWindow(QMainWindow):
         # Standard mod list — always visible
         self._mod_list_view.restore_column_widths()
         self._mod_list_view.restore_framework_widths()
+        self._mod_list_view.restore_preset_widths()
 
         # BG3 mod list — visible when BG3 instance is active
         if self._bg3_mod_list is not None:

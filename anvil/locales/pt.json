@@ -129,7 +129,8 @@
     "fw_deactivate": "Desativar",
     "fw_lock": "Bloquear framework",
     "fw_unlock": "Desbloquear framework",
-    "properties": "Propriedades"
+    "properties": "Propriedades",
+    "remove_preset": "Remover predefinição..."
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -276,7 +277,10 @@
     "unlock_purge_title": "Desbloquear jogo",
     "unlock_purge_text": "Os mods ainda estão na pasta do jogo.\n\nRemover agora? Se o jogo ainda estiver aberto, ele vai fechar com erro.\nO Anvil limpa de qualquer forma no próximo arranque do jogo.",
     "start_while_running_text": "Parece que ainda está um jogo a correr.\n\nIniciar mesmo assim? O Anvil vai limpar a pasta do jogo, e um jogo ainda aberto vai fechar com erro.",
-    "start_while_unknown_text": "O Anvil não consegue determinar se ainda há um jogo a correr.\n\nIniciar mesmo assim? O Anvil vai limpar a pasta do jogo, e um jogo ainda aberto vai fechar com erro."
+    "start_while_unknown_text": "O Anvil não consegue determinar se ainda há um jogo a correr.\n\nIniciar mesmo assim? O Anvil vai limpar a pasta do jogo, e um jogo ainda aberto vai fechar com erro.",
+    "remove_preset_title": "Remover predefinição",
+    "remove_preset_single": "Eliminar mesmo a predefinição \"{name}\"? A pasta será removida definitivamente.",
+    "warning": "Aviso"
   },
   "button": {
     "cancel": "Cancelar",
@@ -426,7 +430,13 @@
     "diag_problem_game_path": "O caminho do jogo não existe: {path}",
     "diag_problem_dir_missing": "Diretório ausente: {label}",
     "diag_problem_dir_not_writable": "Diretório não gravável: {label}",
-    "diag_problem_sandbox": "A executar como {mode}"
+    "diag_problem_sandbox": "A executar como {mode}",
+    "presets": "Predefinições",
+    "presets_active_count": "{x} de {n} ativos",
+    "header_variant": "Variante",
+    "variant_female": "feminino",
+    "variant_male": "masculino",
+    "presets_of_kind": "Predefinições de {kind}"
   },
   "placeholder": {
     "no_file_selected": "Nenhum ficheiro selecionado",

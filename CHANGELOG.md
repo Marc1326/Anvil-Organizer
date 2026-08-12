@@ -2,10 +2,15 @@
 
 ## [Unveröffentlicht]
 
+### Neu
+- **Charakter-Presets haben einen eigenen Bereich** unter der Mod-Liste, so wie die Frameworks. Bei Cyberpunk heißt er „ACU-Presets"; Spiele ohne Presets zeigen ihn gar nicht. Ob etwas ein Preset ist, entscheidet der Inhalt und nicht der Trenner: Wer neben der Preset-Datei noch ein Archiv mitbringt, greift ins Spiel ein und bleibt eine gewöhnliche Mod.
+
 ### Änderungen
 - Die Plugins für **Windrose** und den Windrose-Server sind entfernt. Für das Spiel gibt es keine Mods, damit war auch nichts zu verwalten.
 
 ### Fixes
+- **Beim Umsortieren per Drag & Drop rutschte alles ans Listenende, was gerade nicht angezeigt wurde** — gesperrte Frameworks und Presets. Sie standen danach unter dem letzten Trenner der Liste statt an ihrem Platz. Ausgeblendete Einträge behalten ihre Position jetzt.
+- Ein neuer Trenner landete an der falschen Stelle, sobald oberhalb der Auswahl ausgeblendete Einträge lagen. Die Position wird jetzt über den Ordnernamen bestimmt statt über die Zeilennummer.
 - **Mods konnten stillschweigend aus dem Spiel verschwinden.** Anvil merkt sich die Dateiliste jeder Mod, prüfte auf Änderungen aber nur den obersten Ordner. Wurde eine Datei eine Ebene tiefer umbenannt, hinzugefügt oder gelöscht, galt die Mod als unverändert — ausgerollt wurde die alte, nicht mehr vorhandene Datei. Die Mod fehlte im Spiel, im Log stand trotzdem null Fehler. Geprüft wird jetzt der ganze Ordnerbaum.
 - Landet eine Mod nicht vollständig im Spiel, sagt Anvil das über die Benachrichtigungen. Der Spielstart wird dadurch nicht verhindert.
 - Ein fehlender Mod-Ordner — etwa weil ein Laufwerk nicht eingehängt ist — wird gemeldet statt übersprungen.

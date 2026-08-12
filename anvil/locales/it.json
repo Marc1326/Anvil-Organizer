@@ -129,7 +129,8 @@
     "fw_deactivate": "Disattiva",
     "fw_lock": "Blocca framework",
     "fw_unlock": "Sblocca framework",
-    "properties": "Proprietà"
+    "properties": "Proprietà",
+    "remove_preset": "Rimuovi preimpostazione..."
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -276,7 +277,10 @@
     "unlock_purge_title": "Sblocca gioco",
     "unlock_purge_text": "Le mod sono ancora nella cartella del gioco.\n\nRimuoverle adesso? Se il gioco è ancora in esecuzione, andrà in crash.\nAnvil fa comunque pulizia al prossimo avvio del gioco.",
     "start_while_running_text": "Sembra che ci sia ancora un gioco in esecuzione.\n\nAvviare lo stesso? Anvil ripulisce la cartella del gioco, e un gioco ancora aperto andrà in crash.",
-    "start_while_unknown_text": "Anvil non riesce a stabilire se un gioco è ancora in esecuzione.\n\nAvviare lo stesso? Anvil ripulisce la cartella del gioco, e un gioco ancora aperto andrà in crash."
+    "start_while_unknown_text": "Anvil non riesce a stabilire se un gioco è ancora in esecuzione.\n\nAvviare lo stesso? Anvil ripulisce la cartella del gioco, e un gioco ancora aperto andrà in crash.",
+    "remove_preset_title": "Rimuovi preimpostazione",
+    "remove_preset_single": "Eliminare davvero la preimpostazione \"{name}\"? La cartella verrà rimossa in modo irreversibile.",
+    "warning": "Avviso"
   },
   "button": {
     "cancel": "Annulla",
@@ -426,7 +430,13 @@
     "diag_problem_game_path": "Il percorso del gioco non esiste: {path}",
     "diag_problem_dir_missing": "Cartella mancante: {label}",
     "diag_problem_dir_not_writable": "Cartella non scrivibile: {label}",
-    "diag_problem_sandbox": "In esecuzione come {mode}"
+    "diag_problem_sandbox": "In esecuzione come {mode}",
+    "presets": "Preimpostazioni",
+    "presets_active_count": "{x} di {n} attivi",
+    "header_variant": "Variante",
+    "variant_female": "femminile",
+    "variant_male": "maschile",
+    "presets_of_kind": "Preset {kind}"
   },
   "placeholder": {
     "no_file_selected": "Nessun file selezionato",

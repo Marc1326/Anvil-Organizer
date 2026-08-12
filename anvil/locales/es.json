@@ -129,7 +129,8 @@
     "fw_deactivate": "Desactivar",
     "fw_lock": "Bloquear framework",
     "fw_unlock": "Desbloquear framework",
-    "properties": "Propiedades"
+    "properties": "Propiedades",
+    "remove_preset": "Eliminar preajuste..."
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -276,7 +277,10 @@
     "unlock_purge_title": "Desbloquear juego",
     "unlock_purge_text": "Los mods siguen en la carpeta del juego.\n\n¿Quitarlos ahora? Si el juego sigue abierto, se cerrará de golpe.\nAnvil limpia igualmente en el próximo inicio del juego.",
     "start_while_running_text": "Parece que todavía hay un juego en marcha.\n\n¿Iniciar de todas formas? Anvil limpiará la carpeta del juego, y un juego abierto se cerrará de golpe.",
-    "start_while_unknown_text": "Anvil no puede saber si todavía hay un juego en marcha.\n\n¿Iniciar de todas formas? Anvil limpiará la carpeta del juego, y un juego abierto se cerrará de golpe."
+    "start_while_unknown_text": "Anvil no puede saber si todavía hay un juego en marcha.\n\n¿Iniciar de todas formas? Anvil limpiará la carpeta del juego, y un juego abierto se cerrará de golpe.",
+    "remove_preset_title": "Eliminar preajuste",
+    "remove_preset_single": "¿Eliminar realmente el preajuste \"{name}\"? La carpeta se borrará de forma irreversible.",
+    "warning": "Advertencia"
   },
   "button": {
     "cancel": "Cancelar",
@@ -426,7 +430,13 @@
     "diag_problem_game_path": "La ruta del juego no existe: {path}",
     "diag_problem_dir_missing": "Falta el directorio: {label}",
     "diag_problem_dir_not_writable": "Directorio no escribible: {label}",
-    "diag_problem_sandbox": "Ejecutándose como {mode}"
+    "diag_problem_sandbox": "Ejecutándose como {mode}",
+    "presets": "Preajustes",
+    "presets_active_count": "{x} de {n} activos",
+    "header_variant": "Variante",
+    "variant_female": "femenino",
+    "variant_male": "masculino",
+    "presets_of_kind": "Preajustes de {kind}"
   },
   "placeholder": {
     "no_file_selected": "Ningún archivo seleccionado",

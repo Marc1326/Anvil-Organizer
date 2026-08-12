@@ -129,7 +129,8 @@
     "fw_deactivate": "Отключить",
     "fw_lock": "Заблокировать фреймворк",
     "fw_unlock": "Разблокировать фреймворк",
-    "properties": "Свойства"
+    "properties": "Свойства",
+    "remove_preset": "Удалить пресет..."
   },
   "toolbar": {
     "deploy": "Развернуть",
@@ -276,7 +277,10 @@
     "unlock_purge_title": "Разблокировать игру",
     "unlock_purge_text": "Моды всё ещё лежат в папке игры.\n\nУдалить их сейчас? Если игра ещё запущена, она вылетит.\nПри следующем запуске игры Anvil всё равно всё уберёт.",
     "start_while_running_text": "Похоже, игра ещё запущена.\n\nВсё равно запустить? Anvil очистит папку игры, и запущенная игра вылетит.",
-    "start_while_unknown_text": "Anvil не может определить, запущена ли ещё игра.\n\nВсё равно запустить? Anvil очистит папку игры, и запущенная игра вылетит."
+    "start_while_unknown_text": "Anvil не может определить, запущена ли ещё игра.\n\nВсё равно запустить? Anvil очистит папку игры, и запущенная игра вылетит.",
+    "remove_preset_title": "Удалить пресет",
+    "remove_preset_single": "Действительно удалить пресет «{name}»? Папка будет удалена безвозвратно.",
+    "warning": "Предупреждение"
   },
   "button": {
     "cancel": "Отмена",
@@ -426,7 +430,13 @@
     "diag_problem_game_path": "Путь к игре не существует: {path}",
     "diag_problem_dir_missing": "Каталог отсутствует: {label}",
     "diag_problem_dir_not_writable": "Каталог недоступен для записи: {label}",
-    "diag_problem_sandbox": "Запущено как {mode}"
+    "diag_problem_sandbox": "Запущено как {mode}",
+    "presets": "Пресеты",
+    "presets_active_count": "{x} из {n} активно",
+    "header_variant": "Вариант",
+    "variant_female": "женский",
+    "variant_male": "мужской",
+    "presets_of_kind": "Пресеты {kind}"
   },
   "placeholder": {
     "no_file_selected": "Файл не выбран",

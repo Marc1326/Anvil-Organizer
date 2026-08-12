@@ -161,6 +161,7 @@ class Cyberpunk2077Game(BaseGame):
         return [
             PresetKind(
                 name="ACU-Preset",
+                short="ACU",
                 suffix=".preset",
                 target=(
                     "bin/x64/plugins/cyber_engine_tweaks/mods"

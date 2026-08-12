@@ -129,7 +129,8 @@
     "fw_deactivate": "Deactivate",
     "fw_lock": "Lock framework",
     "fw_unlock": "Unlock framework",
-    "properties": "Properties"
+    "properties": "Properties",
+    "remove_preset": "Remove preset..."
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -276,7 +277,10 @@
     "unlock_purge_title": "Unlock game",
     "unlock_purge_text": "The mods are still in the game directory.\n\nRemove them now? If the game is still running, it will crash.\nAnvil cleans up on the next game start anyway.",
     "start_while_running_text": "It looks like a game is still running.\n\nStart anyway? Anvil clears the game directory first — a game that is still running will crash.",
-    "start_while_unknown_text": "Anvil cannot tell whether a game is still running.\n\nStart anyway? Anvil clears the game directory first — a game that is still running will crash."
+    "start_while_unknown_text": "Anvil cannot tell whether a game is still running.\n\nStart anyway? Anvil clears the game directory first — a game that is still running will crash.",
+    "remove_preset_title": "Remove preset",
+    "remove_preset_single": "Really delete preset \"{name}\"? The folder will be permanently removed.",
+    "warning": "Warning"
   },
   "button": {
     "cancel": "Cancel",
@@ -426,7 +430,13 @@
     "diag_problem_game_path": "Game path does not exist: {path}",
     "diag_problem_dir_missing": "Directory missing: {label}",
     "diag_problem_dir_not_writable": "Directory not writable: {label}",
-    "diag_problem_sandbox": "Running as {mode}"
+    "diag_problem_sandbox": "Running as {mode}",
+    "presets": "Presets",
+    "presets_active_count": "{x} of {n} active",
+    "header_variant": "Variant",
+    "variant_female": "female",
+    "variant_male": "male",
+    "presets_of_kind": "{kind} presets"
   },
   "placeholder": {
     "no_file_selected": "No file selected",

@@ -32,6 +32,13 @@ def _modern_active() -> bool:
 # Standard-Balkenfarbe für Separatoren ohne eigene Farbe (Handoff: Violett)
 _SEP_BAR_DEFAULT = "#6f63b8"
 
+# Klassik-Stil der Abschnittsleisten unter der Mod-Liste. Das moderne Theme
+# wirft ihn weg und greift über #sectionBar aus dem QSS.
+_SECTION_BAR_STYLE = (
+    "QLabel { font-weight: bold; padding: 4px 6px; "
+    "background: #1a2a3a; border-bottom: 1px solid #333; }"
+)
+
 
 def _check_col_width(with_grip: bool = True) -> int:
     """Breite der Schalter-Spalte: modern (Schalter+Griff) vs. klassisch (Kreis)."""
@@ -1251,6 +1258,8 @@ class ModListView(QWidget):
     fw_context_menu_requested = Signal(QPoint, dict)  # global pos + fw_data for framework context menu
     fw_archives_dropped = Signal(list)  # archive paths dropped on framework tree
     fw_active_toggle = Signal(dict)  # Left-click on framework status column
+    preset_toggled = Signal(str, bool)  # Mod-Ordnername + neuer Zustand
+    preset_context_menu_requested = Signal(QPoint, str)  # global pos + Ordnername
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -1329,8 +1338,7 @@ class ModListView(QWidget):
         # Klassik-Style mitgeben — die Bar wählt selbst je nach aktivem Theme
         self._fw_label = CollapsibleSectionBar(
             tr("label.type_framework") + "s", "frameworks", self._fw_tree,
-            style="QLabel { font-weight: bold; padding: 4px 6px; "
-                  "background: #1a2a3a; border-bottom: 1px solid #333; }",
+            style=_SECTION_BAR_STYLE,
             container=fw_container,
             default_collapsed=True,
         )
@@ -1371,14 +1379,67 @@ class ModListView(QWidget):
         # Minimum height = label only (~28px), tree hides when collapsed
         fw_container.setMinimumHeight(28)
 
-        # Splitter: mod list (top) + frameworks (bottom)
+        # ── Presets section (between mod list and frameworks) ────
+        # Presets sind Einstellungsdateien, keine Mods -- sie greifen nicht
+        # ins Spiel ein und koennen mit nichts kollidieren. In der Mod-Liste
+        # standen sie nur im Weg.
+        ps_container = QWidget()
+        ps_layout = QVBoxLayout(ps_container)
+        ps_layout.setContentsMargins(0, 0, 0, 0)
+        ps_layout.setSpacing(0)
+
+        # Mit Eltern erzeugt: sonst macht Qt daraus kurz ein eigenes
+        # Fenster, falls die Leiste den Bereich sofort sichtbar schaltet.
+        self._ps_tree = QTreeWidget(ps_container)
+        self._ps_label = CollapsibleSectionBar(
+            tr("label.presets"), "presets", self._ps_tree,
+            style=_SECTION_BAR_STYLE,
+            container=ps_container,
+            default_collapsed=True,
+        )
+        self._ps_label.set_count(0)
+        ps_layout.addWidget(self._ps_label)
+        self._ps_tree.setHeaderLabels([
+            "",  # Schaltspalte wie in der Mod-Liste
+            tr("label.name"),
+            tr("label.header_variant"),
+        ])
+        self._ps_check_delegate = CheckboxDelegate(self._ps_tree, show_grip=False)
+        self._ps_tree.setItemDelegateForColumn(0, self._ps_check_delegate)
+        self._ps_tree.itemChanged.connect(self._on_ps_item_changed)
+        self._ps_tree.setRootIsDecorated(False)
+        self._ps_tree.setIndentation(0)
+        self._ps_tree.setAlternatingRowColors(True)
+        self._ps_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._ps_tree.setUniformRowHeights(True)
+        self._ps_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._ps_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._ps_tree.customContextMenuRequested.connect(self._on_ps_context_menu)
+        ps_hdr = self._ps_tree.header()
+        ps_hdr.setStretchLastSection(False)
+        ps_hdr.setCascadingSectionResizes(True)
+        ps_hdr.setMinimumSectionSize(30)
+        ps_hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        ps_hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self._ps_tree.setColumnWidth(0, _check_col_width(with_grip=False))
+        self._ps_tree.setColumnWidth(1, 300)
+        self._ps_tree.setColumnWidth(2, 120)
+        self._ph_presets = PersistentHeader(ps_hdr, "presets")
+        ps_layout.addWidget(self._ps_tree)
+        ps_container.setMinimumHeight(28)
+        ps_container.setVisible(False)
+        self._ps_container = ps_container
+
+        # Splitter: mod list (top) + presets + frameworks (bottom)
         self._splitter = QSplitter(Qt.Orientation.Vertical)
         self._splitter.addWidget(self._tree)
+        self._splitter.addWidget(ps_container)
         self._splitter.addWidget(fw_container)
-        self._splitter.setStretchFactor(0, 85)
-        self._splitter.setStretchFactor(1, 15)
+        self._splitter.setStretchFactor(0, 75)
+        self._splitter.setStretchFactor(1, 10)
+        self._splitter.setStretchFactor(2, 15)
         self._splitter.setChildrenCollapsible(False)
-        self._splitter.splitterMoved.connect(self._on_fw_splitter_moved)
+        self._splitter.splitterMoved.connect(self._on_lower_splitter_moved)
         # Hide frameworks section by default (shown when load_frameworks is called)
         fw_container.setVisible(False)
         self._fw_container = fw_container
@@ -1410,11 +1471,13 @@ class ModListView(QWidget):
             return
         self.fw_active_toggle.emit(fw_data)
 
-    def _on_fw_splitter_moved(self) -> None:
-        """Hide/show the framework tree based on available space (respects collapsed state)."""
+    def _on_lower_splitter_moved(self) -> None:
+        """Hide/show the lower trees based on available space (respects collapsed state)."""
         if not self._fw_label.collapsed:
             h = self._fw_container.height()
             self._fw_tree.setVisible(h > 60)
+        if not self._ps_label.collapsed:
+            self._ps_tree.setVisible(self._ps_container.height() > 60)
 
     def source_model(self) -> ModListModel:
         """Return the underlying ModListModel."""
@@ -1445,11 +1508,13 @@ class ModListView(QWidget):
         Schalter-Spalte 62/36 px, Name-Spalte füllt modern die Restbreite."""
         self._tree.setColumnWidth(COL_CHECK, _check_col_width())
         self._fw_tree.setColumnWidth(0, _check_col_width(with_grip=False))
+        self._ps_tree.setColumnWidth(0, _check_col_width(with_grip=False))
         # Modern: ALLE Spalten verriegelt (nicht ziehbar), Name- bzw.
         # Beschreibungs-Spalte dehnt sich als Füller bis zur Panelkante
         # (Vorlage: Name = 1fr). Klassisch: alles frei wie bisher.
         header = self._tree.header()
         fw_hdr = self._fw_tree.header()
+        ps_hdr = self._ps_tree.header()
         if _modern_active():
             for col in range(header.count()):
                 header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
@@ -1457,16 +1522,22 @@ class ModListView(QWidget):
             for col in range(fw_hdr.count()):
                 fw_hdr.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
             fw_hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+            for col in range(ps_hdr.count()):
+                ps_hdr.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
+            ps_hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         else:
             header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
             header.setSectionResizeMode(COL_CHECK, QHeaderView.ResizeMode.Fixed)
             fw_hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
             fw_hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            ps_hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+            ps_hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
 
     def flush_column_widths(self) -> None:
         """Flush any pending debounced column-width write."""
         self._persistent_header.flush()
         self._ph_frameworks.flush()
+        self._ph_presets.flush()
 
     # ── Frameworks section ────────────────────────────────────────
 
@@ -1524,6 +1595,74 @@ class ModListView(QWidget):
                 self._fw_tree.addTopLevelItem(item)
         finally:
             self._fw_tree.blockSignals(False)
+
+    # ── Presets section ───────────────────────────────────────────
+
+    def load_presets(self, presets: list[dict], title: str = "") -> None:
+        """Fuellt den Presets-Bereich.
+
+        Jeder Eintrag: folder (Ordnername), name (Anzeige), variant, enabled.
+        Leere Liste blendet den Bereich aus -- Spiele ohne Presets sehen ihn nie.
+        """
+        self._ps_tree.blockSignals(True)
+        try:
+            self._ps_tree.clear()
+            if not presets:
+                self._ps_container.setVisible(False)
+                return
+
+            self._ps_container.setVisible(True)
+            self._ps_label.set_title(title or tr("label.presets"))
+            self._ps_label.set_count(len(presets))
+            aktiv = sum(1 for p in presets if p.get("enabled"))
+            self._ps_label.set_status(
+                tr("label.presets_active_count", x=aktiv, n=len(presets)))
+
+            for eintrag in presets:
+                item = QTreeWidgetItem()
+                ordner = eintrag.get("folder", "?")
+                item.setText(1, eintrag.get("name") or ordner)
+                item.setText(2, eintrag.get("variant", ""))
+                # Der Anzeigename ist gekuerzt -- zwei Presets gleichen
+                # Namens sind sonst nicht auseinanderzuhalten.
+                item.setToolTip(1, ordner)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                item.setCheckState(
+                    0,
+                    Qt.CheckState.Checked if eintrag.get("enabled")
+                    else Qt.CheckState.Unchecked,
+                )
+                item.setData(0, Qt.ItemDataRole.UserRole, eintrag)
+                self._ps_tree.addTopLevelItem(item)
+        finally:
+            self._ps_tree.blockSignals(False)
+
+    def _on_ps_item_changed(self, item, column: int) -> None:
+        """Preset an- oder abgeschaltet (Spalte 0)."""
+        if column != 0:
+            return
+        daten = item.data(0, Qt.ItemDataRole.UserRole)
+        if not daten or not daten.get("folder"):
+            return
+        an = item.checkState(0) == Qt.CheckState.Checked
+        daten["enabled"] = an
+        self.preset_toggled.emit(daten["folder"], an)
+
+    def _on_ps_context_menu(self, pos) -> None:
+        """Rechtsklick im Presets-Baum weiterreichen."""
+        item = self._ps_tree.itemAt(pos)
+        if item is None:
+            return
+        daten = item.data(0, Qt.ItemDataRole.UserRole)
+        if daten and daten.get("folder"):
+            self.preset_context_menu_requested.emit(
+                self._ps_tree.viewport().mapToGlobal(pos), daten["folder"],
+            )
+
+    def restore_preset_widths(self) -> None:
+        """Gespeicherte Spaltenbreiten des Presets-Baums wiederherstellen."""
+        self._ph_presets.restore()
+        self._ps_tree.setColumnWidth(0, _check_col_width(with_grip=False))
 
     def restore_framework_widths(self) -> None:
         """Restore saved column widths for the frameworks tree."""

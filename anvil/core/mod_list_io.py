@@ -510,3 +510,49 @@ def migrate_to_global_modlist(profiles_dir: Path) -> bool:
             pass
 
     return True
+
+
+def merge_hidden_order(
+    visible: list[str], previous: list[str], hidden: set[str],
+) -> list[str]:
+    """Reihe ausgeblendete Eintraege wieder an ihrem alten Platz ein.
+
+    Die Mod-Liste zeigt nicht alles, was in der ``modlist.txt`` steht --
+    gesperrte Frameworks und Charakter-Presets fehlen. Nach einem Umsortieren
+    per Drag & Drop steht nur die sichtbare Reihenfolge fest. Haengt man den
+    Rest einfach hinten an, rutschen die Presets unter den letzten Trenner der
+    Datei, und ihre Zuordnung zum Trenner darueber ist dahin.
+
+    Deshalb wird gemerkt, hinter welchem sichtbaren Nachbarn ein
+    ausgeblendeter Eintrag vorher stand, und er landet wieder dort. Stand er
+    ganz oben, bleibt er ganz oben.
+
+    Args:
+        visible: Neue Reihenfolge der sichtbaren Namen.
+        previous: Vollstaendige Reihenfolge vor dem Umsortieren.
+        hidden: Namen, die nicht in der Liste stehen.
+
+    Returns:
+        Vollstaendige Reihenfolge, sichtbare wie ausgeblendete.
+    """
+    if not hidden:
+        return list(visible)
+
+    # Zu jedem sichtbaren Namen die ausgeblendeten, die ihm vorher folgten.
+    anhang: dict[str | None, list[str]] = {}
+    vorgaenger: str | None = None
+    for name in previous:
+        if name in hidden:
+            anhang.setdefault(vorgaenger, []).append(name)
+        else:
+            vorgaenger = name
+
+    ergebnis: list[str] = list(anhang.pop(None, []))
+    for name in visible:
+        ergebnis.append(name)
+        ergebnis.extend(anhang.pop(name, []))
+    # Nachbarn, die es nicht mehr gibt: der Rest kommt ans Ende, damit
+    # kein Eintrag verlorengeht.
+    for uebrig in anhang.values():
+        ergebnis.extend(uebrig)
+    return ergebnis
