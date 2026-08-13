@@ -1448,7 +1448,9 @@
     "stray_prompt": "„{file}“ liegt im Ordner von „{mod}“ an einer Stelle, an der {kind} nicht danach sucht.\n\nAnvil verschiebt die Datei innerhalb des Mod-Ordners:\n\nVon:  {von}\nNach: {nach}\n\nAm Spielordner ändert sich dabei nichts. Verschieben?",
     "stray_moved": "„{name}“ eingeräumt — das Preset wirkt ab dem nächsten Ausrollen",
     "stray_failed": "Verschieben fehlgeschlagen: {error}",
-    "stray_exists": "Am Zielort liegt bereits „{name}“. Es wurde nichts verändert."
+    "stray_exists": "Am Zielort liegt bereits „{name}“. Es wurde nichts verändert.",
+    "already_installed": "„{file}“ ist bereits installiert als „{mod}“ — übersprungen",
+    "all_already_installed": "Nichts installiert, bereits vorhanden: {count}"
   },
   "preset_reqs": {
     "refresh": "Von Nexus laden",

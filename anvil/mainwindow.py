@@ -472,7 +472,6 @@ class MainWindow(QMainWindow):
 
         # ── Game Running Lock ─────────────────────────────────────────
         self._game_running: bool = False
-        self._unlock_pending: bool = False
 
         # ── Framework Auto-Re-Lock (5-min unlock-box) ─────────────────
         self._fw_relock_timer = QTimer(self)
@@ -2753,11 +2752,27 @@ class MainWindow(QMainWindow):
         profiles_dir = _active_instance_paths(self).profiles
         angelegt: list[str] = []
         uebernommen: list[Path] = []
+        doppelt: list[tuple[str, str]] = []
         separator = ""
         abgebrochen = False
 
         for kind in arten:
+            # Einmal je Art einlesen und nicht je Datei: sonst laeuft der
+            # Ordner bei jedem Preset des Pakets neu durch.
+            bekannt = cp.installed_presets(mods_dir, kind)
             for datei in cp.find_presets(temp_dir, kind):
+                # Ueber den Inhalt vergleichen. Dasselbe Preset wandert
+                # unter verschiedenen Dateinamen durch die Pakete, und
+                # bei Namensgleichheit hing Anvil bisher stumpf die
+                # Dateigroesse an -- daraus wurde ein zweiter Mod-Ordner
+                # mit identischem Inhalt.
+                abdruck = cp.preset_fingerprint(datei)
+                schon = bekannt.get(abdruck)
+                if schon:
+                    doppelt.append((datei.name, schon))
+                    uebernommen.append(datei)
+                    continue
+
                 variante = cp.detect_variant(datei, kind)
                 if not variante and kind.variants:
                     variante = self._ask_preset_variant(datei.name, kind)
@@ -2794,21 +2809,38 @@ class MainWindow(QMainWindow):
                     write_active_mods(self._current_profile_path, aktiv)
                 angelegt.append(name)
                 uebernommen.append(datei)
+                if abdruck:
+                    bekannt[abdruck] = name
             if abgebrochen:
                 break
 
-        if not angelegt:
+        if not angelegt and not doppelt:
             return False
 
         # Uebernommene Presets aus dem Temp-Ordner nehmen, sonst wandern
-        # sie gleich nochmal als Teil der gewoehnlichen Mod mit.
+        # sie gleich nochmal als Teil der gewoehnlichen Mod mit. Das gilt
+        # auch fuer die schon vorhandenen: sie sollen ja gerade nicht ein
+        # zweites Mal auf der Platte landen.
         for datei in uebernommen:
             datei.unlink(missing_ok=True)
 
+        for dateiname, vorhandene_mod in doppelt:
+            self._log_panel.add_log(
+                "info",
+                tr("preset.already_installed",
+                   file=dateiname, mod=vorhandene_mod),
+            )
+
         self._reload_mod_list()
-        self.statusBar().showMessage(
-            tr("preset.installed", count=len(angelegt), name=archive.name), 6000,
-        )
+        if angelegt:
+            self.statusBar().showMessage(
+                tr("preset.installed", count=len(angelegt), name=archive.name),
+                6000,
+            )
+        else:
+            self.statusBar().showMessage(
+                tr("preset.all_already_installed", count=len(doppelt)), 6000,
+            )
         return not _has_installable_content(temp_dir)
 
     def _write_preset_origin(self, mod_dir: Path, archive: Path) -> None:
@@ -3741,38 +3773,22 @@ class MainWindow(QMainWindow):
         self.menuBar().setEnabled(False)
 
     def _on_unlock_clicked(self) -> None:
-        """Unlock button: ask before removing the deployment.
+        """Gibt die Oberflaeche frei -- und sonst passiert nichts.
 
-        Anvil cannot always tell whether the game is still running, so the
-        decision belongs to the user rather than to a guess — and it is
-        carried out as given, without a second opinion from the lookup.
+        Frueher kam hier eine Rueckfrage, ob die Mods aus dem Spielordner
+        entfernt werden sollen. Die sass in der Falle: der Knopf heisst
+        "Entsperren", das Fenster hiess "Spiel entsperren", und "Ja" las
+        sich wie "ja, entsperren" -- gemeint war "ja, loeschen". Wer nur
+        nachschauen wollte, riss dem laufenden Spiel die Mods weg.
+
+        Entsperren ist eine bewusste Handlung und braucht keine zweite
+        Bestaetigung. Vor allem bleibt der beobachtete Prozess stehen:
+        wuerde er hier vergessen, hielte Anvil das Spiel fuer beendet und
+        jede spaetere Aenderung an einer Mod schluege sofort in den
+        Spielordner durch. Aufgeraeumt wird, wenn das Spiel wirklich endet.
         """
-        if not self._game_panel.has_deployment():
-            print("[LAUNCH] unlock: nothing deployed", flush=True)
-            self._unlock_ui(False)
-            return
-        # Der Dialog dreht eine eigene Event-Schleife: ohne die Sperre kann
-        # game_stopped dazwischenfunken und schon aufraeumen, waehrend der
-        # Nutzer noch ueberlegt.
-        self._unlock_pending = True
-        try:
-            answer = QMessageBox.question(
-                self,
-                tr("dialog.unlock_purge_title"),
-                tr("dialog.unlock_purge_text"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-        finally:
-            self._unlock_pending = False
-        if answer != QMessageBox.StandardButton.Yes:
-            self._unlock_ui(False)
-            return
-        self._game_running = False
-        print("[LAUNCH] unlock: user asked to remove the deployment",
+        print("[LAUNCH] unlock: UI freigegeben, Deployment unangetastet",
               flush=True)
-        self._purge_after_game()
-        self._game_panel.clear_watch_target()
         self._release_ui_lock()
 
     def _unlock_ui(self, stopped: bool = True) -> None:
@@ -3783,10 +3799,6 @@ class MainWindow(QMainWindow):
         is False when the game state could not be established; leftovers
         are then cleaned up on the next game start.
         """
-        if self._unlock_pending:
-            # Der Nutzer entscheidet gerade selbst — seiner Antwort nicht
-            # vorgreifen.
-            return
         self._game_running = False
         if not stopped:
             print("[LAUNCH] game state unknown — keeping the deployment",

@@ -645,41 +645,37 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             stand_in.terminate()
             stand_in.wait()
 
-    def test_confirmed_unlock_removes_the_deployment(self) -> None:
-        """"Yes, remove them" must not be overruled by the lookup."""
+    def test_unlock_only_frees_the_ui(self) -> None:
+        """Entsperren raeumt nichts mehr auf.
+
+        Frueher fragte der Knopf, ob die Mods entfernt werden sollen --
+        und "Ja" las sich wie "ja, entsperren". Wer nur nachschauen
+        wollte, riss dem laufenden Spiel die Dateien weg.
+        """
         purges: list[str] = []
         window = self._window(purges, running=True)
         window._game_panel.has_deployment = lambda: True
         _bind_unlock_helpers(window)
 
-        with mock.patch(
-            "anvil.mainwindow.QMessageBox.question",
-            return_value=mock.sentinel.yes,
-        ), mock.patch("anvil.mainwindow.QMessageBox.StandardButton") as buttons:
-            buttons.Yes = mock.sentinel.yes
+        with mock.patch("anvil.mainwindow.QMessageBox") as box:
             MainWindow._on_unlock_clicked(window)
 
-        self.assertEqual(purges, ["purge"])
-        self.assertIs(window._game_running, False)
+        self.assertEqual(purges, [], "the deployment has to stay")
+        box.question.assert_not_called()
 
-    def test_declined_unlock_keeps_the_deployment(self) -> None:
+    def test_unlock_keeps_the_game_marked_as_running(self) -> None:
+        """Sonst schlaegt jede spaetere Aenderung in den Spielordner durch."""
         purges: list[str] = []
-        window = self._window(purges, running=False)
+        window = self._window(purges, running=True)
         window._game_panel.has_deployment = lambda: True
+        vergessen: list[str] = []
+        window._game_panel.clear_watch_target = lambda: vergessen.append("x")
         _bind_unlock_helpers(window)
-        window._unlock_ui = lambda stopped=True: MainWindow._unlock_ui(
-            window, stopped
-        )
 
-        with mock.patch(
-            "anvil.mainwindow.QMessageBox.question",
-            return_value=mock.sentinel.no,
-        ), mock.patch("anvil.mainwindow.QMessageBox.StandardButton") as buttons:
-            buttons.Yes = mock.sentinel.yes
-            MainWindow._on_unlock_clicked(window)
+        MainWindow._on_unlock_clicked(window)
 
-        self.assertEqual(purges, [], "declining must leave the files alone")
-        self.assertIs(window._game_running, False, "the UI still has to unlock")
+        self.assertIs(window._game_running, True)
+        self.assertEqual(vergessen, [], "the watcher has to keep running")
 
     def test_running_game_blocks_a_second_launch(self) -> None:
         """Pre-launch purge would rip the files from the running game."""
@@ -991,24 +987,26 @@ class SandboxedProcessLookupTests(unittest.TestCase):
         self.assertIsNone(result)
         self.assertEqual(calls, [])
 
-    def test_the_unlock_dialog_is_not_overtaken(self) -> None:
-        """A game_stopped arriving mid-dialog must not act for the user."""
+    def test_game_stopped_cleans_up_as_before(self) -> None:
+        """Endet das Spiel wirklich, wird weiterhin aufgeraeumt."""
         calls: list[str] = []
         window: Any = SimpleNamespace(
-            _unlock_pending=True,
             _game_running=True,
             _game_panel=SimpleNamespace(
                 is_game_running=lambda: False,
                 silent_purge=lambda: calls.append("purge"),
+                clear_watch_target=lambda: calls.append("forget"),
             ),
             _log_game_dir_state=lambda _phase: None,
             keeps_mods_deployed=lambda: False,
+            _purge_after_game=lambda: calls.append("purge"),
+            _release_ui_lock=lambda: None,
         )
 
         MainWindow._unlock_ui(window, True)
 
-        self.assertEqual(calls, [], "the user's answer decides, not the signal")
-        self.assertIs(window._game_running, True, "state stays until they answer")
+        self.assertIn("purge", calls)
+        self.assertIs(window._game_running, False)
 
     def test_appid_match_stops_at_the_value_boundary(self) -> None:
         """A short SteamAppId must not match a longer one starting with it."""

@@ -1448,7 +1448,9 @@
     "stray_prompt": "“{file}” sits inside “{mod}” at a place where {kind} never looks for it.\n\nAnvil will move the file within the mod folder:\n\nFrom: {von}\nTo:   {nach}\n\nNothing in the game folder changes. Move it?",
     "stray_moved": "“{name}” tidied up — the preset takes effect on the next deploy",
     "stray_failed": "Move failed: {error}",
-    "stray_exists": "“{name}” already exists at the target. Nothing was changed."
+    "stray_exists": "“{name}” already exists at the target. Nothing was changed.",
+    "already_installed": "“{file}” is already installed as “{mod}” — skipped",
+    "all_already_installed": "Nothing installed, already present: {count}"
   },
   "preset_reqs": {
     "refresh": "Load from Nexus",

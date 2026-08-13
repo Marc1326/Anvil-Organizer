@@ -13,6 +13,7 @@ Spiel-Plugin (``get_preset_kinds()``). Dieses Modul kennt nur die Regeln.
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -163,6 +164,43 @@ def is_preset_mod(rel_paths, kinds: list[PresetKind]) -> bool:
             return False
         treffer = True
     return treffer
+
+
+def preset_fingerprint(datei: Path) -> str:
+    """Abdruck ueber den Inhalt einer Preset-Datei, leer bei Lesefehler.
+
+    Ueber den Inhalt und nicht ueber den Namen: dasselbe Preset wandert
+    unter verschiedenen Dateinamen durch die Nexus-Pakete.
+    """
+    try:
+        return hashlib.blake2b(datei.read_bytes(), digest_size=16).hexdigest()
+    except OSError:
+        return ""
+
+
+def installed_presets(mods_dir: Path, kind: PresetKind) -> dict[str, str]:
+    """Schon installierte Presets dieser Art: Abdruck -> Mod-Ordner.
+
+    Gesucht wird gezielt unter dem Zielpfad, nicht mit ``rglob`` ueber
+    alle Mods -- bei mehreren hundert Mods ist das der Unterschied
+    zwischen unmerklich und spuerbar.
+    """
+    gefunden: dict[str, str] = {}
+    if not mods_dir.is_dir():
+        return gefunden
+
+    ziel = Path(kind.target)
+    for mod in sorted(mods_dir.iterdir()):
+        if not mod.is_dir():
+            continue
+        basis = mod / ziel
+        if not basis.is_dir():
+            continue
+        for datei in basis.rglob(f"*{kind.suffix}"):
+            abdruck = preset_fingerprint(datei)
+            if abdruck:
+                gefunden.setdefault(abdruck, mod.name)
+    return gefunden
 
 
 def stray_presets(rel_paths, kinds: list[PresetKind]) -> list[str]:

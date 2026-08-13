@@ -1448,7 +1448,9 @@
     "stray_prompt": "«{file}» si trova in «{mod}» in un punto in cui {kind} non lo cerca mai.\n\nAnvil sposterà il file all’interno della cartella della mod:\n\nDa: {von}\nA:  {nach}\n\nLa cartella di gioco non cambia. Spostare?",
     "stray_moved": "«{name}» sistemato: il preset avrà effetto al prossimo deploy",
     "stray_failed": "Spostamento non riuscito: {error}",
-    "stray_exists": "«{name}» esiste già nella destinazione. Non è stato modificato nulla."
+    "stray_exists": "«{name}» esiste già nella destinazione. Non è stato modificato nulla.",
+    "already_installed": "«{file}» è già installato come «{mod}»: saltato",
+    "all_already_installed": "Non installato nulla, già presenti: {count}"
   },
   "preset_reqs": {
     "refresh": "Carica da Nexus",

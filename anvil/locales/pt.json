@@ -1448,7 +1448,9 @@
     "stray_prompt": "«{file}» está dentro de «{mod}» num local onde {kind} nunca procura.\n\nO Anvil vai mover o ficheiro dentro da pasta do mod:\n\nDe:   {von}\nPara: {nach}\n\nA pasta do jogo não é alterada. Mover?",
     "stray_moved": "«{name}» arrumado — a predefinição passa a valer no próximo deploy",
     "stray_failed": "Falha ao mover: {error}",
-    "stray_exists": "«{name}» já existe no destino. Nada foi alterado."
+    "stray_exists": "«{name}» já existe no destino. Nada foi alterado.",
+    "already_installed": "«{file}» já está instalado como «{mod}» — ignorado",
+    "all_already_installed": "Nada instalado, já existem: {count}"
   },
   "preset_reqs": {
     "refresh": "Carregar do Nexus",
