@@ -7,8 +7,14 @@ from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 
-_COLLAPSED_HEIGHT = 28  # label-only height (matches pane minimumHeight)
+# Hoehe der Leiste. Zugeklappt ist der Bereich genau so hoch -- sonst
+# springt die Leiste beim Klappen um ein paar Pixel. Der Standard bleibt
+# der alte Wert; nur wer ausdruecklich mehr will, bekommt mehr.
+_BAR_HEIGHT = 28
 _MAX_HEIGHT = 16777215  # QWIDGETSIZE_MAX — no constraint
+
+# Ab so vielen Pixeln gilt es als Ziehen und nicht mehr als Klick.
+_DRAG_SCHWELLE = 4
 
 
 class CollapsibleSectionBar(QWidget):
@@ -23,6 +29,11 @@ class CollapsibleSectionBar(QWidget):
     """
 
     toggled = Signal(bool)  # emitted on state change; True = expanded (not collapsed)
+    # Die Leiste wird bei gedrueckter Maustaste gezogen. Uebergeben wird
+    # die Verschiebung in Bildpunkten seit dem Aufsetzen: negativ = nach
+    # oben. Wer sie empfaengt, entscheidet was groesser wird.
+    dragged = Signal(int)
+    drag_finished = Signal()
 
     def __init__(
         self,
@@ -34,6 +45,7 @@ class CollapsibleSectionBar(QWidget):
         parent: QWidget | None = None,
         default_collapsed: bool = False,
         max_expanded_height: int = _MAX_HEIGHT,
+        bar_height: int = _BAR_HEIGHT,
     ) -> None:
         super().__init__(parent)
         self._title = title
@@ -41,8 +53,11 @@ class CollapsibleSectionBar(QWidget):
         self._target = target
         self._container = container
         self._max_expanded_height = max_expanded_height
+        self._bar_height = bar_height
         self._count: int | None = None
         self._status: str = ""
+        self._press_y: int | None = None
+        self._zieht = False
 
         # Layout: [label .................. action_button]
         hlayout = QHBoxLayout(self)
@@ -64,6 +79,7 @@ class CollapsibleSectionBar(QWidget):
         self._action_btn: QPushButton | None = None
 
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMinimumHeight(self._bar_height)
 
         # Restore persisted state (falls back to default_collapsed)
         settings = QSettings()
@@ -129,6 +145,15 @@ class CollapsibleSectionBar(QWidget):
         self._apply_state()
         self._persist()
 
+    def expand(self) -> None:
+        """Klappt den Bereich auf, falls er zu ist. Offen bleibt offen."""
+        if not self._collapsed:
+            return
+        self._collapsed = False
+        self._apply_state()
+        self._persist()
+        self.toggled.emit(True)
+
     # ── Events ─────────────────────────────────────────────────────
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
@@ -138,12 +163,43 @@ class CollapsibleSectionBar(QWidget):
             super().mousePressEvent(event)
             return
         if event.button() == Qt.MouseButton.LeftButton:
+            # Hier NICHT klappen: der Benutzer haelt die Leiste
+            # moeglicherweise fest, um sie zu ziehen. Entschieden wird
+            # beim Loslassen.
+            self._press_y = int(event.globalPosition().y())
+            self._zieht = False
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self._press_y is None:
+            super().mouseMoveEvent(event)
+            return
+        versatz = int(event.globalPosition().y()) - self._press_y
+        if not self._zieht and abs(versatz) < _DRAG_SCHWELLE:
+            event.accept()
+            return
+        self._zieht = True
+        self.dragged.emit(versatz)
+        event.accept()
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        if self._press_y is None:
+            super().mouseReleaseEvent(event)
+            return
+        gezogen = self._zieht
+        self._press_y = None
+        self._zieht = False
+        if gezogen:
+            self.drag_finished.emit()
+        else:
+            # Ein Klick ohne Bewegung -- also klappen.
             self._collapsed = not self._collapsed
             self._apply_state()
             self._persist()
             self.toggled.emit(not self._collapsed)
-        else:
-            super().mousePressEvent(event)
+        event.accept()
 
     # ── Internals ──────────────────────────────────────────────────
 
@@ -152,7 +208,7 @@ class CollapsibleSectionBar(QWidget):
         self._target.setVisible(not self._collapsed)
         if self._container is not None:
             if self._collapsed:
-                self._container.setMaximumHeight(_COLLAPSED_HEIGHT)
+                self._container.setMaximumHeight(self._bar_height)
             else:
                 self._container.setMaximumHeight(self._max_expanded_height)
         self._update_text()

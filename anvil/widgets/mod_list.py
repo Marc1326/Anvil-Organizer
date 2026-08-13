@@ -40,6 +40,14 @@ _SECTION_BAR_STYLE = (
 )
 
 
+# Hoehe der Leisten unter der Mod-Liste. Hoeher als der Standard, damit
+# Text und Schalter nicht am Rand kleben.
+_SECTION_BAR_HEIGHT = 34
+
+# So viel bleibt der Mod-Liste beim Ziehen mindestens.
+_MOD_LIST_MIN = 120
+
+
 def _check_col_width(with_grip: bool = True) -> int:
     """Breite der Schalter-Spalte: modern (Schalter+Griff) vs. klassisch (Kreis)."""
     if _modern_active():
@@ -1341,6 +1349,7 @@ class ModListView(QWidget):
             style=_SECTION_BAR_STYLE,
             container=fw_container,
             default_collapsed=True,
+            bar_height=_SECTION_BAR_HEIGHT,
         )
         self._fw_label.set_count(0)
         fw_layout.addWidget(self._fw_label)
@@ -1377,7 +1386,7 @@ class ModListView(QWidget):
         fw_layout.addWidget(self._fw_tree)
 
         # Minimum height = label only (~28px), tree hides when collapsed
-        fw_container.setMinimumHeight(28)
+        fw_container.setMinimumHeight(_SECTION_BAR_HEIGHT)
 
         # ── Presets section (between mod list and frameworks) ────
         # Presets sind Einstellungsdateien, keine Mods -- sie greifen nicht
@@ -1396,6 +1405,7 @@ class ModListView(QWidget):
             style=_SECTION_BAR_STYLE,
             container=ps_container,
             default_collapsed=True,
+            bar_height=_SECTION_BAR_HEIGHT,
         )
         self._ps_label.set_count(0)
         ps_layout.addWidget(self._ps_label)
@@ -1426,7 +1436,7 @@ class ModListView(QWidget):
         self._ps_tree.setColumnWidth(2, 120)
         self._ph_presets = PersistentHeader(ps_hdr, "presets")
         ps_layout.addWidget(self._ps_tree)
-        ps_container.setMinimumHeight(28)
+        ps_container.setMinimumHeight(_SECTION_BAR_HEIGHT)
         ps_container.setVisible(False)
         self._ps_container = ps_container
 
@@ -1440,6 +1450,15 @@ class ModListView(QWidget):
         self._splitter.setStretchFactor(2, 15)
         self._splitter.setChildrenCollapsible(False)
         self._splitter.splitterMoved.connect(self._on_lower_splitter_moved)
+        # Die Leiste ist der Griff: festhalten und ziehen macht den
+        # Bereich groesser, ein Klick ohne Bewegung klappt ihn.
+        self._start_sizes = None
+        self._ps_label.dragged.connect(
+            lambda versatz: self._drag_section(ps_container, versatz))
+        self._fw_label.dragged.connect(
+            lambda versatz: self._drag_section(fw_container, versatz))
+        self._ps_label.drag_finished.connect(self._end_section_drag)
+        self._fw_label.drag_finished.connect(self._end_section_drag)
         # Hide frameworks section by default (shown when load_frameworks is called)
         fw_container.setVisible(False)
         self._fw_container = fw_container
@@ -1470,6 +1489,44 @@ class ModListView(QWidget):
         if want_active == bool(fw_data.get("active", True)):
             return
         self.fw_active_toggle.emit(fw_data)
+
+    def _drag_section(self, container, versatz: int) -> None:
+        """Bereich mitziehen, waehrend die Maustaste auf der Leiste haelt.
+
+        *versatz* ist die Verschiebung seit dem Aufsetzen, negativ heisst
+        nach oben. Nach oben ziehen macht den Bereich groesser -- die
+        Leiste wandert mit dem Zeiger, so wie man es erwartet.
+
+        Ein zugeklappter Bereich hat Mindest- und Hoechsthoehe gleich und
+        laesst sich nicht dehnen. Wer ihn zieht, will ihn offensichtlich
+        sehen, also wird er dabei aufgeklappt.
+        """
+        i = self._splitter.indexOf(container)
+        if i <= 0:
+            return
+        if self._start_sizes is None:
+            self._start_sizes = self._splitter.sizes()
+            leiste = self._ps_label if container is self._ps_container else self._fw_label
+            leiste.expand()
+
+        groessen = list(self._start_sizes)
+        if len(groessen) <= i:
+            return
+        # Der Platz kommt immer aus der Mod-Liste, nicht vom Nachbar-
+        # bereich: sonst schrumpft beim Aufziehen des einen der andere.
+        wachstum = -versatz
+        wachstum = max(wachstum, container.minimumHeight() - groessen[i])
+        wachstum = min(wachstum, groessen[0] - _MOD_LIST_MIN)
+        if wachstum == 0:
+            return
+        groessen[i] += wachstum
+        groessen[0] -= wachstum
+        self._splitter.setSizes(groessen)
+        self._on_lower_splitter_moved()
+
+    def _end_section_drag(self) -> None:
+        """Merker fuer den naechsten Zug zuruecksetzen."""
+        self._start_sizes = None
 
     def _on_lower_splitter_moved(self) -> None:
         """Hide/show the lower trees based on available space (respects collapsed state)."""
