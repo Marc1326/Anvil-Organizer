@@ -126,6 +126,7 @@ def test_game_panel_factory_passes_external_roots_to_standard_deployer(tmp_path:
         _current_plugin = None
         _mod_index = None
         _separator_deploy_paths: dict[str, str] = {}
+        _keep_file_name_mods: set = set()
         _mods_path = mods
         _profiles_path = profiles
 

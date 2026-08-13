@@ -586,6 +586,7 @@ class GamePanel(QWidget):
         self._current_profile_name: str = "Default"
         self._deployer: _Deployer | None = None
         self._separator_deploy_paths: dict[str, str] = {}
+        self._keep_file_name_mods: set[str] = set()
         self._mod_index = None  # ModIndex, set from mainwindow
         self._virtual_files: dict = {}  # what the mods would deploy
         self._watch_binary = ""     # game binary the process watcher looks for
@@ -1147,6 +1148,15 @@ class GamePanel(QWidget):
         # Update deployer if already initialized
         if self._deployer is not None:
             self._deployer._separator_deploy_paths = self._separator_deploy_paths
+
+    def set_keep_file_name_mods(self, names) -> None:
+        """Mods, deren Dateinamen beim Ausrollen unveraendert bleiben."""
+        self._keep_file_name_mods = {str(n) for n in names}
+        # Nicht jeder Deployer kennt den Merker -- Ghost Recon Breakpoint
+        # bringt einen eigenen mit, der die Archive gar nicht nummeriert.
+        setzen = getattr(self._deployer, "set_keep_file_name_mods", None)
+        if callable(setzen):
+            setzen(self._keep_file_name_mods)
 
     # ── Silent deploy / purge (called from MainWindow) ──────────────
 
@@ -3281,6 +3291,7 @@ class GamePanel(QWidget):
             mod_index=self._mod_index,
             redmod_path=redmod_path,
             separator_deploy_paths=self._separator_deploy_paths,
+            keep_file_name_mods=self._keep_file_name_mods,
             pak_load_order_prefix=pak_order,
             pak_load_order_dirs=pak_order_dirs,
             pak_load_order_extensions=pak_order_ext,

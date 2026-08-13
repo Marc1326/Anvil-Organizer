@@ -75,6 +75,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _auto_relock_instance=lambda _path, _reason: None,
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,
+            _sync_keep_file_name_mods=lambda: None,
             _log_game_dir_state=lambda _phase: None,
             keeps_mods_deployed=lambda: False,
         )
@@ -238,6 +239,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _game_running=False,
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,
+            _sync_keep_file_name_mods=lambda: None,
             statusBar=lambda: status,
         )
 
@@ -384,6 +386,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _game_running=False,
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,
+            _sync_keep_file_name_mods=lambda: None,
             statusBar=lambda: _StatusBar(),
         )
 
@@ -405,6 +408,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _game_running=False,
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,
+            _sync_keep_file_name_mods=lambda: None,
             statusBar=lambda: _StatusBar(),
         )
 
@@ -692,6 +696,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             ),
             _auto_relock_instance=lambda _p, _r: None,
             _sync_separator_deploy_paths=lambda: None,
+            _sync_keep_file_name_mods=lambda: None,
             _log_game_dir_state=lambda _phase: None,
             keeps_mods_deployed=lambda: False,
         )
@@ -718,6 +723,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
                 silent_purge=lambda: calls.append("purge"),
             ),
             _sync_separator_deploy_paths=lambda: None,
+            _sync_keep_file_name_mods=lambda: None,
             statusBar=lambda: _StatusBar(),
         )
 
@@ -977,6 +983,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             ),
             _auto_relock_instance=lambda _p, _r: None,
             _sync_separator_deploy_paths=lambda: None,
+            _sync_keep_file_name_mods=lambda: None,
             _log_game_dir_state=lambda _phase: None,
             keeps_mods_deployed=lambda: False,
         )

@@ -128,6 +128,7 @@ def test_game_panel_passes_ba2_loose_paths_to_standard_deployer(
         _current_plugin = SkyrimSEGame()
         _mod_index = None
         _separator_deploy_paths: dict[str, str] = {}
+        _keep_file_name_mods: set = set()
         _mods_path = mods
         _profiles_path = instance / ".profiles"
 

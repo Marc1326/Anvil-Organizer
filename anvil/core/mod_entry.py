@@ -72,6 +72,10 @@ class ModEntry:
     # Custom deploy path (from meta.ini, only for separators)
     deploy_path: str = ""                  # Absolute path or empty = use global game path
 
+    # Von der Durchnummerierung der Archive ausgenommen (aus meta.ini).
+    # Fuer Mods, deren Loader ihre Dateien am exakten Namen sucht.
+    keep_file_names: bool = False
+
     # Group membership (set by GroupManager, NOT from meta.ini)
     group: str = ""                        # Group name this mod belongs to
 
@@ -176,6 +180,13 @@ def _build_entry(
         if raw_deploy:
             sep_deploy_path = raw_deploy
 
+    # Umgekehrt zur Trennerfarbe: der Merker gilt nur fuer echte Mods.
+    keep_names = False
+    if not is_sep:
+        keep_names = str(
+            meta.get("keep_file_names", "")
+        ).strip().lower() in ("1", "true", "yes")
+
     # Parse Nexus category ID
     nexus_cat = 0
     raw_ncat = meta.get("nexuscategory", meta.get("nexusCategory", "0"))
@@ -203,6 +214,7 @@ def _build_entry(
         is_separator=is_sep,
         color=sep_color,
         deploy_path=sep_deploy_path,
+        keep_file_names=keep_names,
         nexus_category=nexus_cat,
         file_count=file_count,
         total_size=total_size,
