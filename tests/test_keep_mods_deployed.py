@@ -27,6 +27,7 @@ def _window(keep: bool, deployed: bool = True, running: bool = False):
         _bg3_installer=None,
         _log_game_dir_state=mock.MagicMock(),
         keeps_mods_deployed=lambda: keep,
+        uses_overlay=lambda: False,
     )
     return window, panel
 

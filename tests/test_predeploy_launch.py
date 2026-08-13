@@ -50,6 +50,8 @@ def _bind_unlock_helpers(window: Any) -> Any:
     """Wire the real MainWindow helpers _unlock_ui delegates to."""
     window._purge_after_game = lambda: MainWindow._purge_after_game(window)
     window._release_ui_lock = lambda: MainWindow._release_ui_lock(window)
+    if not hasattr(window, "uses_overlay"):
+        window.uses_overlay = lambda: False
     window._unlock_pending = False
     panel = window._game_panel
     if not hasattr(panel, "clear_watch_target"):
@@ -78,6 +80,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _sync_keep_file_name_mods=lambda: None,
             _log_game_dir_state=lambda _phase: None,
             keeps_mods_deployed=lambda: False,
+            uses_overlay=lambda: False,
         )
 
         success = MainWindow._predeploy_for_launch(window, "game_start")
@@ -236,6 +239,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _current_instance_path=Path("/tmp/instance"),
             _bg3_installer=None,
             keeps_mods_deployed=lambda: False,
+            uses_overlay=lambda: False,
             _game_running=False,
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,
@@ -268,6 +272,7 @@ class PredeployLaunchTests(unittest.TestCase):
             menuBar=lambda: _Widget(),
             _log_game_dir_state=lambda _phase: None,
             keeps_mods_deployed=lambda: False,
+            uses_overlay=lambda: False,
         )
 
         MainWindow._unlock_ui(_bind_unlock_helpers(window))
@@ -294,6 +299,7 @@ class PredeployLaunchTests(unittest.TestCase):
             menuBar=lambda: _Widget(),
             _log_game_dir_state=lambda _phase: None,
             keeps_mods_deployed=lambda: False,
+            uses_overlay=lambda: False,
         )
 
         MainWindow._unlock_ui(_bind_unlock_helpers(window))
@@ -383,6 +389,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _current_instance_path=Path("/tmp/instance"),
             _bg3_installer=None,
             keeps_mods_deployed=lambda: False,
+            uses_overlay=lambda: False,
             _game_running=False,
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,
@@ -405,6 +412,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _current_instance_path=Path("/tmp/instance"),
             _bg3_installer=None,
             keeps_mods_deployed=lambda: False,
+            uses_overlay=lambda: False,
             _game_running=False,
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,
@@ -562,6 +570,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             menuBar=lambda: _Widget(),
             _log_game_dir_state=lambda _phase: None,
             keeps_mods_deployed=lambda: False,
+            uses_overlay=lambda: False,
         )
 
     def test_unknown_state_keeps_the_deployment(self) -> None:
@@ -699,6 +708,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             _sync_keep_file_name_mods=lambda: None,
             _log_game_dir_state=lambda _phase: None,
             keeps_mods_deployed=lambda: False,
+            uses_overlay=lambda: False,
         )
 
         with mock.patch("anvil.mainwindow.QMessageBox.warning") as warning:
@@ -716,6 +726,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             _current_instance_path=Path("/tmp/instance"),
             _bg3_installer=None,
             keeps_mods_deployed=lambda: False,
+            uses_overlay=lambda: False,
             _game_running=False,
             _game_panel=SimpleNamespace(
                 has_deployment=lambda: True,
@@ -986,6 +997,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             _sync_keep_file_name_mods=lambda: None,
             _log_game_dir_state=lambda _phase: None,
             keeps_mods_deployed=lambda: False,
+            uses_overlay=lambda: False,
         )
 
         with mock.patch("anvil.mainwindow.QMessageBox.warning"):
@@ -1006,6 +1018,7 @@ class SandboxedProcessLookupTests(unittest.TestCase):
             ),
             _log_game_dir_state=lambda _phase: None,
             keeps_mods_deployed=lambda: False,
+            uses_overlay=lambda: False,
             _purge_after_game=lambda: calls.append("purge"),
             _release_ui_lock=lambda: None,
         )

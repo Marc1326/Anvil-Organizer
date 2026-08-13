@@ -87,12 +87,45 @@ if ! bwrap --dev-bind / / "${{ARGS[@]}}" -- /bin/true >>"$LOG" 2>&1; then
     exec "$@"
 fi
 
-echo "[$(date '+%F %T')] uebergebe an das Spiel" >> "$LOG"
+{{
+    echo "[$(date '+%F %T')] uebergebe an das Spiel"
+    echo "  Befehl:  $*"
+    echo "  eigene PID: $$   Elternprozess: $PPID"
+    echo "  WINEDLLOVERRIDES=${{WINEDLLOVERRIDES:-(nicht gesetzt)}}"
+    echo "  STEAM_COMPAT_DATA_PATH=${{STEAM_COMPAT_DATA_PATH:-(nicht gesetzt)}}"
+}} >> "$LOG"
 
-exec bwrap \\
+# Beobachter: haelt fest, wie lange welcher Spielprozess lebt. Ohne das
+# sieht man am Ende nur, DASS das Spiel weg ist, nicht warum.
+(
+    start=$SECONDS
+    gesehen=0
+    while [ $((SECONDS - start)) -lt 900 ]; do
+        n=$(pgrep -c -f "Cyberpunk2077.exe|REDprelauncher" 2>/dev/null || echo 0)
+        if [ "$n" -gt 0 ] && [ "$gesehen" -eq 0 ]; then
+            gesehen=1
+            echo "[$(date '+%F %T')] Spielprozess da (nach $((SECONDS - start))s)" >> "$LOG"
+            pgrep -a -f "Cyberpunk2077.exe|REDprelauncher" >> "$LOG" 2>&1
+        elif [ "$n" -eq 0 ] && [ "$gesehen" -eq 1 ]; then
+            echo "[$(date '+%F %T')] Spielprozess weg (nach $((SECONDS - start))s)" >> "$LOG"
+            break
+        fi
+        sleep 1
+    done
+) &
+beobachter=$!
+
+# Nicht exec: so laesst sich der Rueckgabewert festhalten. Steam sieht
+# weiterhin diesen Prozess als das Spiel.
+bwrap \\
     --dev-bind / / \\
     "${{ARGS[@]}}" \\
     -- "$@"
+code=$?
+# Beobachter mitnehmen, sonst haengt der Wrapper bis zum Zeitlimit.
+kill "$beobachter" 2>/dev/null
+echo "[$(date '+%F %T')] bwrap beendet, Rueckgabewert $code" >> "$LOG"
+exit "$code"
 """
 
 

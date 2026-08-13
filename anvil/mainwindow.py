@@ -3963,6 +3963,14 @@ class MainWindow(QMainWindow):
         data = self.instance_manager.load_instance(name) or {}
         return str(data.get("keep_mods_deployed", "false")).lower() in ("true", "1")
 
+    def uses_overlay(self) -> bool:
+        """Ob die aktuelle Instanz per overlayfs ausrollt."""
+        name = self.instance_manager.current_instance()
+        if not name:
+            return False
+        data = self.instance_manager.load_instance(name) or {}
+        return str(data.get("use_overlay", "false")).lower() in ("true", "1")
+
     def set_keeps_mods_deployed(self, enabled: bool) -> None:
         """Write the flag back to the current instance."""
         name = self.instance_manager.current_instance()
@@ -4034,6 +4042,15 @@ class MainWindow(QMainWindow):
 
     def _purge_after_game(self) -> None:
         """Remove the deployment and log what went out."""
+        # Beim Overlay endet der Mount mit dem Spiel -- es gibt nichts
+        # aufzuraeumen. Schlimmer: der Prozesswaechter verliert das Spiel
+        # hinter dem Startwrapper aus den Augen und meldet zu frueh
+        # „beendet". Wird dann geraeumt, verschwindet die Schicht mitten
+        # im Start, das Spiel findet seine Loader nicht mehr und stuerzt ab.
+        if self.uses_overlay():
+            print("[LAUNCH] overlay: nichts aufzuraeumen, der Mount endet "
+                  "mit dem Spiel", flush=True)
+            return
         if self.keeps_mods_deployed():
             print("[LAUNCH] keep-deployed is on — mods stay in the game dir",
                   flush=True)
