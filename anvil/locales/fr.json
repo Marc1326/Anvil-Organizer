@@ -936,9 +936,14 @@
     "color_change": "Modifier…",
     "color_pick_title": "Choisir une couleur",
     "path_anvil_base_dir": "Anvil base directory",
-    "use_overlay": "Monter les mods en superposition (experimental)",
-    "use_overlay_hint": "Le dossier du jeu n'est plus modifie. Les mods sont superposes au lancement et disparaissent a la fermeture.",
-    "overlay_set_launch_option": "Inscrire l'option de lancement dans Steam"
+    "tab_expert": "Expert",
+    "deploy_method_group": "Deploiement des mods",
+    "deploy_symlink": "Liens symboliques (par defaut)",
+    "deploy_symlink_hint": "Eprouve : Anvil lie les mods dans le dossier du jeu et nettoie apres. Aucun droit particulier requis. Les mods n'agissent que tant qu'ils sont deployes.",
+    "deploy_overlay": "Overlay (experimental)",
+    "deploy_overlay_hint": "Le dossier du jeu reste intact : les mods se superposent en couche, les ecritures vont dans le dossier overwrite. Fonctionne avec tout mode de lancement, meme directement via Steam. Le montage demande des droits systeme une fois par deploiement (mot de passe) -- ou aucun apres une configuration unique.",
+    "overlay_polkit_setup": "Configurer le montage sans mot de passe …",
+    "overlay_polkit_hint": "Installe l'assistant de montage au niveau systeme et une regle polkit. Le montage fonctionne ensuite sans mot de passe."
   },
   "mod_detail": {
     "open_in_explorer": "Ouvrir le Mod dans l'explorateur",
@@ -1491,16 +1496,16 @@
     "hide": "Masquer l'avis"
   },
   "overlay": {
-    "no_userns": "Ce noyau ne gere pas les espaces de noms utilisateur.",
-    "userns_disabled": "Les espaces de noms utilisateur non privilegies sont desactives.",
-    "no_bwrap": "bubblewrap (bwrap) n'est pas installe.",
     "bad_filesystem": "La couche d'ecriture est sur {fs}. Overlay exige ext4, btrfs ou xfs.",
     "no_game_path": "Dossier du jeu introuvable : {path}",
     "requirements_ok": "Toutes les conditions sont remplies.",
-    "launch_option_hint": "Ajoutez cette ligne aux options de lancement Steam :",
-    "launch_no_app": "Cette instance n'a pas d'identifiant Steam. L'option de lancement doit etre saisie a la main.",
-    "launch_steam_running": "Steam est ouvert et ecraserait la modification a la fermeture. Fermez Steam et reessayez, ou collez cette ligne vous-meme :",
-    "launch_no_config": "Aucune configuration Steam trouvee. Collez cette ligne vous-meme :",
-    "launch_written": "Option de lancement inscrite dans {count} compte(s) Steam :"
+    "no_kernel_overlay": "Le noyau ne connait pas le systeme de fichiers overlay.",
+    "no_pkexec": "pkexec est absent (polkit). Sans lui, Anvil ne peut pas monter l'overlay.",
+    "mount_failed": "Echec du montage : {detail}",
+    "mount_aborted": "Mot de passe annule -- les mods sont prets mais non montes.",
+    "unmount_failed": "Echec du demontage : {detail}",
+    "polkit_already": "Deja configure -- le montage fonctionne sans mot de passe.",
+    "polkit_done": "Configure. Le montage fonctionne desormais sans mot de passe.",
+    "polkit_failed": "Echec de la configuration : {detail}"
   }
 }

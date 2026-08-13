@@ -20,6 +20,15 @@ from anvil.core.overlay_deployer import OverlayDeployer
 @pytest.fixture
 def ohne_umgebungspruefung(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(OverlayDeployer, "check_requirements", lambda self: [])
+    monkeypatch.setattr(
+        "anvil.core.overlay_deployer.mount", lambda *a, **k: (True, "")
+    )
+    monkeypatch.setattr(
+        "anvil.core.overlay_deployer.unmount", lambda *a, **k: (True, "")
+    )
+    monkeypatch.setattr(
+        "anvil.core.overlay_deployer.purge_mounts", lambda *a, **k: (True, "")
+    )
 
 
 def _schreibe(base: Path, rel: str, text: str = "x") -> None:

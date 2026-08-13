@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QComboBox,
     QCheckBox,
+    QRadioButton,
     QPushButton,
     QScrollArea,
     QFrame,
@@ -227,25 +228,6 @@ class SettingsDialog(QDialog):
             str(self._idata.get("local_saves", "false")).lower() in ("true", "1"))
         prof_layout.addWidget(self._setting_row(self._cb_local_saves))
         prof_layout.addWidget(self._setting_row(_disabled(QCheckBox(tr("settings.auto_archive_invalidation")))))
-
-        self._cb_use_overlay = QCheckBox(tr("settings.use_overlay"))
-        self._cb_use_overlay.setToolTip(tr("settings.use_overlay_hint"))
-        self._cb_use_overlay.setChecked(
-            str(self._idata.get("use_overlay", "false")).lower() in ("true", "1"))
-        prof_layout.addWidget(self._setting_row(self._cb_use_overlay))
-
-        self._lbl_overlay_problems = QLabel("")
-        self._lbl_overlay_problems.setWordWrap(True)
-        self._lbl_overlay_problems.setVisible(False)
-        prof_layout.addWidget(self._lbl_overlay_problems)
-
-        self._btn_overlay_launch = QPushButton(tr("settings.overlay_set_launch_option"))
-        self._btn_overlay_launch.clicked.connect(
-            lambda checked=False: self._set_overlay_launch_option()
-        )
-        prof_layout.addWidget(self._btn_overlay_launch)
-
-        self._check_overlay_requirements()
 
         scroll_layout.addWidget(prof_grp)
 
@@ -1163,6 +1145,56 @@ class SettingsDialog(QDialog):
         diag_layout.addWidget(diag_scroll)
         self._tabs.addTab(diagnose_tab, tr("settings.tab_diagnostics"))
 
+        # Tab Experte
+        experte_tab = QWidget()
+        ex_layout = QVBoxLayout(experte_tab)
+        ex_scroll = QScrollArea()
+        ex_scroll.setWidgetResizable(True)
+        ex_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        ex_content = QWidget()
+        ex_content_layout = QVBoxLayout(ex_content)
+
+        deploy_grp = QGroupBox(tr("settings.deploy_method_group"))
+        deploy_grp_layout = QVBoxLayout(deploy_grp)
+
+        use_overlay = str(self._idata.get("use_overlay", "false")).lower() in ("true", "1")
+        self._radio_symlink = QRadioButton(tr("settings.deploy_symlink"))
+        self._radio_overlay = QRadioButton(tr("settings.deploy_overlay"))
+        self._radio_overlay.setChecked(use_overlay)
+        self._radio_symlink.setChecked(not use_overlay)
+        deploy_grp_layout.addWidget(self._radio_symlink)
+        symlink_hint = QLabel(tr("settings.deploy_symlink_hint"))
+        symlink_hint.setWordWrap(True)
+        symlink_hint.setContentsMargins(24, 0, 0, 8)
+        deploy_grp_layout.addWidget(symlink_hint)
+        deploy_grp_layout.addWidget(self._radio_overlay)
+        overlay_hint = QLabel(tr("settings.deploy_overlay_hint"))
+        overlay_hint.setWordWrap(True)
+        overlay_hint.setContentsMargins(24, 0, 0, 8)
+        deploy_grp_layout.addWidget(overlay_hint)
+
+        self._lbl_overlay_problems = QLabel("")
+        self._lbl_overlay_problems.setWordWrap(True)
+        self._lbl_overlay_problems.setVisible(False)
+        deploy_grp_layout.addWidget(self._lbl_overlay_problems)
+
+        self._btn_polkit = QPushButton(tr("settings.overlay_polkit_setup"))
+        self._btn_polkit.setToolTip(tr("settings.overlay_polkit_hint"))
+        self._btn_polkit.clicked.connect(
+            lambda checked=False: self._setup_polkit()
+        )
+        self._btn_polkit.setVisible(use_overlay)
+        self._radio_overlay.toggled.connect(self._btn_polkit.setVisible)
+        deploy_grp_layout.addWidget(self._btn_polkit)
+
+        ex_content_layout.addWidget(deploy_grp)
+        ex_content_layout.addStretch()
+        ex_scroll.setWidget(ex_content)
+        ex_layout.addWidget(ex_scroll)
+        self._tabs.addTab(experte_tab, tr("settings.tab_expert"))
+
+        self._check_overlay_requirements()
+
         # Diagnose-Daten initial laden (günstig; Konflikte nur auf Knopfdruck)
         self._diag_data: dict = {}
         self._diag_last_conflicts = None
@@ -1334,68 +1366,33 @@ class SettingsDialog(QDialog):
             return str(app_id) if app_id else ""
         return ""
 
-    def _overlay_launch_option(self) -> str:
-        from anvil.core.overlay_launch import launch_option, wrapper_path
+    def _setup_polkit(self) -> None:
+        """Richtet einmalig ein, dass der Mount ohne Passwort laeuft."""
+        from anvil.core.overlay_mount import (
+            install_polkit_rule,
+            polkit_rule_installed,
+        )
+        import getpass
 
+        titel = tr("settings.overlay_polkit_setup")
         cur = self._instance_manager.current_instance() if self._instance_manager else None
         if not cur:
-            return ""
+            return
         instance_path = self._instance_manager.instances_path() / cur
-        return launch_option(wrapper_path(instance_path))
+        user = getpass.getuser()
 
-    def _set_overlay_launch_option(self) -> None:
-        """Traegt die Startoption bei Steam ein, oder zeigt sie zum Kopieren."""
-        from anvil.core.overlay_launch import (
-            localconfig_files,
-            set_launch_options,
-            steam_is_running,
-        )
-
-        option = self._overlay_launch_option()
-        app_id = self._steam_app_id()
-        titel = tr("settings.overlay_set_launch_option")
-
-        if not option or not app_id:
-            QMessageBox.warning(self, titel, tr("overlay.launch_no_app"))
+        if polkit_rule_installed(instance_path, user):
+            QMessageBox.information(self, titel, tr("overlay.polkit_already"))
             return
 
-        if steam_is_running():
-            QMessageBox.information(
-                self, titel,
-                tr("overlay.launch_steam_running") + "\n\n" + option,
-            )
-            return
-
-        configs = localconfig_files()
-        if not configs:
-            QMessageBox.warning(
-                self, titel,
-                tr("overlay.launch_no_config") + "\n\n" + option,
-            )
-            return
-
-        gesetzt = []
-        fehler = []
-        for config in configs:
-            try:
-                set_launch_options(app_id, option, config)
-                gesetzt.append(config)
-            except (OSError, RuntimeError) as exc:
-                fehler.append(str(exc))
-
-        if gesetzt:
-            QMessageBox.information(
-                self, titel,
-                tr("overlay.launch_written", count=len(gesetzt)) + "\n\n" + option,
-            )
-        else:
-            QMessageBox.warning(
-                self, titel,
-                "\n".join(fehler) + "\n\n" + option,
-            )
+        ok, fehler = install_polkit_rule(instance_path, user)
+        if ok:
+            QMessageBox.information(self, titel, tr("overlay.polkit_done"))
+        elif fehler:
+            QMessageBox.warning(self, titel, tr("overlay.polkit_failed", detail=fehler))
 
     def _check_overlay_requirements(self) -> None:
-        """Zeigt an, was dem Overlay im Weg steht, und sperrt notfalls den Schalter."""
+        """Zeigt an, was dem Overlay im Weg steht, und sperrt notfalls die Wahl."""
         from anvil.core.overlay_deployer import environment_problems
 
         overwrite = self._idata.get("path_overwrite_directory", "")
@@ -1408,14 +1405,13 @@ class SettingsDialog(QDialog):
             self._lbl_overlay_problems.setVisible(False)
             return
 
-        self._btn_overlay_launch.setEnabled(False)
-
         self._lbl_overlay_problems.setText("\n".join(f"• {p}" for p in problems))
         self._lbl_overlay_problems.setVisible(True)
-        # Nur sperren, nicht abhaken. Wer die Einstellungen auf einem Rechner
-        # ohne bwrap oeffnet und mit OK schliesst, soll seine Konfiguration
-        # nicht verlieren.
-        self._cb_use_overlay.setEnabled(False)
+        # Nur sperren, nicht umstellen. Wer die Einstellungen auf einem
+        # Rechner ohne Overlay-Tauglichkeit oeffnet und mit OK schliesst,
+        # soll seine Konfiguration nicht verlieren.
+        self._radio_overlay.setEnabled(False)
+        self._btn_polkit.setEnabled(False)
         self._overlay_locked = True
 
     def _setting_row(self, cb: QCheckBox) -> QWidget:
@@ -1994,7 +1990,7 @@ class SettingsDialog(QDialog):
                 idata["local_saves"] = self._cb_local_saves.isChecked()
                 idata["keep_mods_deployed"] = self._cb_keep_deployed.isChecked()
                 if not getattr(self, "_overlay_locked", False):
-                    idata["use_overlay"] = self._cb_use_overlay.isChecked()
+                    idata["use_overlay"] = self._radio_overlay.isChecked()
                 self._instance_manager.save_instance(cur, idata)
 
         super().accept()

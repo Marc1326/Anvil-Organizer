@@ -936,9 +936,14 @@
     "color_change": "Cambiar…",
     "color_pick_title": "Elegir color",
     "path_anvil_base_dir": "Anvil base directory",
-    "use_overlay": "Montar los mods como capa superpuesta (experimental)",
-    "use_overlay_hint": "Ya no se escribe en la carpeta del juego. Los mods se superponen al iniciar y desaparecen al salir.",
-    "overlay_set_launch_option": "Escribir la opcion de inicio en Steam"
+    "tab_expert": "Experto",
+    "deploy_method_group": "Despliegue de mods",
+    "deploy_symlink": "Enlaces simbolicos (predeterminado)",
+    "deploy_symlink_hint": "Probado: Anvil enlaza los mods en la carpeta del juego y limpia despues. Sin derechos especiales. Los mods solo actuan mientras estan desplegados.",
+    "deploy_overlay": "Overlay (experimental)",
+    "deploy_overlay_hint": "La carpeta del juego queda intacta: los mods se superponen como capa y las escrituras van a la carpeta overwrite. Funciona con cualquier forma de arranque, incluso directamente desde Steam. El montaje necesita derechos de sistema una vez por despliegue (contrasena) -- o ninguno tras una configuracion unica.",
+    "overlay_polkit_setup": "Configurar montaje sin contrasena …",
+    "overlay_polkit_hint": "Instala el asistente de montaje en el sistema y una regla polkit. Despues el montaje funciona sin contrasena."
   },
   "mod_detail": {
     "open_in_explorer": "Abrir Mod en el explorador",
@@ -1491,16 +1496,16 @@
     "hide": "Ocultar aviso"
   },
   "overlay": {
-    "no_userns": "Este nucleo no tiene espacios de nombres de usuario.",
-    "userns_disabled": "Los espacios de nombres de usuario sin privilegios estan desactivados.",
-    "no_bwrap": "bubblewrap (bwrap) no esta instalado.",
     "bad_filesystem": "La capa de escritura esta en {fs}. Overlay necesita ext4, btrfs o xfs.",
     "no_game_path": "Carpeta del juego no encontrada: {path}",
     "requirements_ok": "Se cumplen todos los requisitos.",
-    "launch_option_hint": "Anade esta linea a las opciones de inicio de Steam:",
-    "launch_no_app": "Esta instancia no tiene identificador de Steam. La opcion de inicio debe ponerse a mano.",
-    "launch_steam_running": "Steam esta abierto y sobrescribiria el cambio al cerrarse. Cierra Steam e intentalo de nuevo, o pega esta linea tu mismo:",
-    "launch_no_config": "No se encontro la configuracion de Steam. Pega esta linea tu mismo:",
-    "launch_written": "Opcion de inicio escrita en {count} cuenta(s) de Steam:"
+    "no_kernel_overlay": "El nucleo no soporta el sistema de archivos overlay.",
+    "no_pkexec": "Falta pkexec (polkit). Sin el Anvil no puede montar el overlay.",
+    "mount_failed": "Error al montar: {detail}",
+    "mount_aborted": "Contrasena cancelada -- los mods estan preparados pero no montados.",
+    "unmount_failed": "Error al desmontar: {detail}",
+    "polkit_already": "Ya configurado -- el montaje funciona sin contrasena.",
+    "polkit_done": "Configurado. El montaje ahora funciona sin contrasena.",
+    "polkit_failed": "Error en la configuracion: {detail}"
   }
 }

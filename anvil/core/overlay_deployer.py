@@ -1,12 +1,11 @@
-"""Deploy per overlayfs statt per Symlink.
+"""Deploy per Overlay statt per Symlink.
 
-Der Spielordner wird nicht mehr beschrieben.  Stattdessen liegt er als
-unterste, nur lesbare Schicht in einem Overlay; darueber die Mods, darueber
-die Schreibschicht.  Das Einhaengen passiert erst beim Spielstart im
-Namespace des Spielprozesses -- endet das Spiel, ist der Mount weg.
-
-``deploy()`` haengt nichts ein.  Es baut die Mod-Schicht und schreibt die
-Mount-Beschreibung, die der Startwrapper spaeter liest.
+Der Spielordner wird nicht beschrieben.  Er liegt als unterste, nur
+lesbare Schicht in einem Kernel-Overlay; darueber die Mods, darueber
+die Schreibschicht (.overwrite).  Das Einhaengen passiert beim Deploy
+direkt am Spielordner -- jeder Startweg (Anvil, Steam, Verknuepfung)
+sieht danach dieselbe Sicht.  Root-Rechte braucht nur der Mount selbst,
+vermittelt ueber pkexec (siehe overlay_mount).
 """
 
 from __future__ import annotations
@@ -18,7 +17,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from anvil.core.mod_deployer import DeployResult
-from anvil.core.overlay_launch import launch_option, wrapper_path, write_wrapper
+from anvil.core.overlay_mount import (
+    mount,
+    mount_requirements,
+    purge_mounts,
+    unmount,
+    write_helper,
+)
 from anvil.core.overlay_staging import OverlayStage
 from anvil.core.translator import tr
 
@@ -78,21 +83,7 @@ def environment_problems(
     Leere Liste heisst: es kann losgehen.  Wird auch von den Einstellungen
     benutzt, bevor eine Instanz ueberhaupt umgestellt wird.
     """
-    problems: list[str] = []
-
-    if not Path("/proc/self/uid_map").exists():
-        problems.append(tr("overlay.no_userns"))
-
-    flag = Path("/proc/sys/kernel/unprivileged_userns_clone")
-    if flag.is_file():
-        try:
-            if flag.read_text(encoding="utf-8").strip() == "0":
-                problems.append(tr("overlay.userns_disabled"))
-        except OSError:
-            pass
-
-    if shutil.which("bwrap") is None:
-        problems.append(tr("overlay.no_bwrap"))
+    problems: list[str] = mount_requirements()
 
     if upper_dir is not None:
         fstype = filesystem_of(upper_dir)
@@ -228,11 +219,8 @@ class OverlayDeployer:
 
     @property
     def wrapper(self) -> Path:
-        return wrapper_path(self._instance_path)
-
-    def steam_launch_option(self) -> str:
-        """Was bei Steam in die Startoptionen gehoert."""
-        return launch_option(self.wrapper)
+        """Veraltet: der neue Weg braucht keinen Startwrapper mehr."""
+        return self._instance_path / ".overlay" / "wrapper"
 
     # ── Schnittstelle ──────────────────────────────────────────────────
 
@@ -336,10 +324,20 @@ class OverlayDeployer:
                 encoding="utf-8",
             )
             self._write_mount_conf()
-            write_wrapper(self._instance_path, self.mount_conf_path, self.start_log_path)
+            write_helper(self._instance_path)
         except OSError as exc:
             result.success = False
             result.errors.append(f"Manifest schreiben: {exc}")
+            return result
+
+        ok, protokoll = mount(self._instance_path, self.mount_conf_path)
+        if not ok and protokoll:
+            result.success = False
+            result.errors.append(tr("overlay.mount_failed", detail=protokoll))
+        elif not ok:
+            # Passwort-Dialog abgebrochen: die Schicht steht bereit, der
+            # Mount kann beim naechsten Deploy nachgeholt werden.
+            result.errors.append(tr("overlay.mount_aborted"))
 
         return result
 
@@ -392,12 +390,16 @@ class OverlayDeployer:
             print(f"[OVERLAY] {uebrig} Symlink(s) aus dem alten Deploy entfernt", flush=True)
 
     def purge(self) -> DeployResult:
-        """Raeumt die Mod-Schicht weg.
-
-        Der Mount selbst muss nicht abgebaut werden -- er lebt nur im
-        Namespace des Spielprozesses und verschwindet mit ihm.
-        """
+        """Haengt das Overlay ab und raeumt die Mod-Schicht weg."""
         result = DeployResult()
+
+        if self.mount_conf_path.is_file():
+            ok, protokoll = purge_mounts(self._instance_path, self.mount_conf_path)
+            if not ok and protokoll:
+                result.success = False
+                result.errors.append(tr("overlay.unmount_failed", detail=protokoll))
+                return result
+            self.mount_conf_path.unlink(missing_ok=True)
 
         if self.stage_root.exists():
             try:

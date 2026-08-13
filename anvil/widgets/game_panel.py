@@ -3388,6 +3388,15 @@ class GamePanel(QWidget):
                 deploy_routes=deploy_routes,
                 mod_index=self._mod_index,
             )
+        if not getattr(self, "_use_overlay", False):
+            # Wechsel Overlay -> Symlink: ein stehender Mount wuerde den
+            # Spielordner weiter ueberdecken, und der Symlink-Deploy
+            # schriebe in die Schreibschicht statt ins Spiel.
+            from anvil.core.overlay_deployer import OverlayDeployer
+
+            if (instance_path / OverlayDeployer.MANIFEST_NAME).is_file():
+                OverlayDeployer(instance_path, game_path).purge()
+
         return ModDeployer(
             instance_path,
             game_path,

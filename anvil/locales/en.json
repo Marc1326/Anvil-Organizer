@@ -936,9 +936,14 @@
     "color_change": "Change…",
     "color_pick_title": "Choose color",
     "path_anvil_base_dir": "Anvil base directory",
-    "use_overlay": "Mount mods as an overlay (experimental)",
-    "use_overlay_hint": "The game folder is no longer written to. Mods are layered on top at launch and disappear once the game exits.",
-    "overlay_set_launch_option": "Write launch option to Steam"
+    "tab_expert": "Expert",
+    "deploy_method_group": "Mod deployment",
+    "deploy_symlink": "Symlinks (default)",
+    "deploy_symlink_hint": "Proven: Anvil links the mods into the game folder and cleans up after the game. No special rights needed. Mods only apply while deployed.",
+    "deploy_overlay": "Overlay (experimental)",
+    "deploy_overlay_hint": "The game folder stays untouched: mods sit on top as a layer, writes land in the overwrite folder. Works with every launch path, even directly via Steam. Mounting needs system rights once per deploy (password) -- or none at all after a one-time setup.",
+    "overlay_polkit_setup": "Set up password-free mounting …",
+    "overlay_polkit_hint": "Installs the mount helper system-wide plus a polkit rule. Mounting then runs without a password prompt."
   },
   "mod_detail": {
     "open_in_explorer": "Open Mod in Explorer",
@@ -1491,16 +1496,16 @@
     "hide": "Hide notice"
   },
   "overlay": {
-    "no_userns": "This kernel has no user namespaces.",
-    "userns_disabled": "Unprivileged user namespaces are disabled.",
-    "no_bwrap": "bubblewrap (bwrap) is not installed.",
     "bad_filesystem": "The write layer sits on {fs}. Overlay needs ext4, btrfs or xfs.",
     "no_game_path": "Game folder not found: {path}",
     "requirements_ok": "All requirements met.",
-    "launch_option_hint": "Put this line into Steam's launch options:",
-    "launch_no_app": "This instance has no Steam app id. The launch option has to be set by hand.",
-    "launch_steam_running": "Steam is running and would overwrite the change on exit. Close Steam and try again, or paste this line yourself:",
-    "launch_no_config": "No Steam configuration found. Paste this line yourself:",
-    "launch_written": "Launch option written to {count} Steam account(s):"
+    "no_kernel_overlay": "The kernel does not support the overlay filesystem.",
+    "no_pkexec": "pkexec is missing (polkit). Without it Anvil cannot mount the overlay.",
+    "mount_failed": "Mounting failed: {detail}",
+    "mount_aborted": "Password prompt cancelled -- the mods are staged but not mounted.",
+    "unmount_failed": "Unmounting failed: {detail}",
+    "polkit_already": "Already set up -- mounting runs without a password.",
+    "polkit_done": "Set up. Mounting now runs without a password.",
+    "polkit_failed": "Setup failed: {detail}"
   }
 }

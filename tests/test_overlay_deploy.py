@@ -10,8 +10,20 @@ from anvil.core.overlay_staging import OverlayStage, is_metadata, target_rel
 
 @pytest.fixture
 def ohne_umgebungspruefung(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Testverzeichnisse liegen auf tmpfs -- die Umgebungspruefung wuerde greifen."""
+    """Testverzeichnisse liegen auf tmpfs -- die Umgebungspruefung wuerde greifen.
+
+    Der Mount selbst bleibt aus: pkexec hat in Tests nichts zu suchen.
+    """
     monkeypatch.setattr(OverlayDeployer, "check_requirements", lambda self: [])
+    monkeypatch.setattr(
+        "anvil.core.overlay_deployer.mount", lambda *a, **k: (True, "")
+    )
+    monkeypatch.setattr(
+        "anvil.core.overlay_deployer.unmount", lambda *a, **k: (True, "")
+    )
+    monkeypatch.setattr(
+        "anvil.core.overlay_deployer.purge_mounts", lambda *a, **k: (True, "")
+    )
 
 
 # ── Pfadregeln ─────────────────────────────────────────────────────────
@@ -280,7 +292,9 @@ def test_dateisystem_wird_erkannt(tmp_path: Path) -> None:
     assert filesystem_of(tmp_path) != ""
 
 
-def test_deploy_legt_den_startwrapper_an(tmp_path: Path, ohne_umgebungspruefung: None) -> None:
+def test_deploy_legt_das_helferskript_an(tmp_path: Path, ohne_umgebungspruefung: None) -> None:
+    from anvil.core.overlay_mount import helper_path
+
     instance, game, mods, profiles = _instance(tmp_path)
     _mod(mods, "M", {"archive/a.archive": "x"})
     write_global_modlist(profiles, ["M"])
@@ -289,9 +303,9 @@ def test_deploy_legt_den_startwrapper_an(tmp_path: Path, ohne_umgebungspruefung:
     deployer = OverlayDeployer(instance, game)
     deployer.deploy()
 
-    assert deployer.wrapper.is_file()
-    assert deployer.wrapper.stat().st_mode & 0o111
-    assert deployer.steam_launch_option().endswith("%command%")
+    helfer = helper_path(instance)
+    assert helfer.is_file()
+    assert helfer.stat().st_mode & 0o111
 
 
 def test_mount_conf_enthaelt_alle_schichten(tmp_path: Path, ohne_umgebungspruefung: None) -> None:
@@ -471,10 +485,10 @@ def test_datei_gegen_ordner_stuerzt_nicht_ab(
     assert any("Ordner" in e or "belegt" in e for e in result.errors), result.errors
 
 
-def test_abschalten_entschaerft_den_wrapper(
+def test_abschalten_raeumt_mount_und_schicht_weg(
     tmp_path: Path, ohne_umgebungspruefung: None
 ) -> None:
-    """Bleibt mount.conf liegen, mountet der Wrapper beim naechsten Start weiter."""
+    """Nach dem Purge gibt es weder Mount-Angaben noch Schicht noch Manifest."""
     instance, game, mods, profiles = _instance(tmp_path)
     _mod(mods, "M", {"archive/a.archive": "x"})
     write_global_modlist(profiles, ["M"])
@@ -485,7 +499,6 @@ def test_abschalten_entschaerft_den_wrapper(
     assert deployer.mount_conf_path.is_file()
 
     deployer.purge()
-    deployer.mount_conf_path.unlink(missing_ok=True)
 
     assert not deployer.mount_conf_path.exists()
     assert not deployer.is_deployed()
