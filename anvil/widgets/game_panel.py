@@ -53,6 +53,7 @@ def _dlog(msg: str) -> None:
     print(msg, flush=True)
 
 from PySide6.QtWidgets import (
+    QApplication,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -75,7 +76,10 @@ from PySide6.QtWidgets import (
 )
 
 from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont
-from PySide6.QtCore import Qt, QSize, QPoint, Signal, QUrl, QMimeData, QSettings, QTimer
+from PySide6.QtCore import (
+    Qt, QSize, QPoint, Signal, QUrl, QMimeData, QSettings, QTimer,
+    QElapsedTimer, QThread,
+)
 
 from anvil.core.mod_installer import (
     SUPPORTED_EXTENSIONS,
@@ -2656,13 +2660,18 @@ class GamePanel(QWidget):
             msg.setDetailedText(stderr_text or stdout_text or f"Exit code: {exit_code}")
             msg.exec()
 
+    # So lange wird auf einen frisch gestarteten Steam-Client gewartet.
+    _STEAM_WARTEN_S = 25
+
     def _ensure_steam_running(self, steam_bin: str) -> bool:
         """Make sure a Steam client is up before handing it the launch.
 
         ``steam -applaunch`` needs a client to forward the command to; with
-        none running the launch quietly goes nowhere. Offers to start Steam
-        and waits for the user to confirm the login, since that can take
-        anything from a second to a password prompt.
+        none running the launch quietly goes nowhere.
+
+        Es wird **nicht** gefragt: den Startknopf hat der Benutzer schon
+        gedrueckt, eine zweite Rueckfrage sagt ihm nichts Neues. Steam
+        wird gestartet, und Anvil wartet still, bis der Client da ist.
 
         Returns:
             True if the launch should continue.
@@ -2673,33 +2682,12 @@ class GamePanel(QWidget):
         if is_steam_running():
             return True
 
-        print("[START] Steam is not running", flush=True)
-
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Icon.Question)
-        box.setWindowTitle(tr("game_panel.steam_not_running_title"))
-        box.setText(tr("game_panel.steam_not_running_text"))
-        start_btn = box.addButton(
-            tr("game_panel.steam_start_now"), QMessageBox.ButtonRole.AcceptRole
-        )
-        without_btn = box.addButton(
-            tr("game_panel.steam_continue_without"), QMessageBox.ButtonRole.DestructiveRole
-        )
-        box.addButton(
-            tr("game_panel.steam_cancel"), QMessageBox.ButtonRole.RejectRole
-        )
-        box.exec()
-        clicked = box.clickedButton()
-
-        if clicked is without_btn:
-            print("[START] launching without Steam on user request", flush=True)
-            return True
-        if clicked is not start_btn:
-            return False
-
+        print("[START] Steam is not running, starting it", flush=True)
         try:
             host_popen([steam_bin], env=clean_subprocess_env())
         except OSError as exc:
+            # Das ist ein echter Fehler und keine Rueckfrage -- ohne
+            # Steam kommt der Startbefehl nirgendwo an.
             print(f"[START] could not start Steam: {exc}", flush=True)
             QMessageBox.warning(
                 self, tr("game_panel.steam_not_running_title"),
@@ -2707,14 +2695,26 @@ class GamePanel(QWidget):
             )
             return False
 
-        QMessageBox.information(
-            self, tr("game_panel.steam_wait_title"),
-            tr("game_panel.steam_wait_text"),
-        )
-
-        if not is_steam_running():
+        if self._warte_auf_steam():
+            print("[START] Steam is up", flush=True)
+        else:
+            # Anmeldung kann laenger dauern. Trotzdem weiter: abbrechen
+            # waere hier genauso ein Ratespiel.
             print("[START] Steam still not running, launching anyway", flush=True)
         return True
+
+    def _warte_auf_steam(self) -> bool:
+        """Wartet auf den Steam-Client, ohne die Oberflaeche einzufrieren."""
+        from anvil.stores.steam_utils import is_steam_running
+
+        uhr = QElapsedTimer()
+        uhr.start()
+        while uhr.elapsed() < self._STEAM_WARTEN_S * 1000:
+            QApplication.processEvents()
+            if is_steam_running():
+                return True
+            QThread.msleep(250)
+        return False
 
     def _launch_via_steam(self, plugin) -> None:
         """Launch the main game binary via steam -applaunch."""

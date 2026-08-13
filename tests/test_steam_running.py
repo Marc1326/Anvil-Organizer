@@ -35,12 +35,21 @@ class SteamRunningTests(TestCase):
 
 
 class EnsureSteamRunningTests(TestCase):
-    """The dialog in front of the launch — which button leads where."""
+    """Vor dem Start wird nicht mehr gefragt.
+
+    Frueher kamen zwei Fenster: „Steam jetzt starten?" mit drei Knoepfen
+    und danach „warte auf die Anmeldung" zum Wegklicken. Beide sagten
+    nichts, was der Benutzer nicht schon wusste -- den Startknopf hatte er
+    ja gerade gedrueckt. Jetzt startet Anvil Steam und wartet still.
+    """
 
     def _panel(self) -> SimpleNamespace:
-        return SimpleNamespace()
+        panel = SimpleNamespace()
+        panel._STEAM_WARTEN_S = 0
+        panel._warte_auf_steam = lambda: True
+        return panel
 
-    def test_a_running_steam_asks_nothing(self) -> None:
+    def test_ein_laufendes_steam_fragt_nichts(self) -> None:
         with mock.patch("anvil.stores.steam_utils.is_steam_running",
                         return_value=True), \
              mock.patch("anvil.widgets.game_panel.QMessageBox") as box:
@@ -49,68 +58,56 @@ class EnsureSteamRunningTests(TestCase):
         self.assertTrue(result)
         box.assert_not_called()
 
-    def _click(self, which: str, popen):
-        """Run the dialog and let the user press *which* button."""
-        buttons: dict[str, object] = {}
-
-        class FakeBox:
-            def __init__(self, _parent):
-                self._clicked = None
-
-            def setIcon(self, _icon): pass
-
-            def setWindowTitle(self, _title): pass
-
-            def setText(self, _text): pass
-
-            def addButton(self, label, _role):
-                button = object()
-                buttons[label] = button
-                return button
-
-            def exec(self):
-                self._clicked = buttons[which]
-
-            def clickedButton(self):
-                return self._clicked
-
-        fake = mock.MagicMock()
-        fake.side_effect = lambda parent: FakeBox(parent)
-        fake.Icon = mock.MagicMock()
-        fake.ButtonRole = mock.MagicMock()
-
+    def _starten(self, popen, warten=True):
+        panel = self._panel()
+        panel._warte_auf_steam = lambda: warten
         with mock.patch("anvil.stores.steam_utils.is_steam_running",
                         return_value=False), \
-             mock.patch("anvil.widgets.game_panel.QMessageBox", fake), \
+             mock.patch("anvil.widgets.game_panel.QMessageBox") as box, \
              mock.patch("anvil.core.subprocess_env.host_popen", popen), \
              mock.patch("anvil.widgets.game_panel.clean_subprocess_env",
                         return_value={}):
-            return GamePanel._ensure_steam_running(self._panel(), "/usr/bin/steam")
+            ergebnis = GamePanel._ensure_steam_running(panel, "/usr/bin/steam")
+            return ergebnis, box
 
-    def test_starting_steam_spawns_it_and_continues(self) -> None:
+    def test_steam_wird_ohne_rueckfrage_gestartet(self) -> None:
+        """Der Kern: kein Fenster, Steam laeuft einfach an."""
         popen = mock.MagicMock()
-        result = self._click("Steam starten", popen)
+        ergebnis, box = self._starten(popen)
 
-        self.assertTrue(result)
+        self.assertTrue(ergebnis)
         popen.assert_called_once()
         self.assertEqual(popen.call_args.args[0], ["/usr/bin/steam"])
+        box.assert_not_called()
+        box.question.assert_not_called()
+        box.information.assert_not_called()
 
-    def test_continue_without_steam_launches_untouched(self) -> None:
+    def test_kein_wartefenster_nach_dem_start(self) -> None:
         popen = mock.MagicMock()
-        result = self._click("Ohne Steam weiter", popen)
+        _, box = self._starten(popen)
+        box.information.assert_not_called()
 
-        self.assertTrue(result)
-        popen.assert_not_called()
-
-    def test_cancel_stops_the_launch(self) -> None:
+    def test_start_geht_auch_weiter_wenn_steam_lange_braucht(self) -> None:
+        """Anmeldung kann dauern -- abbrechen waere auch nur geraten."""
         popen = mock.MagicMock()
-        result = self._click("Abbrechen", popen)
+        ergebnis, box = self._starten(popen, warten=False)
 
-        self.assertFalse(result)
-        popen.assert_not_called()
+        self.assertTrue(ergebnis)
+        box.assert_not_called()
 
-    def test_a_failing_steam_start_stops_the_launch(self) -> None:
+    def test_ein_fehlgeschlagener_start_stoppt_und_meldet_sich(self) -> None:
+        """Das ist keine Rueckfrage, sondern ein echter Fehler."""
         popen = mock.MagicMock(side_effect=OSError("no such file"))
-        result = self._click("Steam starten", popen)
+        ergebnis, box = self._starten(popen)
 
-        self.assertFalse(result)
+        self.assertFalse(ergebnis)
+        box.warning.assert_called_once()
+
+    def test_die_alten_dialog_schluessel_werden_nicht_mehr_benutzt(self) -> None:
+        import inspect
+
+        quelle = inspect.getsource(GamePanel._ensure_steam_running)
+        for schluessel in ("steam_not_running_text", "steam_start_now",
+                           "steam_continue_without", "steam_cancel",
+                           "steam_wait_title", "steam_wait_text"):
+            self.assertNotIn(schluessel, quelle, f"{schluessel} ist zurueck")
