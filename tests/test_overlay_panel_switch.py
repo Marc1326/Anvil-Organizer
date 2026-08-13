@@ -18,6 +18,7 @@ class FakePanel:
 
     _current_plugin = FakePlugin()
     _separator_deploy_paths: dict[str, str] = {}
+    _keep_file_name_mods: set = set()
     _mod_index = None
     _mods_path: Path | None = None
     _profiles_path: Path | None = None

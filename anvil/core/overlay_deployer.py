@@ -132,6 +132,17 @@ class OverlayDeployer:
         mods_path: Path | None = None,
         profiles_path: Path | None = None,
         overwrite_path: Path | None = None,
+        copy_deploy_paths: list[str] | None = None,
+        keep_file_name_mods: set[str] | None = None,
+        pak_load_order_prefix: bool = False,
+        pak_load_order_dirs: list[str] | None = None,
+        pak_load_order_extensions: list[str] | None = None,
+        pak_load_order_first_wins: bool = False,
+        archive_load_order_file: str = "",
+        deploy_strip_prefixes: list[str] | None = None,
+        deploy_anchors: list[str] | None = None,
+        deploy_routes: list[dict] | None = None,
+        mod_index=None,
     ) -> None:
         self._instance_path = instance_path
         self._game_path = game_path
@@ -162,7 +173,22 @@ class OverlayDeployer:
             separator_deploy_paths=separator_deploy_paths,
             needs_ba2_packing=needs_ba2_packing,
             ba2_loose_paths=ba2_loose_paths,
+            keep_file_name_mods=keep_file_name_mods,
+            pak_load_order_prefix=pak_load_order_prefix,
+            pak_load_order_dirs=pak_load_order_dirs,
+            pak_load_order_extensions=pak_load_order_extensions,
+            pak_load_order_first_wins=pak_load_order_first_wins,
+            deploy_strip_prefixes=deploy_strip_prefixes,
+            deploy_anchors=deploy_anchors,
+            deploy_routes=deploy_routes,
         )
+        # Diese Dateien muessen echte Kopien im Spielordner sein --
+        # unter Proton kommt ein Verweis nicht als gueltige DLL an.
+        self._copy_deploy_paths = [
+            p.replace("\\", "/") for p in (copy_deploy_paths or [])
+        ]
+        self._archive_load_order_file = archive_load_order_file
+        self._mod_index = mod_index
 
     # ── Pfade ──────────────────────────────────────────────────────────
 

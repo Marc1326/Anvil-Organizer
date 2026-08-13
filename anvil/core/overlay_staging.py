@@ -17,6 +17,15 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from anvil.core.mod_deployer import (
+    has_deploy_anchor,
+    load_order_index,
+    pak_load_order_name,
+    pak_order_allows,
+    route_deploy_path,
+    strip_deploy_prefixes,
+    unreal_mount_point,
+)
 from anvil.core.deploy_rules import (
     SKIP_DIRS,
     apply_data_path,
@@ -97,6 +106,14 @@ class OverlayStage:
         needs_ba2_packing: bool = False,
         ba2_loose_paths: list[str] | None = None,
         skipped_mods: set[str] | None = None,
+        keep_file_name_mods: set[str] | None = None,
+        pak_load_order_prefix: bool = False,
+        pak_load_order_dirs: list[str] | None = None,
+        pak_load_order_extensions: list[str] | None = None,
+        pak_load_order_first_wins: bool = False,
+        deploy_strip_prefixes: list[str] | None = None,
+        deploy_anchors: list[str] | None = None,
+        deploy_routes: list[dict] | None = None,
     ) -> None:
         self._mods_path = mods_path
         self._profiles_dir = profiles_dir
@@ -111,12 +128,39 @@ class OverlayStage:
         self._needs_ba2_packing = needs_ba2_packing
         self._ba2_loose_paths = ba2_loose_paths or []
         self._skipped = {s.lower() for s in (skipped_mods or set())}
+        self._keep_names = {s.lower() for s in (keep_file_name_mods or set())}
+        self._pak_prefix = pak_load_order_prefix
+        self._pak_dirs = pak_load_order_dirs or []
+        self._pak_ext = (
+            {str(e).lower() for e in pak_load_order_extensions}
+            if pak_load_order_extensions else None
+        )
+        self._pak_first_wins = pak_load_order_first_wins
+        self._deploy_strip = deploy_strip_prefixes or []
+        self._deploy_anchors = deploy_anchors or []
+        self._deploy_routes = deploy_routes or []
+        self._mount_cache: dict[str, str] = {}
 
     def set_separator_deploy_paths(self, paths: dict[str, str]) -> None:
         self._separator_deploy_paths = dict(paths or {})
 
     def set_ba2_packing_enabled(self, enabled: bool) -> None:
         self._needs_ba2_packing = bool(enabled)
+
+    def set_keep_file_name_mods(self, names) -> None:
+        self._keep_names = {str(n).lower() for n in names}
+
+    def _mount_point_of(self, src: Path) -> str:
+        """Mount-Point des zugehoerigen Containers, leer wenn keiner."""
+        if not self._deploy_routes:
+            return ""
+        utoc = src if src.suffix.lower() == ".utoc" else src.with_suffix(".utoc")
+        schluessel = str(utoc)
+        if schluessel not in self._mount_cache:
+            self._mount_cache[schluessel] = (
+                unreal_mount_point(utoc) if utoc.is_file() else ""
+            )
+        return self._mount_cache[schluessel]
 
     def _packed_away(self, src: Path, rel: Path) -> bool:
         """True, wenn der Archiv-Packer die Datei uebernimmt.
@@ -241,7 +285,11 @@ class OverlayStage:
         schicht("")
 
         # Niedrigste Prioritaet zuerst -- spaetere ueberschreiben frueheren.
-        for mod_name in reversed(self.enabled_mods()):
+        aktive = self.enabled_mods()
+        # Zu schmal waere fatal: "1000_" sortiert vor "999_".
+        zaehler_breite = max(3, len(str(max(len(aktive) - 1, 0))))
+
+        for load_index, mod_name in enumerate(reversed(aktive)):
             mod_dir = self._mods_path / mod_name
             if not mod_dir.is_dir():
                 continue
@@ -282,6 +330,17 @@ class OverlayStage:
                 gestrippt = strip_root(rel)
                 if self._packed_away(src, gestrippt):
                     continue
+
+                # Zielverteilung: arbeitet auf dem Pfad OHNE Data-Praefix,
+                # muss also davor laufen -- wie im Symlink-Weg.
+                if not is_direct and (self._deploy_strip or self._deploy_routes):
+                    gestrippt = strip_deploy_prefixes(gestrippt, self._deploy_strip)
+                    if not has_deploy_anchor(gestrippt, self._deploy_anchors):
+                        gestrippt = route_deploy_path(
+                            gestrippt, self._deploy_routes,
+                            self._mount_point_of(src),
+                        )
+
                 dest_rel = apply_data_path(
                     gestrippt,
                     mod_name,
@@ -290,6 +349,21 @@ class OverlayStage:
                     nest_under_mod_name=self._nest,
                     multi_folder_routes=self._routes,
                 )
+
+                # Durchnummerieren: die Engines lesen die Mod-Liste nicht,
+                # bei ihnen entscheidet der Dateiname.
+                if ((self._pak_prefix or self._pak_dirs)
+                        and mod_name.lower() not in self._keep_names
+                        and pak_order_allows(dest_rel, self._pak_dirs)):
+                    dest_rel = pak_load_order_name(
+                        dest_rel,
+                        load_order_index(
+                            load_index, len(aktive), self._pak_first_wins,
+                        ),
+                        self._pak_ext,
+                        zaehler_breite,
+                    )
+
                 _place(src, ziel_schicht / dest_rel, result)
                 staged_any = True
 

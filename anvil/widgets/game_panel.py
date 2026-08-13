@@ -3376,8 +3376,6 @@ class GamePanel(QWidget):
                 mods_path=self._mods_path,
                 profiles_path=self._profiles_path,
                 overwrite_path=self._overwrite_path,
-                needs_ba2_packing=ba2_packing,
-                ba2_loose_paths=ba2_loose_paths,
                 copy_deploy_paths=copy_paths,
                 keep_file_name_mods=self._keep_file_name_mods,
                 pak_load_order_prefix=pak_order,

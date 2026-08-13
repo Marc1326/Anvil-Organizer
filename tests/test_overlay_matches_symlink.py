@@ -322,3 +322,117 @@ def test_echte_spieldatei_im_weg(tmp_path: Path, ohne_umgebungspruefung: None) -
     schicht = overlay.stage_dir / "archive" / "a.archive"
     assert schicht.read_text(encoding="utf-8") == "von der mod"
     assert (game / "archive" / "a.archive").read_text(encoding="utf-8") == "vanilla"
+
+
+# ── Was seit dem Abzweig dazukam ───────────────────────────────────────
+#
+# Der Overlay-Weg wurde gebaut, bevor es die Durchnummerierung der
+# Archive und die Zielverteilung gab. Ohne diese Faelle koennte der
+# Overlay still eine andere Sicht erzeugen als der Symlink-Weg -- und
+# genau das darf nicht passieren.
+
+
+def test_archive_bekommen_beidseitig_denselben_zaehler(
+    tmp_path: Path, ohne_umgebungspruefung: None,
+) -> None:
+    """REDengine liest die Mod-Liste nicht -- es entscheidet der Name."""
+    _vergleiche(
+        tmp_path,
+        {
+            "Erste": ["archive/pc/mod/a.archive"],
+            "Zweite": ["archive/pc/mod/b.archive"],
+            "Dritte": ["archive/pc/mod/c.archive"],
+        },
+        pak_load_order_dirs=["archive/pc/mod"],
+        pak_load_order_extensions=[".archive"],
+        pak_load_order_first_wins=True,
+    )
+
+
+def test_ausgenommene_mod_beidseitig_unbenannt(
+    tmp_path: Path, ohne_umgebungspruefung: None,
+) -> None:
+    _vergleiche(
+        tmp_path,
+        {
+            "Loader": ["archive/pc/mod/loader.archive"],
+            "Normal": ["archive/pc/mod/normal.archive"],
+        },
+        pak_load_order_dirs=["archive/pc/mod"],
+        pak_load_order_extensions=[".archive"],
+        pak_load_order_first_wins=True,
+        keep_file_name_mods={"Loader"},
+    )
+
+
+def test_nur_freigegebene_ordner_beidseitig(
+    tmp_path: Path, ohne_umgebungspruefung: None,
+) -> None:
+    """LogicMods & Co. bleiben unangetastet -- auf beiden Wegen."""
+    _vergleiche(
+        tmp_path,
+        {
+            "M": [
+                "Stalker2/Content/Paks/~mods/a_P.pak",
+                "Stalker2/Content/Paks/LogicMods/bp_P.pak",
+            ],
+        },
+        pak_load_order_dirs=["Stalker2/Content/Paks/~mods"],
+    )
+
+
+def test_gespann_bleibt_beidseitig_zusammen(
+    tmp_path: Path, ohne_umgebungspruefung: None,
+) -> None:
+    _vergleiche(
+        tmp_path,
+        {
+            "M": [
+                "Stalker2/Content/Paks/~mods/a_P.pak",
+                "Stalker2/Content/Paks/~mods/a_P.utoc",
+                "Stalker2/Content/Paks/~mods/a_P.ucas",
+                "Stalker2/Content/Paks/~mods/a_P.sig",
+            ],
+        },
+        pak_load_order_dirs=["Stalker2/Content/Paks/~mods"],
+    )
+
+
+def test_zielverteilung_beidseitig_gleich(
+    tmp_path: Path, ohne_umgebungspruefung: None,
+) -> None:
+    """Stalker 2: ~mods abziehen, dann nach Dateiart verteilen."""
+    from anvil.plugins.games.game_stalker2 import Stalker2Game
+
+    _vergleiche(
+        tmp_path,
+        {
+            "Wetter": ["~mods/BesseresWetter.pak"],
+            "Loader": ["loader/dsound.dll"],
+            "Fertig": ["Stalker2/Content/Paks/~mods/Fertig.pak"],
+        },
+        data_path=Stalker2Game.GameDataPath,
+        deploy_strip_prefixes=Stalker2Game.GameDeployStripPrefixes,
+        deploy_anchors=Stalker2Game.GameDeployAnchors,
+        deploy_routes=Stalker2Game.GameDeployRoutes,
+    )
+
+
+def test_verteilung_und_zaehler_zusammen(
+    tmp_path: Path, ohne_umgebungspruefung: None,
+) -> None:
+    """Beides gleichzeitig -- hier faellt eine falsche Reihenfolge auf."""
+    from anvil.plugins.games.game_stalker2 import Stalker2Game
+
+    _vergleiche(
+        tmp_path,
+        {
+            "Erste": ["~mods/a_P.pak"],
+            "Zweite": ["~mods/b_P.pak"],
+        },
+        data_path=Stalker2Game.GameDataPath,
+        deploy_strip_prefixes=Stalker2Game.GameDeployStripPrefixes,
+        deploy_anchors=Stalker2Game.GameDeployAnchors,
+        deploy_routes=Stalker2Game.GameDeployRoutes,
+        pak_load_order_dirs=Stalker2Game.GamePakLoadOrderDirs,
+    )
