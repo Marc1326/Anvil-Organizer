@@ -1,17 +1,13 @@
 #!/bin/bash
-# Startet Anvil aus diesem Worktree mit eigener Konfiguration und eigenem
-# Basisverzeichnis.
+# Startet Anvil aus diesem Repo (Branch overlay-einbau) mit der
+# Sandbox-Konfiguration und dem Sandbox-Basisverzeichnis.
 #
 # Beruehrt NICHT:
-#   /home/mob/Projekte/Anvil Organizer   (Hauptprojekt)
 #   /home/mob/.config/AnvilOrganizer     (echte Einstellungen)
 #   /home/mob/.anvil-organizer           (echte Instanzen)
-#
-# Das Spielverzeichnis wird beim Overlay nur gelesen -- es liegt als untere,
-# schreibgeschuetzte Schicht im Mount.
 set -u
 
-WORKTREE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$(dirname "$0")" && pwd)"
 DATA="/home/mob/anvil-overlay-data"
 
 export XDG_CONFIG_HOME="$DATA/config"
@@ -26,10 +22,10 @@ if ! grep -q '^base_dir=' "$CONF" 2>/dev/null; then
     echo "Basisverzeichnis gesetzt: $DATA/base"
 fi
 
-echo "Worktree:        $WORKTREE"
+echo "Repo:            $REPO"
 echo "Konfiguration:   $XDG_CONFIG_HOME"
 echo "Basisverzeichnis: $DATA/base"
 echo
 
-cd "$WORKTREE"
-.venv/bin/python -u main.py 2>&1 | tee "$WORKTREE/debug.log"
+cd "$REPO"
+.venv/bin/python -u main.py 2>&1 | tee "$DATA/sandbox-debug.log"
