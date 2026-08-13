@@ -301,6 +301,29 @@ class MainWindow(QMainWindow):
         mod_list_layout.addWidget(self._mod_search)
         mod_list_layout.addWidget(self._mod_list_stack)
 
+        # Hinweis, wenn die Reihenfolge fuer gepackte Archive nichts
+        # bewirkt. Sitzt unter dem Stapel, also ausserhalb der Bereiche
+        # fuer Presets und Frameworks -- deren Leisten zu ziehen darf die
+        # Zeile nicht zerquetschen.
+        self._order_hint = QWidget()
+        self._order_hint.setObjectName("orderScopeHint")
+        hint_layout = QHBoxLayout(self._order_hint)
+        hint_layout.setContentsMargins(4, 0, 4, 0)
+        hint_layout.setSpacing(6)
+        self._order_hint_label = QLabel()
+        self._order_hint_label.setWordWrap(True)
+        hint_layout.addWidget(self._order_hint_label, 1)
+        self._order_hint_close = QToolButton()
+        self._order_hint_close.setText("×")
+        self._order_hint_close.setToolTip(tr("order_scope.hide"))
+        self._order_hint_close.setAutoRaise(True)
+        self._order_hint_close.clicked.connect(
+            lambda checked=False: self._hide_order_hint(),
+        )
+        hint_layout.addWidget(self._order_hint_close, 0)
+        self._order_hint.setVisible(False)
+        mod_list_layout.addWidget(self._order_hint)
+
         # ── FilterPanel + ModList ────────────────────────────────────
         self._filter_panel = FilterPanel()
         self._filter_panel.filter_changed.connect(self._on_filter_changed)
@@ -1796,6 +1819,9 @@ class MainWindow(QMainWindow):
             self._mod_index = None
             self._bg3_installer = None
             self._mod_list_view.set_extra_drop_extensions(set())
+            # Sonst bliebe die Auskunft des vorigen Spiels stehen.
+            self._mod_list_view.source_model().set_load_order_plugin(None)
+            self._update_order_hint()
             self._toolbar.deploy_sep.setVisible(False)
             self._toolbar.deploy_action.setVisible(False)
             self._toolbar.proton_action.setVisible(False)
@@ -1941,6 +1967,10 @@ class MainWindow(QMainWindow):
 
         # Load categories for this instance
         self._category_manager.load(instance_path)
+        self._mod_list_view.source_model().set_load_order_plugin(
+            self._current_plugin,
+        )
+        self._update_order_hint()
         self._mod_list_view.source_model().set_category_manager(self._category_manager)
         self._mod_list_view._proxy_model.set_category_manager(self._category_manager)
 
@@ -2063,6 +2093,7 @@ class MainWindow(QMainWindow):
         self._game_panel.set_mod_index(self._mod_index)
         self._game_panel.set_instance_path(instance_path, profile_name=profile_name)
         self._sync_separator_deploy_paths()
+        self._sync_keep_file_name_mods()
         if plugin is not None:
             detected = plugin.get_installed_frameworks()
             managed = getattr(plugin, "managed_framework_mods", lambda: {})()
@@ -2147,6 +2178,101 @@ class MainWindow(QMainWindow):
             if entry.is_separator and entry.deploy_path:
                 paths[entry.name] = entry.deploy_path
         self._game_panel.set_separator_deploy_paths(paths)
+
+    def _sync_keep_file_name_mods(self) -> None:
+        """Sammelt die Mods, die von der Nummerierung ausgenommen sind."""
+        namen = {
+            entry.name for entry in self._current_mod_entries
+            if not entry.is_separator and entry.keep_file_names
+        }
+        self._game_panel.set_keep_file_name_mods(namen)
+
+    def _order_hint_key(self) -> str:
+        kurz = getattr(self._current_plugin, "GameShortName", "") or "?"
+        return f"ModList/order_hint_hidden/{kurz}"
+
+    def _hide_order_hint(self) -> None:
+        """Weggeklickt bleibt weggeklickt -- pro Spiel."""
+        self._settings().setValue(self._order_hint_key(), True)
+        self._order_hint.setVisible(False)
+
+    def _update_order_hint(self) -> None:
+        """Zeigt den Hinweis nur, wo die Reihenfolge wirklich nicht ankommt."""
+        hinweis = getattr(self, "_order_hint", None)
+        if hinweis is None:
+            return
+        from anvil.core.load_order_scope import scope_for, scope_saetze
+
+        scope = scope_for(self._current_plugin)
+        if scope.archive_folgen_der_liste:
+            hinweis.setVisible(False)
+            return
+        if self._settings().value(self._order_hint_key(), False, type=bool):
+            hinweis.setVisible(False)
+            return
+        # Kein eigener Stil: das Zeichen macht die Zeile in allen neun
+        # Themes als Hinweis erkennbar, ohne dass Farben geraten werden.
+        self._order_hint_label.setText("ℹ  " + " ".join(scope_saetze(scope)))
+        hinweis.setVisible(True)
+
+    def _game_numbers_archives(self) -> bool:
+        """True, wenn das aktive Spiel die Archive durchnummeriert.
+
+        Muss dieselbe Bedingung sein wie im Deployer -- sonst zeigt das
+        Menue etwas anderes an, als tatsaechlich passiert.
+        """
+        plugin = self._current_plugin
+        if plugin is None:
+            return False
+        return bool(
+            getattr(plugin, "GamePakLoadOrderDirs", [])
+            or getattr(plugin, "GamePakLoadOrderPrefix", False)
+        )
+
+    def _toggle_keep_file_names(self, mod_names, an: bool) -> None:
+        """Nimmt Mods von der Durchnummerierung aus -- oder zurueck."""
+        if isinstance(mod_names, str):
+            mod_names = [mod_names]
+        namen = [n for n in (mod_names or []) if n]
+        if not namen or not self._current_instance_path:
+            return
+        from anvil.core.mod_metadata import read_meta_ini, write_meta_ini
+
+        # Nicht ".mods" annehmen -- der Ordner kann pro Instanz verlegt sein.
+        mods_dir = _active_instance_paths(self).mods
+        geaendert: list[str] = []
+        for mod_name in namen:
+            mod_dir = mods_dir / mod_name
+            if not mod_dir.is_dir():
+                self._log_panel.add_log(
+                    "warning", tr("log.keep_file_names_failed", name=mod_name),
+                )
+                continue
+            write_meta_ini(mod_dir, {"keep_file_names": "1" if an else "0"})
+            # write_meta_ini meldet Schreibfehler nur auf stderr. Ohne
+            # Nachlesen wuerde das Log Erfolg behaupten, obwohl der
+            # Ordner schreibgeschuetzt ist.
+            gelesen = str(
+                read_meta_ini(mod_dir).get("keep_file_names", ""),
+            ).strip().lower() in ("1", "true", "yes")
+            if gelesen != an:
+                self._log_panel.add_log(
+                    "warning", tr("log.keep_file_names_failed", name=mod_name),
+                )
+                continue
+            geaendert.append(mod_name)
+
+        if not geaendert:
+            return
+        self._reload_mod_list()
+        # _reload_mod_list liest die Eintraege neu ein, gibt sie aber
+        # nicht an den Deployer weiter -- das macht sonst nur
+        # _apply_instance.
+        self._sync_keep_file_name_mods()
+        schluessel = ("log.keep_file_names_on" if an
+                      else "log.keep_file_names_off")
+        for mod_name in geaendert:
+            self._log_panel.add_log("info", tr(schluessel, name=mod_name))
 
     # ── Charakter-Presets ────────────────────────────────────────────
 
@@ -3658,6 +3784,7 @@ class MainWindow(QMainWindow):
                 return False
             print("[DEPLOY] Pre-launch full deploy (with BA2)", flush=True)
             self._sync_separator_deploy_paths()
+            self._sync_keep_file_name_mods()
             deploy_result = self._game_panel.silent_deploy()
             if deploy_result is not None:
                 print(
@@ -4944,6 +5071,27 @@ class MainWindow(QMainWindow):
                 act_fix_preset = menu.addAction(tr("context.fix_preset"))
                 act_fix_preset.setData(eintrag.name)
 
+        # Nur bei Spielen, die die Archive ueberhaupt durchnummerieren --
+        # sonst waere der Eintrag wirkungslos. Dieselbe Bedingung wertet
+        # der Deployer aus, sie muss gleich bleiben.
+        act_keep_names = None
+        if has_selection and self._game_numbers_archives():
+            gewaehlt = [self._entry_for_row(r) for r in selected_rows]
+            # Fremde Mods liegen von Hand im Spielordner -- Anvil rollt
+            # sie nicht aus und benennt daher auch nichts um.
+            gewaehlt = [e for e in gewaehlt
+                        if e is not None and not e.is_separator
+                        and not getattr(e, "is_foreign", False)]
+            if gewaehlt:
+                act_keep_names = menu.addAction(tr("context.keep_file_names"))
+                act_keep_names.setCheckable(True)
+                # Bei gemischter Auswahl bleibt das Haken leer -- ein Klick
+                # schaltet dann alle gemeinsam ein.
+                act_keep_names.setChecked(
+                    all(getattr(e, "keep_file_names", False) for e in gewaehlt)
+                )
+                act_keep_names.setData([e.name for e in gewaehlt])
+
         menu.addSeparator()
 
         # ── Sicherung / Nexus / Explorer ─────────────────────────
@@ -5042,6 +5190,10 @@ class MainWindow(QMainWindow):
             self._ctx_remove_mods(selected_rows)
         elif act_fix_preset is not None and chosen == act_fix_preset:
             self._fix_stray_preset(act_fix_preset.data())
+        elif act_keep_names is not None and chosen == act_keep_names:
+            self._toggle_keep_file_names(
+                act_keep_names.data(), act_keep_names.isChecked(),
+            )
         elif chosen == act_backup:
             self._ctx_create_backup(selected_rows[0])
         elif chosen == act_reassign_cat:
@@ -5946,6 +6098,7 @@ class MainWindow(QMainWindow):
             self._game_panel.silent_purge()
         self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
         self._sync_separator_deploy_paths()
+        self._sync_keep_file_name_mods()
         # The new profile has to reach the game directory now: with
         # keep-deployed on, the user may never launch through Anvil again.
         # Runs after the separator routes are synced, or it would deploy

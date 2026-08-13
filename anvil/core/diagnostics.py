@@ -275,9 +275,28 @@ def read_log_tail(path, max_lines: int = 2000) -> list[str]:
 
 def build_report(sysinfo: dict, path_checks: list[dict], problems: list[dict],
                  deploy_status: dict | None = None,
-                 conflicts: list[dict] | None = None) -> str:
+                 conflicts: list[dict] | None = None,
+                 game_plugin=None) -> str:
     """Baut einen Klartext-Support-Report (ohne Credentials/API-Keys)."""
     lines: list[str] = ["=== Anvil Organizer — Diagnose-Report ===", ""]
+
+    # Beantwortet die haeufigste Rueckfrage bei Fehlerberichten:
+    # „Mod wirkt nicht, obwohl sie ganz oben steht."
+    if game_plugin is not None:
+        from anvil.core.load_order_scope import scope_for
+
+        scope = scope_for(game_plugin)
+        lines.append("[Ladereihenfolge]")
+        lines.append(f"Einstufung: {scope.art}")
+        lines.append(
+            "Nummerierte Ordner: "
+            + (", ".join(scope.ordner) if scope.ordner else "—"),
+        )
+        if scope.rest:
+            lines.append("Ohne Nummerierung: " + ", ".join(scope.rest))
+        if scope.eigene_plugin_liste:
+            lines.append("Plugins haben eine eigene Reihenfolge")
+        lines.append("")
 
     lines.append("[System]")
     for k in ("app_version", "os", "distro", "kernel", "python", "qt",

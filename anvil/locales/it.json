@@ -132,7 +132,8 @@
     "properties": "Proprietà",
     "remove_preset": "Rimuovi preimpostazione...",
     "rename_preset": "Rinomina preimpostazione...",
-    "fix_preset": "Sistema il preset"
+    "fix_preset": "Sistema il preset",
+    "keep_file_names": "Non modificare i nomi dei file"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -276,8 +277,6 @@
     "rename_property_label": "Nuovo nome:",
     "delete_property_title": "Elimina proprietà",
     "delete_property_confirm": "Eliminare la proprietà \"{name}\"?\n\nLa proprietà verrà rimossa da tutte le mod.",
-    "unlock_purge_title": "Sblocca gioco",
-    "unlock_purge_text": "Le mod sono ancora nella cartella del gioco.\n\nRimuoverle adesso? Se il gioco è ancora in esecuzione, andrà in crash.\nAnvil fa comunque pulizia al prossimo avvio del gioco.",
     "start_while_running_text": "Sembra che ci sia ancora un gioco in esecuzione.\n\nAvviare lo stesso? Anvil ripulisce la cartella del gioco, e un gioco ancora aperto andrà in crash.",
     "start_while_unknown_text": "Anvil non riesce a stabilire se un gioco è ancora in esecuzione.\n\nAvviare lo stesso? Anvil ripulisce la cartella del gioco, e un gioco ancora aperto andrà in crash.",
     "remove_preset_title": "Rimuovi preimpostazione",
@@ -338,7 +337,8 @@
     "move_to_optional": "Disattiva plugin selezionati (sposta in optional/)",
     "move_to_active": "Attiva plugin selezionati (torna alla radice del mod)",
     "group_collapsed": "{count} mod in gruppo",
-    "stray_preset": "Questa mod contiene un preset in un punto in cui il gioco non lo cerca mai.\nTasto destro → «Sistema il preset» lo corregge."
+    "stray_preset": "Questa mod contiene un preset in un punto in cui il gioco non lo cerca mai.\nTasto destro → «Sistema il preset» lo corregge.",
+    "keep_file_names": "Anvil lascia invariati i nomi dei file di questa mod.\nLa sua posizione nell'elenco non ha più effetto e un file con lo stesso nome di un'altra mod può trovarsi anch'esso nel gioco."
   },
   "label": {
     "active": "Attivo:",
@@ -549,7 +549,11 @@
     "catch_all_created": "Separatore «{name}» creato: le nuove mod finiranno lì",
     "tidy_catch_all_done": "Spostate in «{ziel}»: {count}"
   },
-  "log": {},
+  "log": {
+    "keep_file_names_on": "{name}: i nomi dei file restano invariati",
+    "keep_file_names_off": "{name}: i nomi dei file vengono di nuovo numerati",
+    "keep_file_names_failed": "{name}: impossibile salvare il contrassegno"
+  },
   "batch_query": {
     "title": "Richiedi info Nexus per tutti",
     "no_ids_found": "Nessun ID Nexus trovato per {count} mod.\nUsa clic destro → 'Richiedi info Nexus' per le mod singole.",
@@ -690,13 +694,7 @@
     "keep_lifted_title": "Mod di nuovo rimosse",
     "keep_lifted_text": "Le mod di {game} sono state rimosse dalla cartella del gioco.\n\n\"Mantenere le mod nella cartella del gioco\" vale sempre per un solo gioco e va scelto di nuovo dopo un cambio di gioco.",
     "steam_not_running_title": "Steam necessario",
-    "steam_not_running_text": "Questo gioco richiede un client Steam in esecuzione, altrimenti il comando di avvio va perso.\n\nAvviare Steam adesso?",
-    "steam_start_now": "Avvia Steam",
-    "steam_continue_without": "Continua senza Steam",
-    "steam_cancel": "Annulla",
     "steam_start_failed": "Impossibile avviare Steam:\n{error}",
-    "steam_wait_title": "Attendere",
-    "steam_wait_text": "Fai clic su OK non appena hai effettuato l'accesso a Steam.",
     "game_dir_not_found": "Directory del gioco non trovata.",
     "exe_not_found": "Eseguibile non trovato:\n{path}",
     "proton_not_found": "Proton non trovato per questo gioco.\nAssicurati di aver avviato il gioco almeno una volta tramite Steam.",
@@ -986,7 +984,17 @@
     "col_archive_own": "Questo archivio",
     "col_archive_other": "Concorrente",
     "col_archive_count": "File",
-    "archive_conflicts_hint": "Per gli archivi compressi Anvil può mostrare solo quanti file di gioco hanno in comune: l’archivio contiene checksum, non nomi. Verde = questo archivio vince."
+    "archive_conflicts_hint": "Per gli archivi compressi Anvil mostra solo il numero di file di gioco in comune: i nomi non sono nell'archivio, solo i checksum.",
+    "archive_winner_unsure": "In questo gioco, chi vince tra gli archivi compressi non lo decide l'ordine in Anvil, ma il gioco stesso.",
+    "archive_winner_numbered": "Verde = questo archivio vince.",
+    "conflicts_count": "{count} conflitti",
+    "conflicts_with_ignored": "{total} conflitti ({ignored} saltati)",
+    "wins_conflicts": "Sovrascrive {count}",
+    "loses_conflicts": "Sovrascritto da {count}",
+    "ini_files_found": "{count} file INI trovati",
+    "plugins_count": "{count} plugin",
+    "ignored_matches": "{count} corrispondenze saltate",
+    "error": "Errore: {error}"
   },
   "filetree": {
     "name": "Nome",
@@ -1469,5 +1477,14 @@
   },
   "separator": {
     "catch_all_default": "Non ordinati"
+  },
+  "order_scope": {
+    "tooltip_head": "In alto = priorità massima. Cosa comporta nel gioco:",
+    "numbered_all": "Il tuo ordine arriva nel gioco: Anvil numera i file della mod durante il deploy. In cima alla lista significa: vince nel gioco.",
+    "numbered_dirs": "Il tuo ordine vale in queste cartelle: {dirs}. Anvil vi numera i file durante il deploy.",
+    "numbered_rest": "Al di fuori ({rest}) l'ordine vale solo per i file sciolti. Gli archivi compressi vengono caricati dal gioco con un metodo proprio.",
+    "not_numbered": "In questo gioco l'ordine decide solo sui file sciolti. Gli archivi compressi vengono caricati dal gioco con un metodo proprio: una mod può quindi perdere pur essendo prima.",
+    "bethesda_plugins": "Questa lista non vale per i plugin (.esp/.esm/.esl): il loro ordine si trova nell'area plugin e viene salvato separatamente.",
+    "hide": "Nascondi avviso"
   }
 }

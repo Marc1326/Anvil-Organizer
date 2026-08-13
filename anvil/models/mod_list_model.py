@@ -56,9 +56,9 @@ ROLE_CONFLICT_TYPE = Qt.ItemDataRole.UserRole + 8 # 'win' | 'lose' | 'both' | ''
 
 
 class ModRow:
-    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "is_data_override", "folder_name", "color", "file_count", "child_count", "group_name", "is_group_head", "deploy_path", "is_foreign", "has_stray_preset")
+    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "is_data_override", "folder_name", "color", "file_count", "child_count", "group_name", "is_group_head", "deploy_path", "is_foreign", "has_stray_preset", "keep_file_names")
 
-    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, is_data_override=False, folder_name="", color="", file_count=0, child_count=0, group_name="", is_group_head=False, deploy_path="", is_foreign=False, has_stray_preset=False):
+    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, is_data_override=False, folder_name="", color="", file_count=0, child_count=0, group_name="", is_group_head=False, deploy_path="", is_foreign=False, has_stray_preset=False, keep_file_names=False):
         self.enabled = enabled
         self.name = name
         self.conflicts = conflicts
@@ -79,6 +79,7 @@ class ModRow:
         self.deploy_path = deploy_path
         self.is_foreign = is_foreign
         self.has_stray_preset = has_stray_preset
+        self.keep_file_names = keep_file_names
 
 
 def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_manager=None) -> ModRow:
@@ -101,11 +102,14 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_m
         if group_name:
             is_group_head = group_manager.is_group_head(entry.name)
 
+    keep_names = getattr(entry, "keep_file_names", False)
     return ModRow(
         enabled=entry.enabled,
         name=entry.display_name or entry.name,
         conflicts=conflicts,
-        markers="",
+        # Kein uebersetzter Text -- ein Zeichen, das in jeder Sprache
+        # gleich aussieht.
+        markers="≡" if keep_names else "",
         category=entry.category,
         version=entry.version,
         priority=entry.priority,
@@ -121,6 +125,7 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_m
         deploy_path=getattr(entry, "deploy_path", ""),
         is_foreign=getattr(entry, "is_foreign", False),
         has_stray_preset=getattr(entry, "has_stray_preset", False),
+        keep_file_names=keep_names,
     )
 
 
@@ -133,6 +138,7 @@ class ModListModel(QAbstractItemModel):
         self._rows: list[ModRow] = []
         self._drop_in_progress = False
         self._category_manager = None  # Set by MainWindow
+        self._load_order_plugin = None  # Set by MainWindow
 
         # ── Settings flags (set by mainwindow._apply_modlist_settings) ──
         self._conflicts_on_separator: bool = False    # Setting 5
@@ -312,6 +318,8 @@ class ModListModel(QAbstractItemModel):
                         return str(count)
                 return ""  # Icon only, no text
             if c == COL_MARKERS:
+                if r.markers and not self._keep_names_wirkt():
+                    return ""
                 return r.markers
             if c == COL_CATEGORY:
                 return self._resolve_category_name(r.category)
@@ -394,6 +402,10 @@ class ModListModel(QAbstractItemModel):
                 return tr("foreign.tooltip")
             if getattr(r, "has_stray_preset", False) and c == COL_NAME:
                 return tr("tooltip.stray_preset")
+            if (getattr(r, "keep_file_names", False)
+                    and c in (COL_NAME, COL_MARKERS)
+                    and self._keep_names_wirkt()):
+                return tr("tooltip.keep_file_names")
             # Separator with custom deploy path shows path as tooltip
             if r.is_separator and c == COL_NAME and getattr(r, "deploy_path", ""):
                 return f"Deploy \u2192 {r.deploy_path}"
@@ -770,8 +782,37 @@ class ModListModel(QAbstractItemModel):
             self._drop_in_progress = False
         return False
 
+    def _keep_names_wirkt(self) -> bool:
+        """True, wenn „Dateinamen nicht aendern" bei diesem Spiel etwas tut.
+
+        Eine aus einer anderen Instanz kopierte ``meta.ini`` kann den
+        Merker mitbringen -- ihn dann anzuzeigen waere eine Falschaussage.
+        """
+        from anvil.core.load_order_scope import scope_for
+
+        return scope_for(
+            getattr(self, "_load_order_plugin", None),
+        ).archive_folgen_der_liste
+
+    def set_load_order_plugin(self, plugin) -> None:
+        """Spiel-Plugin, aus dem der Prioritaets-Tooltip gebaut wird."""
+        self._load_order_plugin = plugin
+        if self.columnCount():
+            self.headerDataChanged.emit(
+                Qt.Orientation.Horizontal, COL_PRIORITY, COL_PRIORITY,
+            )
+
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
-        if orientation != Qt.Orientation.Horizontal or role != Qt.ItemDataRole.DisplayRole:
+        if orientation != Qt.Orientation.Horizontal:
+            return None
+        # Der Spaltenkopf sagt, wofuer die Reihenfolge im Spiel gilt --
+        # bei manchen Spielen naemlich nur fuer lose Dateien.
+        if role == Qt.ItemDataRole.ToolTipRole:
+            if section == COL_PRIORITY:
+                from anvil.core.load_order_scope import scope_tooltip
+                return scope_tooltip(getattr(self, "_load_order_plugin", None))
+            return None
+        if role != Qt.ItemDataRole.DisplayRole:
             return None
         # Headers mit tr() zur Laufzeit übersetzen
         headers = [

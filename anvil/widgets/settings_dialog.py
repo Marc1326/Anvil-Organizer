@@ -1534,7 +1534,22 @@ class SettingsDialog(QDialog):
         return diagnostics.build_report(
             d.get("sysinfo", {}), d.get("path_checks", []), d.get("problems", []),
             deploy_status=d.get("deploy"), conflicts=self._diag_last_conflicts,
+            game_plugin=self._diag_game_plugin(),
         )
+
+    def _diag_game_plugin(self):
+        """Plugin der aktiven Instanz, oder None.
+
+        Der Bericht soll sagen, wofuer die Reihenfolge gilt -- das ist
+        die haeufigste Rueckfrage bei „Mod wirkt nicht trotz Platz 1".
+        """
+        kurz = self._idata.get("game_short_name", "")
+        if not kurz or self._plugin_loader is None:
+            return None
+        for plugin in self._plugin_loader.all_plugins():
+            if getattr(plugin, "GameShortName", "") == kurz:
+                return plugin
+        return None
 
     def _diag_export(self) -> None:
         path, _ = QFileDialog.getSaveFileName(

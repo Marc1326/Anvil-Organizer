@@ -1509,7 +1509,17 @@ def _build_conflicts_tab(
         arch_tree.setColumnWidth(1, 420)
         layout.addWidget(arch_tree, 1)
 
-        hinweis = QLabel(tr("mod_detail.archive_conflicts_hint"))
+        # „Gruen gewinnt" stimmt nur, wo Anvil die Archive durchnummeriert.
+        # Sonst entscheidet das Spiel selbst, und die Liste hat damit
+        # nichts zu tun.
+        from anvil.core.load_order_scope import scope_for
+
+        nummeriert = scope_for(game_plugin).archive_folgen_der_liste
+        hinweis = QLabel(
+            tr("mod_detail.archive_conflicts_hint") + " "
+            + tr("mod_detail.archive_winner_numbered" if nummeriert
+                 else "mod_detail.archive_winner_unsure"),
+        )
         hinweis.setStyleSheet(_dim_info_style())
         hinweis.setWordWrap(True)
         layout.addWidget(hinweis)

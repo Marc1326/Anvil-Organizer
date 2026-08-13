@@ -132,7 +132,8 @@
     "properties": "Properties",
     "remove_preset": "Remove preset...",
     "rename_preset": "Rename preset...",
-    "fix_preset": "Sort preset into place"
+    "fix_preset": "Sort preset into place",
+    "keep_file_names": "Keep file names"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -276,8 +277,6 @@
     "rename_property_label": "New name:",
     "delete_property_title": "Delete Property",
     "delete_property_confirm": "Really delete property \"{name}\"?\n\nThe property will be removed from all mods.",
-    "unlock_purge_title": "Unlock game",
-    "unlock_purge_text": "The mods are still in the game directory.\n\nRemove them now? If the game is still running, it will crash.\nAnvil cleans up on the next game start anyway.",
     "start_while_running_text": "It looks like a game is still running.\n\nStart anyway? Anvil clears the game directory first — a game that is still running will crash.",
     "start_while_unknown_text": "Anvil cannot tell whether a game is still running.\n\nStart anyway? Anvil clears the game directory first — a game that is still running will crash.",
     "remove_preset_title": "Remove preset",
@@ -338,7 +337,8 @@
     "move_to_optional": "Deactivate selected plugins (move to optional/)",
     "move_to_active": "Activate selected plugins (back to mod root)",
     "group_collapsed": "{count} mod(s) in group",
-    "stray_preset": "This mod contains a preset at a place where the game never looks for it.\nRight-click → “Sort preset into place” fixes it."
+    "stray_preset": "This mod contains a preset at a place where the game never looks for it.\nRight-click → “Sort preset into place” fixes it.",
+    "keep_file_names": "Anvil leaves this mod's file names untouched.\nIts position in the list no longer has any effect, and a file of the same name from another mod may end up in the game as well."
   },
   "label": {
     "active": "Active:",
@@ -549,7 +549,11 @@
     "catch_all_created": "Separator “{name}” created — new mods will go there",
     "tidy_catch_all_done": "Moved to “{ziel}”: {count}"
   },
-  "log": {},
+  "log": {
+    "keep_file_names_on": "{name}: file names stay unchanged",
+    "keep_file_names_off": "{name}: file names are numbered again",
+    "keep_file_names_failed": "{name}: could not save the marker"
+  },
   "batch_query": {
     "title": "Query All Nexus Info",
     "no_ids_found": "No Nexus IDs found for {count} mods.\nUse right-click → 'Query Nexus Info' for individual mods.",
@@ -690,13 +694,7 @@
     "keep_lifted_title": "Mods removed again",
     "keep_lifted_text": "The mods for {game} have been removed from the game directory.\n\n\"Keep mods in the game directory permanently\" only ever applies to one game and has to be chosen again after switching games.",
     "steam_not_running_title": "Steam required",
-    "steam_not_running_text": "This game needs a running Steam client, otherwise the launch command goes nowhere.\n\nStart Steam now?",
-    "steam_start_now": "Start Steam",
-    "steam_continue_without": "Continue without Steam",
-    "steam_cancel": "Cancel",
     "steam_start_failed": "Steam could not be started:\n{error}",
-    "steam_wait_title": "Waiting",
-    "steam_wait_text": "Click OK once you are logged in to Steam.",
     "game_dir_not_found": "Game directory not found.",
     "exe_not_found": "Executable not found:\n{path}",
     "proton_not_found": "Proton not found for this game.\nMake sure the game has been run at least once via Steam.",
@@ -986,7 +984,17 @@
     "col_archive_own": "This archive",
     "col_archive_other": "Competitor",
     "col_archive_count": "Files",
-    "archive_conflicts_hint": "For packed archives Anvil can only show how many game files they share — the archive stores checksums, not file names. Green = this archive wins."
+    "archive_conflicts_hint": "For packed archives Anvil only shows the number of shared game files — the file names are not in the archive, only checksums.",
+    "archive_winner_unsure": "In this game the winner is not decided by the order in Anvil, but by the game itself.",
+    "archive_winner_numbered": "Green = this archive wins.",
+    "conflicts_count": "{count} conflicts",
+    "conflicts_with_ignored": "{total} conflicts ({ignored} skipped)",
+    "wins_conflicts": "Overwrites {count}",
+    "loses_conflicts": "Overwritten by {count}",
+    "ini_files_found": "{count} INI files found",
+    "plugins_count": "{count} plugins",
+    "ignored_matches": "{count} matches skipped",
+    "error": "Error: {error}"
   },
   "filetree": {
     "name": "Name",
@@ -1469,5 +1477,14 @@
   },
   "separator": {
     "catch_all_default": "Unsorted"
+  },
+  "order_scope": {
+    "tooltip_head": "Top = highest priority. What that does in the game:",
+    "numbered_all": "Your order reaches the game: Anvil numbers the mod files when deploying. Top of the list means: wins in the game.",
+    "numbered_dirs": "Your order reaches the game in these folders: {dirs}. Anvil numbers the files there when deploying.",
+    "numbered_rest": "Outside of those ({rest}) the order only applies to loose files. Packed archives are loaded by the game's own method.",
+    "not_numbered": "For this game the order only decides about loose files. Packed archives are loaded by the game's own method — so a mod can lose despite being first.",
+    "bethesda_plugins": "This list does not apply to plugins (.esp/.esm/.esl): their order lives in the plugins area and is stored separately.",
+    "hide": "Hide notice"
   }
 }

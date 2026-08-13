@@ -132,7 +132,8 @@
     "properties": "Propiedades",
     "remove_preset": "Eliminar preajuste...",
     "rename_preset": "Renombrar preajuste...",
-    "fix_preset": "Colocar el preajuste en su sitio"
+    "fix_preset": "Colocar el preajuste en su sitio",
+    "keep_file_names": "No cambiar los nombres de archivo"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -276,8 +277,6 @@
     "rename_property_label": "Nuevo nombre:",
     "delete_property_title": "Eliminar propiedad",
     "delete_property_confirm": "¿Eliminar la propiedad \"{name}\"?\n\nLa propiedad se eliminará de todos los mods.",
-    "unlock_purge_title": "Desbloquear juego",
-    "unlock_purge_text": "Los mods siguen en la carpeta del juego.\n\n¿Quitarlos ahora? Si el juego sigue abierto, se cerrará de golpe.\nAnvil limpia igualmente en el próximo inicio del juego.",
     "start_while_running_text": "Parece que todavía hay un juego en marcha.\n\n¿Iniciar de todas formas? Anvil limpiará la carpeta del juego, y un juego abierto se cerrará de golpe.",
     "start_while_unknown_text": "Anvil no puede saber si todavía hay un juego en marcha.\n\n¿Iniciar de todas formas? Anvil limpiará la carpeta del juego, y un juego abierto se cerrará de golpe.",
     "remove_preset_title": "Eliminar preajuste",
@@ -338,7 +337,8 @@
     "move_to_optional": "Desactivar plugins seleccionados (mover a optional/)",
     "move_to_active": "Activar plugins seleccionados (volver a raíz del mod)",
     "group_collapsed": "{count} mod(s) en el grupo",
-    "stray_preset": "Este mod contiene un preajuste en un lugar donde el juego nunca lo busca.\nClic derecho → «Colocar el preajuste en su sitio» lo corrige."
+    "stray_preset": "Este mod contiene un preajuste en un lugar donde el juego nunca lo busca.\nClic derecho → «Colocar el preajuste en su sitio» lo corrige.",
+    "keep_file_names": "Anvil deja intactos los nombres de archivo de este mod.\nSu posición en la lista deja de tener efecto y un archivo con el mismo nombre de otro mod puede quedar también en el juego."
   },
   "label": {
     "active": "Activo:",
@@ -549,7 +549,11 @@
     "catch_all_created": "Separador «{name}» creado: los mods nuevos irán ahí",
     "tidy_catch_all_done": "Movidas a «{ziel}»: {count}"
   },
-  "log": {},
+  "log": {
+    "keep_file_names_on": "{name}: los nombres de archivo se mantienen",
+    "keep_file_names_off": "{name}: los nombres de archivo vuelven a numerarse",
+    "keep_file_names_failed": "{name}: no se pudo guardar la marca"
+  },
   "batch_query": {
     "title": "Consultar info de Nexus de todos",
     "no_ids_found": "No se encontraron IDs de Nexus para {count} mods.\nUsa clic derecho → 'Consultar info de Nexus' para mods individuales.",
@@ -690,13 +694,7 @@
     "keep_lifted_title": "Mods retirados de nuevo",
     "keep_lifted_text": "Los mods de {game} se han retirado de la carpeta del juego.\n\n\"Mantener los mods en la carpeta del juego\" se aplica siempre a un solo juego y debe elegirse de nuevo tras cambiar de juego.",
     "steam_not_running_title": "Se necesita Steam",
-    "steam_not_running_text": "Este juego necesita un cliente de Steam en ejecución, de lo contrario la orden de inicio se pierde.\n\n¿Iniciar Steam ahora?",
-    "steam_start_now": "Iniciar Steam",
-    "steam_continue_without": "Continuar sin Steam",
-    "steam_cancel": "Cancelar",
     "steam_start_failed": "No se pudo iniciar Steam:\n{error}",
-    "steam_wait_title": "Esperando",
-    "steam_wait_text": "Haz clic en Aceptar cuando hayas iniciado sesión en Steam.",
     "game_dir_not_found": "Directorio del juego no encontrado.",
     "exe_not_found": "Ejecutable no encontrado:\n{path}",
     "proton_not_found": "Proton no encontrado para este juego.\nAsegurese de haber ejecutado el juego al menos una vez a traves de Steam.",
@@ -986,7 +984,17 @@
     "col_archive_own": "Este archivo",
     "col_archive_other": "Competidor",
     "col_archive_count": "Archivos",
-    "archive_conflicts_hint": "En los archivos empaquetados Anvil solo puede mostrar cuántos archivos de juego comparten: el archivo guarda sumas de verificación, no nombres. Verde = este archivo gana."
+    "archive_conflicts_hint": "En los archivos empaquetados Anvil solo muestra el número de archivos de juego compartidos: los nombres no están en el archivo, solo sumas de comprobación.",
+    "archive_winner_unsure": "En este juego, quién gana entre los archivos empaquetados no lo decide el orden en Anvil, sino el propio juego.",
+    "archive_winner_numbered": "Verde = este archivo gana.",
+    "conflicts_count": "{count} conflictos",
+    "conflicts_with_ignored": "{total} conflictos ({ignored} omitidos)",
+    "wins_conflicts": "Sobrescribe {count}",
+    "loses_conflicts": "Sobrescrito por {count}",
+    "ini_files_found": "{count} archivos INI encontrados",
+    "plugins_count": "{count} plugins",
+    "ignored_matches": "{count} coincidencias omitidas",
+    "error": "Error: {error}"
   },
   "filetree": {
     "name": "Nombre",
@@ -1469,5 +1477,14 @@
   },
   "separator": {
     "catch_all_default": "Sin ordenar"
+  },
+  "order_scope": {
+    "tooltip_head": "Arriba = máxima prioridad. Lo que eso hace en el juego:",
+    "numbered_all": "Tu orden llega al juego: Anvil numera los archivos del mod al desplegar. Arriba en la lista significa: gana en el juego.",
+    "numbered_dirs": "Tu orden llega en estas carpetas: {dirs}. Anvil numera allí los archivos al desplegar.",
+    "numbered_rest": "Fuera de eso ({rest}) el orden solo vale para archivos sueltos. Los archivos empaquetados los carga el juego con su propio método.",
+    "not_numbered": "En este juego el orden solo decide sobre archivos sueltos. Los archivos empaquetados los carga el juego con su propio método, así que un mod puede perder aunque esté primero.",
+    "bethesda_plugins": "Esta lista no vale para los plugins (.esp/.esm/.esl): su orden está en el área de plugins y se guarda aparte.",
+    "hide": "Ocultar aviso"
   }
 }

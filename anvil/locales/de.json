@@ -132,7 +132,8 @@
     "properties": "Eigenschaften",
     "remove_preset": "Preset entfernen...",
     "rename_preset": "Preset umbenennen...",
-    "fix_preset": "Preset einsortieren"
+    "fix_preset": "Preset einsortieren",
+    "keep_file_names": "Dateinamen nicht ändern"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -276,8 +277,6 @@
     "rename_property_label": "Neuer Name:",
     "delete_property_title": "Eigenschaft löschen",
     "delete_property_confirm": "Eigenschaft \"{name}\" wirklich löschen?\n\nDie Eigenschaft wird von allen Mods entfernt.",
-    "unlock_purge_title": "Spiel entsperren",
-    "unlock_purge_text": "Die Mods liegen noch im Spielordner.\n\nJetzt entfernen? Wenn das Spiel noch läuft, stürzt es dabei ab.\nBeim nächsten Spielstart räumt Anvil ohnehin auf.",
     "start_while_running_text": "Es sieht so aus, als würde noch ein Spiel laufen.\n\nTrotzdem starten? Anvil räumt dabei den Spielordner auf — ein noch laufendes Spiel stürzt ab.",
     "start_while_unknown_text": "Anvil kann nicht feststellen, ob noch ein Spiel läuft.\n\nTrotzdem starten? Anvil räumt dabei den Spielordner auf — ein noch laufendes Spiel stürzt ab.",
     "remove_preset_title": "Preset entfernen",
@@ -338,7 +337,8 @@
     "move_to_optional": "Ausgewählte Plugins deaktivieren (nach optional/ verschieben)",
     "move_to_active": "Ausgewählte Plugins aktivieren (zurück in Mod-Root)",
     "group_collapsed": "{count} Mod(s) in Gruppe",
-    "stray_preset": "Diese Mod enthält ein Preset an einer Stelle, an der das Spiel nicht danach sucht.\nRechtsklick → „Preset einsortieren“ rückt es gerade."
+    "stray_preset": "Diese Mod enthält ein Preset an einer Stelle, an der das Spiel nicht danach sucht.\nRechtsklick → „Preset einsortieren“ rückt es gerade.",
+    "keep_file_names": "Anvil lässt die Dateinamen dieser Mod unverändert.\nIhre Position in der Liste wirkt dadurch nicht mehr, und eine gleichnamige Datei einer anderen Mod kann zusätzlich im Spiel liegen."
   },
   "label": {
     "active": "Aktiv:",
@@ -549,7 +549,11 @@
     "catch_all_created": "Trenner „{name}“ angelegt — neue Mods landen dort",
     "tidy_catch_all_done": "Nach „{ziel}“ verschoben: {count}"
   },
-  "log": {},
+  "log": {
+    "keep_file_names_on": "{name}: Dateinamen bleiben unverändert",
+    "keep_file_names_off": "{name}: Dateinamen werden wieder durchnummeriert",
+    "keep_file_names_failed": "{name}: Merker konnte nicht gespeichert werden"
+  },
   "batch_query": {
     "title": "Alle Nexus-Infos abrufen",
     "no_ids_found": "Keine Nexus-IDs gefunden für {count} Mods.\nVerwende Rechtsklick → 'Nexus-Info abrufen' für einzelne Mods.",
@@ -690,13 +694,7 @@
     "keep_lifted_title": "Mods wieder entfernt",
     "keep_lifted_text": "Die Mods für {game} wurden aus dem Spielordner entfernt.\n\n\"Mods dauerhaft im Spielordner lassen\" gilt immer nur für ein Spiel und muss nach einem Spielwechsel neu gewählt werden.",
     "steam_not_running_title": "Steam wird benötigt",
-    "steam_not_running_text": "Dieses Spiel braucht einen laufenden Steam-Client, sonst kommt der Startbefehl nirgendwo an.\n\nSteam jetzt starten?",
-    "steam_start_now": "Steam starten",
-    "steam_continue_without": "Ohne Steam weiter",
-    "steam_cancel": "Abbrechen",
     "steam_start_failed": "Steam konnte nicht gestartet werden:\n{error}",
-    "steam_wait_title": "Warten",
-    "steam_wait_text": "Auf OK klicken, sobald die Anmeldung bei Steam abgeschlossen ist.",
     "game_dir_not_found": "Spielverzeichnis nicht gefunden.",
     "exe_not_found": "Executable nicht gefunden:\n{path}",
     "proton_not_found": "Proton wurde fuer dieses Spiel nicht gefunden.\nStelle sicher, dass das Spiel mindestens einmal ueber Steam gestartet wurde.",
@@ -986,7 +984,17 @@
     "col_archive_own": "Eigenes Archiv",
     "col_archive_other": "Konkurrent",
     "col_archive_count": "Dateien",
-    "archive_conflicts_hint": "Bei gepackten Archiven zeigt Anvil nur die Anzahl gemeinsamer Spieldateien — die Dateinamen stehen nicht im Archiv, nur Prüfsummen. Grün = dieses Archiv gewinnt."
+    "archive_conflicts_hint": "Bei gepackten Archiven zeigt Anvil nur die Anzahl gemeinsamer Spieldateien — die Dateinamen stehen nicht im Archiv, nur Prüfsummen.",
+    "archive_winner_unsure": "Wer dabei gewinnt, entscheidet bei diesem Spiel nicht die Reihenfolge in Anvil, sondern das Spiel selbst.",
+    "archive_winner_numbered": "Grün = dieses Archiv gewinnt.",
+    "conflicts_count": "{count} Konflikte",
+    "conflicts_with_ignored": "{total} Konflikte ({ignored} übersprungen)",
+    "wins_conflicts": "Überschreibt {count}",
+    "loses_conflicts": "Wird überschrieben von {count}",
+    "ini_files_found": "{count} INI-Dateien gefunden",
+    "plugins_count": "{count} Plugins",
+    "ignored_matches": "{count} Treffer übersprungen",
+    "error": "Fehler: {error}"
   },
   "filetree": {
     "name": "Name",
@@ -1469,5 +1477,14 @@
   },
   "separator": {
     "catch_all_default": "Nicht einsortiert"
+  },
+  "order_scope": {
+    "tooltip_head": "Oben = höchste Priorität. Was das im Spiel bewirkt:",
+    "numbered_all": "Deine Reihenfolge kommt im Spiel an: Anvil nummeriert die Mod-Dateien beim Ausrollen durch. Oben in der Liste heißt: gewinnt im Spiel.",
+    "numbered_dirs": "Deine Reihenfolge kommt in diesen Ordnern an: {dirs}. Anvil nummeriert die Dateien dort beim Ausrollen durch.",
+    "numbered_rest": "Außerhalb davon ({rest}) gilt die Reihenfolge nur für lose Dateien. Gepackte Archive lädt das Spiel dort nach eigenem Verfahren.",
+    "not_numbered": "Bei diesem Spiel entscheidet die Reihenfolge nur über lose Dateien. Gepackte Archive lädt das Spiel nach eigenem Verfahren — eine Mod kann also trotz Platz 1 verlieren.",
+    "bethesda_plugins": "Für Plugins (.esp/.esm/.esl) gilt diese Liste nicht: deren Reihenfolge steht im Plugins-Bereich und wird getrennt gespeichert.",
+    "hide": "Hinweis ausblenden"
   }
 }
