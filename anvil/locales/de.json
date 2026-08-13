@@ -939,11 +939,11 @@
     "tab_expert": "Experte",
     "deploy_method_group": "Bereitstellung der Mods",
     "deploy_symlink": "Symlinks (Standard)",
-    "deploy_symlink_hint": "Bewaehrt: Anvil verlinkt die Mods in den Spielordner und raeumt nach dem Spiel wieder auf. Keine besonderen Rechte noetig. Mods wirken nur, solange sie ausgerollt sind.",
+    "deploy_symlink_hint": "Bewährt: Anvil verlinkt die Mods in den Spielordner und räumt nach dem Spiel wieder auf. Keine besonderen Rechte nötig. Mods wirken nur, solange sie ausgerollt sind.",
     "deploy_overlay": "Overlay (experimentell)",
-    "deploy_overlay_hint": "Der Spielordner bleibt unberuehrt: Die Mods liegen als Schicht darueber, Schreibzugriffe landen im Overwrite-Ordner. Funktioniert bei jedem Startweg, auch direkt ueber Steam. Das Einhaengen braucht einmal pro Deploy Systemrechte (Passwort) -- oder nach einmaliger Einrichtung gar keins.",
+    "deploy_overlay_hint": "Der Spielordner bleibt unberührt: Die Mods liegen als Schicht darüber, Schreibzugriffe landen im Overwrite-Ordner. Funktioniert bei jedem Startweg, auch direkt über Steam. Das Einhängen braucht einmal pro Deploy Systemrechte (Passwort) — oder nach einmaliger Einrichtung gar keins.",
     "overlay_polkit_setup": "Mount ohne Passwort einrichten …",
-    "overlay_polkit_hint": "Installiert das Mount-Helferskript systemweit plus eine polkit-Regel. Danach laeuft das Einhaengen ohne Passwort-Abfrage."
+    "overlay_polkit_hint": "Installiert das Mount-Helferskript systemweit plus eine polkit-Regel. Danach läuft das Einhängen ohne Passwort-Abfrage."
   },
   "mod_detail": {
     "open_in_explorer": "Mod im Explorer öffnen",
@@ -1500,12 +1500,12 @@
     "no_game_path": "Spielordner nicht gefunden: {path}",
     "requirements_ok": "Alle Voraussetzungen erfuellt.",
     "no_kernel_overlay": "Der Kernel kennt kein Overlay-Dateisystem.",
-    "no_pkexec": "pkexec fehlt (polkit). Ohne es kann Anvil das Overlay nicht einhaengen.",
-    "mount_failed": "Einhaengen fehlgeschlagen: {detail}",
-    "mount_aborted": "Passwort-Abfrage abgebrochen -- die Mods liegen bereit, sind aber nicht eingehaengt.",
-    "unmount_failed": "Abhaengen fehlgeschlagen: {detail}",
-    "polkit_already": "Bereits eingerichtet -- der Mount laeuft ohne Passwort.",
-    "polkit_done": "Eingerichtet. Das Einhaengen laeuft ab jetzt ohne Passwort.",
+    "no_pkexec": "pkexec fehlt (polkit). Ohne es kann Anvil das Overlay nicht einhängen.",
+    "mount_failed": "Einhängen fehlgeschlagen: {detail}",
+    "mount_aborted": "Passwort-Abfrage abgebrochen — die Mods liegen bereit, sind aber nicht eingehängt.",
+    "unmount_failed": "Abhängen fehlgeschlagen: {detail}",
+    "polkit_already": "Bereits eingerichtet — der Mount läuft ohne Passwort.",
+    "polkit_done": "Eingerichtet. Das Einhängen läuft ab jetzt ohne Passwort.",
     "polkit_failed": "Einrichtung fehlgeschlagen: {detail}"
   }
 }

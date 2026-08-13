@@ -96,12 +96,12 @@ class SettingsDialog(QDialog):
         self._backdrop = None
         if self._modern:
             self.setObjectName("settingsDlg")
-            self.setFixedSize(976, 726)
+            self.setFixedSize(1240, 760)
             self.setWindowFlags(
                 Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         else:
-            self.setMinimumSize(960, 600)
-            self.resize(960, 600)
+            self.setMinimumSize(1100, 700)
+            self.resize(1240, 760)
 
         if self._modern:
             outer = QVBoxLayout(self)
@@ -1145,56 +1145,6 @@ class SettingsDialog(QDialog):
         diag_layout.addWidget(diag_scroll)
         self._tabs.addTab(diagnose_tab, tr("settings.tab_diagnostics"))
 
-        # Tab Experte
-        experte_tab = QWidget()
-        ex_layout = QVBoxLayout(experte_tab)
-        ex_scroll = QScrollArea()
-        ex_scroll.setWidgetResizable(True)
-        ex_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        ex_content = QWidget()
-        ex_content_layout = QVBoxLayout(ex_content)
-
-        deploy_grp = QGroupBox(tr("settings.deploy_method_group"))
-        deploy_grp_layout = QVBoxLayout(deploy_grp)
-
-        use_overlay = str(self._idata.get("use_overlay", "false")).lower() in ("true", "1")
-        self._radio_symlink = QRadioButton(tr("settings.deploy_symlink"))
-        self._radio_overlay = QRadioButton(tr("settings.deploy_overlay"))
-        self._radio_overlay.setChecked(use_overlay)
-        self._radio_symlink.setChecked(not use_overlay)
-        deploy_grp_layout.addWidget(self._radio_symlink)
-        symlink_hint = QLabel(tr("settings.deploy_symlink_hint"))
-        symlink_hint.setWordWrap(True)
-        symlink_hint.setContentsMargins(24, 0, 0, 8)
-        deploy_grp_layout.addWidget(symlink_hint)
-        deploy_grp_layout.addWidget(self._radio_overlay)
-        overlay_hint = QLabel(tr("settings.deploy_overlay_hint"))
-        overlay_hint.setWordWrap(True)
-        overlay_hint.setContentsMargins(24, 0, 0, 8)
-        deploy_grp_layout.addWidget(overlay_hint)
-
-        self._lbl_overlay_problems = QLabel("")
-        self._lbl_overlay_problems.setWordWrap(True)
-        self._lbl_overlay_problems.setVisible(False)
-        deploy_grp_layout.addWidget(self._lbl_overlay_problems)
-
-        self._btn_polkit = QPushButton(tr("settings.overlay_polkit_setup"))
-        self._btn_polkit.setToolTip(tr("settings.overlay_polkit_hint"))
-        self._btn_polkit.clicked.connect(
-            lambda checked=False: self._setup_polkit()
-        )
-        self._btn_polkit.setVisible(use_overlay)
-        self._radio_overlay.toggled.connect(self._btn_polkit.setVisible)
-        deploy_grp_layout.addWidget(self._btn_polkit)
-
-        ex_content_layout.addWidget(deploy_grp)
-        ex_content_layout.addStretch()
-        ex_scroll.setWidget(ex_content)
-        ex_layout.addWidget(ex_scroll)
-        self._tabs.addTab(experte_tab, tr("settings.tab_expert"))
-
-        self._check_overlay_requirements()
-
         # Diagnose-Daten initial laden (günstig; Konflikte nur auf Knopfdruck)
         self._diag_data: dict = {}
         self._diag_last_conflicts = None
@@ -1281,6 +1231,56 @@ class SettingsDialog(QDialog):
         load_order_tab_layout.addWidget(opts_grp)
         load_order_tab_layout.addStretch()
         self._tabs.addTab(load_order_tab, tr("settings.tab_load_order"))
+
+        # Tab Experte -- bewusst ganz rechts
+        experte_tab = QWidget()
+        ex_layout = QVBoxLayout(experte_tab)
+        ex_scroll = QScrollArea()
+        ex_scroll.setWidgetResizable(True)
+        ex_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        ex_content = QWidget()
+        ex_content_layout = QVBoxLayout(ex_content)
+
+        deploy_grp = QGroupBox(tr("settings.deploy_method_group"))
+        deploy_grp_layout = QVBoxLayout(deploy_grp)
+
+        use_overlay = str(self._idata.get("use_overlay", "false")).lower() in ("true", "1")
+        self._radio_symlink = QRadioButton(tr("settings.deploy_symlink"))
+        self._radio_overlay = QRadioButton(tr("settings.deploy_overlay"))
+        self._radio_overlay.setChecked(use_overlay)
+        self._radio_symlink.setChecked(not use_overlay)
+        deploy_grp_layout.addWidget(self._radio_symlink)
+        symlink_hint = QLabel(tr("settings.deploy_symlink_hint"))
+        symlink_hint.setWordWrap(True)
+        symlink_hint.setContentsMargins(24, 0, 0, 8)
+        deploy_grp_layout.addWidget(symlink_hint)
+        deploy_grp_layout.addWidget(self._radio_overlay)
+        overlay_hint = QLabel(tr("settings.deploy_overlay_hint"))
+        overlay_hint.setWordWrap(True)
+        overlay_hint.setContentsMargins(24, 0, 0, 8)
+        deploy_grp_layout.addWidget(overlay_hint)
+
+        self._lbl_overlay_problems = QLabel("")
+        self._lbl_overlay_problems.setWordWrap(True)
+        self._lbl_overlay_problems.setVisible(False)
+        deploy_grp_layout.addWidget(self._lbl_overlay_problems)
+
+        self._btn_polkit = QPushButton(tr("settings.overlay_polkit_setup"))
+        self._btn_polkit.setToolTip(tr("settings.overlay_polkit_hint"))
+        self._btn_polkit.clicked.connect(
+            lambda checked=False: self._setup_polkit()
+        )
+        self._btn_polkit.setVisible(use_overlay)
+        self._radio_overlay.toggled.connect(self._btn_polkit.setVisible)
+        deploy_grp_layout.addWidget(self._btn_polkit)
+
+        ex_content_layout.addWidget(deploy_grp)
+        ex_content_layout.addStretch()
+        ex_scroll.setWidget(ex_content)
+        ex_layout.addWidget(ex_scroll)
+        self._tabs.addTab(experte_tab, tr("settings.tab_expert"))
+
+        self._check_overlay_requirements()
 
         if self._modern:
             tabs_wrap = QWidget()

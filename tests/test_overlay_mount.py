@@ -27,14 +27,14 @@ def _conf(tmp_path: Path) -> Path:
     return conf
 
 
-def test_helfer_wird_ausfuehrbar_angelegt(tmp_path: Path) -> None:
+def test_helfer_wird_ausführbar_angelegt(tmp_path: Path) -> None:
     ziel = write_helper(tmp_path)
     assert ziel == helper_path(tmp_path)
     assert ziel.is_file()
     assert ziel.stat().st_mode & 0o111
 
 
-def test_helfer_ist_gueltiges_bash(tmp_path: Path) -> None:
+def test_helfer_ist_gültiges_bash(tmp_path: Path) -> None:
     ziel = write_helper(tmp_path)
     lauf = subprocess.run(["bash", "-n", str(ziel)], capture_output=True)
     assert lauf.returncode == 0, lauf.stderr.decode()
@@ -53,7 +53,7 @@ def test_is_mounted_erkennt_nicht_mounts(tmp_path: Path) -> None:
     assert not is_mounted(tmp_path)
 
 
-def test_mount_uebergibt_aktion_und_conf(
+def test_mount_übergibt_aktion_und_conf(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     aufrufe: list[list[str]] = []
@@ -102,8 +102,25 @@ def test_echter_fehler_kommt_als_meldung(
     assert "fehlgeschlagen" in meldung
 
 
-def test_polkit_regel_fehlt_standardmaessig(tmp_path: Path) -> None:
-    assert not polkit_rule_installed(tmp_path, "niemand")
+def test_polkit_regel_erkennt_installierten_helfer(tmp_path: Path) -> None:
+    """Installiert = systemweiter Helfer vorhanden und root-eigen.
+
+    (Die Regeldatei selbst ist für Normalnutzer nicht lesbar.)
+    """
+    from anvil.core.overlay_mount import SYSTEM_HELPER
+
+    erwartet = SYSTEM_HELPER.is_file() and SYSTEM_HELPER.stat().st_uid == 0
+    assert polkit_rule_installed(tmp_path, "niemand") is erwartet
+
+
+def test_polkit_regel_ist_formatierbar() -> None:
+    """Die JavaScript-Klammern dürfen .format() nicht in die Quere kommen."""
+    from anvil.core.overlay_mount import _POLKIT_RULE, SYSTEM_HELPER
+
+    regel = _POLKIT_RULE.format(helper=SYSTEM_HELPER, user="mob")
+    assert str(SYSTEM_HELPER) in regel
+    assert '"mob"' in regel
+    assert "polkit.addRule(function(action, subject) {" in regel
 
 
 def test_umgebung_hier_ist_tauglich() -> None:
