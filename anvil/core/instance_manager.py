@@ -394,6 +394,10 @@ class InstanceManager:
             s.setValue("local_saves", data["local_saves"])
         if "preset_separator" in data:
             s.setValue("preset_separator", data["preset_separator"])
+        if "catchall_separator" in data:
+            s.setValue("catchall_separator", data["catchall_separator"])
+        if "catchall_tidy_asked" in data:
+            s.setValue("catchall_tidy_asked", data["catchall_tidy_asked"])
         s.endGroup()
 
         s.beginGroup("Paths")

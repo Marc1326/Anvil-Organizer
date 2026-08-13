@@ -72,6 +72,7 @@ class ConflictScanner:
         game_plugin=None,
         mod_index: ModIndex | None = None,
         pak_file_lists: dict[str, list[dict]] | None = None,
+        archive_hashes: dict[str, dict[str, frozenset[int]]] | None = None,
     ) -> dict:
         """Scan *mods* for file conflicts.
 
@@ -85,6 +86,11 @@ class ConflictScanner:
                          filtered out.
             mod_index: Optional :class:`ModIndex` for cached file lists.
                        When provided, avoids expensive ``rglob`` calls.
+            archive_hashes: Mod-Name -> Archivpfad -> Pruefsummen der
+                       enthaltenen Spieldateien. Damit werden Konflikte
+                       *innerhalb* gepackter Archive sichtbar, die im
+                       Dateivergleich unsichtbar bleiben: zwei Archive
+                       mit verschiedenen Namen liefern dieselbe Datei.
 
         Returns:
             Dict with two keys:
@@ -149,6 +155,10 @@ class ConflictScanner:
                     continue
 
             # Fallback: scan filesystem directly
+            # Ohne Pfad nichts tun -- Path("") ist das Arbeitsverzeichnis
+            # und wuerde den halben Rechner einlesen.
+            if not mod.get("path"):
+                continue
             mod_root = Path(mod["path"])
 
             if not mod_root.is_dir():
@@ -201,4 +211,61 @@ class ConflictScanner:
             "conflicts": conflicts,
             "ignored": ignored,
             "file_owners": file_owners,
+            "archive_conflicts": self._archive_conflicts(mods, archive_hashes),
         }
+
+    @staticmethod
+    def _archive_conflicts(
+        mods: list[dict],
+        archive_hashes: dict[str, dict[str, frozenset[int]]] | None,
+    ) -> list[dict]:
+        """Archive, die sich dieselben Spieldateien teilen.
+
+        Bewusst getrennt von ``file_owners``: dort stehen echte Pfade,
+        die in den Data-Tab fliessen. Hier sind es Pruefsummen -- der
+        Klartextname der Datei laesst sich daraus nicht zurueckrechnen.
+
+        Gerechnet wird ueber eine Pruefsumme->Besitzer-Abbildung und
+        nicht ueber alle Archivpaare: bei 600 Archiven waeren das
+        180.000 Vergleiche, so bleibt es linear.
+        """
+        if not archive_hashes:
+            return []
+
+        # Pruefsumme -> Liste (Mod, Archiv) in Prioritaetsreihenfolge.
+        besitzer: dict[int, list[tuple[str, str]]] = {}
+        for mod in mods:
+            name = mod["name"]
+            for rel, hashes in (archive_hashes.get(name) or {}).items():
+                for h in hashes:
+                    besitzer.setdefault(h, []).append((name, rel))
+
+        # Paar -> Anzahl gemeinsamer Dateien.
+        paare: dict[tuple[tuple[str, str], tuple[str, str]], int] = {}
+        for eintraege in besitzer.values():
+            if len(eintraege) < 2:
+                continue
+            for i, a in enumerate(eintraege):
+                for b in eintraege[i + 1:]:
+                    if a[0] == b[0]:
+                        continue  # dieselbe Mod, kein Konflikt
+                    if a[1] == b[1]:
+                        # Gleicher Pfad in zwei Mods: das ist ein
+                        # gewoehnlicher Dateikonflikt und steht schon in
+                        # ``conflicts``. Sonst zaehlt das Symbol doppelt.
+                        continue
+                    paare[(a, b)] = paare.get((a, b), 0) + 1
+
+        ergebnis = [
+            {
+                "mod_a": a[0], "archive_a": a[1],
+                "mod_b": b[0], "archive_b": b[1],
+                "count": anzahl,
+                # Wie bei den losen Dateien: der spaetere Eintrag in der
+                # uebergebenen Reihenfolge gewinnt.
+                "winner": b[0],
+            }
+            for (a, b), anzahl in paare.items()
+        ]
+        ergebnis.sort(key=lambda e: (-e["count"], e["mod_a"], e["mod_b"]))
+        return ergebnis

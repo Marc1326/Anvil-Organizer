@@ -131,7 +131,8 @@
     "fw_unlock": "Unlock framework",
     "properties": "Properties",
     "remove_preset": "Remove preset...",
-    "rename_preset": "Rename preset..."
+    "rename_preset": "Rename preset...",
+    "fix_preset": "Sort preset into place"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -281,7 +282,9 @@
     "start_while_unknown_text": "Anvil cannot tell whether a game is still running.\n\nStart anyway? Anvil clears the game directory first — a game that is still running will crash.",
     "remove_preset_title": "Remove preset",
     "remove_preset_single": "Really delete preset \"{name}\"? The folder will be permanently removed.",
-    "warning": "Warning"
+    "warning": "Warning",
+    "tidy_catch_all_title": "Tidy separator",
+    "tidy_catch_all_message": "These entries under “{sep}” are not presets. Move them to “{ziel}”?"
   },
   "button": {
     "cancel": "Cancel",
@@ -334,7 +337,8 @@
     "save_ctrl_s": "Save (Ctrl+S)",
     "move_to_optional": "Deactivate selected plugins (move to optional/)",
     "move_to_active": "Activate selected plugins (back to mod root)",
-    "group_collapsed": "{count} mod(s) in group"
+    "group_collapsed": "{count} mod(s) in group",
+    "stray_preset": "This mod contains a preset at a place where the game never looks for it.\nRight-click → “Sort preset into place” fixes it."
   },
   "label": {
     "active": "Active:",
@@ -541,7 +545,9 @@
     "fw_no_update": "{name} is up to date (version {version})",
     "fw_checking": "Checking Nexus version for {name}…",
     "fw_update_error": "Update check for {name} failed:\n{reason}",
-    "fw_no_nexus_id": "No Nexus ID configured for {name}."
+    "fw_no_nexus_id": "No Nexus ID configured for {name}.",
+    "catch_all_created": "Separator “{name}” created — new mods will go there",
+    "tidy_catch_all_done": "Moved to “{ziel}”: {count}"
   },
   "log": {},
   "batch_query": {
@@ -975,7 +981,12 @@
     "nexus_last_query": "Last query:",
     "nexus_description": "Description:",
     "error_loading": "Error loading file: {error}",
-    "tab_preset_reqs": "Preset"
+    "tab_preset_reqs": "Preset",
+    "archive_conflicts": "Conflicts inside packed archives",
+    "col_archive_own": "This archive",
+    "col_archive_other": "Competitor",
+    "col_archive_count": "Files",
+    "archive_conflicts_hint": "For packed archives Anvil can only show how many game files they share — the archive stores checksums, not file names. Green = this archive wins."
   },
   "filetree": {
     "name": "Name",
@@ -1325,7 +1336,8 @@
     "update_available": "Update available",
     "download_done": "Download finished",
     "download_error": "Download failed",
-    "deploy_gaps": "Not everything reached the game ({count})"
+    "deploy_gaps": "Not everything reached the game ({count})",
+    "stray_presets": "Presets sit where the game does not look ({count})"
   },
   "install": {
     "title": "Install Mod",
@@ -1431,7 +1443,12 @@
     "variant_prompt": "For “{name}” it is not clear who it is meant for.\nPlease choose:",
     "variant_female": "Female",
     "variant_male": "Male",
-    "installed": "{count} preset(s) from {name} set up"
+    "installed": "{count} preset(s) from {name} set up",
+    "stray_title": "Preset in the wrong place",
+    "stray_prompt": "“{file}” sits inside “{mod}” at a place where {kind} never looks for it.\n\nAnvil will move the file within the mod folder:\n\nFrom: {von}\nTo:   {nach}\n\nNothing in the game folder changes. Move it?",
+    "stray_moved": "“{name}” tidied up — the preset takes effect on the next deploy",
+    "stray_failed": "Move failed: {error}",
+    "stray_exists": "“{name}” already exists at the target. Nothing was changed."
   },
   "preset_reqs": {
     "refresh": "Load from Nexus",
@@ -1447,5 +1464,8 @@
     "summary_complete": "All {count} listed mods are present.",
     "error": "Request failed: {error}",
     "open_hint": "Double-click a row to open the mod page on Nexus."
+  },
+  "separator": {
+    "catch_all_default": "Unsorted"
   }
 }

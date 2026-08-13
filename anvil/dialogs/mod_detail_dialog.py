@@ -1337,7 +1337,10 @@ def _build_presets_tab(mod_path: str, game_plugin, installed_ids: dict,
     return page
 
 
-def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
+def _build_conflicts_tab(
+    mod_name: str, all_mods, game_plugin,
+    mod_index=None, archive_hashes=None,
+):
     """Konflikte-Tab: Gewinnt/Verliert-Bereiche mit ConflictScanner.
 
     Zwei QTreeWidgets (Überschreibt / Wird überschrieben) mit Dateipfad
@@ -1357,7 +1360,18 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
 
     # ConflictScanner ausführen
     scanner = ConflictScanner()
-    result = scanner.scan_conflicts(all_mods, game_plugin)
+    result = scanner.scan_conflicts(
+        all_mods, game_plugin,
+        mod_index=mod_index, archive_hashes=archive_hashes,
+    )
+
+    # Konflikte in gepackten Archiven: hier gibt es keine Dateinamen,
+    # nur die Anzahl gemeinsamer Spieldateien -- aus einer Pruefsumme
+    # laesst sich der Pfad nicht zurueckrechnen.
+    archiv_treffer = [
+        e for e in result.get("archive_conflicts", [])
+        if mod_name in (e["mod_a"], e["mod_b"])
+    ]
 
     # Konflikte filtern die DIESE Mod betreffen
     wins = []   # Dateien die diese Mod gewinnt
@@ -1374,7 +1388,7 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
             losses.append({"file": conflict["file"], "winner": conflict["winner"]})
 
     # Keine Konflikte
-    if not wins and not losses:
+    if not wins and not losses and not archiv_treffer:
         no_conflict = QLabel(tr("mod_detail.no_conflicts"))
         no_conflict.setStyleSheet("color: #4CAF50; font-size: 14px; padding: 20px;")
         no_conflict.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1452,8 +1466,56 @@ def _build_conflicts_tab(mod_name: str, all_mods, game_plugin):
     lose_tree.setColumnWidth(0, 500)
     layout.addWidget(lose_tree, 1)
 
+    # --- Konflikte in gepackten Archiven ---
+    if archiv_treffer:
+        if _modern:
+            arch_label = QLabel(tr("mod_detail.archive_conflicts").upper())
+            arch_label.setObjectName("conflictWinHeader")
+        else:
+            arch_label = QLabel(tr("mod_detail.archive_conflicts"))
+            arch_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+        layout.addWidget(arch_label)
+
+        arch_tree = QTreeWidget()
+        arch_tree.setObjectName("conflictTree")
+        arch_tree.setHeaderLabels([
+            tr("mod_detail.col_archive_own"),
+            tr("mod_detail.col_archive_other"),
+            tr("mod_detail.col_archive_count"),
+        ])
+        arch_tree.setColumnCount(3)
+        arch_tree.setAlternatingRowColors(True)
+        arch_tree.setRootIsDecorated(False)
+        arch_tree.setSortingEnabled(True)
+        for e in archiv_treffer:
+            eigen_ist_a = e["mod_a"] == mod_name
+            eigenes = e["archive_a"] if eigen_ist_a else e["archive_b"]
+            fremdes = e["archive_b"] if eigen_ist_a else e["archive_a"]
+            fremder_mod = e["mod_b"] if eigen_ist_a else e["mod_a"]
+            item = QTreeWidgetItem([
+                eigenes.rsplit("/", 1)[-1],
+                f"{fremder_mod} — {fremdes.rsplit('/', 1)[-1]}",
+            ])
+            # Als Zahl und nicht als Text: sonst sortiert Qt 1, 10, 2.
+            item.setData(2, Qt.ItemDataRole.DisplayRole, e["count"])
+            gewinnt = e["winner"] == mod_name
+            item.setForeground(0, QColor(
+                _tc("ok", "#4CAF50") if gewinnt else _tc("error", "#F44336")))
+            arch_tree.addTopLevelItem(item)
+        arch_header = arch_tree.header()
+        arch_header.setStretchLastSection(True)
+        arch_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        arch_tree.setColumnWidth(0, 320)
+        arch_tree.setColumnWidth(1, 420)
+        layout.addWidget(arch_tree, 1)
+
+        hinweis = QLabel(tr("mod_detail.archive_conflicts_hint"))
+        hinweis.setStyleSheet(_dim_info_style())
+        hinweis.setWordWrap(True)
+        layout.addWidget(hinweis)
+
     # --- Info-Zeile ---
-    total = len(wins) + len(losses)
+    total = len(wins) + len(losses) + len(archiv_treffer)
     ignored = len(result["ignored"])
     if ignored > 0:
         info_text = tr("mod_detail.conflicts_with_ignored", total=total, ignored=ignored)
@@ -1800,7 +1862,8 @@ class ModDetailDialog(QDialog):
     def __init__(self, parent=None, mod_name="", mod_path="",
                  all_mods=None, game_plugin=None,
                  category_manager=None, mod_entry=None,
-                 installed_nexus_ids=None, requirements_cache=None):
+                 installed_nexus_ids=None, requirements_cache=None,
+                 mod_index=None, archive_hashes=None):
         super().__init__(parent)
         self._all_mods = all_mods or []
         self.setWindowTitle(mod_name or tr("dialog.mod_details"))
@@ -1876,7 +1939,11 @@ class ModDetailDialog(QDialog):
 
         # Tab 4: Konflikte
         self.tab_widget.addTab(
-            _build_conflicts_tab(mod_name, all_mods, game_plugin), tr("mod_detail.tab_conflicts"),
+            _build_conflicts_tab(
+                mod_name, all_mods, game_plugin,
+                mod_index=mod_index, archive_hashes=archive_hashes,
+            ),
+            tr("mod_detail.tab_conflicts"),
         )
 
         # Tab 5: Kategorien

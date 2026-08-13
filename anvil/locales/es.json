@@ -131,7 +131,8 @@
     "fw_unlock": "Desbloquear framework",
     "properties": "Propiedades",
     "remove_preset": "Eliminar preajuste...",
-    "rename_preset": "Renombrar preajuste..."
+    "rename_preset": "Renombrar preajuste...",
+    "fix_preset": "Colocar el preajuste en su sitio"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -281,7 +282,9 @@
     "start_while_unknown_text": "Anvil no puede saber si todavía hay un juego en marcha.\n\n¿Iniciar de todas formas? Anvil limpiará la carpeta del juego, y un juego abierto se cerrará de golpe.",
     "remove_preset_title": "Eliminar preajuste",
     "remove_preset_single": "¿Eliminar realmente el preajuste \"{name}\"? La carpeta se borrará de forma irreversible.",
-    "warning": "Advertencia"
+    "warning": "Advertencia",
+    "tidy_catch_all_title": "Ordenar separador",
+    "tidy_catch_all_message": "Estas entradas bajo «{sep}» no son preajustes. ¿Moverlas a «{ziel}»?"
   },
   "button": {
     "cancel": "Cancelar",
@@ -334,7 +337,8 @@
     "save_ctrl_s": "Guardar (Ctrl+S)",
     "move_to_optional": "Desactivar plugins seleccionados (mover a optional/)",
     "move_to_active": "Activar plugins seleccionados (volver a raíz del mod)",
-    "group_collapsed": "{count} mod(s) en el grupo"
+    "group_collapsed": "{count} mod(s) en el grupo",
+    "stray_preset": "Este mod contiene un preajuste en un lugar donde el juego nunca lo busca.\nClic derecho → «Colocar el preajuste en su sitio» lo corrige."
   },
   "label": {
     "active": "Activo:",
@@ -541,7 +545,9 @@
     "fw_no_update": "{name} está actualizado (versión {version})",
     "fw_checking": "Comprobando versión de Nexus para {name}…",
     "fw_update_error": "Comprobación de actualización para {name} falló:\n{reason}",
-    "fw_no_nexus_id": "No hay ID de Nexus configurado para {name}."
+    "fw_no_nexus_id": "No hay ID de Nexus configurado para {name}.",
+    "catch_all_created": "Separador «{name}» creado: los mods nuevos irán ahí",
+    "tidy_catch_all_done": "Movidas a «{ziel}»: {count}"
   },
   "log": {},
   "batch_query": {
@@ -975,7 +981,12 @@
     "nexus_last_query": "Última consulta:",
     "nexus_description": "Descripción:",
     "error_loading": "Error al cargar: {error}",
-    "tab_preset_reqs": "Preset"
+    "tab_preset_reqs": "Preset",
+    "archive_conflicts": "Conflictos dentro de archivos empaquetados",
+    "col_archive_own": "Este archivo",
+    "col_archive_other": "Competidor",
+    "col_archive_count": "Archivos",
+    "archive_conflicts_hint": "En los archivos empaquetados Anvil solo puede mostrar cuántos archivos de juego comparten: el archivo guarda sumas de verificación, no nombres. Verde = este archivo gana."
   },
   "filetree": {
     "name": "Nombre",
@@ -1325,7 +1336,8 @@
     "update_available": "Actualización disponible",
     "download_done": "Descarga completada",
     "download_error": "Error de descarga",
-    "deploy_gaps": "No todo llegó al juego ({count})"
+    "deploy_gaps": "No todo llegó al juego ({count})",
+    "stray_presets": "Hay preajustes donde el juego no los busca ({count})"
   },
   "install": {
     "title": "Instalar mod",
@@ -1431,7 +1443,12 @@
     "variant_prompt": "En «{name}» no está claro para quién es.\nElige:",
     "variant_female": "Femenino",
     "variant_male": "Masculino",
-    "installed": "{count} preajuste(s) de {name} configurados"
+    "installed": "{count} preajuste(s) de {name} configurados",
+    "stray_title": "El preajuste está mal ubicado",
+    "stray_prompt": "«{file}» está dentro de «{mod}» en un lugar donde {kind} nunca lo busca.\n\nAnvil moverá el archivo dentro de la carpeta del mod:\n\nDe:  {von}\nA:   {nach}\n\nLa carpeta del juego no cambia. ¿Mover?",
+    "stray_moved": "«{name}» ordenado: el preajuste tendrá efecto en el próximo despliegue",
+    "stray_failed": "Error al mover: {error}",
+    "stray_exists": "«{name}» ya existe en el destino. No se cambió nada."
   },
   "preset_reqs": {
     "refresh": "Cargar desde Nexus",
@@ -1447,5 +1464,8 @@
     "summary_complete": "Los {count} mods indicados están presentes.",
     "error": "Error al consultar: {error}",
     "open_hint": "Doble clic en una fila abre la página del mod en Nexus."
+  },
+  "separator": {
+    "catch_all_default": "Sin ordenar"
   }
 }

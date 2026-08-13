@@ -932,6 +932,25 @@ class BaseGame:
         """
         return []
 
+    # Dateiendungen gepackter Archive, deren Inhalt fuer die
+    # Konfliktpruefung geoeffnet werden soll. Leer = das Spiel packt
+    # nichts, oder Anvil kann sein Format (noch) nicht lesen.
+    GameArchiveSuffixes: list[str] = []
+
+    def read_archive_hashes(self, path: Path) -> frozenset[int] | None:
+        """Pruefsummen der Dateien in einem gepackten Archiv.
+
+        Zwei Archive mit derselben Pruefsumme liefern dieselbe
+        Spieldatei -- damit laesst sich ein Konflikt erkennen, ohne die
+        Klartextnamen zu kennen.
+
+        Returns:
+            Die Pruefsummen, oder ``None`` wenn die Datei kein lesbares
+            Archiv ist. Wirft nicht -- der Aufrufer laeuft ueber hunderte
+            Dateien und darf an einer kaputten nicht haengenbleiben.
+        """
+        return None
+
     # ── Override-Punkte (Subklassen können diese überschreiben) ───────
 
     def executables(self) -> list[dict[str, str]]:

@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from anvil.core.mod_list_io import (
+    catch_all_position,
     read_active_mods,
     read_global_modlist,
     write_active_mods,
@@ -374,6 +375,7 @@ def apply_collection(
     *,
     mods_path: Path | None = None,
     profiles_path: Path | None = None,
+    catch_all: str = "",
 ) -> int:
     """Apply a collection to the current instance.
 
@@ -387,6 +389,9 @@ def apply_collection(
         profile_path: Current profile folder.
         apply_categories: Whether to update category assignments.
         categories_data: Optional categories.json data to write.
+        catch_all: Folder name of the catch-all separator. Mods on disk
+                   that the collection does not mention land behind it
+                   instead of at the very end. Empty = old behaviour.
 
     Returns:
         Number of missing mods (not on disk, excluding separators).
@@ -443,11 +448,16 @@ def apply_collection(
         else:
             missing_count += 1
 
-    # Also keep mods that are on disk but not in collection (append at end)
+    # Was auf der Platte liegt, aber nicht in der Sammlung steht, geht
+    # hinter den Auffang-Trenner -- ohne einen ans Ende, wie bisher.
     existing_order = read_global_modlist(profiles_dir)
-    for name in existing_order:
-        if name not in new_order and name in on_disk:
-            new_order.append(name)
+    uebrig = [
+        name for name in existing_order
+        if name not in new_order and name in on_disk
+    ]
+    if uebrig:
+        pos = catch_all_position(new_order, catch_all)
+        new_order[pos:pos] = uebrig
 
     # Write new global modlist
     write_global_modlist(profiles_dir, new_order)

@@ -131,7 +131,8 @@
     "fw_unlock": "Sblocca framework",
     "properties": "Proprietà",
     "remove_preset": "Rimuovi preimpostazione...",
-    "rename_preset": "Rinomina preimpostazione..."
+    "rename_preset": "Rinomina preimpostazione...",
+    "fix_preset": "Sistema il preset"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -281,7 +282,9 @@
     "start_while_unknown_text": "Anvil non riesce a stabilire se un gioco è ancora in esecuzione.\n\nAvviare lo stesso? Anvil ripulisce la cartella del gioco, e un gioco ancora aperto andrà in crash.",
     "remove_preset_title": "Rimuovi preimpostazione",
     "remove_preset_single": "Eliminare davvero la preimpostazione \"{name}\"? La cartella verrà rimossa in modo irreversibile.",
-    "warning": "Avviso"
+    "warning": "Avviso",
+    "tidy_catch_all_title": "Riordina separatore",
+    "tidy_catch_all_message": "Queste voci sotto «{sep}» non sono preset. Spostarle in «{ziel}»?"
   },
   "button": {
     "cancel": "Annulla",
@@ -334,7 +337,8 @@
     "save_ctrl_s": "Salva (Ctrl+S)",
     "move_to_optional": "Disattiva plugin selezionati (sposta in optional/)",
     "move_to_active": "Attiva plugin selezionati (torna alla radice del mod)",
-    "group_collapsed": "{count} mod in gruppo"
+    "group_collapsed": "{count} mod in gruppo",
+    "stray_preset": "Questa mod contiene un preset in un punto in cui il gioco non lo cerca mai.\nTasto destro → «Sistema il preset» lo corregge."
   },
   "label": {
     "active": "Attivo:",
@@ -541,7 +545,9 @@
     "fw_no_update": "{name} è aggiornato (versione {version})",
     "fw_checking": "Controllo versione Nexus per {name}…",
     "fw_update_error": "Controllo aggiornamento per {name} fallito:\n{reason}",
-    "fw_no_nexus_id": "Nessun ID Nexus configurato per {name}."
+    "fw_no_nexus_id": "Nessun ID Nexus configurato per {name}.",
+    "catch_all_created": "Separatore «{name}» creato: le nuove mod finiranno lì",
+    "tidy_catch_all_done": "Spostate in «{ziel}»: {count}"
   },
   "log": {},
   "batch_query": {
@@ -975,7 +981,12 @@
     "nexus_last_query": "Ultima richiesta:",
     "nexus_description": "Descrizione:",
     "error_loading": "Errore di caricamento: {error}",
-    "tab_preset_reqs": "Preset"
+    "tab_preset_reqs": "Preset",
+    "archive_conflicts": "Conflitti dentro archivi compressi",
+    "col_archive_own": "Questo archivio",
+    "col_archive_other": "Concorrente",
+    "col_archive_count": "File",
+    "archive_conflicts_hint": "Per gli archivi compressi Anvil può mostrare solo quanti file di gioco hanno in comune: l’archivio contiene checksum, non nomi. Verde = questo archivio vince."
   },
   "filetree": {
     "name": "Nome",
@@ -1325,7 +1336,8 @@
     "update_available": "Aggiornamento disponibile",
     "download_done": "Download completato",
     "download_error": "Download non riuscito",
-    "deploy_gaps": "Non tutto è arrivato nel gioco ({count})"
+    "deploy_gaps": "Non tutto è arrivato nel gioco ({count})",
+    "stray_presets": "Ci sono preset dove il gioco non li cerca ({count})"
   },
   "install": {
     "title": "Installa mod",
@@ -1431,7 +1443,12 @@
     "variant_prompt": "Per «{name}» non è chiaro a chi sia destinato.\nScegli:",
     "variant_female": "Femminile",
     "variant_male": "Maschile",
-    "installed": "{count} preset da {name} configurati"
+    "installed": "{count} preset da {name} configurati",
+    "stray_title": "Preset nel posto sbagliato",
+    "stray_prompt": "«{file}» si trova in «{mod}» in un punto in cui {kind} non lo cerca mai.\n\nAnvil sposterà il file all’interno della cartella della mod:\n\nDa: {von}\nA:  {nach}\n\nLa cartella di gioco non cambia. Spostare?",
+    "stray_moved": "«{name}» sistemato: il preset avrà effetto al prossimo deploy",
+    "stray_failed": "Spostamento non riuscito: {error}",
+    "stray_exists": "«{name}» esiste già nella destinazione. Non è stato modificato nulla."
   },
   "preset_reqs": {
     "refresh": "Carica da Nexus",
@@ -1447,5 +1464,8 @@
     "summary_complete": "Tutte le {count} mod indicate sono presenti.",
     "error": "Richiesta non riuscita: {error}",
     "open_hint": "Doppio clic su una riga per aprire la pagina della mod su Nexus."
+  },
+  "separator": {
+    "catch_all_default": "Non ordinati"
   }
 }

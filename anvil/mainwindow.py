@@ -79,7 +79,7 @@ from anvil.core.mod_list_io import (
     rename_mod_in_modlist, read_active_mods, write_active_mods,
     read_global_modlist, write_global_modlist, migrate_to_global_modlist,
     migrate_modlist_order, insert_mod_in_modlist, rename_mod_globally, remove_mod_globally,
-    merge_hidden_order,
+    merge_hidden_order, catch_all_position, separator_label,
 )
 from anvil.core.categories import CategoryManager, _DEFAULT_CATEGORIES
 from anvil.version import APP_VERSION
@@ -413,6 +413,8 @@ class MainWindow(QMainWindow):
         # ── Mod state ─────────────────────────────────────────────────
         self._current_mod_entries = []
         self._preset_namen: set[str] = set()
+        self._stray_preset_namen: dict[str, set] = {}
+        self._stray_presets_of: dict[str, list[str]] = {}
         self._pending_query_path: Path | None = None
         self._pending_dl_query_path: str | None = None
         self._fw_query_queue: list[tuple[str, int]] = []
@@ -478,6 +480,17 @@ class MainWindow(QMainWindow):
         self._fw_relock_timer.timeout.connect(self._fw_relock_tick)
         self._fw_relock_timer.start()
 
+        # Die Glocke muss stehen, bevor die erste Instanz geladen wird --
+        # schon beim Aufbau der Liste koennen Meldungen anfallen.
+        self._notification_center = NotificationCenter(self)
+        self._notification_center.changed.connect(self._on_notifications_changed)
+
+        # Ein einziger Timer statt QTimer.singleShot: bei zwei schnellen
+        # Instanzwechseln stapelten sich sonst zwei Aufraeum-Dialoge.
+        self._tidy_timer = QTimer(self)
+        self._tidy_timer.setSingleShot(True)
+        self._tidy_timer.timeout.connect(self._offer_tidy_catch_all)
+
         # ── Erster Start / Instanz laden ──────────────────────────────
         # Locke Frameworks in ALLEN Instanzen bevor die aktuelle geladen wird
         self._fw_relock_startup_scan()
@@ -487,8 +500,6 @@ class MainWindow(QMainWindow):
         QApplication.instance().installEventFilter(self)
 
         # ── Benachrichtigungen (Glocken-Button) ─────────────────────
-        self._notification_center = NotificationCenter(self)
-        self._notification_center.changed.connect(self._on_notifications_changed)
         self._game_panel.deploy_gaps.connect(self._on_deploy_gaps)
         # Download-Ereignisse als Quellen anbinden (zusätzlich zur game_panel-Logik)
         dm = self._game_panel.download_manager()
@@ -1699,6 +1710,7 @@ class MainWindow(QMainWindow):
         # Presets der alten Instanz unter der neuen Liste.
         self._mod_list_view.load_presets([])
         self._preset_namen = set()
+        self._stray_presets_of = {}
 
         # Collapsed Separators leeren (KERN-FIX fuer den gemeldeten Bug)
         self._mod_list_view._tree._collapsed_separators.clear()
@@ -1987,7 +1999,9 @@ class MainWindow(QMainWindow):
             self._group_manager.cleanup_orphans(existing_folders)
 
         # Rebuild mod file index (only re-scans changed mods)
-        self._mod_index = ModIndex(instance_path, mods_path=instance_paths.mods)
+        self._mod_index = ModIndex(
+            instance_path, mods_path=instance_paths.mods, game_plugin=plugin,
+        )
         self._mod_index.rebuild()
         if plugin is not None:
             plugin.setModIndex(self._mod_index)
@@ -1999,6 +2013,7 @@ class MainWindow(QMainWindow):
             mod_index=self._mod_index,
             mods_path=instance_paths.mods,
             profiles_path=instance_paths.profiles,
+            catch_all=self._catch_all_separator(instance_name),
         )
         # Mark direct-install (framework) mods
         direct_patterns = getattr(plugin, "GameDirectInstallMods", []) if plugin else []
@@ -2035,6 +2050,10 @@ class MainWindow(QMainWindow):
         # Log mod count
         active_count = sum(1 for e in visible_entries if e.enabled)
         self._log_panel.add_log("info", f"{len(visible_entries)} Mods geladen ({active_count} aktiv)")
+
+        # Erst wenn das Fenster steht -- ein Dialog mitten im Laden
+        # blockiert den Aufbau.
+        self._tidy_timer.start(0)
 
         # 5. Mod deployer — mods are deployed on game start, not here
         from anvil.widgets.game_panel import _dlog
@@ -2196,6 +2215,219 @@ class MainWindow(QMainWindow):
 
         return folder
 
+    # ── Auffang-Trenner ──────────────────────────────────────────────
+
+    _CATCH_ALL_KEY = "catchall_separator"
+
+    def _catch_all_separator(self, instanz: str = "") -> str:
+        """Der Auffang-Trenner der Instanz, oder leer.
+
+        Geprueft wird der Ordner auf der Platte und nicht die angezeigte
+        Liste -- waehrend einer Installation ist die noch die alte.
+
+        Args:
+            instanz: Name der gemeinten Instanz. Muss beim Umschalten
+                mitgegeben werden: ``.current`` zeigt bis zum Ende von
+                ``_apply_instance`` noch auf die vorige Instanz, die
+                Pfade aber schon auf die neue.
+        """
+        inst = instanz or self.instance_manager.current_instance()
+        if not inst:
+            return ""
+        data = self.instance_manager.load_instance(inst) or {}
+        name = str(data.get(self._CATCH_ALL_KEY, ""))
+        if not name:
+            return ""
+        vorhanden = (_active_instance_paths(self).mods / name).is_dir()
+        return name if vorhanden else ""
+
+    def _ensure_catch_all_separator(self) -> str:
+        """Legt den Auffang-Trenner an, falls die Instanz noch keinen hat.
+
+        Ohne Rueckfrage: er entsteht erst beim ersten Zugang und
+        verschiebt nichts, was schon in der Liste steht.
+        """
+        vorhanden = self._catch_all_separator()
+        if vorhanden:
+            return vorhanden
+
+        inst = self.instance_manager.current_instance()
+        if not inst:
+            return ""
+
+        folder = f"{tr('separator.catch_all_default')}_separator"
+        mods_dir = _active_instance_paths(self).mods
+        profiles_dir = _active_instance_paths(self).profiles
+
+        try:
+            (mods_dir / folder).mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            print(f"catch-all separator: {exc}", file=sys.stderr)
+            return ""
+
+        order = read_global_modlist(profiles_dir)
+        if folder not in order:
+            order.append(folder)
+            write_global_modlist(profiles_dir, order)
+
+        if self._current_profile_path:
+            aktiv = read_active_mods(self._current_profile_path)
+            aktiv.add(folder)
+            write_active_mods(self._current_profile_path, aktiv)
+
+        data = self.instance_manager.load_instance(inst) or {}
+        data[self._CATCH_ALL_KEY] = folder
+        self.instance_manager.save_instance(inst, data)
+
+        self.statusBar().showMessage(
+            tr("status.catch_all_created", name=separator_label(folder)), 5000,
+        )
+        return folder
+
+    _TIDY_ASKED_KEY = "catchall_tidy_asked"
+
+    def _sammler_kinder(self, order: list[str], separator: str) -> list[str]:
+        """Die Eintraege, die unter *separator* haengen."""
+        if separator not in order:
+            return []
+        start = order.index(separator) + 1
+        ende = start
+        while ende < len(order) and not order[ende].endswith("_separator"):
+            ende += 1
+        return order[start:ende]
+
+    def _tidy_kandidaten(self, order: list[str], preset_sep: str) -> list[str]:
+        """Was unter dem Preset-Trenner haengt und dort nicht hingehoert.
+
+        Drei Gruppen bleiben ausdruecklich draussen:
+
+        * **Presets** -- die stehen ja richtig.
+        * **Frameworks** -- die werden getrennt verwaltet, haben ihre
+          eigene Liste und sind in der Mod-Liste gar nicht sichtbar.
+          Ihre Position in der ``modlist.txt`` ist ihr Ladeindex; sie zu
+          verschieben hiesse, an der Ladereihenfolge von RED4ext,
+          redscript und ArchiveXL zu drehen.
+        * **verirrte Presets** -- ein Preset am falschen Ort ist immer
+          noch ein Preset. Es gehoert geraderueckt, danach wandert es von
+          selbst in den Presets-Bereich.
+        """
+        frameworks = {
+            e.name for e in self._current_mod_entries
+            if getattr(e, "is_direct_install", False)
+        }
+        return [
+            name for name in self._sammler_kinder(order, preset_sep)
+            if name not in self._preset_namen
+            and name not in frameworks
+            and name not in self._stray_presets_of
+        ]
+
+    def _offer_tidy_catch_all(self) -> None:
+        """Bietet genau einmal an, den Preset-Trenner aufzuraeumen.
+
+        Unter ihm sammelt sich alles, was frueher ans Listenende
+        gehaengt wurde. Verschoben wird nur nach ausdruecklichem Ja;
+        ein Nein wird dauerhaft gemerkt.
+        """
+        inst = self.instance_manager.current_instance()
+        if not inst:
+            return
+        data = self.instance_manager.load_instance(inst) or {}
+        if str(data.get(self._TIDY_ASKED_KEY, "")).lower() == "true":
+            return
+
+        preset_sep = self._preset_separator()
+        if not preset_sep:
+            return
+
+        profiles_dir = _active_instance_paths(self).profiles
+        order = read_global_modlist(profiles_dir)
+        fremd = self._tidy_kandidaten(order, preset_sep)
+        if not fremd:
+            return
+
+        # Den Namen nehmen, der wirklich benutzt wird -- sonst nennt der
+        # Dialog ein anderes Ziel als die Meldung danach.
+        vorhanden = self._catch_all_separator()
+        ziel = (
+            separator_label(vorhanden) if vorhanden
+            else tr("separator.catch_all_default")
+        )
+        antwort = QMessageBox.question(
+            self,
+            tr("dialog.tidy_catch_all_title"),
+            tr(
+                "dialog.tidy_catch_all_message",
+                sep=separator_label(preset_sep), ziel=ziel,
+            ) + "\n\n" + "\n".join(fremd),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        data = self.instance_manager.load_instance(inst) or {}
+        data[self._TIDY_ASKED_KEY] = "true"
+        self.instance_manager.save_instance(inst, data)
+
+        if antwort != QMessageBox.StandardButton.Yes:
+            return
+
+        sammel = self._ensure_catch_all_separator()
+        if not sammel:
+            return
+
+        # Neu einlesen: das Anlegen des Trenners hat die Liste schon
+        # geschrieben.
+        order = read_global_modlist(profiles_dir)
+        uebrig = [name for name in order if name not in fremd]
+        pos = catch_all_position(uebrig, sammel)
+        uebrig[pos:pos] = fremd
+        write_global_modlist(profiles_dir, uebrig)
+
+        self._reload_mod_list()
+        self.statusBar().showMessage(
+            tr(
+                "status.tidy_catch_all_done",
+                count=len(fremd), ziel=separator_label(sammel),
+            ),
+            5000,
+        )
+
+    def _follow_separator_rename(self, old_name: str, new_name: str) -> None:
+        """Merkt sich den neuen Namen eines besonderen Trenners.
+
+        Ohne das zeigt der Schluessel in der Instanz-Konfiguration nach
+        dem Umbenennen ins Leere, und Anvil legt beim naechsten Zugang
+        einen zweiten Trenner an.
+        """
+        inst = self.instance_manager.current_instance()
+        if not inst:
+            return
+        data = self.instance_manager.load_instance(inst) or {}
+        geaendert = False
+        for schluessel in (self._CATCH_ALL_KEY, self._PRESET_SEP_KEY):
+            if str(data.get(schluessel, "")) == old_name:
+                data[schluessel] = new_name
+                geaendert = True
+        if geaendert:
+            self.instance_manager.save_instance(inst, data)
+
+    def _add_mod_to_order(self, name: str) -> None:
+        """Eine neue Mod in die Ladereihenfolge aufnehmen.
+
+        Schreibt die globale Liste, sobald es sie gibt. Die Datei im
+        Profilordner liest seit dem Umbau auf die globale Liste niemand
+        mehr -- ein Eintrag dort waere unsichtbar.
+        """
+        profiles_dir = _active_instance_paths(self).profiles
+        if (profiles_dir / "modlist.txt").is_file():
+            sammel = self._ensure_catch_all_separator()
+            order = read_global_modlist(profiles_dir)
+            if name in order:
+                return
+            order.insert(catch_all_position(order, sammel), name)
+            write_global_modlist(profiles_dir, order)
+        elif self._current_profile_path:
+            add_mod_to_modlist(self._current_profile_path, name, False)
+
     def _ask_preset_variant(self, dateiname: str, kind) -> str:
         """Fragt, fuer welche Figur das Preset ist. Leer = abgebrochen."""
         from anvil.core.character_presets import FEMALE
@@ -2239,6 +2471,143 @@ class MainWindow(QMainWindow):
             if is_preset_mod(pfade, arten):
                 namen.add(eintrag.name)
         return namen
+
+    # ── Verirrte Presets ─────────────────────────────────────────────
+
+    def _stray_preset_mods(self, plugin, entries) -> dict[str, list[str]]:
+        """Mods mit einer Preset-Datei am falschen Ort.
+
+        Laeuft im selben Durchgang wie ``_preset_mod_names`` ueber den
+        Dateiindex -- kein zusaetzlicher Plattenzugriff.
+
+        Returns:
+            Mod-Name -> die verirrten Pfade.
+        """
+        from anvil.core.character_presets import stray_presets
+
+        arten = self._preset_kinds(plugin)
+        if not arten or self._mod_index is None:
+            return {}
+
+        gefunden: dict[str, list[str]] = {}
+        for eintrag in entries:
+            if getattr(eintrag, "is_separator", False) or getattr(eintrag, "is_foreign", False):
+                continue
+            pfade = (d["rel"] for d in self._mod_index.get_file_list(eintrag.name))
+            verirrt = stray_presets(pfade, arten)
+            if verirrt:
+                gefunden[eintrag.name] = verirrt
+        return gefunden
+
+    def _report_stray_presets(self, fundstellen: dict[str, list[str]]) -> None:
+        """Meldet verirrte Presets ueber die Glocke -- einmal je Menge.
+
+        Die Liste wird bei jedem Umsortieren neu gezeichnet. Ohne diese
+        Bremse haengte nach ein paar Klicks ein Dutzend gleicher
+        Meldungen an der Glocke.
+        """
+        # Nach Instanz getrennt merken: die Glocke behaelt ihre
+        # Eintraege ueber den Wechsel hinweg. Ein gemeinsamer Merker
+        # haengte beim Zurueckwechseln dieselbe Warnung ein zweites Mal
+        # an.
+        inst = self.instance_manager.current_instance() or ""
+        namen = {(mod, tuple(pfade)) for mod, pfade in fundstellen.items()}
+        if namen == self._stray_preset_namen.get(inst):
+            return
+
+        glocke = getattr(self, "_notification_center", None)
+        if glocke is None:
+            # Noch nicht aufgebaut -- nichts merken, sonst faellt die
+            # Meldung fuer immer unter den Tisch.
+            return
+
+        self._stray_preset_namen[inst] = namen
+        if not namen:
+            return
+
+        text = "\n".join(
+            f"{mod}: {', '.join(pfade)}"
+            for mod, pfade in sorted(fundstellen.items())
+        )
+        titel = tr("notifications.stray_presets", count=len(fundstellen))
+        glocke.add("warning", titel, text)
+        protokoll = getattr(self, "_log_panel", None)
+        if protokoll is not None:
+            protokoll.add_log("warning", titel)
+
+    def _fix_stray_preset(self, mod_name: str) -> None:
+        """Schiebt verirrte Presets an ihren Platz -- nach Rueckfrage.
+
+        Alle auf einmal: bliebe eines liegen, waere die Mod danach immer
+        noch markiert und Marc muesste raten, was noch offen ist.
+        """
+        from anvil.core import character_presets as cp
+
+        pfade = self._stray_presets_of.get(mod_name) or []
+        if not pfade:
+            return
+        arten = self._preset_kinds(self._current_plugin)
+        mod_dir = _active_instance_paths(self).mods / mod_name
+
+        # Erst alles klaeren, dann fragen, dann verschieben.
+        vorhaben: list[tuple[str, object, str, Path]] = []
+        for rel in pfade:
+            kind = cp.kind_for(rel, arten)
+            if kind is None:
+                continue
+            quelle = mod_dir / rel
+            variante = cp.detect_variant(quelle, kind)
+            if kind.variants and not variante:
+                variante = self._ask_preset_variant(quelle.name, kind)
+                if not variante:
+                    return
+            vorhaben.append(
+                (rel, kind, variante,
+                 mod_dir / cp.target_path(kind, variante, quelle.name)),
+            )
+        if not vorhaben:
+            return
+
+        erste = vorhaben[0]
+        antwort = QMessageBox.question(
+            self,
+            tr("preset.stray_title"),
+            tr(
+                "preset.stray_prompt",
+                file=", ".join(Path(v[0]).name for v in vorhaben),
+                mod=mod_name, kind=erste[1].label,
+                von="\n      ".join(v[0] for v in vorhaben),
+                nach="\n      ".join(
+                    str(v[3].relative_to(mod_dir)) for v in vorhaben),
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if antwort != QMessageBox.StandardButton.Yes:
+            return
+
+        for rel, kind, variante, ziel in vorhaben:
+            try:
+                cp.fix_stray_path(mod_dir, rel, kind, variante)
+            except FileExistsError:
+                QMessageBox.warning(
+                    self, tr("preset.stray_title"),
+                    tr("preset.stray_exists", name=ziel.name),
+                )
+                return
+            except (OSError, FileNotFoundError) as exc:
+                QMessageBox.warning(
+                    self, tr("preset.stray_title"),
+                    tr("preset.stray_failed", error=str(exc)),
+                )
+                return
+
+        if self._mod_index is not None:
+            self._mod_index.invalidate_and_rescan(mod_name)
+        self._reload_mod_list()
+        self._do_redeploy()
+        self.statusBar().showMessage(
+            tr("preset.stray_moved", name=mod_name), 5000,
+        )
 
     def _preset_variant(self, mod_name: str, arten: list) -> str:
         """Geschlechts-Unterordner eines Presets, leer wenn ohne.
@@ -2294,9 +2663,15 @@ class MainWindow(QMainWindow):
         """
         namen = self._preset_mod_names(plugin, visible_entries)
         self._load_preset_section(plugin, namen)
-        if not namen:
-            return visible_entries
-        return [e for e in visible_entries if e.name not in namen]
+
+        # Verirrte Presets: was hier haengenbleibt, wirkt im Spiel nicht.
+        uebrig = [e for e in visible_entries if e.name not in namen]
+        self._stray_presets_of = self._stray_preset_mods(plugin, uebrig)
+        for e in uebrig:
+            e.has_stray_preset = e.name in self._stray_presets_of
+        self._report_stray_presets(self._stray_presets_of)
+
+        return uebrig
 
     def _load_preset_section(self, plugin, namen: set[str]) -> None:
         """Fuellt den Presets-Bereich unter der Mod-Liste."""
@@ -3008,7 +3383,23 @@ class MainWindow(QMainWindow):
             return {}
         return ConflictScanner().scan_conflicts(
             all_mods, self._current_plugin, mod_index=self._mod_index,
+            archive_hashes=self._archive_hashes(all_mods),
         )
+
+    def _archive_hashes(self, mods: list[dict]) -> dict[str, dict]:
+        """Pruefsummen der gepackten Archive, aus dem Index.
+
+        Leer, wenn das Spiel keine liest -- dann kostet der Aufruf
+        nichts.
+        """
+        if self._mod_index is None:
+            return {}
+        gefunden = {}
+        for mod in mods:
+            archive = self._mod_index.get_archives(mod["name"])
+            if archive:
+                gefunden[mod["name"]] = archive
+        return gefunden
 
     def collect_diagnostics_conflicts(self) -> dict:
         """Für den Diagnose-Tab: Datei-Konflikte der aktiven Mods (read-only).
@@ -3061,6 +3452,29 @@ class MainWindow(QMainWindow):
                 else:
                     per_mod[mod_name]["losses"] += 1
                     per_mod[mod_name]["lose_mods"].add(winner)
+
+        # Konflikte innerhalb gepackter Archive zaehlen mit. Ohne das
+        # blieben die Symbole in der Liste blind, obwohl im Spiel eine
+        # Datei die andere ueberschreibt.
+        for treffer in result.get("archive_conflicts", []):
+            gewinner = treffer["winner"]
+            for mod_name in (treffer["mod_a"], treffer["mod_b"]):
+                if mod_name not in per_mod:
+                    per_mod[mod_name] = {
+                        "wins": 0, "losses": 0,
+                        "win_mods": set(), "lose_mods": set(),
+                    }
+                anderer = (
+                    treffer["mod_b"] if mod_name == treffer["mod_a"]
+                    else treffer["mod_a"]
+                )
+                if mod_name == gewinner:
+                    per_mod[mod_name]["wins"] += treffer["count"]
+                    per_mod[mod_name]["win_mods"].add(anderer)
+                else:
+                    per_mod[mod_name]["losses"] += treffer["count"]
+                    per_mod[mod_name]["lose_mods"].add(gewinner)
+
         # Convert sets to counts and determine type
         result_data: dict[str, dict] = {}
         for mod_name, info in per_mod.items():
@@ -3964,6 +4378,10 @@ class MainWindow(QMainWindow):
                 profiles_dir = _active_instance_paths(self).profiles
                 global_modlist = profiles_dir / "modlist.txt"
                 if global_modlist.is_file():
+                    # Ohne Zielzeile faengt der Auffang-Trenner den Zugang
+                    # auf. Erst anlegen, dann lesen -- das Anlegen schreibt
+                    # die Liste selbst.
+                    sammel = "" if insert_at is not None else self._ensure_catch_all_separator()
                     # Global system: write to .profiles/modlist.txt
                     mod_names = read_global_modlist(profiles_dir)
                     if mod_path.name not in mod_names:
@@ -3988,7 +4406,10 @@ class MainWindow(QMainWindow):
                             mod_names.insert(pos, mod_path.name)
                             _prev_inserted_name = mod_path.name
                         else:
-                            mod_names.append(mod_path.name)
+                            mod_names.insert(
+                                catch_all_position(mod_names, sammel),
+                                mod_path.name,
+                            )
                         write_global_modlist(profiles_dir, mod_names)
                     # enabled=False → do NOT add to active_mods.json (default = disabled)
                 else:
@@ -4195,6 +4616,10 @@ class MainWindow(QMainWindow):
                 mod_entry=mod_entry,
                 installed_nexus_ids=nexus_ids,
                 requirements_cache=cache,
+                # Ohne den Index liest der Dialog bei jedem Oeffnen alle
+                # Mod-Ordner neu von der Platte.
+                mod_index=self._mod_index,
+                archive_hashes=self._archive_hashes(all_mods),
             )
             _center_on_parent(dlg)
             result = dlg.exec()
@@ -4498,6 +4923,15 @@ class MainWindow(QMainWindow):
         act_reinstall.setEnabled(single)
         act_remove = menu.addAction(tr("context.remove_mod"))
         act_remove.setEnabled(has_selection)
+
+        # Nur bei einer Mod, deren Preset am falschen Ort liegt.
+        act_fix_preset = None
+        if single:
+            eintrag = self._entry_for_row(selected_rows[0])
+            if eintrag is not None and eintrag.name in self._stray_presets_of:
+                act_fix_preset = menu.addAction(tr("context.fix_preset"))
+                act_fix_preset.setData(eintrag.name)
+
         menu.addSeparator()
 
         # ── Sicherung / Nexus / Explorer ─────────────────────────
@@ -4594,6 +5028,8 @@ class MainWindow(QMainWindow):
             self._ctx_reinstall_mod(selected_rows[0])
         elif chosen == act_remove:
             self._ctx_remove_mods(selected_rows)
+        elif act_fix_preset is not None and chosen == act_fix_preset:
+            self._fix_stray_preset(act_fix_preset.data())
         elif chosen == act_backup:
             self._ctx_create_backup(selected_rows[0])
         elif chosen == act_reassign_cat:
@@ -5682,7 +6118,7 @@ class MainWindow(QMainWindow):
         result = installer.install_from_archive(archive_path)
 
         if result:
-            add_mod_to_modlist(self._current_profile_path, result.name, False)
+            self._add_mod_to_order(result.name)
             self._reload_mod_list()
             self.statusBar().showMessage(tr("status.mod_installed", name=result.name), 5000)
         else:
@@ -5722,7 +6158,7 @@ class MainWindow(QMainWindow):
             )
             return
 
-        add_mod_to_modlist(self._current_profile_path, name, False)
+        self._add_mod_to_order(name)
         self._reload_mod_list()
         self.statusBar().showMessage(tr("status.empty_mod_created", name=name), 5000)
 
@@ -6075,6 +6511,7 @@ class MainWindow(QMainWindow):
                 categories_data=cats_data,
                 mods_path=_active_instance_paths(self).mods,
                 profiles_path=_active_instance_paths(self).profiles,
+                catch_all=self._catch_all_separator(),
             )
         except Exception as exc:
             QMessageBox.warning(
@@ -7102,6 +7539,7 @@ class MainWindow(QMainWindow):
 
         profiles_dir = _active_instance_paths(self).profiles
         rename_mod_globally(profiles_dir, old_name, new_name)
+        self._follow_separator_rename(old_name, new_name)
         self._update_install_meta_name(old_name, new_name)
         # Anzeigename (meta.ini "name") nachziehen, sonst zeigt die Liste den alten Namen
         from anvil.core.mod_metadata import write_meta_ini
@@ -7375,6 +7813,7 @@ class MainWindow(QMainWindow):
             mod_index=self._mod_index,
             mods_path=_active_instance_paths(self).mods,
             profiles_path=_active_instance_paths(self).profiles,
+            catch_all=self._catch_all_separator(),
         )
         # Re-mark direct-install mods
         plugin = self._current_plugin

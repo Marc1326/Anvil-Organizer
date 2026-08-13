@@ -425,6 +425,21 @@ class Cyberpunk2077Game(BaseGame):
             "**/credits*.txt",      # credits files
         ]
 
+    GameArchiveSuffixes = [".archive"]
+
+    def read_archive_hashes(self, path: Path) -> frozenset[int] | None:
+        """Pruefsummen aus einem REDengine-Archiv.
+
+        Gelesen werden nur Kopf und Indextabelle, ein paar Kilobyte je
+        Datei -- der Inhalt bleibt ungepackt liegen.
+        """
+        from anvil.core.redengine_archive import ArchiveError, read_archive
+
+        try:
+            return read_archive(path).hashes
+        except (ArchiveError, OSError):
+            return None
+
     def iniFiles(self) -> list[str]:
         """Return config files managed by Cyberpunk 2077."""
         return ["UserSettings.json"]

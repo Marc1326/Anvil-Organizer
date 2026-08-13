@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from anvil.core.mod_list_io import (
+    catch_all_position,
     read_active_mods,
     read_global_modlist,
     read_modlist,
@@ -60,6 +61,10 @@ class ModEntry:
     # sie liegen ausserhalb und werden ueber ihren Dateinamen geschaltet.
     is_foreign: bool = False
     foreign_path: Path | None = None       # Die Datei im Spielordner
+
+    # Enthaelt eine Preset-Datei an einer Stelle, an der das Spiel nicht
+    # danach sucht. Wird beim Aufbau der Liste gesetzt, nicht beim Scan.
+    has_stray_preset: bool = False
 
     # Separator color (from meta.ini, compatible with common meta.ini format)
     color: str = ""                        # Hex color e.g. "#FF0000", empty = no custom color
@@ -212,6 +217,7 @@ def scan_mods_directory(
     *,
     mods_path: Path | None = None,
     profiles_path: Path | None = None,
+    catch_all: str = "",
 ) -> list[ModEntry]:
     """Scan an instance's mods and return a sorted list of ModEntry.
 
@@ -221,7 +227,8 @@ def scan_mods_directory(
     2. Read ``active_mods.json`` from *profile_path* for enabled state.
     3. Scan ``.mods/`` under *instance_path* for actual mod folders.
     4. For each mod in ``modlist.txt`` that exists on disk: build entry.
-    5. For each mod on disk **not** in ``modlist.txt``: append at end
+    5. For each mod on disk **not** in ``modlist.txt``: insert behind the
+       catch-all separator, or append at end when there is none
        (newly installed, enabled by default).  Skipped when
        *include_external* is ``False``.
     6. Mods in ``modlist.txt`` but **not** on disk are skipped (deleted).
@@ -237,6 +244,9 @@ def scan_mods_directory(
                           ``modlist.txt`` are excluded from the result.
         mod_index: Optional :class:`ModIndex` instance for cached
                    file counts and sizes.
+        catch_all: Folder name of the catch-all separator. Mods on disk
+                   without a modlist entry land behind it instead of at
+                   the very end. Empty = old behaviour.
 
     Returns:
         List of :class:`ModEntry`, ordered by priority
@@ -272,28 +282,32 @@ def scan_mods_directory(
                 file=sys.stderr,
             )
 
-    # 3. Build entries from modlist order (skip missing)
-    result: list[ModEntry] = []
+    # 3. Reihenfolge aus der Liste, alles Geloeschte faellt raus
+    order: list[str] = []
     seen: set[str] = set()
-    priority = 0
-
     for name in mod_order:
-        if name not in on_disk:
-            continue  # deleted from disk
+        if name not in on_disk or name in seen:
+            continue  # von der Platte weg oder Doppeleintrag
         seen.add(name)
-        enabled = name in active_mods
-        entry = _build_entry(name, enabled, priority, mods_dir, mod_index)
-        result.append(entry)
-        priority += 1
+        order.append(name)
 
-    # 4. Append new mods (on disk but not in modlist)
-    # New mods default to enabled
-    # When include_external=False, skip mods not listed in modlist.txt
+    # 4. Zugaenge einsortieren (auf der Platte, aber nicht in der Liste).
+    # Ohne Auffang-Trenner ans Ende -- wie bisher.
+    # Mit include_external=False bleiben sie ganz aussen vor.
+    new_mods: set[str] = set()
     if include_external:
-        new_mods = sorted(on_disk - seen)
-        for name in new_mods:
-            entry = _build_entry(name, True, priority, mods_dir, mod_index)
-            result.append(entry)
-            priority += 1
+        zugaenge = sorted(on_disk - seen)
+        if zugaenge:
+            new_mods = set(zugaenge)
+            pos = catch_all_position(order, catch_all)
+            order[pos:pos] = zugaenge
+
+    # 5. Eintraege bauen -- Zugaenge sind standardmaessig aktiv
+    result: list[ModEntry] = []
+    for priority, name in enumerate(order):
+        enabled = True if name in new_mods else name in active_mods
+        result.append(
+            _build_entry(name, enabled, priority, mods_dir, mod_index),
+        )
 
     return result

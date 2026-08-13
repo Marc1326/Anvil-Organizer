@@ -366,6 +366,29 @@ class _Plugin:
         return [ACU]
 
 
+class _Instanzen:
+    """Nur so viel Instanzverwaltung, wie die Meldung braucht."""
+
+    def __init__(self, name="Testinstanz"):
+        self._name = name
+
+    def current_instance(self):
+        return self._name
+
+
+class _Sammler:
+    """Nimmt Glocken- und Log-Meldungen entgegen."""
+
+    def __init__(self):
+        self.meldungen = []
+
+    def add(self, art, titel, text=""):
+        self.meldungen.append((art, titel, text))
+
+    def add_log(self, art, titel):
+        self.meldungen.append((art, titel, ""))
+
+
 class _FensterMitPresets:
     """Uebernimmt die echten Methoden, ohne ein Qt-Fenster zu bauen."""
 
@@ -375,6 +398,8 @@ class _FensterMitPresets:
     _preset_variant = _MW._preset_variant
     _load_preset_section = _MW._load_preset_section
     _split_presets = _MW._split_presets
+    _stray_preset_mods = _MW._stray_preset_mods
+    _report_stray_presets = _MW._report_stray_presets
     del _MW
 
     def __init__(self, dateien, eintraege):
@@ -382,6 +407,11 @@ class _FensterMitPresets:
         self._current_mod_entries = eintraege
         self._mod_list_view = _AnsichtMitBereich()
         self._preset_namen = set()
+        self._stray_preset_namen = {}
+        self._stray_presets_of = {}
+        self._notification_center = _Sammler()
+        self._log_panel = _Sammler()
+        self.instance_manager = _Instanzen()
 
 
 def _mod(name, enabled=True, is_separator=False):

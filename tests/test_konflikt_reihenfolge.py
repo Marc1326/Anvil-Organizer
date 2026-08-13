@@ -60,7 +60,10 @@ def _fenster(tmp_path: Path, bg3=None, namen=("Oben", "Unten")) -> SimpleNamespa
         _bg3_installer=bg3,
         _game_panel=mock.MagicMock(),
     )
-    for methode in ("_conflict_mod_list", "_run_conflict_scan", "_push_virtual_files"):
+    for methode in (
+        "_conflict_mod_list", "_run_conflict_scan", "_push_virtual_files",
+        "_archive_hashes",
+    ):
         setattr(
             fenster, methode,
             partial(getattr(MainWindow, methode), fenster),

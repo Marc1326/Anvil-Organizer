@@ -131,7 +131,8 @@
     "fw_unlock": "Framework entsperren",
     "properties": "Eigenschaften",
     "remove_preset": "Preset entfernen...",
-    "rename_preset": "Preset umbenennen..."
+    "rename_preset": "Preset umbenennen...",
+    "fix_preset": "Preset einsortieren"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -281,7 +282,9 @@
     "start_while_unknown_text": "Anvil kann nicht feststellen, ob noch ein Spiel läuft.\n\nTrotzdem starten? Anvil räumt dabei den Spielordner auf — ein noch laufendes Spiel stürzt ab.",
     "remove_preset_title": "Preset entfernen",
     "remove_preset_single": "Preset \"{name}\" wirklich löschen? Der Ordner wird unwiderruflich gelöscht.",
-    "warning": "Warnung"
+    "warning": "Warnung",
+    "tidy_catch_all_title": "Trenner aufräumen",
+    "tidy_catch_all_message": "Diese Einträge unter „{sep}“ sind keine Presets. Nach „{ziel}“ verschieben?"
   },
   "button": {
     "cancel": "Abbrechen",
@@ -334,7 +337,8 @@
     "save_ctrl_s": "Speichern (Strg+S)",
     "move_to_optional": "Ausgewählte Plugins deaktivieren (nach optional/ verschieben)",
     "move_to_active": "Ausgewählte Plugins aktivieren (zurück in Mod-Root)",
-    "group_collapsed": "{count} Mod(s) in Gruppe"
+    "group_collapsed": "{count} Mod(s) in Gruppe",
+    "stray_preset": "Diese Mod enthält ein Preset an einer Stelle, an der das Spiel nicht danach sucht.\nRechtsklick → „Preset einsortieren“ rückt es gerade."
   },
   "label": {
     "active": "Aktiv:",
@@ -541,7 +545,9 @@
     "fw_no_update": "{name} ist aktuell (Version {version})",
     "fw_checking": "Prüfe Nexus-Version für {name}…",
     "fw_update_error": "Update-Prüfung für {name} fehlgeschlagen:\n{reason}",
-    "fw_no_nexus_id": "Für {name} ist keine Nexus-ID hinterlegt."
+    "fw_no_nexus_id": "Für {name} ist keine Nexus-ID hinterlegt.",
+    "catch_all_created": "Trenner „{name}“ angelegt — neue Mods landen dort",
+    "tidy_catch_all_done": "Nach „{ziel}“ verschoben: {count}"
   },
   "log": {},
   "batch_query": {
@@ -975,7 +981,12 @@
     "nexus_last_query": "Letzte Abfrage:",
     "nexus_description": "Beschreibung:",
     "error_loading": "Fehler beim Laden: {error}",
-    "tab_preset_reqs": "Preset"
+    "tab_preset_reqs": "Preset",
+    "archive_conflicts": "Konflikte in gepackten Archiven",
+    "col_archive_own": "Eigenes Archiv",
+    "col_archive_other": "Konkurrent",
+    "col_archive_count": "Dateien",
+    "archive_conflicts_hint": "Bei gepackten Archiven zeigt Anvil nur die Anzahl gemeinsamer Spieldateien — die Dateinamen stehen nicht im Archiv, nur Prüfsummen. Grün = dieses Archiv gewinnt."
   },
   "filetree": {
     "name": "Name",
@@ -1325,7 +1336,8 @@
     "update_available": "Update verfügbar",
     "download_done": "Download abgeschlossen",
     "download_error": "Download fehlgeschlagen",
-    "deploy_gaps": "Nicht alles ist im Spiel angekommen ({count})"
+    "deploy_gaps": "Nicht alles ist im Spiel angekommen ({count})",
+    "stray_presets": "Presets liegen an einer Stelle, an der das Spiel nicht sucht ({count})"
   },
   "install": {
     "title": "Mod installieren",
@@ -1431,7 +1443,12 @@
     "variant_prompt": "Bei „{name}“ ist nicht eindeutig, für wen es gedacht ist.\nBitte auswählen:",
     "variant_female": "Weiblich",
     "variant_male": "Männlich",
-    "installed": "{count} Preset(s) aus {name} eingerichtet"
+    "installed": "{count} Preset(s) aus {name} eingerichtet",
+    "stray_title": "Preset liegt falsch",
+    "stray_prompt": "„{file}“ liegt im Ordner von „{mod}“ an einer Stelle, an der {kind} nicht danach sucht.\n\nAnvil verschiebt die Datei innerhalb des Mod-Ordners:\n\nVon:  {von}\nNach: {nach}\n\nAm Spielordner ändert sich dabei nichts. Verschieben?",
+    "stray_moved": "„{name}“ eingeräumt — das Preset wirkt ab dem nächsten Ausrollen",
+    "stray_failed": "Verschieben fehlgeschlagen: {error}",
+    "stray_exists": "Am Zielort liegt bereits „{name}“. Es wurde nichts verändert."
   },
   "preset_reqs": {
     "refresh": "Von Nexus laden",
@@ -1447,5 +1464,8 @@
     "summary_complete": "Alle {count} angegebenen Mods sind vorhanden.",
     "error": "Abruf fehlgeschlagen: {error}",
     "open_hint": "Doppelklick auf eine Zeile öffnet die Mod-Seite bei Nexus."
+  },
+  "separator": {
+    "catch_all_default": "Nicht einsortiert"
   }
 }

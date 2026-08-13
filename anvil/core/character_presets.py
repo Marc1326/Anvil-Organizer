@@ -165,6 +165,82 @@ def is_preset_mod(rel_paths, kinds: list[PresetKind]) -> bool:
     return treffer
 
 
+def stray_presets(rel_paths, kinds: list[PresetKind]) -> list[str]:
+    """Preset-Dateien, die im Mod-Ordner am falschen Platz liegen.
+
+    Sie tragen die richtige Endung, stehen aber nicht unter dem Zielpfad
+    des Spiels. Beim Ausrollen landen sie irgendwo im Spielordner, wo das
+    Framework nie danach sucht -- die Mod ist scheinbar aktiv und wirkt
+    doch nicht.
+
+    Args:
+        rel_paths: Relative Pfade der Mod-Dateien, wie sie im Index stehen.
+        kinds: Preset-Arten des Spiels. Leer = das Spiel kennt keine.
+
+    Returns:
+        Die verirrten Pfade in der Reihenfolge, in der sie kamen.
+    """
+    if not kinds:
+        return []
+
+    gefunden: list[str] = []
+    for rel in rel_paths:
+        pfad = str(rel).replace("\\", "/").lstrip("/")
+        name = pfad.rsplit("/", 1)[-1].lower()
+        if name.startswith(".") or name in _NEBENSACHE:
+            continue
+        passende = [k for k in kinds if name.endswith(k.suffix.lower())]
+        if not passende:
+            continue
+        if not any(_gehoert_zu(pfad, k) for k in passende):
+            gefunden.append(pfad)
+    return gefunden
+
+
+def kind_for(rel: str, kinds: list[PresetKind]) -> PresetKind | None:
+    """Die Preset-Art, zu deren Endung *rel* passt."""
+    name = str(rel).replace("\\", "/").rsplit("/", 1)[-1].lower()
+    for kind in kinds:
+        if name.endswith(kind.suffix.lower()):
+            return kind
+    return None
+
+
+def fix_stray_path(
+    mod_dir: Path,
+    rel: str,
+    kind: PresetKind,
+    variant: str,
+) -> Path:
+    """Schiebt ein verirrtes Preset an seinen Platz im selben Mod-Ordner.
+
+    Verlustfrei umkehrbar: die Datei bleibt im Ordner, sie liegt nur
+    tiefer. Der Spielordner raeumt sich beim naechsten Ausrollen selbst
+    auf, weil vorher gepurged wird.
+
+    Returns:
+        Der neue Pfad der Datei.
+
+    Raises:
+        FileNotFoundError: Wenn die Quelle nicht da ist.
+        FileExistsError: Wenn am Zielort schon etwas liegt -- es wird
+            nichts ueberschrieben.
+    """
+    quelle = mod_dir / rel
+    if not quelle.is_file():
+        raise FileNotFoundError(str(quelle))
+
+    ziel = mod_dir / target_path(kind, variant, quelle.name)
+    if ziel.resolve() == quelle.resolve():
+        return ziel
+    if ziel.exists():
+        raise FileExistsError(str(ziel))
+
+    ziel.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(quelle), str(ziel))
+    return ziel
+
+
 def build_mod(
     quelle: Path,
     mods_dir: Path,

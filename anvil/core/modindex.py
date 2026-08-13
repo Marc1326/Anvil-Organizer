@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
-_CACHE_VERSION = 2
+_CACHE_VERSION = 3
 _CACHE_FILENAME = ".modindex.json"
 
 
@@ -79,6 +79,9 @@ class _ModCache:
     # Aggregates (pre-computed for fast access)
     file_count: int = 0
     total_size: int = 0
+    # Archivpfad -> Pruefsummen der enthaltenen Spieldateien. Nur
+    # gefuellt, wenn das Spiel-Plugin gepackte Archive lesen kann.
+    archives: dict[str, list[int]] = field(default_factory=dict)
 
 
 class ModIndex:
@@ -89,12 +92,25 @@ class ModIndex:
             (e.g. ``~/.anvil-organizer/instances/Cyberpunk 2077/``).
     """
 
-    def __init__(self, instance_path: Path, mods_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        instance_path: Path,
+        mods_path: Path | None = None,
+        game_plugin=None,
+    ) -> None:
         self._instance_path = instance_path
         self._mods_path = mods_path if mods_path is not None else instance_path / ".mods"
         self._cache_path = instance_path / _CACHE_FILENAME
         self._index: dict[str, _ModCache] = {}
         self._dirty = False
+        self._archive_suffixes: tuple[str, ...] = ()
+        self._archive_reader = None
+        if game_plugin is not None:
+            endungen = getattr(game_plugin, "GameArchiveSuffixes", []) or []
+            leser = getattr(game_plugin, "read_archive_hashes", None)
+            if endungen and callable(leser):
+                self._archive_suffixes = tuple(e.lower() for e in endungen)
+                self._archive_reader = leser
 
     # ── Public API ─────────────────────────────────────────────────
 
@@ -178,6 +194,17 @@ class ModIndex:
         if cached is None:
             return []
         return cached.files
+
+    def get_archives(self, mod_name: str) -> dict[str, frozenset[int]]:
+        """Pruefsummen je gepacktem Archiv von *mod_name*.
+
+        Leer, wenn die Mod keine Archive hat oder das Spiel-Plugin sie
+        nicht lesen kann.
+        """
+        cached = self._index.get(mod_name)
+        if cached is None or not cached.archives:
+            return {}
+        return {rel: frozenset(werte) for rel, werte in cached.archives.items()}
 
     def get_stats(self, mod_name: str) -> tuple[int, int]:
         """Return ``(file_count, total_size)`` for *mod_name*.
@@ -298,6 +325,7 @@ class ModIndex:
         files: list[dict] = []
         total_size = 0
         file_count = 0
+        archives: dict[str, list[int]] = {}
 
         try:
             for entry in self._walk_files(mod_dir):
@@ -309,6 +337,22 @@ class ModIndex:
                 files.append({"rel": rel, "size": size})
                 total_size += size
                 file_count += 1
+
+                if self._archive_reader is not None and rel.lower().endswith(
+                    self._archive_suffixes,
+                ):
+                    # Ein kaputtes Archiv darf den Scan nicht abbrechen --
+                    # sonst faellt die ganze Mod aus dem Index.
+                    try:
+                        hashes = self._archive_reader(entry)
+                    except Exception as exc:  # noqa: BLE001
+                        print(
+                            f"modindex: {rel} nicht lesbar: {exc}",
+                            file=sys.stderr,
+                        )
+                        hashes = None
+                    if hashes:
+                        archives[rel] = sorted(hashes)
         except OSError as exc:
             print(
                 f"modindex: failed to scan {mod_dir}: {exc}",
@@ -320,6 +364,7 @@ class ModIndex:
             files=files,
             file_count=file_count,
             total_size=total_size,
+            archives=archives,
         )
 
     @staticmethod
@@ -364,6 +409,18 @@ class ModIndex:
             self._dirty = True
             return
 
+        # Wurde der Cache ohne Archiv-Leser gebaut (z.B. beim Neuaufbau
+        # nach einem Umzug), fehlen die Pruefsummen -- und "nie gelesen"
+        # sieht im Cache aus wie "hat keine Archive". Dann lieber neu
+        # einlesen, sonst faellt die Archiv-Konfliktanzeige still aus.
+        gebaut_mit = data.get("archive_suffixes")
+        if not isinstance(gebaut_mit, list):
+            gebaut_mit = []
+        if [str(e) for e in gebaut_mit] != list(self._archive_suffixes):
+            self._index.clear()
+            self._dirty = True
+            return
+
         mods = data.get("mods")
         if not isinstance(mods, dict):
             self._index.clear()
@@ -388,26 +445,37 @@ class ModIndex:
                 self._index[name] = _ModCache()
                 self._dirty = True
                 continue
+            roh_arch = info.get("archives")
+            archives: dict[str, list[int]] = {}
+            if isinstance(roh_arch, dict):
+                for pfad, werte in roh_arch.items():
+                    if isinstance(pfad, str) and isinstance(werte, list):
+                        archives[pfad] = [w for w in werte if isinstance(w, int)]
             self._index[name] = _ModCache(
                 fingerprint=str(info.get("fingerprint", "")),
                 files=dateien,
                 file_count=len(dateien),
                 total_size=sum(f["size"] for f in dateien),
+                archives=archives,
             )
 
     def _save_cache(self) -> None:
         """Write the cache to disk."""
         mods = {}
         for name, cached in self._index.items():
-            mods[name] = {
+            eintrag = {
                 "fingerprint": cached.fingerprint,
                 "files": cached.files,
                 "file_count": cached.file_count,
                 "total_size": cached.total_size,
             }
+            if cached.archives:
+                eintrag["archives"] = cached.archives
+            mods[name] = eintrag
 
         data = {
             "version": _CACHE_VERSION,
+            "archive_suffixes": list(self._archive_suffixes),
             "mods": mods,
         }
 

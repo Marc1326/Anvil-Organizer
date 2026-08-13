@@ -56,9 +56,9 @@ ROLE_CONFLICT_TYPE = Qt.ItemDataRole.UserRole + 8 # 'win' | 'lose' | 'both' | ''
 
 
 class ModRow:
-    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "is_data_override", "folder_name", "color", "file_count", "child_count", "group_name", "is_group_head", "deploy_path", "is_foreign")
+    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "is_data_override", "folder_name", "color", "file_count", "child_count", "group_name", "is_group_head", "deploy_path", "is_foreign", "has_stray_preset")
 
-    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, is_data_override=False, folder_name="", color="", file_count=0, child_count=0, group_name="", is_group_head=False, deploy_path="", is_foreign=False):
+    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, is_data_override=False, folder_name="", color="", file_count=0, child_count=0, group_name="", is_group_head=False, deploy_path="", is_foreign=False, has_stray_preset=False):
         self.enabled = enabled
         self.name = name
         self.conflicts = conflicts
@@ -78,6 +78,7 @@ class ModRow:
         self.is_group_head = is_group_head
         self.deploy_path = deploy_path
         self.is_foreign = is_foreign
+        self.has_stray_preset = has_stray_preset
 
 
 def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_manager=None) -> ModRow:
@@ -119,6 +120,7 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_m
         is_group_head=is_group_head,
         deploy_path=getattr(entry, "deploy_path", ""),
         is_foreign=getattr(entry, "is_foreign", False),
+        has_stray_preset=getattr(entry, "has_stray_preset", False),
     )
 
 
@@ -390,6 +392,8 @@ class ModListModel(QAbstractItemModel):
                 return tr("tooltip.direct_install")
             if getattr(r, "is_foreign", False) and c == COL_NAME:
                 return tr("foreign.tooltip")
+            if getattr(r, "has_stray_preset", False) and c == COL_NAME:
+                return tr("tooltip.stray_preset")
             # Separator with custom deploy path shows path as tooltip
             if r.is_separator and c == COL_NAME and getattr(r, "deploy_path", ""):
                 return f"Deploy \u2192 {r.deploy_path}"

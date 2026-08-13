@@ -131,7 +131,8 @@
     "fw_unlock": "Déverrouiller le framework",
     "properties": "Propriétés",
     "remove_preset": "Supprimer le préréglage...",
-    "rename_preset": "Renommer le préréglage..."
+    "rename_preset": "Renommer le préréglage...",
+    "fix_preset": "Ranger le préréglage"
   },
   "toolbar": {
     "deploy": "Deploy",
@@ -281,7 +282,9 @@
     "start_while_unknown_text": "Anvil ne peut pas savoir si un jeu est encore en cours.\n\nLancer quand même ? Anvil va vider le dossier du jeu, et un jeu encore ouvert va planter.",
     "remove_preset_title": "Supprimer le préréglage",
     "remove_preset_single": "Supprimer vraiment le préréglage \"{name}\" ? Le dossier sera définitivement effacé.",
-    "warning": "Avertissement"
+    "warning": "Avertissement",
+    "tidy_catch_all_title": "Ranger le séparateur",
+    "tidy_catch_all_message": "Ces entrées sous « {sep} » ne sont pas des préréglages. Les déplacer vers « {ziel} » ?"
   },
   "button": {
     "cancel": "Annuler",
@@ -334,7 +337,8 @@
     "save_ctrl_s": "Enregistrer (Ctrl+S)",
     "move_to_optional": "Désactiver les plugins sélectionnés (déplacer vers optional/)",
     "move_to_active": "Activer les plugins sélectionnés (retour à la racine du mod)",
-    "group_collapsed": "{count} mod(s) dans le groupe"
+    "group_collapsed": "{count} mod(s) dans le groupe",
+    "stray_preset": "Ce mod contient un préréglage à un endroit où le jeu ne le cherche jamais.\nClic droit → « Ranger le préréglage » corrige cela."
   },
   "label": {
     "active": "Actif :",
@@ -541,7 +545,9 @@
     "fw_no_update": "{name} est à jour (version {version})",
     "fw_checking": "Vérification de la version Nexus pour {name}…",
     "fw_update_error": "Échec de la vérification de mise à jour pour {name} :\n{reason}",
-    "fw_no_nexus_id": "Aucun ID Nexus configuré pour {name}."
+    "fw_no_nexus_id": "Aucun ID Nexus configuré pour {name}.",
+    "catch_all_created": "Séparateur « {name} » créé — les nouveaux mods iront là",
+    "tidy_catch_all_done": "Déplacés vers « {ziel} » : {count}"
   },
   "log": {},
   "batch_query": {
@@ -975,7 +981,12 @@
     "nexus_last_query": "Dernière requête :",
     "nexus_description": "Description :",
     "error_loading": "Erreur de chargement : {error}",
-    "tab_preset_reqs": "Preset"
+    "tab_preset_reqs": "Preset",
+    "archive_conflicts": "Conflits dans les archives compactées",
+    "col_archive_own": "Cette archive",
+    "col_archive_other": "Concurrent",
+    "col_archive_count": "Fichiers",
+    "archive_conflicts_hint": "Pour les archives compactées, Anvil ne peut afficher que le nombre de fichiers de jeu en commun : l’archive ne stocke que des sommes de contrôle, pas les noms. Vert = cette archive l’emporte."
   },
   "filetree": {
     "name": "Nom",
@@ -1325,7 +1336,8 @@
     "update_available": "Mise à jour disponible",
     "download_done": "Téléchargement terminé",
     "download_error": "Échec du téléchargement",
-    "deploy_gaps": "Tout n'est pas arrivé dans le jeu ({count})"
+    "deploy_gaps": "Tout n'est pas arrivé dans le jeu ({count})",
+    "stray_presets": "Des préréglages sont là où le jeu ne cherche pas ({count})"
   },
   "install": {
     "title": "Installer le mod",
@@ -1431,7 +1443,12 @@
     "variant_prompt": "Pour « {name} », le destinataire n'est pas clair.\nVeuillez choisir :",
     "variant_female": "Féminin",
     "variant_male": "Masculin",
-    "installed": "{count} préréglage(s) de {name} configurés"
+    "installed": "{count} préréglage(s) de {name} configurés",
+    "stray_title": "Préréglage au mauvais endroit",
+    "stray_prompt": "« {file} » se trouve dans « {mod} » à un endroit où {kind} ne le cherche jamais.\n\nAnvil déplacera le fichier à l’intérieur du dossier du mod :\n\nDe :   {von}\nVers : {nach}\n\nLe dossier du jeu n’est pas modifié. Déplacer ?",
+    "stray_moved": "« {name} » rangé — le préréglage agira au prochain déploiement",
+    "stray_failed": "Échec du déplacement : {error}",
+    "stray_exists": "« {name} » existe déjà à destination. Rien n’a été modifié."
   },
   "preset_reqs": {
     "refresh": "Charger depuis Nexus",
@@ -1447,5 +1464,8 @@
     "summary_complete": "Les {count} mods indiqués sont présents.",
     "error": "Échec de la requête : {error}",
     "open_hint": "Double-cliquez sur une ligne pour ouvrir la page du mod sur Nexus."
+  },
+  "separator": {
+    "catch_all_default": "Non classé"
   }
 }

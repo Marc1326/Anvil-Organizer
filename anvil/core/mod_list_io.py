@@ -96,7 +96,7 @@ def write_modlist(
 def add_mod_to_modlist(
     profile_path: Path, mod_name: str, enabled: bool = True,
 ) -> None:
-    """Append a mod at the end of ``modlist.txt`` (highest priority).
+    """Append a mod at the end of ``modlist.txt`` (lowest priority).
 
     If the mod is already in the list it is **not** added again.
 
@@ -289,6 +289,40 @@ def read_global_modlist(profiles_dir: Path) -> list[str]:
 def _is_separator_name(name: str) -> bool:
     """Check if a mod name represents a separator (ends with ``_separator``)."""
     return name.endswith("_separator")
+
+
+def separator_label(name: str) -> str:
+    """Der Trennername ohne die Endung ``_separator``.
+
+    In der Liste steht ueberall der kurze Name -- in Meldungen darf
+    nicht ploetzlich der Ordnername auftauchen.
+    """
+    if _is_separator_name(name):
+        return name[: -len("_separator")]
+    return name
+
+
+def catch_all_position(order: list[str], catch_all: str) -> int:
+    """Position, an der ein Neuzugang in *order* eingefuegt wird.
+
+    Hinter dem Auffang-Trenner und hinter allem, was schon unter ihm
+    haengt -- also vor dem naechsten Trenner. Ohne Auffang-Trenner
+    bleibt es beim Listenende.
+
+    Args:
+        order: Ladereihenfolge, erster Eintrag = hoechste Prioritaet.
+        catch_all: Ordnername des Auffang-Trenners, leer wenn keiner.
+
+    Returns:
+        0-basierter Index fuer ``list.insert()``.
+    """
+    if not catch_all or catch_all not in order:
+        return len(order)
+
+    pos = order.index(catch_all) + 1
+    while pos < len(order) and not _is_separator_name(order[pos]):
+        pos += 1
+    return pos
 
 
 def write_global_modlist(profiles_dir: Path, mod_names: list[str]) -> None:
