@@ -24,7 +24,7 @@ from anvil.core.overlay_mount import (
     unmount,
     write_helper,
 )
-from anvil.core.overlay_staging import OverlayStage
+from anvil.core.overlay_staging import OverlayStage, StageResult
 from anvil.core.translator import tr
 
 # Dateisysteme, die overlayfs nicht als Schreibschicht akzeptiert.
@@ -133,6 +133,7 @@ class OverlayDeployer:
         deploy_strip_prefixes: list[str] | None = None,
         deploy_anchors: list[str] | None = None,
         deploy_routes: list[dict] | None = None,
+        stage_exclude_paths: list[str] | None = None,
         mod_index=None,
     ) -> None:
         self._instance_path = instance_path
@@ -172,6 +173,7 @@ class OverlayDeployer:
             deploy_strip_prefixes=deploy_strip_prefixes,
             deploy_anchors=deploy_anchors,
             deploy_routes=deploy_routes,
+            stage_exclude_paths=stage_exclude_paths,
         )
         # Diese Dateien muessen echte Kopien im Spielordner sein --
         # unter Proton kommt ein Verweis nicht als gueltige DLL an.
@@ -292,8 +294,6 @@ class OverlayDeployer:
 
         staged = self._stage.build(self.stage_root)
         self._layers = staged.layers or {"": self.stage_dir}
-        result.links_created = staged.files_linked
-        result.files_copied = staged.files_copied
         result.errors.extend(staged.errors)
         if not staged.success:
             result.success = False
@@ -303,6 +303,10 @@ class OverlayDeployer:
             result.success = False
             result.errors.append("Keine aktiven Mods gefunden.")
             return result
+
+        self._schreibe_archiv_ladeliste(staged, result)
+        result.links_created = staged.files_linked
+        result.files_copied = staged.files_copied
 
         manifest = {
             "deployed_at": datetime.now(timezone.utc).isoformat(),
@@ -340,6 +344,68 @@ class OverlayDeployer:
             result.errors.append(tr("overlay.mount_aborted"))
 
         return result
+
+    def _schreibe_archiv_ladeliste(
+        self, staged: StageResult, result: DeployResult
+    ) -> None:
+        """Schreibt die Ladeliste der Archive in die Schicht.
+
+        Entspricht _write_archive_load_order im Symlink-Weg: verwaltete
+        Archive in Prioritaetsreihenfolge, fremde aus dem Spielordner vorn.
+        Eine fremde Liste im Spielordner bleibt unangetastet -- sie liegt
+        im Lower und wird waehrend des Mounts nur ueberdeckt.
+        """
+        if not self._archive_load_order_file:
+            return
+        rel_datei = Path(self._archive_load_order_file)
+        ordner_rel = str(rel_datei.parent).replace("\\", "/").strip("/").lower()
+        hauptschicht = staged.layers.get("")
+        if hauptschicht is None:
+            return
+
+        # placed liegt in Bau-Reihenfolge vor: niedrigste Prioritaet zuerst.
+        verwaltet: list[str] = []
+        for basis, ziel in staged.placed:
+            if basis:
+                continue
+            if ziel.suffix.lower() != ".archive":
+                continue
+            if str(ziel.parent).replace("\\", "/").strip("/").lower() != ordner_rel:
+                continue
+            verwaltet.append(ziel.name)
+
+        # Doppelte Namen: der spaetere Eintrag stammt von der hoeheren Mod.
+        gesehen: set[str] = set()
+        eindeutig: list[str] = []
+        for name in reversed(verwaltet):
+            if name.lower() in gesehen:
+                continue
+            gesehen.add(name.lower())
+            eindeutig.append(name)
+        eindeutig.reverse()
+
+        ordner_spiel = self._game_path / rel_datei.parent
+        try:
+            fremd = sorted(
+                (p.name for p in ordner_spiel.iterdir()
+                 if p.is_file() and not p.is_symlink()
+                 and p.suffix.lower() == ".archive"
+                 and p.name.lower() not in gesehen),
+                key=str.lower,
+            )
+        except OSError:
+            fremd = []
+
+        zeilen = fremd + eindeutig
+        if not zeilen:
+            return
+        ziel = hauptschicht / rel_datei
+        try:
+            ziel.parent.mkdir(parents=True, exist_ok=True)
+            ziel.write_text("\n".join(zeilen) + "\n", encoding="utf-8")
+            staged.files_copied += 1
+        except OSError as exc:
+            result.errors.append(f"Ladeliste {rel_datei}: {exc}")
 
     def _write_mount_conf(self) -> None:
         """Eine Zeile je Mount: Ziel, untere Schichten, Schreibschicht, Arbeit.

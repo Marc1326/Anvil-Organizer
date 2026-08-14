@@ -65,6 +65,17 @@ class Cyberpunk2077Game(BaseGame):
         "red4ext/plugins",
     ]
 
+    # Diese Dateien gehören dem Spiel: es migriert und beschreibt sie selbst.
+    # Im Symlink-Deploy überschreibt das Spiel den Verweis beim ersten
+    # Schreiben mit seiner eigenen Datei, ein mitgelieferter Override wirkt
+    # dort faktisch nie. In der Overlay-Schicht würde so eine Datei das
+    # Original dauerhaft überdecken — ein veralteter Stand (z. B. ein
+    # Settings-Preset mit alter Options-Version) lässt das Spiel dann beim
+    # Start ohne Meldung aussteigen. Also nicht in die Schicht aufnehmen.
+    GameStageExcludePaths = [
+        "r6/config/settings/platform/pc/options.json",
+    ]
+
     # Die Liste wird weiter geschrieben, entscheidet aber nichts: an drei
     # Spielstarts gemessen laedt REDengine die Archive nach Dateinamen und
     # ignoriert sie. Sie bleibt, weil Werkzeuge und andere Manager sie lesen.

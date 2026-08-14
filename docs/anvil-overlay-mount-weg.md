@@ -1,6 +1,6 @@
 # Overlay-Deploy: Mount direkt auf den Spielordner
 
-Stand: 13.08.2026 (Abend) — ersetzt den Startwrapper-Ansatz.
+Stand: 14.08.2026 — produktiver Live-Test mit Cyberpunk 2077.
 
 ## Erkenntnisse des Tages (Live-Tests mit Cyberpunk 2077)
 
@@ -8,15 +8,19 @@ Stand: 13.08.2026 (Abend) — ersetzt den Startwrapper-Ansatz.
 |---|---|
 | Leeres Overlay auf den Spielordner, normaler Steam-Start | läuft |
 | Overlay mit Frameworks (winmm/RED4ext) | läuft, RED4ext lädt |
-| + Archive (321) | läuft, Mods sichtbar |
-| + falsch geroutete Dateien (r6/config/settings-Override, Root-Müll) | Spiel beendet sich still |
-| Sauber geroutete Schicht aus den echten Mods | **läuft, Mods laden** |
+| + Archive | läuft, Mods sichtbar |
+| Vollständige Schicht mit alter `r6/config/settings/platform/pc/options.json` | Spiel beendet sich still |
+| Dieselbe Schicht ohne den alten Settings-Override | **läuft, Mods laden** |
+| Produktivstart Anvil → Steam → Spiel | 9/9 RED4ext-Plugins, 364 Archive und 31.301 redscript-Refs |
+| Augenmod im Overlay | Colorful-Augen sichtbar; verbleibender Head-Fehler als Modkonflikt isoliert |
 
-Die Abstürze kamen nie vom Overlay-Mechanismus, sondern von einer
-Test-Schicht, die Dateien an Orte legte, wo das Spiel sie nicht
-erwartet.  Das produktive Staging (overlay_staging.py) nutzt dieselben
-Routen wie der Symlink-Deployer — der Vergleichstest
-test_overlay_matches_symlink.py haelt beide Wege deckungsgleich.
+Die Abstürze kamen nicht vom Overlay-Mechanismus. Der konkrete Startkiller
+war eine von `v2 UnlockFovImmersiveFirstPersonPatch` gelieferte
+`options.json` in Version 136; das aktuelle Spiel erwartet Version 140.
+Sie wird deshalb nur im Overlay-Staging ausgeschlossen. Der Symlink-Weg
+bleibt unverändert. Das produktive Staging nutzt ansonsten dieselben Routen
+wie der Symlink-Deployer — `test_overlay_matches_symlink.py` hält beide Wege
+deckungsgleich.
 
 Weitere Beobachtungen:
 
@@ -29,6 +33,19 @@ Weitere Beobachtungen:
   vor einem neuen Mount erst alle alten Schichten ab.
 - Der Mount übersteht das Spielende — er wird erst beim Purge
   abgebaut (oder beim Wechsel auf Symlinks).
+- Der direkte Kernel-Mount ist global und lebt nicht in einem kurzlebigen
+  Spiel-Namespace. Nach zuverlässig erkanntem Spielende muss Anvil deshalb
+  `silent_purge()` ausführen; drei Live-Tests bestätigten andernfalls einen
+  weiter aktiven Mount.
+- Wiederverwendete Overlay-Verzeichnisse können `trusted.overlay.origin`
+  tragen und mit `ESTALE` scheitern. Der privilegierte Helfer entfernt das
+  Attribut am Upper-Wurzelverzeichnis, leert das root-eigene Workdir und
+  mountet mit `index=off`.
+- Der visuelle Fehler „Colorful-Augen und Mund sichtbar, Kopf schwarz" war
+  kein Overlay- oder Archiv-Reihenfolgefehler. Ursache war die aktivierte
+  Option `UV body user - Unique eyes compatible`. Verifiziert funktioniert
+  die Kombination aus Colorful, Unique Eyes Core V2.5 Default und
+  VTK Vanilla HD Head; UV-Option und RE9 Grace waren dabei aus.
 
 ## Architektur
 
@@ -49,8 +66,27 @@ deploy()                          purge()
   polkit-Einrichtung.  Kein bwrap, kein Namespace, kein Steam-Eingriff.
 - `anvil/core/overlay_deployer.py` — Schnittstelle wie der
   Symlink-Deployer; mounted am Ende von deploy().
-- `anvil/core/overlay_staging.py` — unverändert, baut die Schicht mit
-  den echten Deploy-Routen.
+- `anvil/core/overlay_staging.py` — baut die Schicht mit den echten
+  Deploy-Routen, dedupliziert kollidierende Archive und wendet ausschließlich
+  für Overlay konfigurierte Pfadausschlüsse an.
+
+## Archivpriorität
+
+Cyberpunk lädt die Archive nach Dateinamen; die erzeugte `modlist.txt` wird
+zwar geöffnet, entschied in drei Messläufen aber nicht über die Priorität.
+Darum nummeriert das Staging ausschließlich `.archive`-Dateien unter
+`archive/pc/mod`:
+
+```text
+000_...  höchste GUI-Priorität
+001_...
+002_...
+```
+
+Bei REDengine gewinnt das alphabetisch erste Archiv. Gleichnamige Archive
+werden vor dem Nummerieren dedupliziert, damit nicht Gewinner und Verlierer
+unter verschiedenen Namen gleichzeitig geladen werden. `.xl`-Dateien und
+REDmod-Archive bleiben unbenannt.
 
 ## Rechte: pkexec und polkit
 
@@ -62,14 +98,14 @@ installiert das Helferskript root-eigen nach
 Skript für genau diesen Nutzer freigibt.
 
 Das Skript darf bewusst **nicht** im Home-Verzeichnis bleiben, wenn es
-passwortfrei laufen soll: Ein Nutzer-eigenes Skript liesse sich
-umschreiben und waere ein offenes Root-Tor.
+passwortfrei laufen soll: Ein Nutzer-eigenes Skript ließe sich
+umschreiben und wäre ein offenes Root-Tor.
 
 ## Einstellungen: Tab „Experte"
 
 - Auswahl pro Instanz: **Symlinks (Standard)** oder **Overlay
   (experimentell)** — mit kurzer Gegenüberstellung.
-- Gespeichert bleibt `use_overlay` in der Instanz — die Oberflaeche
+- Gespeichert bleibt `use_overlay` in der Instanz — die Oberfläche
   musste sonst nichts Neues lernen.
 - Bei Problemen (kein Overlay im Kernel, kein pkexec) wird die Wahl
   gesperrt, aber nicht umgestellt.

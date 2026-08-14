@@ -50,41 +50,49 @@ class StageResult:
     # Schluessel sind eigene Zielpfade aus den Trenner-Einstellungen und
     # brauchen je einen eigenen Mount.
     layers: dict[str, Path] = field(default_factory=dict)
+    # Abgelegte Dateien in Bau-Reihenfolge (Basis, Zielpfad) -- der
+    # Deployer schreibt daraus die Ladeliste der Archive.
+    placed: list[tuple[str, Path]] = field(default_factory=list)
 
 
-def _place(src: Path, dest: Path, result: StageResult) -> None:
+def _place(src: Path, dest: Path, result: StageResult) -> str | None:
     """Legt *src* als Hardlink unter *dest* ab, hoehere Prioritaet gewinnt.
 
     Liefert ein Mod einen Pfad als Datei, den ein anderer als Ordner belegt,
     kann hier nichts abgelegt werden. Der Symlink-Weg meldet das als Fehler
     statt abzustuerzen -- hier genauso.
+
+    Gibt "link" oder "copy" zurueck, None wenn nichts abgelegt wurde.
     """
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
     except (OSError, NotADirectoryError) as exc:
         result.errors.append(f"{dest}: {exc}")
-        return
+        return None
 
     if dest.is_dir() and not dest.is_symlink():
         result.errors.append(f"{dest}: bereits als Ordner belegt")
-        return
+        return None
 
     if dest.exists() or dest.is_symlink():
         try:
             dest.unlink()
         except OSError as exc:
             result.errors.append(f"{dest}: {exc}")
-            return
+            return None
     try:
         os.link(src, dest)
         result.files_linked += 1
+        return "link"
     except OSError:
         # Anderes Dateisystem oder Hardlink-Grenze erreicht
         try:
             shutil.copy2(src, dest)
             result.files_copied += 1
+            return "copy"
         except OSError as exc:
             result.errors.append(f"{src}: {exc}")
+            return None
 
 
 class OverlayStage:
@@ -114,6 +122,7 @@ class OverlayStage:
         deploy_strip_prefixes: list[str] | None = None,
         deploy_anchors: list[str] | None = None,
         deploy_routes: list[dict] | None = None,
+        stage_exclude_paths: list[str] | None = None,
     ) -> None:
         self._mods_path = mods_path
         self._profiles_dir = profiles_dir
@@ -139,6 +148,11 @@ class OverlayStage:
         self._deploy_strip = deploy_strip_prefixes or []
         self._deploy_anchors = deploy_anchors or []
         self._deploy_routes = deploy_routes or []
+        # Pfade, die nie in der Schicht landen duerfen -- etwa spieleigene
+        # Live-Dateien, die das Spiel selbst migriert und beschreibt.
+        self._exclude = {
+            p.replace("\\", "/").lower() for p in (stage_exclude_paths or [])
+        }
         self._mount_cache: dict[str, str] = {}
 
     def set_separator_deploy_paths(self, paths: dict[str, str]) -> None:
@@ -288,6 +302,9 @@ class OverlayStage:
         aktive = self.enabled_mods()
         # Zu schmal waere fatal: "1000_" sortiert vor "999_".
         zaehler_breite = max(3, len(str(max(len(aktive) - 1, 0))))
+        # Nummerierte Dateien: (Basis, Zielpfad, Pfad vor dem Zaehler).
+        # Dient dem Dedup gleichnamiger Dateien aus verschiedenen Mods.
+        nummerierte: list[tuple[str, Path, Path]] = []
 
         for load_index, mod_name in enumerate(reversed(aktive)):
             mod_dir = self._mods_path / mod_name
@@ -309,13 +326,17 @@ class OverlayStage:
                         rel = src.relative_to(quelle)
                         if is_metadata(src, quelle, rel):
                             continue
-                        _place(src, ziel_schicht / prefix / rel, result)
+                        ziel = prefix / rel
+                        if ziel.as_posix().lower() in self._exclude:
+                            continue
+                        _place(src, ziel_schicht / ziel, result)
                         staged_any = True
                 if staged_any:
                     result.mods_staged += 1
                 continue
 
-            ziel_schicht = schicht(self._deploy_base_of(mod_name, mod_to_separator))
+            ziel_basis = self._deploy_base_of(mod_name, mod_to_separator)
+            ziel_schicht = schicht(ziel_basis)
 
             for src in mod_dir.rglob("*"):
                 if not src.is_file():
@@ -352,9 +373,11 @@ class OverlayStage:
 
                 # Durchnummerieren: die Engines lesen die Mod-Liste nicht,
                 # bei ihnen entscheidet der Dateiname.
+                unbenannt: Path | None = None
                 if ((self._pak_prefix or self._pak_dirs)
                         and mod_name.lower() not in self._keep_names
                         and pak_order_allows(dest_rel, self._pak_dirs)):
+                    vorher = dest_rel
                     dest_rel = pak_load_order_name(
                         dest_rel,
                         load_order_index(
@@ -363,12 +386,49 @@ class OverlayStage:
                         self._pak_ext,
                         zaehler_breite,
                     )
+                    if dest_rel != vorher:
+                        unbenannt = vorher
 
-                _place(src, ziel_schicht / dest_rel, result)
+                if dest_rel.as_posix().lower() in self._exclude:
+                    continue
+
+                if _place(src, ziel_schicht / dest_rel, result):
+                    result.placed.append((ziel_basis, dest_rel))
+                    if unbenannt is not None:
+                        nummerierte.append((ziel_basis, dest_rel, unbenannt))
                 staged_any = True
 
             if staged_any:
                 result.mods_staged += 1
+
+        # Der Zaehler macht gleichnamige Dateien aus zwei Mods zu zwei
+        # verschiedenen Namen -- ohne diese Aufraeumung blieben beide in
+        # der Schicht und das Spiel laede beide. Der Symlink-Weg loest das
+        # mit _drop_superseded_numbered, hier passiert es direkt im Bau:
+        # pro Ausgangsdatei bleibt nur die Kopie der staerksten Mod.
+        beste: dict[tuple[str, str], int] = {}
+        for nr, (basis, ziel, unbenannt) in enumerate(nummerierte):
+            zahl = int(ziel.name.partition("_")[0])
+            schluessel = (basis, str(unbenannt).lower())
+            vorher = beste.get(schluessel)
+            if vorher is None or (
+                (zahl < int(nummerierte[vorher][1].name.partition("_")[0]))
+                if self._pak_first_wins
+                else (zahl > int(nummerierte[vorher][1].name.partition("_")[0]))
+            ):
+                beste[schluessel] = nr
+        behalten = set(beste.values())
+        for nr, (basis, ziel, unbenannt) in enumerate(nummerierte):
+            if nr in behalten:
+                continue
+            verlierer = result.layers[basis] / ziel
+            try:
+                verlierer.unlink(missing_ok=True)
+            except OSError as exc:
+                result.errors.append(f"{verlierer}: {exc}")
+                continue
+            result.placed.remove((basis, ziel))
+            print(f"[STAGE]   superseded: {ziel}", flush=True)
 
         if result.errors:
             result.success = False

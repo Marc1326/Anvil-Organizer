@@ -42,12 +42,26 @@ einhängen() {
         IFS='|' read -r ziel lower upper work <<< "${line#MOUNT=}"
         [ -n "$ziel" ] && [ -n "$lower" ] && [ -n "$upper" ] && [ -n "$work" ] || continue
         [ -d "$ziel" ] || continue
-        mkdir -p "$upper" "$work"
         # Schon gemountet? Dann liegt ein Stapel vor -- erst abnehmen.
+        # Upper und Work dürfen bei aktivem Overlay nicht verändert werden.
         while findmnt -T "$ziel" -o FSTYPE -n | grep -qx overlay; do
             umount "$ziel" || break
         done
-        mount -t overlay overlay -o "lowerdir=$lower,upperdir=$upper,workdir=$work" "$ziel" \
+        mkdir -p "$upper" "$work"
+        # Bei jedem Deploy wird die Schicht neu gebaut und bekommt neue
+        # Inodes. Der Kernel stempelt die Herkunft des Lowers als xattr
+        # in den Upper -- passt sie nicht mehr zur neuen Schicht, endet
+        # der Mount mit ESTALE ("failed to verify upper root origin").
+        # Also vor jedem Mount löschen, der Kernel stempelt frisch.
+        setfattr -x trusted.overlay.origin "$upper" 2>/dev/null || true
+        # Das Arbeitsverzeichnis geht nach einem Mount in root-Besitz ueber
+        # und hält einen Inode-Index auf den alten Upper fest ("failed to
+        # verify index dir"). Als root können wir es leeren -- und mit
+        # index=off entfällt der Index gleich ganz. Der ist für NFS-
+        # Export gedacht, nicht für eine Mod-Schicht.
+        rm -rf "$work"
+        mkdir -p "$work"
+        mount -t overlay overlay -o "lowerdir=$lower,upperdir=$upper,workdir=$work,index=off" "$ziel" \
             || { echo "Mount fehlgeschlagen: $ziel" >&2; exit 1; }
         echo "gemountet: $ziel"
     done < "$CONF"
@@ -223,7 +237,12 @@ def mount_requirements() -> list[str]:
     except OSError:
         arten = ""
     if "overlay" not in arten:
-        probleme.append(tr("overlay.no_kernel_overlay"))
+        # /proc/filesystems fuehrt das Modul erst nach dem Laden. Ladbar
+        # ist es, solange es unter /lib/modules liegt.
+        import platform
+        modul = Path(f"/lib/modules/{platform.release()}/kernel/fs/overlayfs")
+        if not any(modul.glob("overlay.ko*")):
+            probleme.append(tr("overlay.no_kernel_overlay"))
     import shutil
     if shutil.which("pkexec") is None:
         probleme.append(tr("overlay.no_pkexec"))

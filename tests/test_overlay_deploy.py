@@ -126,6 +126,26 @@ def test_dokumentation_im_wurzelverzeichnis_bleibt_draussen(tmp_path: Path) -> N
     assert not (tmp_path / "stage" / "main" / "liesmich.txt").exists()
 
 
+def test_ausgeschlossene_pfade_kommen_nicht_in_die_schicht(tmp_path: Path) -> None:
+    """Spieleigene Live-Dateien duerfen das Original nicht ueberdecken."""
+    mods, profiles = _library(tmp_path)
+    _mod(mods, "M", {
+        "r6/config/settings/platform/pc/options.json": "{}",
+        "r6/scripts/laeuft.reds": "// ok",
+    })
+    write_global_modlist(profiles, ["M"])
+    write_active_mods(profiles / "Default", {"M"})
+
+    stage = OverlayStage(
+        mods, profiles,
+        stage_exclude_paths=["r6/config/settings/platform/pc/options.json"],
+    )
+    stage.build(tmp_path / "stage")
+
+    assert not (tmp_path / "stage" / "main" / "r6/config/settings/platform/pc/options.json").exists()
+    assert (tmp_path / "stage" / "main" / "r6/scripts/laeuft.reds").is_file()
+
+
 def test_metadaten_kommen_nicht_in_die_schicht(tmp_path: Path) -> None:
     mods, profiles = _library(tmp_path)
     _mod(mods, "M", {"meta.ini": "x", "fomod/info.xml": "x", "a.archive": "gut"})

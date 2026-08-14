@@ -40,6 +40,24 @@ def test_helfer_ist_gültiges_bash(tmp_path: Path) -> None:
     assert lauf.returncode == 0, lauf.stderr.decode()
 
 
+def test_helfer_loescht_origin_xattr(tmp_path: Path) -> None:
+    """Ohne das scheitert jeder Mount nach einem Schicht-Neuaufbau (ESTALE)."""
+    ziel = write_helper(tmp_path)
+    inhalt = ziel.read_text(encoding="utf-8")
+    assert "setfattr -x trusted.overlay.origin" in inhalt
+    assert "index=off" in inhalt
+
+
+def test_helfer_haengt_vor_workdir_cleanup_ab(tmp_path: Path) -> None:
+    """Work und Upper dürfen nie bei aktivem Overlay verändert werden."""
+    ziel = write_helper(tmp_path)
+    inhalt = ziel.read_text(encoding="utf-8")
+    unmount = inhalt.index('while findmnt -T "$ziel"')
+    xattr = inhalt.index('setfattr -x trusted.overlay.origin "$upper"')
+    workdir = inhalt.index('rm -rf "$work"')
+    assert unmount < xattr < workdir
+
+
 def test_helfer_bricht_ohne_conf_ab(tmp_path: Path) -> None:
     ziel = write_helper(tmp_path)
     lauf = subprocess.run(

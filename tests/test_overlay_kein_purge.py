@@ -1,19 +1,9 @@
-"""Beim Overlay wird nach dem Spiel nichts aufgeraeumt.
+"""Der globale Kernel-Overlay-Mount endet erst durch Anvils Cleanup.
 
-Gemessen am 13.08.2026 mit Marcs Cyberpunk-Sammlung: Anvil legte 1459
-Dateien in die Schicht, der Mount klappte -- und dann meldete der
-Prozesswaechter „game process gone", obwohl das Spiel gerade erst
-startete. Hinter dem Startwrapper und ``bwrap`` sieht der Prozessbaum
-anders aus, Anvil verlor das Spiel aus den Augen.
-
-Das folgende Aufraeumen loeschte die Schicht **waehrend** das Spiel
-hochfuhr. Ein Overlay liest live aus der Schicht, also verschwanden
-``version.dll`` und ``winmm.dll`` mitten im Start. Wine lud seine
-eigenen (im Proton-Protokoll als ``builtin``), Cyber Engine Tweaks und
-RED4ext kamen nie hoch, das Spiel stuerzte ab.
-
-Beim Overlay gibt es ohnehin nichts aufzuraeumen: der Mount lebt im
-Namespace des Spiels und endet mit ihm.
+Der Prozesswaechter darf erst aufraeumen, wenn das Spiel wirklich beendet
+ist. Danach muss er es aber tun: Der direkte Mount auf dem Spielordner lebt
+nicht in einem kurzlebigen Spiel-Namespace und blieb in drei Live-Tests nach
+dem Spielende weiter aktiv.
 """
 
 from __future__ import annotations
@@ -62,13 +52,11 @@ class _Fenster:
         self.protokolliert += 1
 
 
-def test_overlay_raeumt_nicht_auf() -> None:
-    """Der Kern: die Schicht bleibt stehen."""
+def test_overlay_raeumt_nach_spielende_auf() -> None:
+    """Der globale Mount darf nach dem Spiel nicht stehen bleiben."""
     f = _Fenster(overlay=True)
     f._purge_after_game()
-    assert f._game_panel.geraeumt == 0, (
-        "die Schicht wurde geloescht -- das Spiel verliert seine Loader"
-    )
+    assert f._game_panel.geraeumt == 1
 
 
 def test_symlink_weg_raeumt_weiterhin_auf() -> None:
@@ -78,11 +66,11 @@ def test_symlink_weg_raeumt_weiterhin_auf() -> None:
     assert f._game_panel.geraeumt == 1
 
 
-def test_overlay_schaut_gar_nicht_erst_in_den_spielordner() -> None:
-    """Kein Vorher/Nachher-Vergleich, es gibt ja nichts zu vergleichen."""
+def test_overlay_protokolliert_vorher_und_nachher() -> None:
+    """Die Diagnose bleibt fuer fehlgeschlagene Unmounts sichtbar."""
     f = _Fenster(overlay=True)
     f._purge_after_game()
-    assert f.protokolliert == 0
+    assert f.protokolliert == 2
 
 
 def test_dauerhaft_bleibt_unberuehrt() -> None:
@@ -92,8 +80,8 @@ def test_dauerhaft_bleibt_unberuehrt() -> None:
     assert f._game_panel.geraeumt == 0
 
 
-def test_overlay_gewinnt_gegen_dauerhaft() -> None:
-    """Beides an: geraeumt wird trotzdem nicht."""
+def test_dauerhaft_schuetzt_auch_overlay() -> None:
+    """Der ausdrueckliche Dauerbetrieb bleibt die einzige Ausnahme."""
     f = _Fenster(overlay=True, dauerhaft=True)
     f._purge_after_game()
     assert f._game_panel.geraeumt == 0

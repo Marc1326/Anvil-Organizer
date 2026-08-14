@@ -445,3 +445,50 @@ def test_verteilung_und_zaehler_zusammen(
         deploy_routes=Stalker2Game.GameDeployRoutes,
         pak_load_order_dirs=Stalker2Game.GamePakLoadOrderDirs,
     )
+
+
+def test_gleichnamiges_archiv_nur_gewinner(
+    tmp_path: Path, ohne_umgebungspruefung: None,
+) -> None:
+    """Zwei Mods liefern dasselbe Archiv: der Zaehler macht die Namen
+    verschieden, trotzdem darf nur die staerkere Mod ankommen -- sonst
+    laedt das Spiel beide und die schwaechere gewinnt womoeglich."""
+    _vergleiche(
+        tmp_path,
+        {
+            "Oben": ["archive/pc/mod/gleich.archive"],
+            "Unten": ["archive/pc/mod/gleich.archive"],
+        },
+        pak_load_order_dirs=["archive/pc/mod"],
+        pak_load_order_extensions=[".archive"],
+        pak_load_order_first_wins=True,
+    )
+
+
+def test_gewinner_inhalt_und_ladeliste(
+    tmp_path: Path, ohne_umgebungspruefung: None,
+) -> None:
+    """Der Gewinner steht in der Schicht, die Ladeliste kennt ihn."""
+    instance, game, mods, profiles = _welt(tmp_path)
+    _schreibe(mods / "Oben", "archive/pc/mod/gleich.archive", "oben")
+    _schreibe(mods / "Unten", "archive/pc/mod/gleich.archive", "unten")
+    write_global_modlist(profiles, ["Oben", "Unten"])
+    write_active_mods(profiles / "Default", {"Oben", "Unten"})
+
+    overlay = OverlayDeployer(
+        instance,
+        game,
+        pak_load_order_dirs=["archive/pc/mod"],
+        pak_load_order_extensions=[".archive"],
+        pak_load_order_first_wins=True,
+        archive_load_order_file="archive/pc/mod/modlist.txt",
+    )
+    ergebnis = overlay.deploy()
+    assert ergebnis.success, ergebnis.errors
+
+    ziel = instance / ".overlay" / "stage" / "main" / "archive" / "pc" / "mod"
+    gleich = sorted(p.name for p in ziel.glob("*gleich.archive"))
+    assert gleich == ["000_gleich.archive"]
+    assert (ziel / "000_gleich.archive").read_text(encoding="utf-8") == "oben"
+    ladeliste = (ziel / "modlist.txt").read_text(encoding="utf-8").splitlines()
+    assert ladeliste == ["000_gleich.archive"]

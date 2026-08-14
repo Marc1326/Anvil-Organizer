@@ -3356,6 +3356,9 @@ class GamePanel(QWidget):
         deploy_strip = getattr(plugin, "GameDeployStripPrefixes", []) if plugin else []
         deploy_anchors = getattr(plugin, "GameDeployAnchors", []) if plugin else []
         deploy_routes = getattr(plugin, "GameDeployRoutes", []) if plugin else []
+        stage_exclude = (
+            getattr(plugin, "GameStageExcludePaths", []) if plugin else []
+        )
 
         if getattr(self, "_use_overlay", False):
             from anvil.core.overlay_deployer import OverlayDeployer
@@ -3386,6 +3389,7 @@ class GamePanel(QWidget):
                 deploy_strip_prefixes=deploy_strip,
                 deploy_anchors=deploy_anchors,
                 deploy_routes=deploy_routes,
+                stage_exclude_paths=stage_exclude,
                 mod_index=self._mod_index,
             )
         if not getattr(self, "_use_overlay", False):
