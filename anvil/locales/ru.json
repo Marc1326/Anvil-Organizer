@@ -945,7 +945,7 @@
     "overlay_polkit_setup": "Настроить монтирование без пароля …",
     "overlay_polkit_hint": "Устанавливает помощник монтирования в систему и правило polkit. После этого монтирование работает без запроса пароля.",
     "deployment_wiki_link": "<a href=\"{url}\">Подробное описание в GitHub Wiki</a>",
-    "deployment_wiki_url": "https://github.com/Marc1326/Anvil-Organizer/wiki/Deployment-Methods"
+    "deployment_wiki_url": "https://github.com/Marc1326/Anvil-Organizer/wiki/Deployment-Methods-%E2%80%90-%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9"
   },
   "mod_detail": {
     "open_in_explorer": "Открыть мод в проводнике",

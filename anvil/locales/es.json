@@ -945,7 +945,7 @@
     "overlay_polkit_setup": "Configurar montaje sin contrasena …",
     "overlay_polkit_hint": "Instala el asistente de montaje en el sistema y una regla polkit. Despues el montaje funciona sin contrasena.",
     "deployment_wiki_link": "<a href=\"{url}\">Descripción detallada en la wiki de GitHub</a>",
-    "deployment_wiki_url": "https://github.com/Marc1326/Anvil-Organizer/wiki/Deployment-Methods"
+    "deployment_wiki_url": "https://github.com/Marc1326/Anvil-Organizer/wiki/Deployment-Methods-%E2%80%90-espa%C3%B1ol"
   },
   "mod_detail": {
     "open_in_explorer": "Abrir Mod en el explorador",

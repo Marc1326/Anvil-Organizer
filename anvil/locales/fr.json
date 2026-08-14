@@ -945,7 +945,7 @@
     "overlay_polkit_setup": "Configurer le montage sans mot de passe …",
     "overlay_polkit_hint": "Installe l'assistant de montage au niveau systeme et une regle polkit. Le montage fonctionne ensuite sans mot de passe.",
     "deployment_wiki_link": "<a href=\"{url}\">Description détaillée dans le wiki GitHub</a>",
-    "deployment_wiki_url": "https://github.com/Marc1326/Anvil-Organizer/wiki/Deployment-Methods"
+    "deployment_wiki_url": "https://github.com/Marc1326/Anvil-Organizer/wiki/Deployment-Methods-%E2%80%90-fran%C3%A7ais"
   },
   "mod_detail": {
     "open_in_explorer": "Ouvrir le Mod dans l'explorateur",
