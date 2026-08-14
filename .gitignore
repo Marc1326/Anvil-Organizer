@@ -9,6 +9,7 @@ debug.log
 release/
 AnvilOrganizer.AppDir/
 *.AppImage
+*.flatpak
 *.spec
 !anvil-organizer.spec
 
