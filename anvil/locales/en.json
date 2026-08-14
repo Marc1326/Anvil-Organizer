@@ -943,7 +943,9 @@
     "deploy_overlay": "Overlay (experimental)",
     "deploy_overlay_hint": "The game folder stays untouched: mods sit on top as a layer, writes land in the overwrite folder. Works with every launch path, even directly via Steam. Mounting needs system rights once per deploy (password) -- or none at all after a one-time setup.",
     "overlay_polkit_setup": "Set up password-free mounting …",
-    "overlay_polkit_hint": "Installs the mount helper system-wide plus a polkit rule. Mounting then runs without a password prompt."
+    "overlay_polkit_hint": "Installs the mount helper system-wide plus a polkit rule. Mounting then runs without a password prompt.",
+    "deployment_wiki_link": "<a href=\"{url}\">Detailed description in the GitHub Wiki</a>",
+    "deployment_wiki_url": "https://github.com/Marc1326/Anvil-Organizer/wiki/Deployment-Methods"
   },
   "mod_detail": {
     "open_in_explorer": "Open Mod in Explorer",

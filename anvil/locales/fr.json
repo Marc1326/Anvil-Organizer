@@ -943,7 +943,9 @@
     "deploy_overlay": "Overlay (experimental)",
     "deploy_overlay_hint": "Le dossier du jeu reste intact : les mods se superposent en couche, les ecritures vont dans le dossier overwrite. Fonctionne avec tout mode de lancement, meme directement via Steam. Le montage demande des droits systeme une fois par deploiement (mot de passe) -- ou aucun apres une configuration unique.",
     "overlay_polkit_setup": "Configurer le montage sans mot de passe …",
-    "overlay_polkit_hint": "Installe l'assistant de montage au niveau systeme et une regle polkit. Le montage fonctionne ensuite sans mot de passe."
+    "overlay_polkit_hint": "Installe l'assistant de montage au niveau systeme et une regle polkit. Le montage fonctionne ensuite sans mot de passe.",
+    "deployment_wiki_link": "<a href=\"{url}\">Description détaillée dans le wiki GitHub</a>",
+    "deployment_wiki_url": "https://github.com/Marc1326/Anvil-Organizer/wiki/Deployment-Methods"
   },
   "mod_detail": {
     "open_in_explorer": "Ouvrir le Mod dans l'explorateur",

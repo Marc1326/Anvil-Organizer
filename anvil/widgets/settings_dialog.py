@@ -151,6 +151,9 @@ class SettingsDialog(QDialog):
             if cur:
                 self._idata = self._instance_manager.load_instance(cur)
                 self._instance_path = self._instance_manager.instances_path() / cur
+        use_overlay = str(self._idata.get("use_overlay", "false")).lower() in (
+            "true", "1"
+        )
 
         # Helper: Widget deaktivieren + Tooltip setzen
         def _disabled(w):
@@ -232,14 +235,15 @@ class SettingsDialog(QDialog):
         scroll_layout.addWidget(prof_grp)
 
         # Gruppe Mods im Spielordner
-        keep_grp = QGroupBox(tr("settings.deploy_group"))
-        keep_layout = QVBoxLayout(keep_grp)
+        self._keep_deployed_group = QGroupBox(tr("settings.deploy_group"))
+        keep_layout = QVBoxLayout(self._keep_deployed_group)
         self._cb_keep_deployed = QCheckBox(tr("settings.keep_mods_deployed"))
         self._cb_keep_deployed.setChecked(
             str(self._idata.get("keep_mods_deployed", "false")).lower()
             in ("true", "1"))
         keep_layout.addWidget(self._setting_row(self._cb_keep_deployed))
-        scroll_layout.addWidget(keep_grp)
+        self._keep_deployed_group.setVisible(not use_overlay)
+        scroll_layout.addWidget(self._keep_deployed_group)
 
         # Gruppe Sonstiges
         misc_grp = QGroupBox(tr("settings.misc"))
@@ -1244,7 +1248,6 @@ class SettingsDialog(QDialog):
         deploy_grp = QGroupBox(tr("settings.deploy_method_group"))
         deploy_grp_layout = QVBoxLayout(deploy_grp)
 
-        use_overlay = str(self._idata.get("use_overlay", "false")).lower() in ("true", "1")
         self._radio_symlink = QRadioButton(tr("settings.deploy_symlink"))
         self._radio_overlay = QRadioButton(tr("settings.deploy_overlay"))
         self._radio_overlay.setChecked(use_overlay)
@@ -1272,7 +1275,20 @@ class SettingsDialog(QDialog):
         )
         self._btn_polkit.setVisible(use_overlay)
         self._radio_overlay.toggled.connect(self._btn_polkit.setVisible)
+        self._radio_overlay.toggled.connect(
+            lambda checked=False: self._keep_deployed_group.setVisible(not checked)
+        )
         deploy_grp_layout.addWidget(self._btn_polkit)
+
+        wiki_url = tr("settings.deployment_wiki_url")
+        self._deployment_wiki_link = QLabel(
+            tr("settings.deployment_wiki_link", url=wiki_url)
+        )
+        self._deployment_wiki_link.setTextFormat(Qt.TextFormat.RichText)
+        self._deployment_wiki_link.setOpenExternalLinks(True)
+        self._deployment_wiki_link.setWordWrap(True)
+        self._deployment_wiki_link.setContentsMargins(24, 4, 0, 0)
+        deploy_grp_layout.addWidget(self._deployment_wiki_link)
 
         ex_content_layout.addWidget(deploy_grp)
         ex_content_layout.addStretch()
@@ -1988,7 +2004,10 @@ class SettingsDialog(QDialog):
                 idata["game_path"] = self._le_game_path.text()
                 idata["local_inis"] = self._cb_local_inis.isChecked()
                 idata["local_saves"] = self._cb_local_saves.isChecked()
-                idata["keep_mods_deployed"] = self._cb_keep_deployed.isChecked()
+                idata["keep_mods_deployed"] = (
+                    self._cb_keep_deployed.isChecked()
+                    and not self._radio_overlay.isChecked()
+                )
                 if not getattr(self, "_overlay_locked", False):
                     idata["use_overlay"] = self._radio_overlay.isChecked()
                 self._instance_manager.save_instance(cur, idata)

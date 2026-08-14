@@ -943,7 +943,9 @@
     "deploy_overlay": "Overlay (experimentell)",
     "deploy_overlay_hint": "Der Spielordner bleibt unberührt: Die Mods liegen als Schicht darüber, Schreibzugriffe landen im Overwrite-Ordner. Funktioniert bei jedem Startweg, auch direkt über Steam. Das Einhängen braucht einmal pro Deploy Systemrechte (Passwort) — oder nach einmaliger Einrichtung gar keins.",
     "overlay_polkit_setup": "Mount ohne Passwort einrichten …",
-    "overlay_polkit_hint": "Installiert das Mount-Helferskript systemweit plus eine polkit-Regel. Danach läuft das Einhängen ohne Passwort-Abfrage."
+    "overlay_polkit_hint": "Installiert das Mount-Helferskript systemweit plus eine polkit-Regel. Danach läuft das Einhängen ohne Passwort-Abfrage.",
+    "deployment_wiki_link": "<a href=\"{url}\">Ausführliche Beschreibung im GitHub-Wiki</a>",
+    "deployment_wiki_url": "https://github.com/Marc1326/Anvil-Organizer/wiki/Deployment-Methods-%E2%80%90-deutsch"
   },
   "mod_detail": {
     "open_in_explorer": "Mod im Explorer öffnen",

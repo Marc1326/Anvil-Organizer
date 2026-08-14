@@ -943,7 +943,9 @@
     "deploy_overlay": "Overlay (experimental)",
     "deploy_overlay_hint": "A pasta do jogo fica intacta: os mods ficam por cima como camada, as escritas vao para a pasta overwrite. Funciona com qualquer forma de arranque, ate diretamente pelo Steam. A montagem precisa de direitos de sistema uma vez por distribuicao (palavra-passe) -- ou nunca, apos uma configuracao unica.",
     "overlay_polkit_setup": "Configurar montagem sem palavra-passe …",
-    "overlay_polkit_hint": "Instala o assistente de montagem no sistema e uma regra polkit. A partir dai a montagem funciona sem palavra-passe."
+    "overlay_polkit_hint": "Instala o assistente de montagem no sistema e uma regra polkit. A partir dai a montagem funciona sem palavra-passe.",
+    "deployment_wiki_link": "<a href=\"{url}\">Descrição detalhada no wiki do GitHub</a>",
+    "deployment_wiki_url": "https://github.com/Marc1326/Anvil-Organizer/wiki/Deployment-Methods"
   },
   "mod_detail": {
     "open_in_explorer": "Abrir Mod no explorador",
