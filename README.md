@@ -12,13 +12,13 @@ Most mod managers only target Windows — Anvil fills the gap on Linux.
 ![GitHub Downloads](https://img.shields.io/github/downloads/Marc1326/Anvil-Organizer/total)
 ![Latest Release](https://img.shields.io/github/v/release/Marc1326/Anvil-Organizer)
 
-> ⚠️ **Early Development** — Anvil Organizer is under active development. Expect bugs and breaking changes. Feedback and bug reports are welcome!
+> ✅ **Feature complete** — The general feature set is finished. Development continues with bug fixes, game plugins, and companion apps required by individual games. Feedback and bug reports are welcome!
 
 ---
 
 ## Features
 
-- **MO2-style virtual file system** — symlink-based deployment for standard game plugins
+- **Symlink or OverlayFS deployment** — symlinks by default, or an optional OverlayFS mount that keeps mods entirely outside the game directory
 - **Multi-instance support** — separate configurations per game
 - **Storage management** — move individual components, game instances, or the complete Anvil data directory with verification and rollback
 - **Profile system** — switch mod setups per game instance
@@ -88,7 +88,7 @@ Works with **Steam** and **Heroic Games Launcher** (GOG/Epic via Proton/Wine).
 |---------|:-:|:-:|:-:|
 | **Native Linux** | **Yes** | No (Wine) | No (Wine) |
 | **Proton Script Extender Shims** (SKSE64/F4SE/SFSE) | **Yes** | No | No |
-| **MO2-style virtual filesystem** | Symlinks | VFS driver | Hardlinks |
+| **Virtual deployment** | Symlinks + OverlayFS | VFS driver | Hardlinks |
 | **Drag & drop load order** | **Yes** | Yes | Limited |
 | **Multi-instance / Multi-game** | **Yes** | Yes | Yes |
 | **Profile system** | **Yes** | Yes | Yes |
@@ -229,7 +229,7 @@ Anvil-Organizer/
 ├── anvil/
 │   ├── mainwindow.py       # Main window (MO2-style layout)
 │   ├── core/               # Business logic
-│   │   ├── mod_deployer.py     # Symlink-based virtual deploy
+│   │   ├── mod_deployer.py     # Deployment (symlink + OverlayFS)
 │   │   ├── mod_installer.py    # Archive extraction + installation
 │   │   ├── instance_manager.py # Multi-game instance management
 │   │   ├── update_checker.py   # Git-based self-update
@@ -258,6 +258,8 @@ For most games, Anvil uses a **symlink-based virtual file system**:
 4. Purging removes the links and restores the undeployed state
 
 This approach works natively on Linux without the need for a virtual filesystem driver.
+
+Alternatively, deployment can use **OverlayFS** (Settings → Expert): a kernel overlay mount is placed directly over the game directory, so mod files stay entirely outside the game folder and the original files are never touched. Requires the game directory on ext4, btrfs or xfs; on first use Anvil can install a polkit rule so mounting works without a password prompt.
 
 Ghost Recon Breakpoint is the exception: its mods are deployed natively into Forge archives. Anvil creates verified pristine backups before the first change and rebuilds or restores the archives from those backups when the active mod set changes.
 

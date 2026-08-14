@@ -1,8 +1,9 @@
 # Changelog
 
-## [Unveröffentlicht]
+## [1.8.0] — 2026-08-14
 
 ### Neu
+- **Mods lassen sich wahlweise per OverlayFS einbinden statt per Symlink** (Einstellungen → Experte). Das Overlay wird direkt über den Spielordner gelegt: Die Moddateien bleiben komplett außerhalb, die Originaldateien werden nie angerührt, und Steam-Updates oder -Reparaturen sehen ein sauberes Spielverzeichnis, sobald das Overlay abgehängt ist. Auf Wunsch richtet Anvil einmalig eine polkit-Regel ein, danach läuft das Einhängen ohne Passwortabfrage. Voraussetzung: Spielordner auf ext4, btrfs oder xfs. Ausführlich dokumentiert im Wiki — in allen sieben Sprachen.
 - **Charakter-Presets haben einen eigenen Bereich** unter der Mod-Liste, so wie die Frameworks. Bei Cyberpunk heißt er „ACU-Presets"; Spiele ohne Presets zeigen ihn gar nicht. Ob etwas ein Preset ist, entscheidet der Inhalt und nicht der Trenner: Wer neben der Preset-Datei noch ein Archiv mitbringt, greift ins Spiel ein und bleibt eine gewöhnliche Mod.
 
 ### Änderungen
