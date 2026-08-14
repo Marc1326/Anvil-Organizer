@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unveröffentlicht]
+
+### Fixes
+- **OverlayFS funktioniert jetzt auch, wenn Anvil als Flatpak läuft.** Mount, Unmount und die polkit-Einrichtung werden über `flatpak-spawn` auf dem Host ausgeführt; die eingerichtete Passwort-frei-Regel greift dort genauso.
+
 ## [1.8.0] — 2026-08-14
 
 ### Neu
