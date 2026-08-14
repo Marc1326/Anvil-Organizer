@@ -15,12 +15,26 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from anvil.core.subprocess_env import host_which, is_flatpak
+
 HELPER_NAME = ".overlay-mount-helper"
 # Systemweite, root-eigene Variante -- erst dann darf polkit das
 # Passwort weglassen. Ein Skript im Home liesse sich vom Nutzer selbst
 # umschreiben und waere ein offenes Root-Tor.
 SYSTEM_HELPER = Path("/usr/local/libexec/anvil-overlay-mount")
 POLKIT_RULE = Path("/etc/polkit-1/rules.d/50-anvil-overlay.rules")
+
+
+def _run_host(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
+    """subprocess.run -- im Flatpak auf dem Host (flatpak-spawn).
+
+    Mounts, umount und pkexec müssen im Host-Namespace laufen: Die
+    Sandbox hat eine eigene Mount-Tabelle und kein Root auf dem Host.
+    """
+    if is_flatpak():
+        cmd = ["flatpak-spawn", "--host", *cmd]
+    return subprocess.run(cmd, **kwargs)
+
 
 _HELPER = """#!/bin/bash
 # Von Anvil erzeugt. Handaenderungen gehen beim naechsten Deploy verloren.
@@ -129,7 +143,7 @@ def write_helper(base_path: Path) -> Path:
 def is_mounted(target: Path) -> bool:
     """Hängt an diesem Pfad gerade ein Overlay?"""
     try:
-        ausgabe = subprocess.run(
+        ausgabe = _run_host(
             ["findmnt", "-T", str(target), "-o", "FSTYPE", "-n"],
             capture_output=True, text=True, timeout=10,
         )
@@ -159,7 +173,7 @@ def _rufe_helfer(aktion: str, base_path: Path, mount_conf: Path) -> tuple[bool, 
     """
     helfer = _helfer_für_aufruf(base_path)
     try:
-        lauf = subprocess.run(
+        lauf = _run_host(
             ["pkexec", str(helfer), aktion, str(mount_conf)],
             capture_output=True, text=True, timeout=300,
         )
@@ -190,6 +204,17 @@ def purge_mounts(base_path: Path, mount_conf: Path) -> tuple[bool, str]:
 
 def polkit_rule_installed(base_path: Path, user: str) -> bool:
     del base_path, user  # Die Einrichtung gilt systemweit, nicht pro Basis.
+    if is_flatpak():
+        # /usr/local ist in der Sandbox unsichtbar -- auf dem Host prüfen.
+        prüfung = '[ -f "$1" ] && [ "$(stat -c %u "$1")" = "0" ]'
+        try:
+            lauf = _run_host(
+                ["sh", "-c", prüfung, "sh", str(SYSTEM_HELPER)],
+                capture_output=True, timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return lauf.returncode == 0
     # /etc/polkit-1/rules.d ist für Normalnutzer nicht lesbar -- die
     # Regel selbst können wir nicht prüfen.  Sie wurde aber im selben
     # Installationslauf wie der systemweite Helfer geschrieben:  Ist der
@@ -213,7 +238,7 @@ def install_polkit_rule(base_path: Path, user: str) -> tuple[bool, str]:
         + " && cat > " + _q(str(POLKIT_RULE))
     )
     regel = _POLKIT_RULE.format(helper=SYSTEM_HELPER, user=user)
-    lauf = subprocess.run(
+    lauf = _run_host(
         ["pkexec", "sh", "-c", einrichten],
         input=regel, capture_output=True, text=True, timeout=120,
     )
@@ -239,11 +264,23 @@ def mount_requirements() -> list[str]:
     if "overlay" not in arten:
         # /proc/filesystems fuehrt das Modul erst nach dem Laden. Ladbar
         # ist es, solange es unter /lib/modules liegt.
-        import platform
-        modul = Path(f"/lib/modules/{platform.release()}/kernel/fs/overlayfs")
-        if not any(modul.glob("overlay.ko*")):
-            probleme.append(tr("overlay.no_kernel_overlay"))
-    import shutil
-    if shutil.which("pkexec") is None:
+        if is_flatpak():
+            # /lib/modules der Sandbox ist die Laufzeit, nicht der Host.
+            try:
+                lauf = _run_host(
+                    ["sh", "-c", 'ls /lib/modules/"$(uname -r)"/kernel/fs/overlayfs/overlay.ko* >/dev/null 2>&1'],
+                    capture_output=True, timeout=10,
+                )
+                ladbar = lauf.returncode == 0
+            except (OSError, subprocess.SubprocessError):
+                ladbar = False
+            if not ladbar:
+                probleme.append(tr("overlay.no_kernel_overlay"))
+        else:
+            import platform
+            modul = Path(f"/lib/modules/{platform.release()}/kernel/fs/overlayfs")
+            if not any(modul.glob("overlay.ko*")):
+                probleme.append(tr("overlay.no_kernel_overlay"))
+    if host_which("pkexec") is None:
         probleme.append(tr("overlay.no_pkexec"))
     return probleme
