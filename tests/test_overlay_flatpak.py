@@ -82,6 +82,23 @@ def test_polkit_einrichtung_läuft_auf_dem_host(tmp_path: Path) -> None:
     assert cmd[:3] == ["flatpak-spawn", "--host", "pkexec"]
 
 
+def test_helferwahl_nimmt_systemhelfer_ohne_lokale_sicht(tmp_path: Path) -> None:
+    """Im Flatpak ist /usr/local unsichtbar -- die Host-Prüfung entscheidet."""
+    with (
+        patch.object(overlay_mount, "is_flatpak", return_value=True),
+        patch.object(overlay_mount, "SYSTEM_HELPER", tmp_path / "unsichtbar"),
+        patch.object(overlay_mount, "polkit_rule_installed", return_value=True),
+    ):
+        assert overlay_mount._helfer_für_aufruf(tmp_path) == tmp_path / "unsichtbar"
+
+    with (
+        patch.object(overlay_mount, "is_flatpak", return_value=True),
+        patch.object(overlay_mount, "SYSTEM_HELPER", tmp_path / "unsichtbar"),
+        patch.object(overlay_mount, "polkit_rule_installed", return_value=False),
+    ):
+        assert overlay_mount._helfer_für_aufruf(tmp_path) == overlay_mount.helper_path(tmp_path)
+
+
 def test_anforderungen_pruefen_pkexec_auf_dem_host() -> None:
     with (
         patch.object(overlay_mount, "is_flatpak", return_value=True),

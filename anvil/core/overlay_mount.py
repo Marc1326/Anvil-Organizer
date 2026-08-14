@@ -154,7 +154,12 @@ def is_mounted(target: Path) -> bool:
 
 def _helfer_für_aufruf(base_path: Path) -> Path:
     """Systemweiter Helfer, wenn eingerichtet -- sonst frisch schreiben."""
-    if polkit_rule_installed(base_path, _aktueller_user()) and SYSTEM_HELPER.is_file():
+    eingerichtet = polkit_rule_installed(base_path, _aktueller_user())
+    if is_flatpak():
+        # /usr/local ist in der Sandbox unsichtbar -- die Host-Prüfung in
+        # polkit_rule_installed hat Existenz und root-Besitz schon belegt.
+        return SYSTEM_HELPER if eingerichtet else write_helper(base_path)
+    if eingerichtet and SYSTEM_HELPER.is_file():
         return SYSTEM_HELPER
     return write_helper(base_path)
 
