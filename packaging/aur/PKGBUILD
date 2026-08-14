@@ -1,7 +1,7 @@
 # Maintainer: Marc <marc1326@users.noreply.github.com>
 
 pkgname=anvil-organizer
-pkgver=1.7.2
+pkgver=1.8.0
 pkgrel=1
 pkgdesc="Native Linux mod manager"
 arch=('x86_64')
@@ -28,7 +28,7 @@ makedepends=(
     'python-wheel'
 )
 source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('62393b1a5d206bf31076b8a0087805092625aa3c607754d43bcbfd013f3f2ac1')
+sha256sums=('d7995878dd4a949b58f32baf22ad661105abb309497c2b253f6b9b848e5483f5')
 
 prepare() {
     cd "Anvil-Organizer-${pkgver}"
