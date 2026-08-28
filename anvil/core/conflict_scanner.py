@@ -57,6 +57,25 @@ def _match_ignore(rel_path: str, pattern: str) -> bool:
     return fnmatch(rl, pl)
 
 
+def _vermerke(
+    file_owners: dict[str, list[str]],
+    anzeige: dict[str, str],
+    rel: str,
+    mod_name: str,
+) -> None:
+    """*mod_name* als Eigner von *rel* vermerken, Schreibweise egal.
+
+    Bringt eine Mod dieselbe Datei zweimal mit -- einmal unter ``meshes``,
+    einmal unter ``Meshes`` --, ist das kein Konflikt mit sich selbst: im
+    Spiel landet eine Datei, und sie gehoert dieser einen Mod.
+    """
+    schluessel = rel.lower()
+    anzeige.setdefault(schluessel, rel)
+    owners = file_owners.setdefault(schluessel, [])
+    if not owners or owners[-1] != mod_name:
+        owners.append(mod_name)
+
+
 class ConflictScanner:
     """Scan active mods for real file conflicts."""
 
@@ -112,6 +131,10 @@ class ConflictScanner:
         # 2. Build mapping: relative_path -> [mod_name, ...]
         #    Preserves insertion order (= priority order).
         file_owners: dict[str, list[str]] = {}
+        # Der Deployer legt "meshes/a.nif" und "Meshes/a.nif" auf dieselbe
+        # Zieldatei -- ohne gemeinsamen Schluessel bliebe der Konflikt
+        # unsichtbar. Angezeigt wird die zuerst gesehene Schreibweise.
+        anzeige: dict[str, str] = {}
 
         for mod in mods:
             mod_name = mod["name"]
@@ -127,8 +150,7 @@ class ConflictScanner:
                     ext = fname[dot_pos:].lower() if dot_pos >= 0 else ""
                     if ext in self._IGNORED_EXTENSIONS:
                         continue
-                    owners = file_owners.setdefault(rel, [])
-                    owners.append(mod_name)
+                    _vermerke(file_owners, anzeige, rel, mod_name)
                 continue
 
             # pak mode active but mod not in file lists → skip entirely
@@ -150,8 +172,7 @@ class ConflictScanner:
                         ext = fname[dot_pos:].lower() if dot_pos >= 0 else ""
                         if ext in self._IGNORED_EXTENSIONS:
                             continue
-                        owners = file_owners.setdefault(rel, [])
-                        owners.append(mod_name)
+                        _vermerke(file_owners, anzeige, rel, mod_name)
                     continue
 
             # Fallback: scan filesystem directly
@@ -178,16 +199,16 @@ class ConflictScanner:
                 if file_path.suffix.lower() in self._IGNORED_EXTENSIONS:
                     continue
 
-                owners = file_owners.setdefault(rel, [])
-                owners.append(mod_name)
+                _vermerke(file_owners, anzeige, rel, mod_name)
 
         # 3. Separate real conflicts from ignored matches
         conflicts: list[dict] = []
         ignored: list[dict] = []
 
-        for rel_path, owners in file_owners.items():
+        for schluessel, owners in file_owners.items():
             if len(owners) < 2:
                 continue
+            rel_path = anzeige.get(schluessel, schluessel)
 
             # Check against ignore patterns (case-insensitive)
             is_ignored = any(
@@ -210,7 +231,11 @@ class ConflictScanner:
         return {
             "conflicts": conflicts,
             "ignored": ignored,
-            "file_owners": file_owners,
+            # Nach aussen mit der echten Schreibweise -- der kleingeschriebene
+            # Schluessel dient nur dem Zusammenfassen.
+            "file_owners": {
+                anzeige.get(k, k): v for k, v in file_owners.items()
+            },
             "archive_conflicts": self._archive_conflicts(mods, archive_hashes),
         }
 
@@ -249,10 +274,12 @@ class ConflictScanner:
                 for b in eintraege[i + 1:]:
                     if a[0] == b[0]:
                         continue  # dieselbe Mod, kein Konflikt
-                    if a[1] == b[1]:
+                    if a[1].lower() == b[1].lower():
                         # Gleicher Pfad in zwei Mods: das ist ein
                         # gewoehnlicher Dateikonflikt und steht schon in
                         # ``conflicts``. Sonst zaehlt das Symbol doppelt.
+                        # Ohne Ruecksicht auf die Schreibweise, denn genau
+                        # so fasst ``file_owners`` oben zusammen.
                         continue
                     paare[(a, b)] = paare.get((a, b), 0) + 1
 

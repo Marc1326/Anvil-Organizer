@@ -56,6 +56,7 @@ from anvil.dialogs.quick_install_dialog import QuickInstallDialog
 from anvil.dialogs.query_overwrite_dialog import QueryOverwriteDialog, OverwriteAction
 from anvil.plugins.plugin_loader import PluginLoader
 from anvil.core.base_dir import anvil_base_paths
+from anvil.core.case_paths import CaseIndex
 from anvil.core.instance_manager import InstanceManager
 from anvil.core.instance_paths import (
     InstancePaths,
@@ -134,10 +135,29 @@ def _has_installable_content(root: Path) -> bool:
 
 
 def _path_matches(base: Path, rel: str) -> bool:
-    """True wenn *rel* unter *base* existiert — mit Wildcard-Support."""
+    """True wenn *rel* unter *base* existiert — mit Wildcard-Support.
+
+    Die Schreibweise darf abweichen: die Muster sind an Windows-Pfaden
+    abgeschrieben, im Spielordner steht aber, was das Archiv mitgebracht hat.
+    """
     if any(c in rel for c in "*?["):
-        return any(base.glob(rel))
-    return (base / rel).exists()
+        try:
+            if any(base.glob(rel)):
+                return True
+        except (ValueError, OSError, NotImplementedError):
+            return False
+        # Der Platzhalter steht meist im Dateinamen, der Ordner davor ist
+        # das, was sich in der Schreibweise unterscheidet.
+        ordner, _, muster = rel.replace("\\", "/").rstrip("/").rpartition("/")
+        if not ordner or not muster:
+            return False
+        try:
+            return any((base / CaseIndex(base).resolve(ordner)).glob(muster))
+        except (ValueError, OSError, NotImplementedError):
+            return False
+    if (base / rel).exists():
+        return True
+    return (base / CaseIndex(base).resolve(rel)).exists()
 
 
 def _ensure_list(val) -> list:
@@ -9476,11 +9496,33 @@ class MainWindow(QMainWindow):
                     if self._mod_index is not None:
                         self._mod_index.invalidate(folder)
 
-        # Hand-installed copy in the game directory
+        # Hand-installed copy in the game directory.
+        # Die Erkennung (base_game._is_in_game_dir) loest Platzhalter auf,
+        # das Loeschen muss das genauso tun -- sonst meldet die Liste
+        # "installiert" und die Deinstallation findet nichts. Die
+        # Schreibweise darf dabei abweichen, die Muster stammen aus der
+        # Windows-Welt.
+        namen = CaseIndex(game_path)
         for det_path in fw_obj.detect_installed:
-            full = game_path / det_path
-            disabled = full.with_name(full.name + framework_state.DISABLED_SUFFIX)
-            for target in (full, disabled):
+            treffer: list[Path] = []
+            if any(c in det_path for c in "*?["):
+                ordner, _, muster = det_path.replace("\\", "/").rpartition("/")
+                elternteil = game_path / namen.resolve(ordner) if ordner else game_path
+                if elternteil.is_dir():
+                    treffer = [
+                        p for p in elternteil.iterdir()
+                        if fnmatch.fnmatch(p.name, muster)
+                        or fnmatch.fnmatch(
+                            p.name, muster + framework_state.DISABLED_SUFFIX
+                        )
+                    ]
+            else:
+                full = game_path / namen.resolve(det_path)
+                treffer = [
+                    full,
+                    full.with_name(full.name + framework_state.DISABLED_SUFFIX),
+                ]
+            for target in treffer:
                 if target.is_file():
                     target.unlink()
                     removed += 1

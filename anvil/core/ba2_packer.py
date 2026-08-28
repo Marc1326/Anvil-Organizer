@@ -29,6 +29,7 @@ from anvil.core.subprocess_env import clean_env, host_popen
 from PySide6.QtCore import QSettings
 
 from anvil.core.archive_packing import is_archive_loose_path
+from anvil.core.case_paths import CaseIndex
 
 
 # ── Constants ────────────────────────────────────────────────────────
@@ -244,6 +245,10 @@ class BA2Packer:
         general_count = 0
         texture_count = 0
         skipped_count = 0
+        # "meshes" und "Meshes" sind fuer die Engine derselbe Ordner --
+        # im Archiv duerfen sie nicht zweimal auftauchen.
+        namen = {general_dir: CaseIndex(general_dir),
+                 textures_dir: CaseIndex(textures_dir)}
 
         for src in mod_dir.rglob("*"):
             if not src.is_file():
@@ -266,11 +271,17 @@ class BA2Packer:
                 skipped_count += 1
                 continue
 
+            basis = textures_dir if classification == "texture" else general_dir
+            dest = basis / namen[basis].resolve(rel)
+            # Zwei Schreibweisen derselben Datei ergeben einen Eintrag im
+            # Archiv -- also auch nur einen in der Zaehlung.
+            if dest.exists():
+                skipped_count += 1
+                continue
+
             if classification == "texture":
-                dest = textures_dir / rel
                 texture_count += 1
             else:
-                dest = general_dir / rel
                 general_count += 1
 
             dest.parent.mkdir(parents=True, exist_ok=True)

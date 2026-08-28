@@ -3168,29 +3168,38 @@ class GamePanel(QWidget):
             QTreeWidgetItem(self._data_tree, [tr("game_panel.read_error"), "", "", "", ""])
             return
 
-        # Roll the mods' file lists up to top level: name -> owning mods
+        # Roll the mods' file lists up to top level: name -> owning mods.
+        # Schluessel ohne Ruecksicht auf die Schreibweise -- der Deployer
+        # legt "meshes" und "Meshes" in denselben Ordner, sonst stuende der
+        # echte Ordner ohne Besitzer da und daneben eine Zeile fuer einen
+        # Ordner, der nie entsteht.
         virtual_dirs: dict[str, set[str]] = {}
         virtual_files: dict[str, list[str]] = {}
+        anzeige: dict[str, str] = {}
         for rel, owners in getattr(self, "_virtual_files", {}).items():
             head, _, tail = str(rel).partition("/")
+            schluessel = head.lower()
+            anzeige.setdefault(schluessel, head)
             if tail:
-                virtual_dirs.setdefault(head, set()).update(owners)
+                virtual_dirs.setdefault(schluessel, set()).update(owners)
             else:
-                virtual_files[head] = list(owners)
+                virtual_files[schluessel] = list(owners)
 
         on_disk: set[str] = set()
         for entry in entries:
-            on_disk.add(entry.name)
+            on_disk.add(entry.name.lower())
             try:
                 if entry.is_dir():
                     QTreeWidgetItem(self._data_tree, [
                         entry.name,
-                        self._owner_label(sorted(virtual_dirs.get(entry.name, ()))),
+                        self._owner_label(
+                            sorted(virtual_dirs.get(entry.name.lower(), ()))
+                        ),
                         tr("game_panel.folder"), "-", "-",
                     ])
                 else:
                     size = self._format_size(entry.stat().st_size)
-                    owners = virtual_files.get(entry.name, [])
+                    owners = virtual_files.get(entry.name.lower(), [])
                     QTreeWidgetItem(self._data_tree, [
                         entry.name,
                         self._owner_label(owners) or tr("game_panel.unmanaged"),
@@ -3208,7 +3217,7 @@ class GamePanel(QWidget):
             is_dir = name in virtual_dirs
             owners = sorted(virtual_dirs[name]) if is_dir else virtual_files[name]
             QTreeWidgetItem(self._data_tree, [
-                name,
+                anzeige.get(name, name),
                 self._owner_label(owners),
                 tr("game_panel.folder") if is_dir else "",
                 "-", "-",

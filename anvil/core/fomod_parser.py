@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from anvil.core.case_paths import CaseIndex
+
 
 # ── Data structures ───────────────────────────────────────────────────
 
@@ -480,21 +482,35 @@ def assemble_fomod_files(source_dir: Path, files: list[FomodFile]) -> Path | Non
     # Sort by priority so higher-priority files overwrite lower
     sorted_files = sorted(files, key=lambda f: f.priority)
 
+    # Schreibt eine Option nach "meshes" und die naechste nach "Meshes",
+    # liegen sonst beide im Mod und die Prioritaet entscheidet nichts mehr:
+    # welche Datei am Ende gilt, haengt dann an der Reihenfolge des
+    # Dateisystems. Der Zielordner entsteht hier frisch -- angeglichen wird
+    # also nur, was dieser Aufruf selbst anlegt.
+    namen = CaseIndex(dest)
+
     for f in sorted_files:
         src = resolve_path_ci(source_dir, f.source)
         if src is None:
             continue
 
+        # Path traversal guard (K1 fix) -- muss VOR der Angleichung stehen.
+        # Die verwirft ".." und absolute Angaben von sich aus, ein
+        # ausbrechender Eintrag wuerde danach als harmloser Pfad
+        # durchgehen statt abgelehnt zu werden.
+        roh = f.destination or ("" if f.is_folder else f.source)
+        if roh and not _is_safe_path(dest, dest / roh):
+            art = "folder" if f.is_folder else "file"
+            print(f"fomod_parser: skipping unsafe {art} path: {roh}", flush=True)
+            continue
+
         if f.is_folder and src.is_dir():
-            dst_dir = dest / f.destination if f.destination else dest
-            # Path traversal guard (K1 fix)
-            if not _is_safe_path(dest, dst_dir):
-                print(f"fomod_parser: skipping unsafe folder path: {f.destination}", flush=True)
-                continue
+            dst_rel = namen.resolve(f.destination) if f.destination else Path()
+            dst_dir = dest / dst_rel
             dst_dir.mkdir(parents=True, exist_ok=True)
             for item in src.rglob("*"):
                 rel = item.relative_to(src)
-                target = dst_dir / rel
+                target = dest / namen.resolve(dst_rel / rel)
                 if not _is_safe_path(dest, target):
                     continue
                 if item.is_dir():
@@ -504,8 +520,7 @@ def assemble_fomod_files(source_dir: Path, files: list[FomodFile]) -> Path | Non
                     shutil.copy2(item, target)
 
         elif not f.is_folder and src.is_file():
-            target = dest / f.destination if f.destination else dest / f.source
-            # Path traversal guard (K1 fix)
+            target = dest / namen.resolve(f.destination or f.source)
             if not _is_safe_path(dest, target):
                 print(f"fomod_parser: skipping unsafe file path: {f.destination}", flush=True)
                 continue

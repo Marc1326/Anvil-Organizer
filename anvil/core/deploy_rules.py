@@ -94,20 +94,31 @@ def apply_data_path(
 
     Frameworks bleiben in der Spielwurzel -- sie bringen Loader mit, die
     dort liegen muessen.
+
+    Praefix und Umleitungen werden ohne Ruecksicht auf die Schreibweise
+    erkannt: ein Archiv mit ``data/meshes`` meint dasselbe wie ``Data/meshes``,
+    sonst kaeme ein zweites ``Data`` davor. Die Schreibweise aus der
+    Spiel-Konfiguration gewinnt dabei, damit alle Mods im selben Ordner
+    landen.
     """
     if not data_path or is_direct:
         return rel
 
     prefix = Path(data_path)
     routes = multi_folder_routes or {}
-    if routes and len(rel.parts) > 1 and rel.parts[0] in routes:
-        return Path(routes[rel.parts[0]]) / Path(*rel.parts[1:])
+    if routes and len(rel.parts) > 1:
+        gesucht = rel.parts[0].lower()
+        for schluessel, ziel in routes.items():
+            if schluessel.lower() == gesucht:
+                return Path(ziel) / Path(*rel.parts[1:])
 
-    try:
-        rel.relative_to(prefix)
-        return rel
-    except ValueError:
-        pass
+    # Echt laenger, nicht gleich lang: eine Datei, die im Wurzelverzeichnis
+    # zufaellig "data" heisst, ist nicht der Data-Ordner.
+    tiefe = len(prefix.parts)
+    if len(rel.parts) > tiefe and all(
+        a.lower() == b.lower() for a, b in zip(rel.parts[:tiefe], prefix.parts)
+    ):
+        return prefix.joinpath(*rel.parts[tiefe:])
 
     if nest_under_mod_name:
         return prefix / mod_name / rel

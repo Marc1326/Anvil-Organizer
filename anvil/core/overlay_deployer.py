@@ -16,6 +16,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from anvil.core.case_paths import CaseIndex
 from anvil.core.mod_deployer import DeployResult
 from anvil.core.overlay_mount import (
     mount,
@@ -156,6 +157,7 @@ class OverlayDeployer:
             self._mods_path,
             self._profiles_dir,
             profile_name,
+            game_path=self._game_path,
             data_path=data_path,
             nest_under_mod_name=nest_under_mod_name,
             multi_folder_routes=multi_folder_routes,
@@ -357,11 +359,16 @@ class OverlayDeployer:
         """
         if not self._archive_load_order_file:
             return
-        rel_datei = Path(self._archive_load_order_file)
-        ordner_rel = str(rel_datei.parent).replace("\\", "/").strip("/").lower()
         hauptschicht = staged.layers.get("")
         if hauptschicht is None:
             return
+        # Die Schreibweise des Archivordners richtet sich nach dem Spiel und
+        # danach nach der Schicht -- sonst legt die Liste selbst den
+        # gespaltenen Ordner an, den das Angleichen verhindern soll.
+        rel_datei = CaseIndex(self._game_path, hauptschicht).resolve(
+            self._archive_load_order_file
+        )
+        ordner_rel = str(rel_datei.parent).replace("\\", "/").strip("/").lower()
 
         # placed liegt in Bau-Reihenfolge vor: niedrigste Prioritaet zuerst.
         verwaltet: list[str] = []

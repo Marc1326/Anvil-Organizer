@@ -17,6 +17,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from anvil.core.case_paths import CaseIndex
 from anvil.core.mod_deployer import (
     has_deploy_anchor,
     load_order_index,
@@ -104,6 +105,7 @@ class OverlayStage:
         profiles_dir: Path,
         profile_name: str = "Default",
         *,
+        game_path: Path | None = None,
         data_path: str = "",
         nest_under_mod_name: bool = False,
         multi_folder_routes: dict[str, str] | None = None,
@@ -127,6 +129,7 @@ class OverlayStage:
         self._mods_path = mods_path
         self._profiles_dir = profiles_dir
         self._profile_path = profiles_dir / profile_name
+        self._game_path = game_path
         self._data_path = data_path
         self._nest = nest_under_mod_name
         self._routes = multi_folder_routes or {}
@@ -298,6 +301,33 @@ class OverlayStage:
 
         schicht("")
 
+        # Der Kernel legt nur buchstabengleiche Ordner zusammen: liegt im
+        # Spiel "Data/Meshes" und die Schicht baut "Data/meshes", sieht das
+        # Spiel zwei Ordner statt einem. Also richtet sich die Schicht nach
+        # dem Spielordner -- der steht zuerst und gewinnt.
+        namen: dict[str, CaseIndex] = {}
+
+        def angleichen(
+            basis: str, ziel_schicht: Path, rel: Path, is_direct: bool = False,
+        ) -> Path:
+            index = namen.get(basis)
+            if index is None:
+                unten = Path(basis) if basis else self._game_path
+                index = CaseIndex(*(w for w in (unten, ziel_schicht) if w))
+                namen[basis] = index
+            angeglichen = index.resolve(rel)
+            # Wie im Symlink-Weg: zeigt der angeglichene Pfad eines
+            # Frameworks auf eine echte Spieldatei, behaelt der Dateiname
+            # die Schreibweise des Archivs -- der Ordner bleibt angeglichen.
+            # Beide Wege muessen dasselbe Ergebnis liefern.
+            if is_direct and angeglichen.name != rel.name:
+                unten = Path(basis) if basis else self._game_path
+                if unten is not None:
+                    ziel = unten / angeglichen
+                    if ziel.is_file() and not ziel.is_symlink():
+                        return angeglichen.parent / rel.name
+            return angeglichen
+
         # Niedrigste Prioritaet zuerst -- spaetere ueberschreiben frueheren.
         aktive = self.enabled_mods()
         # Zu schmal waere fatal: "1000_" sortiert vor "999_".
@@ -313,6 +343,11 @@ class OverlayStage:
 
             is_direct = self.is_direct_install(mod_name)
             staged_any = False
+            # Was DIESE Mod schon abgelegt hat: zwei ihrer Quellpfade koennen
+            # nach dem Angleichen dieselbe Zieldatei meinen. Ueber Mods
+            # hinweg darf das nicht gelten -- dort ueberschreibt die hoehere
+            # Mod die niedrigere, und der spaetere Eintrag ist der gueltige.
+            gelegt: set[tuple[str, Path]] = set()
 
             # Ordner-Mods landen immer im Spielordner -- eigene Zielpfade
             # gelten dort auch beim Symlink-Weg nicht.
@@ -326,7 +361,7 @@ class OverlayStage:
                         rel = src.relative_to(quelle)
                         if is_metadata(src, quelle, rel):
                             continue
-                        ziel = prefix / rel
+                        ziel = angleichen("", ziel_schicht, prefix / rel)
                         if ziel.as_posix().lower() in self._exclude:
                             continue
                         _place(src, ziel_schicht / ziel, result)
@@ -370,6 +405,7 @@ class OverlayStage:
                     nest_under_mod_name=self._nest,
                     multi_folder_routes=self._routes,
                 )
+                dest_rel = angleichen(ziel_basis, ziel_schicht, dest_rel, is_direct)
 
                 # Durchnummerieren: die Engines lesen die Mod-Liste nicht,
                 # bei ihnen entscheidet der Dateiname.
@@ -393,9 +429,17 @@ class OverlayStage:
                     continue
 
                 if _place(src, ziel_schicht / dest_rel, result):
-                    result.placed.append((ziel_basis, dest_rel))
-                    if unbenannt is not None:
-                        nummerierte.append((ziel_basis, dest_rel, unbenannt))
+                    # Bringt eine Mod dieselbe Datei in zwei Schreibweisen
+                    # mit, zeigen beide auf dasselbe Ziel -- in der Schicht
+                    # liegt eine Datei, also darf sie auch nur einmal
+                    # verbucht werden. Sonst raeumt die Zaehler-Bereinigung
+                    # unten genau die Datei weg, die gerade entstanden ist.
+                    schon_da = (ziel_basis, dest_rel) in gelegt
+                    if not schon_da:
+                        gelegt.add((ziel_basis, dest_rel))
+                        result.placed.append((ziel_basis, dest_rel))
+                        if unbenannt is not None:
+                            nummerierte.append((ziel_basis, dest_rel, unbenannt))
                 staged_any = True
 
             if staged_any:

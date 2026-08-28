@@ -3,6 +3,11 @@
 ## [Unveröffentlicht]
 
 ### Fixes
+- **Mods mit Ordnern in gemischter Schreibweise werden nur noch halb geladen — das ist behoben.** Unter Windows sind `meshes` und `Meshes` derselbe Ordner, unter Linux zwei verschiedene. Brachte eine Mod beide Schreibweisen mit oder schrieben zwei Mods denselben Ordner unterschiedlich, lagen im Spiel zwei Ordner nebeneinander und die Hälfte der Dateien blieb unsichtbar. Anvil legt sie beim Ausrollen jetzt zusammen: Es zählt, was im Spielordner bereits liegt, sonst die Schreibweise der zuerst ausgerollten Mod. Das gilt für beide Wege, Symlink wie OverlayFS, und für jedes Spiel. In den Mod-Ordnern selbst wird nichts verändert — auch bereits installierte Mods sind damit repariert, ohne sie neu installieren zu müssen.
+- **Bei FOMOD-Installern entschied nicht mehr die getroffene Auswahl.** Lieferten zwei Optionen dieselbe Datei in unterschiedlicher Schreibweise, landeten beide im Mod, und welche im Spiel galt, hing vom Zufall ab. Jetzt gewinnt wieder die Option mit der höheren Priorität — also das, was im Installationsdialog ausgewählt wurde.
+- Ein Mod-Archiv mit `data/` statt `Data/` landete unter `Data/data/` und war damit wirkungslos. Betraf jedes Spiel mit eigenem Datenordner, unter anderem Skyrim, Fallout 4, Starfield, STALKER 2, Witcher 3 und Stellar Blade.
+- **Die Konfliktanzeige übersah Überdeckungen**, wenn zwei Mods denselben Pfad unterschiedlich schrieben — sie meldete null Konflikte, obwohl eine Datei die andere verdrängte.
+- Hinweis zu den beiden Punkten oben: Bringt eine Mod eine Datei mit, die im Spielordner schon in anderer Schreibweise als **echte Datei** liegt, wird sie jetzt übersprungen und als solche gemeldet, statt still in einem zweiten Ordner zu landen. Gefunden hätte das Spiel sie dort ohnehin nicht — nach dem Update taucht sie nur zum ersten Mal in der Übersprungen-Liste auf. Ein bereits gespaltener Spielordner wird beim nächsten vollständigen Aufräumen zusammengeführt.
 - **OverlayFS funktioniert jetzt auch, wenn Anvil als Flatpak läuft.** Mount, Unmount und die polkit-Einrichtung werden über `flatpak-spawn` auf dem Host ausgeführt; die eingerichtete Passwort-frei-Regel greift dort genauso.
 
 ## [1.8.0] — 2026-08-14

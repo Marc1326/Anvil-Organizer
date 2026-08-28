@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING
 
 # Die alten Namen bleiben als Alias erhalten: Tests und
 # character_presets._NEBENSACHE beziehen sich darauf.
+from anvil.core.case_paths import CaseIndex
 from anvil.core.deploy_rules import (
     ARCHIVE_KEEP_EXTENSIONS as _BA2_SYMLINK_EXTENSIONS,
     SKIP_DIRS as _SKIP_DIRS,
@@ -281,6 +282,21 @@ class DeployResult:
     errors: list[str] = field(default_factory=list)
 
 
+def _drop_duplicate_links(symlinks: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Behaelt je Ziel nur den letzten Eintrag.
+
+    Bringt eine Mod dieselbe Datei in zwei Schreibweisen mit, zeigen beide
+    nach dem Angleichen auf dasselbe Ziel -- auf der Platte liegt eine
+    Datei, im Abdruck staenden zwei Eintraege. Der spaetere hat wirklich
+    geschrieben, der frueherer wurde ueberschrieben.
+    """
+    letzter: dict[tuple[str, str], int] = {}
+    for nr, eintrag in enumerate(symlinks):
+        letzter[(eintrag.get("deploy_base", ""), eintrag.get("link", ""))] = nr
+    behalten = set(letzter.values())
+    return [e for nr, e in enumerate(symlinks) if nr in behalten]
+
+
 class ModDeployer:
     """Symlink-based mod deployer.
 
@@ -512,6 +528,29 @@ class ModDeployer:
         # gilt die Kopie einer schwaecheren Mod als echte Spieldatei und
         # die staerkere wird uebersprungen -- die Reihenfolge kehrt sich um.
         written_targets: set[str] = set()
+        # Ordner, die es schon gibt, behalten ihre Schreibweise. Sonst legt
+        # eine Mod mit "Meshes" neben "meshes" einen zweiten Ordner an und
+        # das Spiel sieht nur einen davon.
+        namen: dict[Path, CaseIndex] = {}
+
+        def index_fuer(basis: Path) -> CaseIndex:
+            vorhanden = namen.get(basis)
+            if vorhanden is None:
+                vorhanden = CaseIndex(basis)
+                namen[basis] = vorhanden
+            return vorhanden
+
+        # Ordner-Mods (LML, REDmod) haengen als ganzer Ordner im Spiel und
+        # laufen an der Dateischleife vorbei -- ihr Zielordner braucht die
+        # Angleichung genauso, sonst stehen "mods" und "Mods" nebeneinander.
+        lml_rel = (
+            index_fuer(self._game_path).resolve(self._lml_path)
+            if self._lml_path else None
+        )
+        redmod_rel = (
+            index_fuer(self._game_path).resolve(self._redmod_path)
+            if self._redmod_path else None
+        )
 
         # Process mods from lowest to highest priority.
         # Higher priority mods overwrite lower ones (replace symlink).
@@ -544,7 +583,7 @@ class ModDeployer:
 
             # LML-Mod? (hat install.xml im Mod-Root) → Ordner-Symlink
             if self._lml_path and (mod_dir / "install.xml").is_file():
-                lml_target = self._game_path / self._lml_path / mod_name
+                lml_target = self._game_path / lml_rel / mod_name
                 lml_target.parent.mkdir(parents=True, exist_ok=True)
 
                 if lml_target.is_symlink():
@@ -559,7 +598,7 @@ class ModDeployer:
                     lml_target.symlink_to(mod_dir)
                     result.links_created += 1
                     symlinks.append({
-                        "link": str(Path(self._lml_path) / mod_name),
+                        "link": str(lml_rel / mod_name),
                         "target": str(mod_dir),
                         "mod": mod_name,
                         "type": "dir_symlink",
@@ -579,7 +618,7 @@ class ModDeployer:
                 # → gesamter Mod ist ein REDmod-Ordner
                 if (mod_dir / "info.json").is_file():
                     redmod_target = (
-                        self._game_path / self._redmod_path / mod_name
+                        self._game_path / redmod_rel / mod_name
                     )
                     redmod_target.parent.mkdir(parents=True, exist_ok=True)
 
@@ -596,9 +635,7 @@ class ModDeployer:
                         redmod_target.symlink_to(mod_dir)
                         result.links_created += 1
                         symlinks.append({
-                            "link": str(
-                                Path(self._redmod_path) / mod_name
-                            ),
+                            "link": str(redmod_rel / mod_name),
                             "target": str(mod_dir),
                             "mod": mod_name,
                             "type": "dir_symlink",
@@ -625,9 +662,7 @@ class ModDeployer:
                             and (child / "info.json").is_file()
                         ):
                             redmod_target = (
-                                self._game_path
-                                / self._redmod_path
-                                / child.name
+                                self._game_path / redmod_rel / child.name
                             )
                             redmod_target.parent.mkdir(
                                 parents=True, exist_ok=True
@@ -649,10 +684,7 @@ class ModDeployer:
                                 redmod_target.symlink_to(child)
                                 result.links_created += 1
                                 symlinks.append({
-                                    "link": str(
-                                        Path(self._redmod_path)
-                                        / child.name
-                                    ),
+                                    "link": str(redmod_rel / child.name),
                                     "target": str(child),
                                     "mod": mod_name,
                                     "type": "dir_symlink",
@@ -777,6 +809,36 @@ class ModDeployer:
                     multi_folder_routes=self._multi_folder_routes,
                 )
 
+                # Determine deploy base: custom separator path or global game path
+                mod_separator = mod_to_separator.get(mod_name, "")
+                sep_path = self._separator_deploy_paths.get(mod_separator, "")
+                deploy_base = Path(sep_path) if sep_path else self._game_path
+
+                # Schreibweise an das angleichen, was im Ziel schon liegt.
+                # Muss vor der Nummerierung stehen -- der Overlay-Weg macht
+                # es genauso, sonst entstehen "001_x.pak" und "001_X.pak".
+                index = namen.get(deploy_base)
+                if index is None:
+                    index = CaseIndex(deploy_base)
+                    namen[deploy_base] = index
+                angeglichen = index.resolve(rel)
+                if is_direct and angeglichen.name != rel.name:
+                    # Frameworks duerfen echte Spieldateien ueberschreiben.
+                    # Wuerde das Angleichen eine treffen, die sonst
+                    # unberuehrt bliebe, gilt der Dateiname aus dem Archiv:
+                    # ein "version.dll", das auf ein vorhandenes
+                    # "Version.dll" gezogen wird, kostet beim Zurueck-
+                    # schreiben die Originaldatei des Spiels.
+                    #
+                    # Nur der Name, nicht der Ordner -- sonst zerreisst es
+                    # das Framework auf "RED4ext/" und "red4ext/", genau den
+                    # Zustand, den das Angleichen beseitigen soll.
+                    ziel = deploy_base / angeglichen
+                    if (ziel.is_file() and not ziel.is_symlink()
+                            and str(ziel) not in written_targets):
+                        angeglichen = angeglichen.parent / rel.name
+                rel = angeglichen
+
                 rel_ohne_zaehler = ""
                 nummerieren = (
                     (self._pak_load_order_prefix or self._pak_load_order_dirs)
@@ -799,11 +861,6 @@ class ModDeployer:
                         # fremde Datei kann selbst "00_" heissen.
                         if rel != vorher:
                             rel_ohne_zaehler = str(vorher)
-
-                # Determine deploy base: custom separator path or global game path
-                mod_separator = mod_to_separator.get(mod_name, "")
-                sep_path = self._separator_deploy_paths.get(mod_separator, "")
-                deploy_base = Path(sep_path) if sep_path else self._game_path
 
                 target = deploy_base / rel
 
@@ -860,8 +917,14 @@ class ModDeployer:
                 # 3) Everything else → symlink
                 needs_copy = is_direct
                 if not needs_copy and self._copy_deploy_paths:
-                    rel_posix = str(rel).replace("\\", "/")
+                    # Ohne Ruecksicht auf die Schreibweise: der Pfad ist an
+                    # dieser Stelle schon angeglichen, und eine Datei unter
+                    # "RED4ext/plugins" muss genauso kopiert werden wie unter
+                    # "red4ext/plugins" -- als Symlink kommt die DLL unter
+                    # Proton nicht als gueltige DLL an.
+                    rel_posix = str(rel).replace("\\", "/").lower()
                     for cp in self._copy_deploy_paths:
+                        cp = cp.lower()
                         if rel_posix.startswith(cp + "/") or rel_posix == cp:
                             needs_copy = True
                             break
@@ -965,6 +1028,7 @@ class ModDeployer:
         if self._mod_index is not None:
             self._mod_index.flush()
 
+        symlinks = _drop_duplicate_links(symlinks)
         symlinks = self._drop_superseded_numbered(symlinks, result)
         symlinks.extend(self._write_archive_load_order(symlinks, result))
 
@@ -1097,7 +1161,13 @@ class ModDeployer:
         if not self._archive_load_order_file:
             return []
 
-        rel_datei = Path(self._archive_load_order_file)
+        # Die Schreibweise des Archivordners steht nicht in der Plugin-
+        # Konfiguration, sondern in dem, was die erste Mod angelegt hat --
+        # sonst laege die Liste in einem zweiten Ordner daneben, oder sie
+        # wuerde gar nicht geschrieben.
+        rel_datei = CaseIndex(self._game_path).resolve(
+            self._archive_load_order_file
+        )
         ordner_rel = str(rel_datei.parent).replace("\\", "/").strip("/").lower()
         ordner = self._game_path / rel_datei.parent
         if not ordner.is_dir():
