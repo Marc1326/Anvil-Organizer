@@ -53,18 +53,21 @@ sed -i "s/^version = .*/version = \"${VERSION}\"/" pyproject.toml
 sed -i "s/^VERSION=.*/VERSION=\"${VERSION}\"/" build-appimage.sh
 sed -i "s/^Version:.*/Version:        ${VERSION}/" packaging/rpm/anvil-organizer.spec
 sed -i "s/^version:.*/version: '${VERSION}'/" packaging/snap/snapcraft.yaml
+sed -i "s/^pkgver=.*/pkgver=${VERSION}/" packaging/aur/PKGBUILD
 
 echo "  ✓ anvil/version.py"
 echo "  ✓ pyproject.toml"
 echo "  ✓ build-appimage.sh"
 echo "  ✓ packaging/rpm/anvil-organizer.spec"
 echo "  ✓ packaging/snap/snapcraft.yaml"
+echo "  ✓ packaging/aur/PKGBUILD (Prüfsumme folgt nach dem Tag)"
 
 # --- 2. Commit + Push ---
 echo ""
 echo "[2/7] Commit + Push ..."
 git add anvil/version.py pyproject.toml build-appimage.sh \
-    packaging/rpm/anvil-organizer.spec packaging/snap/snapcraft.yaml
+    packaging/rpm/anvil-organizer.spec packaging/snap/snapcraft.yaml \
+    packaging/aur/PKGBUILD
 git commit -m "$TAG"
 git push origin main
 echo "  ✓ Commit gepusht"
@@ -83,6 +86,32 @@ gh release create "$TAG" --draft --title "$TAG" --notes "Release $TAG" \
     install-flatpak.sh \
     Anvil-Organizer-installer.sh
 echo "  ✓ Draft-Release erstellt (+ Installer-Scripts)"
+
+# AUR-Pruefsumme: geht erst jetzt, den Tarball gibt es erst mit dem Tag.
+echo ""
+echo "      AUR-Prüfsumme holen ..."
+TARBALL_URL="https://github.com/Marc1326/Anvil-Organizer/archive/refs/tags/${TAG}.tar.gz"
+TARBALL_TMP="$(mktemp)"
+AUR_SUM=""
+for _ in $(seq 1 12); do
+    if curl -fsSL "$TARBALL_URL" -o "$TARBALL_TMP" 2>/dev/null; then
+        AUR_SUM="$(sha256sum "$TARBALL_TMP" | cut -d' ' -f1)"
+        break
+    fi
+    sleep 5
+done
+rm -f "$TARBALL_TMP"
+
+if [ -z "$AUR_SUM" ]; then
+    echo "  ⚠ Tarball nicht erreichbar — PKGBUILD-Prüfsumme bleibt veraltet."
+    echo "    Nachholen: sha256sum des Tarballs in packaging/aur/PKGBUILD eintragen."
+else
+    sed -i "s/^sha256sums=.*/sha256sums=('${AUR_SUM}')/" packaging/aur/PKGBUILD
+    git add packaging/aur/PKGBUILD
+    git commit -q -m "AUR checksum for $TAG"
+    git push -q origin main
+    echo "  ✓ PKGBUILD-Prüfsumme aktualisiert und gepusht"
+fi
 
 # --- 4. Warten auf Builds ---
 echo ""
