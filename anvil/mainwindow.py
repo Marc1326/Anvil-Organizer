@@ -3881,6 +3881,11 @@ class MainWindow(QMainWindow):
         if not predeploy:
             self._report_predeploy_failure(predeploy)
             return
+        # Erst nach dem Ausrollen umbiegen: dann steht im Manifest, wo die
+        # Datei wirklich liegt. Ein Werkzeug in .mods/ saehe nur seine eigene Mod.
+        exe_path, working_dir = self._game_panel.resolve_tool_path(
+            exe_path, working_dir
+        )
         if use_proton:
             self._game_panel.run_with_proton(exe_path, list(args), working_dir or None)
             return

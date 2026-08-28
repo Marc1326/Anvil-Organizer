@@ -21,6 +21,7 @@ from anvil.core.game_process import (
     find_game_process, plugin_watch_target, TOOL_ENV_MARKER,
 )
 from anvil.widgets.proton_tools_dialog import load_proton_tools, ProtonToolsDialog
+from anvil.core.tool_paths import resolve_tool_entry
 
 _DEPLOY_LOG = Path("/tmp/anvil-deploy.log")
 
@@ -978,11 +979,31 @@ class GamePanel(QWidget):
                     break
         self._update_exe_hint()
 
+    def _tool_path_args(self) -> dict:
+        """Alles, was zum Umrechnen eines Mod-Pfads auf das Spiel noetig ist."""
+        plugin = self._current_plugin
+        return {
+            "instance_path": self._instance_path,
+            "mods_path": self._mods_path,
+            "game_path": self._current_game_path,
+            "data_path": getattr(plugin, "GameDataPath", "") if plugin else "",
+            "nest_under_mod_name": (
+                getattr(plugin, "GameNestModsUnderName", False) if plugin else False
+            ),
+            "multi_folder_routes": (
+                getattr(plugin, "GameMultiFolderRoutes", {}) if plugin else {}
+            ),
+        }
+
+    def resolve_tool_path(self, exe_path: str, working_dir: str) -> tuple[str, str]:
+        """Einen Werkzeug-Pfad aus ``.mods/`` auf den ausgerollten Ort umbiegen."""
+        return resolve_tool_entry(exe_path, working_dir, **self._tool_path_args())
+
     def _on_edit_executables(self) -> None:
         """Open the editor for the instance's custom programs."""
         if not self._instance_path:
             return
-        dlg = ProtonToolsDialog(self, instance_path=self._instance_path)
+        dlg = ProtonToolsDialog(self, **self._tool_path_args())
         dlg.exec()
         # Das Menü lädt die geänderte Liste beim nächsten Öffnen via aboutToShow.
 

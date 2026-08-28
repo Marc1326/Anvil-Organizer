@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 from anvil.core.translator import tr
+from anvil.core.tool_paths import deployed_tool_path
 
 TOOLS_FILE = "proton_tools.json"
 
@@ -57,13 +58,28 @@ def save_proton_tools(instance_path: Path, tools: list[dict]) -> None:
 
 
 class ProtonToolsDialog(QDialog):
-    def __init__(self, parent=None, instance_path: Path | None = None):
+    def __init__(
+        self,
+        parent=None,
+        instance_path: Path | None = None,
+        *,
+        mods_path: Path | None = None,
+        game_path: Path | None = None,
+        data_path: str = "",
+        nest_under_mod_name: bool = False,
+        multi_folder_routes: dict[str, str] | None = None,
+    ):
         super().__init__(parent)
         self._parent_win = parent
         self.setWindowTitle(tr("proton_tools.manage_title"))
         self.setMinimumSize(780, 520)
         self.resize(780, 520)
         self._instance_path = instance_path
+        self._mods_path = mods_path
+        self._game_path = game_path
+        self._data_path = data_path
+        self._nest_under_mod_name = nest_under_mod_name
+        self._multi_folder_routes = multi_folder_routes
         self._tools: list[dict] = []
         if instance_path:
             self._tools = load_proton_tools(instance_path)
@@ -228,14 +244,36 @@ class ProtonToolsDialog(QDialog):
         if item:
             item.setText(tool["name"] or "?")
 
+    def _im_spiel(self, exe: Path) -> Path:
+        """Aus ``.mods/`` auf den ausgerollten Ort umbiegen.
+
+        Ein Werkzeug im Mod-Ordner sieht nur seine eigene Mod. Gemeint ist
+        immer die Stelle im Spielverzeichnis, wo alle Mods zusammenlaufen.
+        """
+        return deployed_tool_path(
+            exe,
+            instance_path=self._instance_path,
+            mods_path=self._mods_path,
+            game_path=self._game_path,
+            data_path=self._data_path,
+            nest_under_mod_name=self._nest_under_mod_name,
+            multi_folder_routes=self._multi_folder_routes,
+        ) or exe
+
+    def _start_dir(self) -> str:
+        """Startordner der Dateiauswahl -- dort liegen die Mods."""
+        if self._mods_path is not None and self._mods_path.is_dir():
+            return str(self._mods_path)
+        return ""
+
     def _on_add(self, checked=False) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, tr("proton_tools.select_exe"), "",
+            self, tr("proton_tools.select_exe"), self._start_dir(),
             tr("proton_tools.all_files"),
         )
         if not path:
             return
-        exe = Path(path)
+        exe = self._im_spiel(Path(path))
         new_tool = {
             "name": exe.stem,
             "exe_path": str(exe),
@@ -276,7 +314,7 @@ class ProtonToolsDialog(QDialog):
         self._list.setCurrentRow(select_row)
 
     def _on_browse_exe(self) -> None:
-        start_dir = ""
+        start_dir = self._start_dir()
         current_exe = self._exe_edit.text().strip()
         if current_exe:
             p = Path(current_exe)
@@ -287,12 +325,15 @@ class ProtonToolsDialog(QDialog):
             tr("proton_tools.exe_filter"),
         )
         if path:
-            self._exe_edit.setText(path)
+            exe = self._im_spiel(Path(path))
+            self._exe_edit.setText(str(exe))
+            if not self._dir_edit.text().strip():
+                self._dir_edit.setText(str(exe.parent))
             if not self._name_edit.text().strip():
-                self._name_edit.setText(Path(path).stem)
+                self._name_edit.setText(exe.stem)
 
     def _on_browse_dir(self) -> None:
-        start_dir = self._dir_edit.text().strip() or ""
+        start_dir = self._dir_edit.text().strip() or self._start_dir()
         path = QFileDialog.getExistingDirectory(
             self, tr("proton_tools.select_dir"), start_dir,
         )
