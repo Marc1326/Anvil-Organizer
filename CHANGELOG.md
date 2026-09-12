@@ -2,6 +2,9 @@
 
 ## [Unveröffentlicht]
 
+### Neu
+- **The Blood of Dawnwalker wird unterstützt** (Steam und GOG). Das Spiel hat keine offizielle Mod-Unterstützung; Anvil verteilt die vier Mod-Arten selbst: Pak-Mods nach `~mods`, Blueprint-Mods nach `LogicMods`, UE4SS samt Lua-Mods neben die Spiel-Exe und den SML-Konsolen-Loader direkt in den Paks-Ordner. UE4SS und der Console Enabler and Mod Loader sind als Frameworks hinterlegt. Hinweis: UE4SS läuft nur mit dem für Dawnwalker vorkonfigurierten Paket und ist an den jeweiligen Spiel-Build gebunden.
+
 ### Fixes
 - **Überschreiben sich zwei Mods bei einer Textdatei, sagt Anvil das jetzt.** Die Konfliktanzeige warf jede `.txt` weg, egal wo sie lag — auch Übersetzungen wie `Interface/Translations/MCM_en.txt`, die sehr wohl im Spiel landen. Zwei Mods mit derselben Übersetzungsdatei überschrieben sich also stillschweigend. Readmes und Änderungslisten bleiben weiterhin still.
 
