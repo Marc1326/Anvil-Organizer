@@ -1,5 +1,5 @@
 Name:           anvil-organizer
-Version:        1.8.3
+Version:        1.8.4
 Release:        1%{?dist}
 Summary:        Native Linux Mod Manager
 
