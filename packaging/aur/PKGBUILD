@@ -28,7 +28,7 @@ makedepends=(
     'python-wheel'
 )
 source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('dec12c30ccbf7722b04a684a142540be3ecfff417f11249a2a56a1229ba84adc')
+sha256sums=('20cbc5cf2ef72c0ece1ed85ae43b7944d1e301db974b8d3556864387ff9a1377')
 
 prepare() {
     cd "Anvil-Organizer-${pkgver}"
