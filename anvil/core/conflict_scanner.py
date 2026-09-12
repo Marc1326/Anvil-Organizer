@@ -59,18 +59,6 @@ def _match_ignore(rel_path: str, pattern: str) -> bool:
     return fnmatch(rl, pl)
 
 
-def _endung(rel: str) -> str:
-    """The lowercased file extension of *rel*, like ``Path.suffix``.
-
-    A leading dot does not start an extension: ``.hidden`` has none.
-    """
-    name = rel.rsplit("/", 1)[-1]
-    punkt = name.rfind(".")
-    if 0 < punkt < len(name) - 1:
-        return name[punkt:].lower()
-    return ""
-
-
 def _vermerke(
     file_owners: dict[str, list[str]],
     anzeige: dict[str, str],
@@ -99,9 +87,10 @@ class ConflictScanner:
     # never reaches the game cannot collide there.
     _INTERNAL_FILES = {"meta.ini"}
 
-    # Extensions that are never real conflicts (readme files, docs, etc.).
-    # Broader than the deploy rules on purpose: this also drops .txt in
-    # subdirectories, which the game does receive.
+    # For the pak branch only, like ``_INTERNAL_FILES`` above.  Outside an
+    # archive a .txt in a subdirectory is game content -- interface
+    # translations are the common case -- and may well collide.  Readmes
+    # and changelogs are handled by the game plugins' ignore patterns.
     _IGNORED_EXTENSIONS = {".txt"}
 
     def scan_conflicts(
@@ -185,8 +174,6 @@ class ConflictScanner:
                         # Management files and installer directories
                         if is_metadata_rel(rel):
                             continue
-                        if _endung(rel) in self._IGNORED_EXTENSIONS:
-                            continue
                         _vermerke(file_owners, anzeige, rel, mod_name)
                     continue
 
@@ -208,10 +195,6 @@ class ConflictScanner:
 
                 # Management files and installer directories
                 if is_metadata_rel(rel):
-                    continue
-
-                # Skip ignored extensions (readme files, docs, etc.)
-                if _endung(rel) in self._IGNORED_EXTENSIONS:
                     continue
 
                 _vermerke(file_owners, anzeige, rel, mod_name)

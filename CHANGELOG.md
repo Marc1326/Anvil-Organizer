@@ -3,6 +3,11 @@
 ## [Unveröffentlicht]
 
 ### Fixes
+- **Überschreiben sich zwei Mods bei einer Textdatei, sagt Anvil das jetzt.** Die Konfliktanzeige warf jede `.txt` weg, egal wo sie lag — auch Übersetzungen wie `Interface/Translations/MCM_en.txt`, die sehr wohl im Spiel landen. Zwei Mods mit derselben Übersetzungsdatei überschrieben sich also stillschweigend. Readmes und Änderungslisten bleiben weiterhin still.
+
+## [1.8.3] — 2026-09-12
+
+### Fixes
 - **Eigene Programme sahen nur eine einzige Mod.** Wer BodySlide, xEdit oder ein ähnliches Werkzeug aus dem Mod-Ordner eingetragen hat, startete es dort, wo nur diese eine Mod liegt — BodySlide fand seine eigenen Slider und sonst nichts. Anvil biegt den Pfad jetzt auf das Spielverzeichnis um, wo alle Mods zusammenlaufen. Das gilt beim Eintragen wie beim Starten, also auch für Einträge, die schon länger bestehen. Ein selbst gesetzter Arbeitsordner bleibt unangetastet.
 - **Die Konfliktanzeige meldete Dateien, die im Spiel nie ankommen.** Bei Mods aus einem FOMOD-Installer stand `fomod_choices.json` als Konflikt in der Liste, dazu der `fomod`-Ordner selbst, Vorschaubilder und andere Verwaltungsdateien aus dem Mod-Verzeichnis. Anvil rollt all das gar nicht erst aus — dort kann also nichts kollidieren. Konflikterkennung und Ausrollen richten sich jetzt nach denselben Regeln.
 - **Lange Beschreibungen im FOMOD-Installer waren nicht zu Ende zu lesen.** Schrieb ein Installer mehrere Absätze zu einer Option, brach der Text am unteren Fensterrand ab, ohne dass man weiterblättern konnte. Die Beschreibung lässt sich jetzt rollen; bei einer anderen Option beginnt sie wieder oben.

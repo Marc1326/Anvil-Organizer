@@ -9,7 +9,7 @@ fuehrte als die Deploy-Regeln.
 
 from pathlib import Path, PurePosixPath
 
-from anvil.core.conflict_scanner import ConflictScanner, _endung
+from anvil.core.conflict_scanner import ConflictScanner
 from anvil.core.deploy_rules import _segmente
 from anvil.core.modindex import ModIndex
 
@@ -107,25 +107,3 @@ def test_segmente_wie_purePosixPath() -> None:
             f"{rel!r}: {_segmente(rel)} statt {list(PurePosixPath(rel).parts)}"
         )
 
-
-def test_endung_wie_path_suffix() -> None:
-    """``_endung`` ersetzt zwei frueher unterschiedliche Berechnungen.
-
-    Ein fuehrender Punkt beginnt keine Endung, und gross geschrieben muss
-    dasselbe herauskommen -- sonst waere ``LIESMICH.TXT`` wieder ein Konflikt.
-    """
-    faelle = {
-        "a.TXT": ".txt",
-        "LIESMICH.TXT": ".txt",
-        ".hidden": "",
-        "a.": "",
-        "a.b.txt": ".txt",
-        "ordner.txt/datei": "",
-        "pfad/a.DDS": ".dds",
-        "": "",
-    }
-    for rel, erwartet in faelle.items():
-        assert _endung(rel) == erwartet, f"{rel!r} ergab {_endung(rel)!r}"
-        assert _endung(rel) == Path(rel).suffix.lower(), (
-            f"{rel!r} weicht von Path.suffix ab"
-        )
