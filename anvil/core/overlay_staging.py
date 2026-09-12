@@ -31,13 +31,13 @@ from anvil.core.deploy_rules import (
     SKIP_DIRS,
     apply_data_path,
     goes_into_archive,
-    is_metadata,
+    is_metadata_rel,
     strip_root,
     target_rel,
 )
 from anvil.core.mod_list_io import read_active_mods, read_global_modlist
 
-__all__ = ["OverlayStage", "StageResult", "is_metadata", "target_rel"]
+__all__ = ["OverlayStage", "StageResult", "is_metadata_rel", "target_rel"]
 
 
 @dataclass
@@ -359,7 +359,7 @@ class OverlayStage:
                         if not src.is_file():
                             continue
                         rel = src.relative_to(quelle)
-                        if is_metadata(src, quelle, rel):
+                        if is_metadata_rel(rel.as_posix()):
                             continue
                         ziel = angleichen("", ziel_schicht, prefix / rel)
                         if ziel.as_posix().lower() in self._exclude:
@@ -380,7 +380,7 @@ class OverlayStage:
                     rel = src.relative_to(mod_dir)
                 except ValueError:
                     continue
-                if is_metadata(src, mod_dir, rel):
+                if is_metadata_rel(rel.as_posix()):
                     continue
 
                 gestrippt = strip_root(rel)

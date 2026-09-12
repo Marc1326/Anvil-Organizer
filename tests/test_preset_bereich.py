@@ -641,8 +641,8 @@ def test_presets_bereich_als_widget():
 
 def test_nebensachen_passen_zum_deployer():
     from anvil.core.character_presets import _NEBENSACHE
-    from anvil.core.mod_deployer import _SKIP_FILES
-    assert _NEBENSACHE == set(_SKIP_FILES), (
+    from anvil.core.deploy_rules import SKIP_FILES
+    assert _NEBENSACHE == set(SKIP_FILES), (
         "Was der Deployer ueberspringt, darf die Preset-Erkennung "
         "nicht als Inhalt werten")
 

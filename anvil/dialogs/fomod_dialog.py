@@ -160,9 +160,22 @@ class FomodDialog(QDialog):
         self._preview_desc.setAlignment(Qt.AlignmentFlag.AlignTop)
         self._preview_desc.setObjectName("fomodPreviewDesc")
         self._preview_desc.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum
         )
-        pv.addWidget(self._preview_desc)
+
+        # Some installers write several paragraphs per option -- without
+        # its own scroll area the text is simply clipped at the window
+        # edge and the rest is out of reach.
+        self._preview_desc_scroll = QScrollArea()
+        self._preview_desc_scroll.setObjectName("fomodPreviewDescScroll")
+        self._preview_desc_scroll.setWidgetResizable(True)
+        # AsNeeded, not AlwaysOff: a single unbreakable word wider than
+        # the panel would otherwise be clipped with no way to reach it.
+        self._preview_desc_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self._preview_desc_scroll.setWidget(self._preview_desc)
+        pv.addWidget(self._preview_desc_scroll, 1)
 
         splitter.addWidget(preview)
         splitter.setSizes([420, 350])
@@ -333,9 +346,9 @@ class FomodDialog(QDialog):
             self._preview_image.setText(tr("fomod.no_image"))
 
         if first_plugin and first_plugin.description:
-            self._preview_desc.setText(first_plugin.description)
+            self._set_preview_desc(first_plugin.description)
         else:
-            self._preview_desc.setText(tr("fomod.no_description"))
+            self._set_preview_desc(tr("fomod.no_description"))
 
         self._update_buttons()
 
@@ -454,7 +467,7 @@ class FomodDialog(QDialog):
                 else:
                     self._preview_image.clear()
                     self._preview_image.setText(tr("fomod.no_image"))
-                self._preview_desc.setText(
+                self._set_preview_desc(
                     plugin.description or tr("fomod.no_description")
                 )
                 return
@@ -462,7 +475,16 @@ class FomodDialog(QDialog):
         # "None" or invalid index
         self._preview_image.clear()
         self._preview_image.setText(tr("fomod.no_image"))
-        self._preview_desc.setText("")
+        self._set_preview_desc("")
+
+    def _set_preview_desc(self, text: str) -> None:
+        """Set the description and scroll back to the top.
+
+        Without the reset the next option starts mid-text when the user
+        scrolled down on the previous one.
+        """
+        self._preview_desc.setText(text)
+        self._preview_desc_scroll.verticalScrollBar().setValue(0)
 
     def _load_preview_image(self, rel_path: str) -> None:
         """Load a preview image from the extracted archive."""

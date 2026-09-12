@@ -25,22 +25,17 @@ import json
 import os
 import shutil
 import struct
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-# Die alten Namen bleiben als Alias erhalten: Tests und
-# character_presets._NEBENSACHE beziehen sich darauf.
 from anvil.core.case_paths import CaseIndex
 from anvil.core.deploy_rules import (
-    ARCHIVE_KEEP_EXTENSIONS as _BA2_SYMLINK_EXTENSIONS,
     SKIP_DIRS as _SKIP_DIRS,
-    SKIP_FILES as _SKIP_FILES,
-    SKIP_ROOT_EXTENSIONS as _SKIP_ROOT_EXTENSIONS,
     apply_data_path,
     goes_into_archive,
+    is_metadata_rel,
     strip_root,
 )
 from anvil.core.mod_list_io import read_global_modlist, read_active_mods
@@ -736,27 +731,15 @@ class ModDeployer:
             for src_file in file_iter:
                 fehlt = aus_cache and not src_file.is_file()
 
-                # Skip metadata files
-                if src_file.name in _SKIP_FILES:
-                    continue
-
-                # Skip installer directories (fomod/ etc.)
-                try:
-                    rel_check = src_file.relative_to(mod_dir)
-                    if rel_check.parts and rel_check.parts[0].lower() in _SKIP_DIRS:
-                        continue
-                except ValueError:
-                    pass
-
-                # Skip non-game files in mod root directory only
-                # (images, readmes, etc. — subdirectory files are game content)
-                if src_file.parent == mod_dir and src_file.suffix.lower() in _SKIP_ROOT_EXTENSIONS:
-                    continue
-
                 # Compute relative path from mod root
                 try:
                     rel = src_file.relative_to(mod_dir)
                 except ValueError:
+                    continue
+
+                # Skip metadata files, installer directories and non-game
+                # files in the mod root
+                if is_metadata_rel(rel.as_posix()):
                     continue
 
                 if fehlt:

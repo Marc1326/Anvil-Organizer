@@ -368,6 +368,10 @@ QMessageBox QPushButton {
   padding: 8px;
   color: #AAAAAA; }
 
+#fomodPreviewDescScroll {
+  background: transparent;
+  border: 0; }
+
 /* ── QFileDialog: Icon-Größe für Toolbar-Buttons ── */
 QFileDialog QToolBar QToolButton {
   icon-size: 22px;

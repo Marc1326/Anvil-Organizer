@@ -5,7 +5,7 @@ import pytest
 
 from anvil.core.mod_list_io import write_active_mods, write_global_modlist
 from anvil.core.overlay_deployer import OverlayDeployer, filesystem_of
-from anvil.core.overlay_staging import OverlayStage, is_metadata, target_rel
+from anvil.core.overlay_staging import OverlayStage, is_metadata_rel, target_rel
 
 
 @pytest.fixture
@@ -73,11 +73,11 @@ def test_metadaten_werden_erkannt(tmp_path: Path) -> None:
     (mod / "textures").mkdir()
     (mod / "textures" / "haut.png").write_bytes(b"x")
 
-    assert is_metadata(mod / "meta.ini", mod, Path("meta.ini"))
-    assert is_metadata(mod / "vorschau.png", mod, Path("vorschau.png"))
-    assert is_metadata(mod / "fomod" / "info.xml", mod, Path("fomod/info.xml"))
+    assert is_metadata_rel("meta.ini")
+    assert is_metadata_rel("vorschau.png")
+    assert is_metadata_rel("fomod/info.xml")
     # Bilder in Unterordnern sind Spielinhalt
-    assert not is_metadata(mod / "textures" / "haut.png", mod, Path("textures/haut.png"))
+    assert not is_metadata_rel("textures/haut.png")
 
 
 # ── Staging ────────────────────────────────────────────────────────────
@@ -112,6 +112,33 @@ def test_hoehere_prioritaet_gewinnt(tmp_path: Path) -> None:
     gemeinsam = tmp_path / "stage" / "main" / "archive" / "gemeinsam.archive"
     assert gemeinsam.read_text(encoding="utf-8") == "oben"
     assert (tmp_path / "stage" / "main" / "archive" / "nur_unten.archive").is_file()
+
+
+def test_ordner_mod_laesst_verwaltungsdateien_draussen(tmp_path: Path) -> None:
+    """LML-Mods gehen als ganzer Ordner ins Ziel -- ueber einen eigenen Zweig.
+
+    Der prueft seit jeher getrennt vom Datei-fuer-Datei-Weg, und genau dort
+    fiel bisher kein Test durch, wenn die Pruefung fehlte.
+    """
+    mods, profiles = _library(tmp_path)
+    _mod(mods, "LML-Mod", {
+        "install.xml": "<x/>",
+        "meta.ini": "verwaltung",
+        "vorschau.png": "bild",
+        "fomod_choices.json": "{}",
+        "fomod/info.xml": "<i/>",
+        "scripts/main.lua": "inhalt",
+    })
+    write_global_modlist(profiles, ["LML-Mod"])
+    write_active_mods(profiles / "Default", {"LML-Mod"})
+
+    OverlayStage(mods, profiles, lml_path="lml/mods").build(tmp_path / "stage")
+
+    ziel = tmp_path / "stage" / "main" / "lml" / "mods" / "LML-Mod"
+    assert (ziel / "scripts" / "main.lua").is_file(), "Spielinhalt fehlt"
+    assert (ziel / "install.xml").is_file(), "LML braucht seine install.xml"
+    for rel in ("meta.ini", "vorschau.png", "fomod_choices.json", "fomod/info.xml"):
+        assert not (ziel / rel).exists(), f"{rel} ist im Overlay gelandet"
 
 
 def test_dokumentation_im_wurzelverzeichnis_bleibt_draussen(tmp_path: Path) -> None:

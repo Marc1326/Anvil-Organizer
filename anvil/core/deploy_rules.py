@@ -39,21 +39,46 @@ ARCHIVE_KEEP_EXTENSIONS = {
 }
 
 
-def is_metadata(src: Path, mod_dir: Path, rel: Path) -> bool:
+def _segmente(rel: str) -> list[str]:
+    """Die Pfadabschnitte von *rel*, wie ``PurePosixPath.parts`` sie liefert.
+
+    Von Hand, weil die Funktion pro Konfliktpruefung ueber
+    hunderttausende Dateien laeuft und ``PurePosixPath`` dabei ein
+    Vielfaches kostet. ``tests/test_konflikt_verwaltungsdateien.py``
+    haelt beide Fassungen auf denselben Faellen gleich.
+    """
+    teile = [t for t in rel.split("/") if t and t != "."]
+    # POSIX behandelt genau zwei fuehrende Schraegstriche eigen, drei
+    # oder mehr wieder wie einen.
+    if rel.startswith("//") and not rel.startswith("///"):
+        teile.insert(0, "//")
+    elif rel.startswith("/"):
+        teile.insert(0, "/")
+    return teile
+
+
+def is_metadata_rel(rel: str) -> bool:
     """True fuer Dateien, die zur Mod-Verwaltung gehoeren.
 
-    Der Symlink-Weg hat dieselben drei Pruefungen inline stehen
-    (``mod_deployer.py``, Schleife ueber ``file_iter``) -- dort wird
-    ``rel`` erst danach berechnet, deshalb ist der Aufruf nicht
-    austauschbar. ``tests/test_deploy_regeln.py`` haelt beide Seiten
-    auf denselben Faellen gleich.
+    *rel* ist der Pfad relativ zur Mod-Wurzel. Die Regel steht nur hier:
+    Deployer, Overlay-Weg und Konfliktscanner fragen alle diese Funktion.
+    Solange jeder sie nachbaute, liefen sie auseinander --
+    ``fomod_choices.json`` wurde beim Ausrollen uebersprungen, tauchte
+    aber als Konflikt auf.
     """
-    if src.name in SKIP_FILES:
+    teile = _segmente(rel)
+    if not teile:
+        return False
+
+    name = teile[-1]
+    if name in SKIP_FILES:
         return True
-    if rel.parts and rel.parts[0].lower() in SKIP_DIRS:
+    if teile[0].lower() in SKIP_DIRS:
         return True
-    if src.parent == mod_dir and src.suffix.lower() in SKIP_ROOT_EXTENSIONS:
-        return True
+    if len(teile) == 1:
+        punkt = name.rfind(".")
+        if punkt > 0 and name[punkt:].lower() in SKIP_ROOT_EXTENSIONS:
+            return True
     return False
 
 

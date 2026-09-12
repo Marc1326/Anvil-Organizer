@@ -20,6 +20,8 @@ from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
+from anvil.core.deploy_rules import is_metadata_rel
+
 if TYPE_CHECKING:
     from anvil.core.modindex import ModIndex
 
@@ -57,6 +59,18 @@ def _match_ignore(rel_path: str, pattern: str) -> bool:
     return fnmatch(rl, pl)
 
 
+def _endung(rel: str) -> str:
+    """The lowercased file extension of *rel*, like ``Path.suffix``.
+
+    A leading dot does not start an extension: ``.hidden`` has none.
+    """
+    name = rel.rsplit("/", 1)[-1]
+    punkt = name.rfind(".")
+    if 0 < punkt < len(name) - 1:
+        return name[punkt:].lower()
+    return ""
+
+
 def _vermerke(
     file_owners: dict[str, list[str]],
     anzeige: dict[str, str],
@@ -79,10 +93,15 @@ def _vermerke(
 class ConflictScanner:
     """Scan active mods for real file conflicts."""
 
-    # Files that are always internal to Anvil and never conflict.
+    # Files internal to Anvil, for the pak branch only: those paths sit
+    # *inside* an archive, where the deploy rules do not apply.  Every
+    # other branch asks ``deploy_rules.is_metadata_rel`` instead -- what
+    # never reaches the game cannot collide there.
     _INTERNAL_FILES = {"meta.ini"}
 
-    # Extensions that are never real conflicts (readme files, docs, etc.)
+    # Extensions that are never real conflicts (readme files, docs, etc.).
+    # Broader than the deploy rules on purpose: this also drops .txt in
+    # subdirectories, which the game does receive.
     _IGNORED_EXTENSIONS = {".txt"}
 
     def scan_conflicts(
@@ -163,14 +182,10 @@ class ConflictScanner:
                 if cached_files:
                     for finfo in cached_files:
                         rel = finfo["rel"]
-                        # Extract filename for internal-file check
-                        fname = rel.rsplit("/", 1)[-1] if "/" in rel else rel
-                        if fname in self._INTERNAL_FILES:
+                        # Management files and installer directories
+                        if is_metadata_rel(rel):
                             continue
-                        # Extract extension for ignored-extension check
-                        dot_pos = fname.rfind(".")
-                        ext = fname[dot_pos:].lower() if dot_pos >= 0 else ""
-                        if ext in self._IGNORED_EXTENSIONS:
+                        if _endung(rel) in self._IGNORED_EXTENSIONS:
                             continue
                         _vermerke(file_owners, anzeige, rel, mod_name)
                     continue
@@ -191,12 +206,12 @@ class ConflictScanner:
 
                 rel = file_path.relative_to(mod_root).as_posix()
 
-                # Skip Anvil-internal files
-                if file_path.name in self._INTERNAL_FILES:
+                # Management files and installer directories
+                if is_metadata_rel(rel):
                     continue
 
                 # Skip ignored extensions (readme files, docs, etc.)
-                if file_path.suffix.lower() in self._IGNORED_EXTENSIONS:
+                if _endung(rel) in self._IGNORED_EXTENSIONS:
                     continue
 
                 _vermerke(file_owners, anzeige, rel, mod_name)

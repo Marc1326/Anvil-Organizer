@@ -127,7 +127,7 @@ def target_path(kind: PresetKind, variant: str, dateiname: str) -> Path:
 
 
 # Von Anvil selbst angelegt, sagt nichts ueber den Inhalt der Mod aus.
-# Muss zu ``mod_deployer._SKIP_FILES`` passen -- was der Deployer nicht
+# Muss zu ``deploy_rules.SKIP_FILES`` passen -- was der Deployer nicht
 # ausrollt, darf hier auch nicht ueber die Einordnung entscheiden. Ein Test
 # haelt beide Mengen gleich.
 _NEBENSACHE = {"meta.ini", "codes.txt", "fomod_choices.json"}

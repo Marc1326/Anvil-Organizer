@@ -30,6 +30,7 @@ from PySide6.QtCore import QSettings
 
 from anvil.core.archive_packing import is_archive_loose_path
 from anvil.core.case_paths import CaseIndex
+from anvil.core.deploy_rules import is_metadata_rel
 
 
 # ── Constants ────────────────────────────────────────────────────────
@@ -253,13 +254,15 @@ class BA2Packer:
         for src in mod_dir.rglob("*"):
             if not src.is_file():
                 continue
-            if src.name in {"meta.ini", "codes.txt"}:
-                skipped_count += 1
-                continue
-
             try:
                 rel = src.relative_to(mod_dir)
             except ValueError:
+                continue
+
+            # Management files, installer directories and non-game files
+            # in the mod root never belong inside an archive
+            if is_metadata_rel(rel.as_posix()):
+                skipped_count += 1
                 continue
 
             classification = _classify_file(

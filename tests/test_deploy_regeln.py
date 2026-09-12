@@ -290,11 +290,12 @@ _INHALT_FAELLE = [
 
 
 def test_is_metadata_stimmt_mit_dem_deploy_ueberein(tmp_path: Path) -> None:
-    """Der Overlay-Weg benutzt ``is_metadata``, der Symlink-Weg hat die
-    drei Pruefungen inline. Laufen sie auseinander, sehen beide Wege
-    unterschiedliche Spielordner -- und kein anderer Test merkt es.
+    """Beide Deploy-Wege fragen ``is_metadata_rel``. Was die Funktion als
+    Verwaltung einstuft, darf der Deployer nicht ins Spiel legen -- und
+    umgekehrt. Laufen sie auseinander, sehen beide Wege unterschiedliche
+    Spielordner, und kein anderer Test merkt es.
     """
-    from anvil.core.deploy_rules import is_metadata
+    from anvil.core.deploy_rules import is_metadata_rel
 
     alle = {rel: b"x" for rel in _VERWALTUNG_FAELLE + _INHALT_FAELLE}
     instanz, spiel, mod = _bibliothek(tmp_path, alle)
@@ -302,18 +303,16 @@ def test_is_metadata_stimmt_mit_dem_deploy_ueberein(tmp_path: Path) -> None:
     ModDeployer(instanz, spiel).deploy()
 
     for rel in _VERWALTUNG_FAELLE:
-        quelle = mod / rel
-        assert is_metadata(quelle, mod, Path(rel)) is True, (
-            f"is_metadata laesst {rel} durch"
+        assert is_metadata_rel(rel) is True, (
+            f"is_metadata_rel laesst {rel} durch"
         )
         assert not (spiel / rel).exists(), (
             f"der Deployer hat {rel} ins Spiel gelegt"
         )
 
     for rel in _INHALT_FAELLE:
-        quelle = mod / rel
-        assert is_metadata(quelle, mod, Path(rel)) is False, (
-            f"is_metadata wirft {rel} weg"
+        assert is_metadata_rel(rel) is False, (
+            f"is_metadata_rel wirft {rel} weg"
         )
         assert (spiel / rel).is_symlink(), (
             f"der Deployer hat {rel} weggeworfen"
@@ -405,9 +404,5 @@ def test_konstanten_sind_nicht_doppelt_definiert() -> None:
     """
     from anvil.core import deploy_rules, mod_deployer
 
-    assert mod_deployer._SKIP_FILES is deploy_rules.SKIP_FILES
     assert mod_deployer._SKIP_DIRS is deploy_rules.SKIP_DIRS
-    assert (mod_deployer._SKIP_ROOT_EXTENSIONS
-            is deploy_rules.SKIP_ROOT_EXTENSIONS)
-    assert (mod_deployer._BA2_SYMLINK_EXTENSIONS
-            is deploy_rules.ARCHIVE_KEEP_EXTENSIONS)
+    assert mod_deployer.is_metadata_rel is deploy_rules.is_metadata_rel
