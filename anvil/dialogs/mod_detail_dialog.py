@@ -1876,7 +1876,9 @@ class ModDetailDialog(QDialog):
                  mod_index=None, archive_hashes=None):
         super().__init__(parent)
         self._all_mods = all_mods or []
-        self.setWindowTitle(mod_name or tr("dialog.mod_details"))
+        # mod_name ist der Ordnername; im Titel steht der Anzeigename
+        title = getattr(mod_entry, "display_name", "") or mod_name
+        self.setWindowTitle(title or tr("dialog.mod_details"))
         from anvil.styles.dark_theme import theme_color
         self._modern = bool(theme_color("panel2", ""))
         self.setMinimumSize(1280, 720)
@@ -1908,7 +1910,7 @@ class ModDetailDialog(QDialog):
             tb = QHBoxLayout(title_bar)
             tb.setContentsMargins(16, 0, 16, 0)
             tb.setSpacing(10)
-            t_lbl = QLabel(mod_name or tr("dialog.mod_details"))
+            t_lbl = QLabel(title or tr("dialog.mod_details"))
             t_lbl.setObjectName("instTitleLabel")
             tb.addWidget(t_lbl)
             version = getattr(mod_entry, "version", "") if mod_entry else ""

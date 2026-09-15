@@ -363,6 +363,11 @@
     "header_category": "Categoría",
     "header_priority": "Prioridad",
     "header_mod_name": "Nombre del Mod",
+    "header_installed_at": "Instalado",
+    "header_mod_size": "Tamaño",
+    "header_download_date": "Descargado",
+    "header_archive_size": "Tamaño del archivo",
+    "sort_by_priority": "Ordenar por prioridad",
     "header_author": "Autor",
     "type_framework": "Framework",
     "type_data_override": "Data-Override",
@@ -547,7 +552,9 @@
     "fw_update_error": "Comprobación de actualización para {name} falló:\n{reason}",
     "fw_no_nexus_id": "No hay ID de Nexus configurado para {name}.",
     "catch_all_created": "Separador «{name}» creado: los mods nuevos irán ahí",
-    "tidy_catch_all_done": "Movidas a «{ziel}»: {count}"
+    "tidy_catch_all_done": "Movidas a «{ziel}»: {count}",
+    "modlist_sort_locked": "Los mods solo se pueden mover mientras estén ordenados por prioridad (ascendente).",
+    "plugins_sort_locked": "Los plugins solo se pueden mover mientras estén ordenados por índice (ascendente)."
   },
   "log": {
     "keep_file_names_on": "{name}: los nombres de archivo se mantienen",

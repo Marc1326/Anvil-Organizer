@@ -165,6 +165,10 @@ class DownloadManager(QObject):
             # ganzen Instanzwechsel mit einer Exception abzubrechen.
             print(f"[DownloadManager] Downloads-Verzeichnis nicht verfügbar: {path} ({e})")
 
+    def clear_downloads_dir(self) -> None:
+        """Kein Ziel -- neue Downloads werden abgelehnt."""
+        self._downloads_dir = None
+
     def downloads_dir(self) -> Path | None:
         """Return the current downloads directory."""
         return self._downloads_dir

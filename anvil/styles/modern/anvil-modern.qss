@@ -41,7 +41,9 @@ QTreeView, QListView {
   #savesTree::item, #dataTree::item {
     min-height: 32px; }
 
-QHeaderView::up-arrow, QHeaderView::down-arrow {
+/* Nur Dialoge: Mod-Liste und Seitenleiste setzen den Pfeil selbst neben
+   den Titel (header_arrow_style.py) */
+QDialog QHeaderView::up-arrow, QDialog QHeaderView::down-arrow {
   height: 10px;
   width: 10px;
   padding-right: 4px; }
@@ -331,11 +333,20 @@ QProgressBar {
     background: {{accent}};
     border-radius: 6px; }
 
-/* Horizontale Trenner = 1-px-Linie wie in der Vorlage (Panels sind fix);
+/* Horizontale Trenner = 1-px-Linie wie in der Vorlage (Filter-Panel ist fix);
    vertikale Trenner (Frameworks/Log) bleiben greifbar */
 QSplitter::handle:horizontal {
   width: 1px;
   background: {{line}}; }
+/* Seitenleiste: greifbarer Griff, sichtbar bleibt die 1-px-Linie */
+QSplitter#mainSplitter::handle:horizontal {
+  width: 6px;
+  background: {{panel}};
+  border: 0;
+  border-left: 1px solid {{line}}; }
+  QSplitter#mainSplitter::handle:horizontal:hover,
+  QSplitter#mainSplitter::handle:horizontal:pressed {
+    background: {{accent_soft}}; }
 QSplitter::handle:vertical {
   height: 6px;
   background: {{bg}}; }

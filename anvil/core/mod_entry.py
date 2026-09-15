@@ -50,6 +50,7 @@ class ModEntry:
     description: str = ""
     url: str = ""
     install_date: str = ""                 # ISO format
+    installation_file: str = ""            # Archivname, aus dem die Mod installiert wurde
 
     # Special types
     is_separator: bool = False             # True for _separator dirs
@@ -211,6 +212,7 @@ def _build_entry(
         description=meta.get("description", ""),
         url=meta.get("url", ""),
         install_date=meta.get("installDate", ""),
+        installation_file=meta.get("installationFile", ""),
         is_separator=is_sep,
         color=sep_color,
         deploy_path=sep_deploy_path,

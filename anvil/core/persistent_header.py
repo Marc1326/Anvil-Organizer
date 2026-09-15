@@ -11,6 +11,7 @@ one disk write instead of hundreds.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, QTimer
@@ -79,16 +80,45 @@ class PersistentHeader:
 
     def _write_widths(self) -> None:
         """Snapshot all non-stretch column widths to QSettings."""
+        if not self.enabled:
+            return
         h = self._header
+        s = _settings()
+        # Ausgeblendete Spalten melden 0 -- ihre gespeicherte Breite bleibt stehen
+        vorher = self._read_widths(s)
         widths: list[int] = []
         last = h.count() - 1
         for i in range(h.count()):
             if h.stretchLastSection() and i == last:
                 widths.append(-1)          # sentinel: "let Qt stretch"
+            elif h.isSectionHidden(i) and i < len(vorher) and vorher[i] > 0:
+                widths.append(vorher[i])
             else:
                 widths.append(h.sectionSize(i))
-        s = _settings()
         s.setValue(f"{self._key}/column_widths", widths)
+
+    def _read_widths(self, s: QSettings) -> list[int]:
+        raw = s.value(f"{self._key}/column_widths")
+        if not isinstance(raw, list):
+            return []
+        try:
+            return [int(v) for v in raw]
+        except (TypeError, ValueError):
+            return []
+
+    def saved_widths(self) -> list[int]:
+        """Gespeicherte Breiten (leer, wenn nichts Brauchbares gespeichert ist)."""
+        return self._read_widths(_settings())
+
+    @contextmanager
+    def silenced(self):
+        """Breitenaenderungen im Block nicht speichern."""
+        vorher = self._restoring
+        self._restoring = True
+        try:
+            yield
+        finally:
+            self._restoring = vorher
 
     def flush(self) -> None:
         """Force any pending debounced write to disk immediately.
@@ -105,26 +135,18 @@ class PersistentHeader:
         """Apply previously saved widths.  Returns True if widths existed."""
         if not self.enabled:
             return False
-        s = _settings()
-        raw = s.value(f"{self._key}/column_widths")
-        if not raw:
-            return False
-
-        widths: list[int]
-        if isinstance(raw, list):
-            widths = [int(v) for v in raw]
-        else:
-            return False
+        widths = self.saved_widths()
 
         h = self._header
-        if not widths or len(widths) != h.count():
-            return False            # column count changed — ignore stale data
+        if not widths or len(widths) > h.count():
+            return False            # mehr gespeichert als vorhanden — veraltet
+        # Kuerzere Liste: vorne uebernehmen, neue Spalten behalten ihre Breite
 
         self._restoring = True
         try:
             for i, w in enumerate(widths):
-                if w == -1:
-                    continue        # stretch sentinel — leave alone
+                if w <= 0:
+                    continue        # -1 = gestreckt, 0 = war ausgeblendet
                 if i < h.count():
                     h.resizeSection(i, w)
         finally:

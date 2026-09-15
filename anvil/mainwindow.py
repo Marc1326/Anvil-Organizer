@@ -48,7 +48,7 @@ from anvil.widgets.profile_bar import ProfileBar
 from anvil.widgets.mod_list import ModListView
 from anvil.widgets.collapsible_bar import CollapsibleSectionBar
 from anvil.widgets.filter_panel import FilterPanel
-from anvil.widgets.game_panel import GamePanel, GAME_RUNNING
+from anvil.widgets.game_panel import GamePanel, GAME_RUNNING, PANEL_MIN_WIDTH
 from anvil.widgets.status_bar import StatusBarWidget
 from anvil.widgets.toast import Toast
 from anvil.dialogs import ModDetailDialog
@@ -115,6 +115,9 @@ _PRESET_SEP_COLOR = "#ffd700"
 # Beipack, aus dem allein keine Mod wird.
 _NUR_BEIWERK = {".txt", ".md", ".pdf", ".url", ".nfo", ".ds_store"}
 _NUR_BEIWERK_NAMEN = {"thumbs.db", ".ds_store", "desktop.ini"}
+
+# Modern: Greiffläche zwischen Mod-Liste und Seitenleiste (sichtbar bleibt 1 px)
+_MAIN_HANDLE_MODERN = 6
 
 
 def _has_installable_content(root: Path) -> bool:
@@ -261,6 +264,7 @@ class MainWindow(QMainWindow):
 
         # Profil-Leiste NUR ueber der linken Seite, nicht ueber die ganze Breite
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._splitter.setObjectName("mainSplitter")
         splitter = self._splitter
         left_pane = QWidget()
         left_layout = QVBoxLayout(left_pane)
@@ -494,6 +498,12 @@ class MainWindow(QMainWindow):
         self._mod_list_view.preset_toggled.connect(self._on_preset_toggled)
         self._mod_list_view.preset_context_menu_requested.connect(
             self._on_preset_context_menu)
+        self._mod_list_view.reorder_blocked.connect(
+            lambda: self.statusBar().showMessage(tr("status.modlist_sort_locked"), 5000))
+        self._game_panel.downloads_scanned.connect(
+            self._mod_list_view.source_model().set_archive_stats)
+        self._game_panel.reorder_blocked.connect(
+            lambda: self.statusBar().showMessage(tr("status.plugins_sort_locked"), 5000))
         self._game_panel.install_requested.connect(self._on_downloads_install)
         self._game_panel.start_requested.connect(self._on_start_game)
         self._game_panel.custom_start_requested.connect(self._on_custom_tool_start)
@@ -1464,31 +1474,44 @@ class MainWindow(QMainWindow):
         # Log: CollapsibleSectionBar restores its own state; sync menu check
         self._act_log.setChecked(not self._log_bar.collapsed)
 
-        # Modern: Seiten-Splitter verriegeln — Panelbreiten sind fest
+        # Modern: Filter-Panel verriegeln, Seitenleiste nur nach unten begrenzen
         self._apply_splitter_locks()
 
     def _apply_splitter_locks(self) -> None:
-        """Modern: Filter-/Game-Panel-Schieber nicht ziehbar (feste Breiten),
-        Griff = 1-px-Trennlinie; klassisch: frei ziehbar in Standard-Breite."""
+        """Modern: Filter-Panel-Schieber nicht ziehbar (feste Breite, 1-px-Linie),
+        Seitenleiste ziehbar ab PANEL_MIN_WIDTH, nichts klappt weg;
+        klassisch: beide frei ziehbar in Standard-Breite."""
         from anvil.styles.dark_theme import theme_color
-        locked = bool(theme_color("panel2", ""))
-        if not hasattr(self, "_default_handle_width"):
-            self._default_handle_width = self._splitter.handleWidth()
-        for sp in (self._filter_splitter, self._splitter):
-            sp.setHandleWidth(1 if locked else self._default_handle_width)
-            for i in range(1, sp.count()):
-                h = sp.handle(i)
-                if h is not None:
-                    h.setEnabled(not locked)
+        modern = bool(theme_color("panel2", ""))
+        # Klassisch -1 = Breite aus dem Stil. Ein beim Start gemerkter Wert
+        # stammte nach Start im modernen Design aus dessen QSS.
+        fs = self._filter_splitter
+        fs.setHandleWidth(1 if modern else -1)
+        for i in range(1, fs.count()):
+            h = fs.handle(i)
+            if h is not None:
+                h.setEnabled(not modern)
+        # Muss nach restoreState laufen — der Stand bringt Griffbreite und
+        # Zusammenklappbarkeit mit
+        ms = self._splitter
+        ms.setHandleWidth(_MAIN_HANDLE_MODERN if modern else -1)
+        for i in range(ms.count()):
+            h = ms.handle(i)
+            if i > 0 and h is not None:
+                h.setEnabled(True)
+            ms.setCollapsible(i, not modern)
+        # Modern waechst beim Vergroessern nur die Mod-Liste
+        ms.setStretchFactor(0, 1 if modern else 0)
+        ms.setStretchFactor(1, 0)
         # Modern: kein Abstand zwischen Splittern und Log-Leiste —
         # die 1-px-Linien enden direkt an der Leiste (wie in der Vorlage)
         lay = self.centralWidget().layout()
         if not hasattr(self, "_default_layout_spacing"):
             self._default_layout_spacing = lay.spacing()
-        lay.setSpacing(0 if locked else self._default_layout_spacing)
-        if not locked:
+        lay.setSpacing(0 if modern else self._default_layout_spacing)
+        if not modern:
             return
-        # Restaurierte Splitter-Stände an die festen Breiten angleichen —
+        # Restaurierte Stände an die feste Filter-Panel-Breite angleichen —
         # der Splitter klemmt das Panel zwar auf min/max, positioniert den
         # Nachbarn aber nach dem alten Stand: die Differenz bleibt als
         # unsichtbare Lücke stehen (gleiche Hintergrundfarbe).
@@ -1496,10 +1519,14 @@ class MainWindow(QMainWindow):
         total = sum(self._filter_splitter.sizes())
         if total > fp_w:
             self._filter_splitter.setSizes([fp_w, total - fp_w])
-        gp_w = self._game_panel.maximumWidth()
-        total = sum(self._splitter.sizes())
-        if total > gp_w:
-            self._splitter.setSizes([total - gp_w, gp_w])
+        # Seitenleiste nur nach unten klemmen (alter oder klassischer Stand).
+        # Die Konstante, nicht minimumWidth(): beim Live-Wechsel laeuft das
+        # hier vor GamePanel.apply_theme_metrics().
+        sizes = ms.sizes()
+        if len(sizes) == 2 and sizes[1] < PANEL_MIN_WIDTH:
+            total = sum(sizes)
+            if total > PANEL_MIN_WIDTH:
+                ms.setSizes([total - PANEL_MIN_WIDTH, PANEL_MIN_WIDTH])
 
     # ── Mod-Liste Settings (Backend-Logik) ──────────────────────────
 
@@ -1839,6 +1866,7 @@ class MainWindow(QMainWindow):
             self._mod_index = None
             self._bg3_installer = None
             self._mod_list_view.set_extra_drop_extensions(set())
+            self._mod_list_view.set_view_features_enabled(True)
             # Sonst bliebe die Auskunft des vorigen Spiels stehen.
             self._mod_list_view.source_model().set_load_order_plugin(None)
             self._update_order_hint()
@@ -1917,6 +1945,13 @@ class MainWindow(QMainWindow):
                 instance_paths.profiles,
                 instance_paths.overwrite,
             )
+            # Downloads nicht im Ordner der vorigen Instanz ablegen. Fehlt der
+            # Ordner, nichts anlegen -- er laege sonst unter dem Mountpunkt.
+            dm = self._game_panel.download_manager()
+            if instance_paths.downloads.is_dir():
+                dm.set_downloads_dir(instance_paths.downloads)
+            else:
+                dm.clear_downloads_dir()
             self._toolbar.deploy_sep.setVisible(False)
             self._toolbar.deploy_action.setVisible(False)
             self._toolbar.proton_action.setVisible(False)
@@ -1951,6 +1986,8 @@ class MainWindow(QMainWindow):
 
         # ── BG3-specific path ─────────────────────────────────────
         if short_name == "baldursgate3":
+            # BG3 sieht die Mod-Liste wie bisher: ohne Sortieren und Spaltenwahl
+            self._mod_list_view.set_view_features_enabled(False)
             self._apply_bg3_instance(instance_name, data, plugin, game_path)
             self._status_bar.update_instance(game_name, short_name, store)
             self._restore_ui_state()
@@ -1986,6 +2023,7 @@ class MainWindow(QMainWindow):
         self._mod_list_stack.setCurrentWidget(self._mod_list_view)
         self._bg3_installer = None
         self._mod_list_view.set_extra_drop_extensions(set())
+        self._mod_list_view.set_view_features_enabled(True)
 
         # Load categories for this instance
         self._category_manager.load(instance_path)
@@ -3293,6 +3331,9 @@ class MainWindow(QMainWindow):
                     entry.priority = i
                     new_entries.append(entry)
                     break
+        # Der Filter liest die Eintraege ueber die Quellzeile -- sie muessen
+        # der neuen Reihenfolge folgen.
+        self._mod_list_view._proxy_model.set_mod_entries(new_entries)
         # Alles retten, was nicht in der Liste steht -- gesperrte Frameworks
         # und Presets. Wuerde es hier wegfallen, verschwaende es beim
         # naechsten Schreiben auch aus der modlist.txt und damit aus dem Spiel.
@@ -4756,16 +4797,25 @@ class MainWindow(QMainWindow):
     # ── Other slots ───────────────────────────────────────────────────
 
     def _on_mod_double_click(self, index=None):
+        view = self._mod_list_view
+        # Ordnername statt Anzeigename -- Pfad und Eintrag haengen am Ordner.
+        # BG3 bleibt beim Anzeigenamen, dort ist der Ordnername eine UUID.
+        by_folder = self._bg3_installer is None
         # Index aus dem doubleClicked Signal verwenden (falls vorhanden)
         if index is not None and index.isValid():
-            mod_name = self._mod_list_view.get_mod_name_from_index(index)
+            mod_name = (view.get_folder_name_from_index(index) if by_folder
+                        else view.get_mod_name_from_index(index))
         else:
-            mod_name = self._mod_list_view.get_current_mod_name()
+            mod_name = (view.get_current_folder_name() if by_folder
+                        else view.get_current_mod_name())
         if not mod_name:
             return
 
         # Sichtbare Mod-Reihenfolge aus dem Proxy-Model (ohne Separatoren)
-        mod_names = self._mod_list_view.get_visible_mod_names()
+        mod_names = (view.get_visible_mod_folder_names() if by_folder
+                     else view.get_visible_mod_names())
+        select_mod = (view.select_mod_by_folder_name if by_folder
+                      else view.select_mod_by_name)
 
         while mod_name:
             mod_path = str(_active_instance_paths(self).mods / mod_name)
@@ -4807,14 +4857,14 @@ class MainWindow(QMainWindow):
                     mod_name = mod_names[idx - 1]
                 else:
                     mod_name = mod_names[-1]  # wrap around
-                self._mod_list_view.select_mod_by_name(mod_name)
+                select_mod(mod_name)
             elif result == ModDetailDialog.RESULT_NEXT:
                 idx = mod_names.index(mod_name) if mod_name in mod_names else -1
                 if idx < len(mod_names) - 1:
                     mod_name = mod_names[idx + 1]
                 else:
                     mod_name = mod_names[0]  # wrap around
-                self._mod_list_view.select_mod_by_name(mod_name)
+                select_mod(mod_name)
             else:
                 break  # Schliessen
 
@@ -5088,12 +5138,16 @@ class MainWindow(QMainWindow):
         send_to_menu.setEnabled(False)
         move_to_sep_menu = menu.addMenu(tr("context.move_to_separator"))
         separators = self._mod_list_view.source_model().get_all_separators()
-        if separators and has_selection:
+        sort_locked = not self._mod_list_view.is_priority_order()
+        if separators and has_selection and not sort_locked:
             for sep_row, sep_folder, sep_name in separators:
                 act_sep = move_to_sep_menu.addAction(sep_name)
                 act_sep.setData(sep_folder)
         else:
             move_to_sep_menu.setEnabled(False)
+            if sort_locked:
+                menu.setToolTipsVisible(True)
+                move_to_sep_menu.menuAction().setToolTip(tr("status.modlist_sort_locked"))
         act_rename = menu.addAction(tr("context.rename_mod"))
         act_rename.setEnabled(single)
         act_reinstall = menu.addAction(tr("context.reinstall_mod"))
@@ -6785,6 +6839,9 @@ class MainWindow(QMainWindow):
 
     def _ctx_move_to_separator(self, source_rows: list[int], separator_folder: str) -> None:
         """Move selected mods to the end of the given separator's children."""
+        if not self._mod_list_view.is_priority_order():
+            self.statusBar().showMessage(tr("status.modlist_sort_locked"), 5000)
+            return
         model = self._mod_list_view.source_model()
 
         # Separator-Position im Model finden
@@ -8182,6 +8239,10 @@ class MainWindow(QMainWindow):
                 mod_name=entry["mod_name"],
                 mod_version=entry["mod_version"],
             )
+            if dl_id < 0:
+                pending.pop((tag_mod_id, tag_file_id), None)
+                self.statusBar().showMessage(tr("status.no_downloads_folder"), 5000)
+                return
             self.statusBar().showMessage(
                 tr("status.nexus_download_started", name=file_name), 5000,
             )
@@ -8570,9 +8631,15 @@ class MainWindow(QMainWindow):
         val = s.value("splitter/state")
         if val:
             self._splitter.restoreState(val)
-        # Modern: feste Panelbreiten erzwingen — ein alter Stand darf
-        # keine Lücke neben Mod-Liste/Game-Panel hinterlassen
+        # Modern: Filter-Panel fest, Seitenleiste mindestens PANEL_MIN_WIDTH —
+        # ein alter Stand darf keine Lücke hinterlassen
         self._apply_splitter_locks()
+        from anvil.styles.dark_theme import theme_color
+        if not val and theme_color("panel2", ""):
+            # Erststart modern: Seitenleiste in Mindestbreite statt 420
+            total = sum(self._splitter.sizes())
+            if total > PANEL_MIN_WIDTH:
+                self._splitter.setSizes([total - PANEL_MIN_WIDTH, PANEL_MIN_WIDTH])
 
         # Standard mod list — always visible
         self._mod_list_view.restore_column_widths()

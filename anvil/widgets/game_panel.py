@@ -29,6 +29,9 @@ GAME_RUNNING = "running"
 GAME_STOPPED = "stopped"
 GAME_UNKNOWN = "unknown"
 
+# Modern: schmaler geht die Seitenleiste nicht (deutsche Knopftexte)
+PANEL_MIN_WIDTH = 340
+
 # Wie lange die letzte Messung des Watchers als aktuell gilt.
 _GAME_STATE_TTL = 15
 
@@ -74,12 +77,14 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QAbstractItemView,
     QSizePolicy,
+    QStyle,
+    QStyleOptionHeader,
 )
 
-from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont
+from PySide6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QFont, QFontMetrics
 from PySide6.QtCore import (
-    Qt, QSize, QPoint, Signal, QUrl, QMimeData, QSettings, QTimer,
-    QElapsedTimer, QThread,
+    Qt, QSize, QPoint, QRect, Signal, QUrl, QMimeData, QSettings, QTimer,
+    QElapsedTimer, QThread, QItemSelectionModel,
 )
 
 from anvil.core.mod_installer import (
@@ -98,6 +103,9 @@ from anvil.core.plugins_txt_writer import (
 from anvil.core.desktop_shortcut import create_game_shortcut
 from anvil.core.translator import tr
 from anvil.styles.dark_theme import theme_color
+from anvil.styles.header_arrow_style import (
+    apply_header_arrow_style, header_title_font, title_arrow_width,
+)
 
 
 class _Deployer(Protocol):
@@ -151,12 +159,83 @@ class _NumericSortItem(QTableWidgetItem):
         return super().__lt__(other)
 
 
+def _sort_title_width(header: QHeaderView, column: int) -> int:
+    """Breite, in der Titel und Sortierpfeil im aktiven Stil nebeneinander passen."""
+    header.ensurePolished()
+    style = header.style()
+    opt = QStyleOptionHeader()
+    opt.initFrom(header)
+    opt.orientation = Qt.Orientation.Horizontal
+    opt.section = column
+    opt.text = str(header.model().headerData(column, Qt.Orientation.Horizontal) or "")
+    opt.rect = QRect(0, 0, header.sectionSize(column),
+                     max(header.height(), header.sizeHint().height()))
+    # QSize(0, 0) statt QSize(): sonst misst der Stil mit der Schrift des
+    # Widgets statt mit der Schrift der Kopfzeilen-Regel
+    width = style.sizeFromContents(
+        QStyle.ContentsType.CT_HeaderSection, opt, QSize(0, 0), header).width()
+    opt.sortIndicator = QStyleOptionHeader.SortIndicator.SortDown
+    arrow = style.subElementRect(QStyle.SubElement.SE_HeaderArrow, opt, header)
+    width += arrow.width() + 2
+    if theme_color("panel2", ""):
+        # Modern steht der Pfeil neben dem Titel, mittig braucht er mehr Platz
+        alignment = header.model().headerData(
+            column, Qt.Orientation.Horizontal, Qt.ItemDataRole.TextAlignmentRole)
+        alignment = (header.defaultAlignment() if alignment is None
+                     else Qt.AlignmentFlag(int(alignment)))
+        text_width = QFontMetrics(header_title_font(header)).horizontalAdvance(opt.text)
+        width = max(width, title_arrow_width(text_width, alignment))
+    return width
+
+
+_FOLDER_ROLE = Qt.ItemDataRole.UserRole + 1
+
+
+class _SortKeyTreeItem(QTreeWidgetItem):
+    """Sortiert nach dem Rohwert in UserRole, sonst nach dem Text.
+
+    Traegt Spalte 0 den Ordner-Merker (_FOLDER_ROLE), stehen Ordner in jeder
+    Spalte und Richtung vor Dateien.
+    """
+
+    def __lt__(self, other):
+        tree = self.treeWidget()
+        col = tree.sortColumn() if tree is not None else 0
+        a_dir = self.data(0, _FOLDER_ROLE)
+        b_dir = other.data(0, _FOLDER_ROLE)
+        if a_dir is not None and b_dir is not None and bool(a_dir) != bool(b_dir):
+            # Qt dreht bei absteigend den Vergleich um — hier zurueckdrehen
+            descending = (
+                tree is not None
+                and tree.header().sortIndicatorOrder() == Qt.SortOrder.DescendingOrder
+            )
+            return bool(a_dir) != descending
+        a = self.data(col, Qt.ItemDataRole.UserRole)
+        b = other.data(col, Qt.ItemDataRole.UserRole)
+        if a is not None and b is not None:
+            return a < b
+        return self.text(col).casefold() < other.text(col).casefold()
+
+
 class _PluginOrderTree(QTreeWidget):
     """Top-level-only plugin tree that reports a completed internal drop."""
 
     order_dropped = Signal()
+    drag_blocked = Signal()  # Ziehversuch, waehrend nicht nach Index sortiert ist
+
+    # Gesetzt vom GamePanel: sortierte Ansicht ist nicht die Ladereihenfolge
+    order_locked = False
+
+    def startDrag(self, supportedActions) -> None:
+        if self.order_locked:
+            self.drag_blocked.emit()
+            return
+        super().startDrag(supportedActions)
 
     def dropEvent(self, event) -> None:
+        if self.order_locked:
+            event.ignore()
+            return
         before = [
             id(self.topLevelItem(index))
             for index in range(self.topLevelItemCount())
@@ -302,6 +381,8 @@ class GamePanel(QWidget):
     deploy_gaps = Signal(list)  # Mods/Dateien, die nicht im Spiel gelandet sind
 
     dl_query_info_requested = Signal(str)  # archive_path
+    reorder_blocked = Signal()  # Plugins: Ziehversuch in sortierter Ansicht
+    downloads_scanned = Signal(dict, dict)  # Archivname / Mod-Ordner -> (Groesse, mtime)
     _redmod_finished = Signal(int, str, str, str, bool)  # (exit_code, stdout, stderr, binary, is_steam)
     _redmod_manual_finished = Signal(int, str, str)       # (exit_code, stdout, stderr)
 
@@ -445,7 +526,16 @@ class GamePanel(QWidget):
         self._updating_plugins = False
         self._plugins_tree.itemChanged.connect(self._on_plugin_item_changed)
         self._plugins_tree.order_dropped.connect(self._on_plugin_order_dropped)
+        self._plugins_tree.drag_blocked.connect(self.reorder_blocked)
         plugins_header = self._plugins_tree.header()
+        # Kein setSortingEnabled: die natuerliche Reihenfolge ist die
+        # Ladereihenfolge (Index aufsteigend), sortiert wird per sortItems
+        self._plugins_sort = (2, Qt.SortOrder.AscendingOrder)
+        self._plugins_sorting = False
+        plugins_header.setSectionsClickable(True)
+        plugins_header.setSortIndicatorShown(True)
+        plugins_header.setSortIndicator(2, Qt.SortOrder.AscendingOrder)
+        plugins_header.sortIndicatorChanged.connect(self._on_plugins_sort_changed)
         plugins_header.setStretchLastSection(False)
         plugins_header.setCascadingSectionResizes(True)
         plugins_header.setMinimumSectionSize(40)
@@ -488,6 +578,10 @@ class GamePanel(QWidget):
         self._data_tree.setColumnWidth(2, 70)
         self._data_tree.setColumnWidth(3, 80)
         self._data_tree.setColumnWidth(4, 130)
+        # Ohne Sortierspalte bleibt die Einfuege-Reihenfolge (Ordner, Dateien,
+        # erst nach dem Deploy) — der erste Klick sortiert
+        data_header.setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
+        self._data_tree.setSortingEnabled(True)
         self._ph_data = PersistentHeader(data_header, "data")
         data_layout.addWidget(self._data_tree)
         data_bar = QHBoxLayout()
@@ -543,6 +637,9 @@ class GamePanel(QWidget):
         self._saves_tree.setColumnWidth(0, 250)
         self._saves_tree.setColumnWidth(1, 150)
         self._saves_tree.setColumnWidth(2, 90)
+        # Neueste zuerst — die Reihenfolge aus listSaves()
+        saves_header.setSortIndicator(1, Qt.SortOrder.DescendingOrder)
+        self._saves_tree.setSortingEnabled(True)
         self._ph_saves = PersistentHeader(saves_header, "saves")
         saves_layout.addWidget(self._saves_tree)
         self._saves_count_label = QLabel()
@@ -579,7 +676,12 @@ class GamePanel(QWidget):
         self._dl_table.verticalHeader().setDefaultSectionSize(46)
         self._dl_table.verticalHeader().setVisible(False)
         self._dl_table.setStyleSheet("QTableWidget { font-size: 14px; }")
-        self._dl_table.setSortingEnabled(True)
+        # Kein setSortingEnabled: Qt wuerde die Ordner-Trennzeilen mitsortieren.
+        # Sortiert wird innerhalb der Gruppen in _sort_download_rows().
+        self._dl_sort = (0, Qt.SortOrder.AscendingOrder)
+        dl_header.setSortIndicatorShown(True)
+        dl_header.setSortIndicator(0, Qt.SortOrder.AscendingOrder)
+        dl_header.sortIndicatorChanged.connect(self._on_dl_sort_changed)
         self._dl_table.setAlternatingRowColors(True)
         self._dl_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._dl_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -598,6 +700,9 @@ class GamePanel(QWidget):
         fe.textChanged.connect(self._on_dl_filter_changed)
         dl_layout.addWidget(fe)
         tabs.addTab(downloads, tr("game_panel.downloads_tab"))
+
+        # Modern: Sortierpfeil neben dem Titel statt am Spaltenrand
+        apply_header_arrow_style(self._sort_headers())
 
         layout.addWidget(tabs)
 
@@ -665,6 +770,7 @@ class GamePanel(QWidget):
             self._ph_saves.restore()
         elif tab_index == 3:
             self._ph_downloads.restore()
+        self._fit_sort_titles()
 
     def restore_all_column_widths(self) -> None:
         """Restore column widths for all tabs."""
@@ -672,6 +778,31 @@ class GamePanel(QWidget):
         self._ph_data.restore()
         self._ph_saves.restore()
         self._ph_downloads.restore()
+        self._fit_sort_titles()
+
+    def _sort_headers(self) -> tuple[QHeaderView, ...]:
+        """Die sortierbaren Spaltenköpfe der Seitenleiste."""
+        return (
+            self._plugins_tree.header(),
+            self._data_tree.header(),
+            self._saves_tree.header(),
+            self._dl_table.horizontalHeader(),
+        )
+
+    def _fit_sort_titles(self) -> None:
+        """Feste Spalten mindestens so breit wie Titel plus Sortierpfeil.
+
+        Ziehen kann man sie nicht — ein langer Titel (andere Sprache) laege
+        sonst unter dem Pfeil.
+        """
+        for header in self._sort_headers():
+            for col in range(header.count()):
+                if (header.isSectionHidden(col)
+                        or header.sectionResizeMode(col) != QHeaderView.ResizeMode.Fixed):
+                    continue
+                need = _sort_title_width(header, col)
+                if header.sectionSize(col) < need:
+                    header.resizeSection(col, need)
 
     def flush_column_widths(self) -> None:
         """Flush any pending debounced column-width writes."""
@@ -1086,15 +1217,14 @@ class GamePanel(QWidget):
                self._game_btn.height() - a.height() - 4)
 
     def _apply_panel_width(self) -> None:
-        """Modern: feste Breite — etwas breiter als das Prototyp-Maß (296),
-        damit die deutschen Button-Texte (Neu laden / Dateimanager öffnen)
-        nicht abgeschnitten werden; klassisch: frei per Splitter."""
+        """Modern: per Splitter breiter ziehbar, aber nie schmaler als
+        PANEL_MIN_WIDTH — sonst werden die deutschen Button-Texte (Neu laden /
+        Dateimanager öffnen) abgeschnitten; klassisch: frei per Splitter."""
         if theme_color("panel2", ""):
-            self.setMinimumWidth(340)
-            self.setMaximumWidth(340)
+            self.setMinimumWidth(PANEL_MIN_WIDTH)
         else:
             self.setMinimumWidth(0)
-            self.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
+        self.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
 
     def _apply_start_btn_mode(self) -> None:
         """Modern: voll breiter „Starten"-Button mit Text + ▾-Exe-Button;
@@ -1150,6 +1280,7 @@ class GamePanel(QWidget):
         Downloads-Zeilen 52px. Klassisch: alle Spalten frei ziehbar mit
         gespeicherten Breiten, Settings show_meta_info/compact_list gelten."""
         modern = bool(theme_color("panel2", ""))
+        apply_header_arrow_style(self._sort_headers())
         dl_header = self._dl_table.horizontalHeader()
         saves_header = self._saves_tree.header()
         # Modern verwaltet das Theme die Spalten — Breiten weder speichern
@@ -1184,6 +1315,7 @@ class GamePanel(QWidget):
                 self._dl_table.verticalHeader().setDefaultSectionSize(46)
             self._ph_downloads.restore()
             self._ph_saves.restore()
+        self._fit_sort_titles()
 
     def _on_explore_virtual_folder(self) -> None:
         """Open the .mods/ directory in the file manager."""
@@ -1891,14 +2023,18 @@ class GamePanel(QWidget):
 
         indices = writer.plugin_indices(entries)
         self._updating_plugins = True
-        for entry in entries:
+        for position, entry in enumerate(entries):
             name = entry.name
             ext = Path(name).suffix.lower()
             is_locked = name.casefold() in locked_lower
 
-            item = QTreeWidgetItem()
+            item = _SortKeyTreeItem()
             # Column 0: Plugin name and real persisted activation state
             item.setText(0, name)
+            # Sortierwerte vor addTopLevelItem — sonst meldet der Baum itemChanged.
+            # Der Index-Text ("FE:000", leer bei inaktiv) ist nicht sortierbar.
+            item.setData(0, Qt.ItemDataRole.UserRole, name.casefold())
+            item.setData(2, Qt.ItemDataRole.UserRole, position)
             item.setCheckState(
                 0,
                 Qt.CheckState.Checked if entry.active else Qt.CheckState.Unchecked,
@@ -1923,7 +2059,29 @@ class GamePanel(QWidget):
             item.setText(2, indices.get(name.casefold(), ""))
 
             self._plugins_tree.addTopLevelItem(item)
+        self._apply_plugins_sort()
         self._updating_plugins = False
+
+    def _plugins_in_load_order(self) -> bool:
+        """True, solange der Baum die Ladereihenfolge zeigt (Index aufsteigend)."""
+        return self._plugins_sort == (2, Qt.SortOrder.AscendingOrder)
+
+    def _on_plugins_sort_changed(self, column: int, order: Qt.SortOrder) -> None:
+        if self._plugins_sorting:
+            return
+        self._plugins_sort = (column, order)
+        self._apply_plugins_sort()
+
+    def _apply_plugins_sort(self) -> None:
+        """Sortiert die Anzeige; Index aufsteigend stellt die Ladereihenfolge
+        ueber die gemerkte Position wieder her, ohne die Platte zu lesen."""
+        column, order = self._plugins_sort
+        self._plugins_sorting = True
+        try:
+            self._plugins_tree.sortItems(column, order)
+        finally:
+            self._plugins_sorting = False
+        self._plugins_tree.order_locked = not self._plugins_in_load_order()
 
     def _on_plugin_item_changed(self, item: QTreeWidgetItem, column: int) -> None:
         """Persist user activation changes from the Plugins tab."""
@@ -1986,6 +2144,9 @@ class GamePanel(QWidget):
 
     def _persist_plugin_tree_order(self) -> bool:
         """Persist drag-and-drop order while keeping primary plugins canonical."""
+        # Eine sortierte Ansicht ist nicht die Ladereihenfolge — nie schreiben
+        if not self._plugins_in_load_order():
+            return False
         if (
             self._current_plugin is None
             or self._current_game_path is None
@@ -3177,6 +3338,14 @@ class GamePanel(QWidget):
 
     def _populate_data_tree(self, game_path: Path | None) -> None:
         """Show the game directory plus what the mods would deploy into it."""
+        # Beim Befuellen nicht sortieren — danach einmal nach dem Pfeil
+        self._data_tree.setSortingEnabled(False)
+        try:
+            self._fill_data_tree(game_path)
+        finally:
+            self._data_tree.setSortingEnabled(True)
+
+    def _fill_data_tree(self, game_path: Path | None) -> None:
         self._data_tree.clear()
 
         if game_path is None or not game_path.is_dir():
@@ -3211,21 +3380,24 @@ class GamePanel(QWidget):
             on_disk.add(entry.name.lower())
             try:
                 if entry.is_dir():
-                    QTreeWidgetItem(self._data_tree, [
+                    item = _SortKeyTreeItem(self._data_tree, [
                         entry.name,
                         self._owner_label(
                             sorted(virtual_dirs.get(entry.name.lower(), ()))
                         ),
                         tr("game_panel.folder"), "-", "-",
                     ])
+                    self._set_data_sort_keys(item, entry.name, True, -1)
                 else:
-                    size = self._format_size(entry.stat().st_size)
+                    st_size = entry.stat().st_size
+                    size = self._format_size(st_size)
                     owners = virtual_files.get(entry.name.lower(), [])
-                    QTreeWidgetItem(self._data_tree, [
+                    item = _SortKeyTreeItem(self._data_tree, [
                         entry.name,
                         self._owner_label(owners) or tr("game_panel.unmanaged"),
                         "", size, "",
                     ])
+                    self._set_data_sort_keys(item, entry.name, False, st_size)
             except OSError:
                 continue
 
@@ -3237,12 +3409,22 @@ class GamePanel(QWidget):
         for name in pending:
             is_dir = name in virtual_dirs
             owners = sorted(virtual_dirs[name]) if is_dir else virtual_files[name]
-            QTreeWidgetItem(self._data_tree, [
+            item = _SortKeyTreeItem(self._data_tree, [
                 anzeige.get(name, name),
                 self._owner_label(owners),
                 tr("game_panel.folder") if is_dir else "",
                 "-", "-",
             ])
+            self._set_data_sort_keys(item, anzeige.get(name, name), is_dir, -1)
+
+    @staticmethod
+    def _set_data_sort_keys(
+        item: QTreeWidgetItem, name: str, is_dir: bool, size: int,
+    ) -> None:
+        """Ordner vor Dateien in jeder Spalte; Groesse in Bytes ("-" = -1)."""
+        item.setData(0, _FOLDER_ROLE, is_dir)
+        item.setData(0, Qt.ItemDataRole.UserRole, name.casefold())
+        item.setData(3, Qt.ItemDataRole.UserRole, size)
 
     @staticmethod
     def _owner_label(owners) -> str:
@@ -3263,6 +3445,14 @@ class GamePanel(QWidget):
 
     def _populate_saves_tree(self, saves_dir: Path, game_plugin) -> None:
         """Fill the saves tree with save-game files from *saves_dir*."""
+        # Beim Befuellen nicht sortieren — danach einmal nach dem Pfeil
+        self._saves_tree.setSortingEnabled(False)
+        try:
+            self._fill_saves_tree(saves_dir, game_plugin)
+        finally:
+            self._saves_tree.setSortingEnabled(True)
+
+    def _fill_saves_tree(self, saves_dir: Path, game_plugin) -> None:
         self._saves_tree.clear()
         saves = game_plugin.listSaves(saves_dir) if game_plugin else []
         if not saves:
@@ -3279,9 +3469,15 @@ class GamePanel(QWidget):
                     st = p.stat()
                 dt = datetime.fromtimestamp(st.st_mtime).strftime("%d.%m.%Y %H:%M")
                 sz = self._format_size(st.st_size)
+                mtime, size = st.st_mtime, st.st_size
             except OSError:
                 dt, sz = "—", "—"
-            it = QTreeWidgetItem(self._saves_tree, [p.name, dt, sz])
+                mtime, size = 0.0, -1
+            it = _SortKeyTreeItem(self._saves_tree, [p.name, dt, sz])
+            # Datumstext sortiert alphabetisch falsch — Rohwerte fuer Qt
+            it.setData(0, Qt.ItemDataRole.UserRole, p.name.casefold())
+            it.setData(1, Qt.ItemDataRole.UserRole, mtime)
+            it.setData(2, Qt.ItemDataRole.UserRole, size)
             # Größe als Tooltip — modern ist die Spalte versteckt
             it.setToolTip(0, sz)
         self._saves_count_label.setText(tr("game_panel.saves_count", count=len(saves)))
@@ -3508,10 +3704,20 @@ class GamePanel(QWidget):
 
     def refresh_downloads(self) -> None:
         """Scan .downloads/ recursively (1 level deep) and populate the table with folder separators."""
+        # Reihenfolge der laufenden Downloads merken (oben nach unten) — ihre
+        # Zeilen gehen gleich verloren, und _active_dl_rows zeigte sonst auf
+        # fremde Archive
+        shown = [
+            did for did, _row in sorted(
+                self._active_dl_rows.items(), key=lambda kv: kv[1])
+        ]
+        self._active_dl_rows = {}
         self._dl_table.setRowCount(0)
         self._dl_archives.clear()
 
         if not self._downloads_path or not self._downloads_path.is_dir():
+            self._restore_active_download_rows(shown)
+            self.downloads_scanned.emit({}, {})
             return
 
         import re
@@ -3561,7 +3767,6 @@ class GamePanel(QWidget):
             QSettings.Format.IniFormat,
         )
 
-        self._dl_table.setSortingEnabled(False)
         self._dl_table.setRowCount(total_rows)
 
         row = 0
@@ -3607,7 +3812,9 @@ class GamePanel(QWidget):
 
             # Date
             date_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
-            self._dl_table.setItem(row_idx, 3, QTableWidgetItem(date_str))
+            item_date = QTableWidgetItem(date_str)
+            item_date.setData(Qt.ItemDataRole.UserRole, mtime)
+            self._dl_table.setItem(row_idx, 3, item_date)
 
             # Größe + Datum als Tooltip — modern sind die Spalten versteckt
             item_name.setToolTip(f"{self._format_size(size)} · {date_str}")
@@ -3663,8 +3870,9 @@ class GamePanel(QWidget):
                 _insert_archive_row(row, name, size, mtime, path, is_hidden, meta_installed, meta_install_file, folder_name)
                 row += 1
 
-        # Sorting bleibt deaktiviert — manuelle Ordnung durch Ordner-Gruppen
-        # self._dl_table.setSortingEnabled(True)
+        # Keine Qt-Sortierung — die Ordner-Gruppen sind eine manuelle Ordnung;
+        # eine gewaehlte Sortierung stellt _sort_download_rows() unten her
+        self._restore_active_download_rows(shown)
 
         # Spalten-Sichtbarkeit + Zeilenhöhe je nach Theme und Settings
         self._apply_tab_view_modes()
@@ -3673,6 +3881,127 @@ class GamePanel(QWidget):
         self._on_dl_filter_changed(self._dl_filter_edit.text())
         # Collapse-State anwenden (bleibt über Refresh erhalten)
         self._apply_dl_collapse()
+        if self._dl_sort != (0, Qt.SortOrder.AscendingOrder):
+            self._sort_download_rows()
+
+        # Archivdaten fuer die Mod-Liste -- aus dem Scan oben, ohne neuen
+        # Plattenzugriff. Gleicher Name mehrfach: das neueste gewinnt.
+        by_file: dict[str, tuple[int, float]] = {}
+        by_mod: dict[str, tuple[int, float]] = {}
+        alle = list(root_archives)
+        for _folder, folder_archives in subfolders:
+            alle.extend(folder_archives)
+        for (_name, size, mtime, path, _hidden, _installed, meta_install_file) in alle:
+            key = path.name.casefold()
+            if key not in by_file or by_file[key][1] < mtime:
+                by_file[key] = (size, mtime)
+            if meta_install_file:
+                key = meta_install_file.casefold()
+                if key not in by_mod or by_mod[key][1] < mtime:
+                    by_mod[key] = (size, mtime)
+        self.downloads_scanned.emit(by_file, by_mod)
+
+    def _restore_active_download_rows(self, shown: list[int]) -> None:
+        """Laufende Downloads dieses Download-Ordners wieder oben einfuegen.
+
+        Ein Download einer anderen Instanz bekommt hier keine Zeile — sein
+        Archiv waere sonst in dieser Liste installier- und loeschbar. Beim
+        Zurueckwechseln ist er wieder da, solange er laeuft.
+        """
+        running = {
+            task.download_id
+            for task in self._download_manager.active_downloads()
+            # "pending" hat noch keine Zeile, die kommt mit download_started
+            if task.status == "downloading"
+            and self._in_downloads_folder(task.save_path)
+        }
+        # Bisher gezeigte in ihrer Reihenfolge, der Rest wie beim Start: neueste oben
+        order = [did for did in shown if did in running]
+        order += sorted(running.difference(order), reverse=True)
+        for download_id in reversed(order):
+            self._insert_active_download_row(download_id)
+
+    def _in_downloads_folder(self, path: Path) -> bool:
+        if not self._downloads_path:
+            return False
+        try:
+            return Path(path).parent.resolve().is_relative_to(
+                self._downloads_path.resolve())
+        except (OSError, RuntimeError):
+            return False
+
+    def _on_dl_sort_changed(self, column: int, order: Qt.SortOrder) -> None:
+        self._dl_sort = (column, order)
+        self._sort_download_rows()
+
+    def _sort_download_rows(self) -> None:
+        """Sortiert die Archive innerhalb ihrer Ordner-Gruppe, an Ort und Stelle.
+
+        Trennzeilen bleiben stehen (ihr Span haengt an der Zeilennummer),
+        Zeilen laufender Downloads auch (_active_dl_rows zeigt auf sie).
+        Die Sichtbarkeit wandert mit: _apply_dl_collapse fasst basis-versteckte
+        Zeilen nicht an.
+        """
+        table = self._dl_table
+        column, order = self._dl_sort
+        descending = order == Qt.SortOrder.DescendingOrder
+        selected = {
+            self._get_dl_archive_path(idx.row())
+            for idx in table.selectedIndexes()
+        }
+        selected.discard(None)
+        fixed = set(self._active_dl_rows.values())
+        segments: list[list[int]] = [[]]
+        for r in range(table.rowCount()):
+            if self._is_separator_row(r):
+                segments.append([])
+            elif r not in fixed:
+                segments[-1].append(r)
+
+        table.clearSelection()
+        table.setUpdatesEnabled(False)
+        try:
+            for rows in segments:
+                if len(rows) < 2:
+                    continue
+                with_value = []
+                without_value = []
+                for r in rows:
+                    name_item = table.item(r, 0)
+                    name = name_item.text().lower() if name_item else ""
+                    key_item = table.item(r, column)
+                    if key_item is None:
+                        value = None
+                    elif column in (1, 3):
+                        value = key_item.data(Qt.ItemDataRole.UserRole)
+                    else:
+                        value = key_item.text().lower()
+                    entry = (
+                        value, name,
+                        [table.takeItem(r, c) for c in range(table.columnCount())],
+                        table.isRowHidden(r),
+                    )
+                    (without_value if value is None else with_value).append(entry)
+                with_value.sort(key=lambda e: (e[0], e[1]), reverse=descending)
+                for slot, (_value, _name, items, hidden) in zip(
+                    rows, with_value + without_value
+                ):
+                    for c, item in enumerate(items):
+                        if item is not None:
+                            table.setItem(slot, c, item)
+                    table.setRowHidden(slot, hidden)
+            self._apply_dl_collapse()
+            if selected:
+                flags = (
+                    QItemSelectionModel.SelectionFlag.Select
+                    | QItemSelectionModel.SelectionFlag.Rows
+                )
+                for r in range(table.rowCount()):
+                    if self._get_dl_archive_path(r) in selected:
+                        table.selectionModel().select(
+                            table.model().index(r, 0), flags)
+        finally:
+            table.setUpdatesEnabled(True)
 
     def _get_dl_archive_path(self, row: int) -> str | None:
         """Get archive path from the name column's UserRole data."""
@@ -4058,10 +4387,17 @@ class GamePanel(QWidget):
     def _on_dm_started(self, download_id: int) -> None:
         """Insert a new row at the top of the downloads table for an active download."""
         task = self._download_manager.get_task(download_id)
+        # Wartender Download einer anderen Instanz: keine Zeile, wie beim Neuaufbau
+        if task is None or not self._in_downloads_folder(task.save_path):
+            return
+        self._insert_active_download_row(download_id)
+
+    def _insert_active_download_row(self, download_id: int) -> None:
+        """Zeile eines laufenden Downloads oben einfuegen und zuordnen."""
+        task = self._download_manager.get_task(download_id)
         if not task:
             return
 
-        self._dl_table.setSortingEnabled(False)
         row = 0
         self._dl_table.insertRow(row)
 
@@ -4085,8 +4421,8 @@ class GamePanel(QWidget):
             new_map[did] = r + 1
         self._active_dl_rows = new_map
         self._active_dl_rows[download_id] = row
-        # Sorting bleibt aus — sonst springt der laufende Download von Zeile 0
-        # weg und die Ordner-Gruppen geraten durcheinander
+        # Keine Qt-Sortierung — sonst springt der laufende Download von Zeile 0
+        # weg; _sort_download_rows() laesst diese Zeilen stehen
 
     def _on_dm_progress(self, download_id: int, percent: float, speed_str: str) -> None:
         """Update progress for an active download row."""

@@ -1,6 +1,9 @@
 """QAbstractItemModel für Mod-Liste."""
 
 import os
+import re
+from datetime import datetime
+from pathlib import Path
 
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, QMimeData, QByteArray, QDataStream, QIODevice, QSize, Signal
 from PySide6.QtGui import QColor, QBrush, QFont, QIcon
@@ -40,8 +43,11 @@ def _get_conflict_icon(conflict_type: str) -> QIcon | None:
 
 
 COL_CHECK, COL_NAME, COL_CONFLICTS, COL_MARKERS, COL_CATEGORY, COL_VERSION, COL_PRIORITY = range(7)
-COL_COUNT = 7
-HEADERS = ["", "Mod Name", "Konflikte", "Markierungen", "Kategorie", "Version", "Priorität"]
+# Zusatzspalten haengen hinten an, damit die Nummern oben stabil bleiben.
+COL_INSTALLED_AT, COL_SIZE, COL_DOWNLOAD_DATE, COL_ARCHIVE_SIZE = range(7, 11)
+COL_COUNT = 11
+HEADERS = ["", "Mod Name", "Konflikte", "Markierungen", "Kategorie", "Version", "Priorität",
+           "Installiert am", "Größe", "Download-Datum", "Archivgröße"]
 MIME_MOD_ROWS = "application/x-anvil-mod-rows"
 
 # Custom roles
@@ -53,12 +59,42 @@ ROLE_IS_DATA_OVERRIDE = Qt.ItemDataRole.UserRole + 5  # True for BG3 data-overri
 ROLE_GROUP_NAME = Qt.ItemDataRole.UserRole + 6    # Group name this mod belongs to (str)
 ROLE_IS_GROUP_HEAD = Qt.ItemDataRole.UserRole + 7 # True if mod is the first member of its group
 ROLE_CONFLICT_TYPE = Qt.ItemDataRole.UserRole + 8 # 'win' | 'lose' | 'both' | '' (für Badge-Delegate)
+ROLE_SORT_VALUE = Qt.ItemDataRole.UserRole + 9    # (hat_wert, wert) wie sort_value()
+
+_CONFLICT_RANK = {"win": 0, "both": 1, "lose": 2}
+_SIZE_COLUMNS = (COL_SIZE, COL_ARCHIVE_SIZE)
+
+
+def _format_size(size_bytes: int) -> str:
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    if size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.2f} KB"
+    if size_bytes < 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.2f} MB"
+    return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+
+
+def _format_timestamp(ts: float) -> str:
+    try:
+        return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
+    except (OverflowError, OSError, ValueError):
+        return ""
+
+
+def _version_key(version: str) -> tuple:
+    """Natuerliche Reihenfolge: 1.9 vor 1.10, "v1.6" wie "1.6"."""
+    teile = re.split(r"(\d+)", re.sub(r"^v(?=\d)", "", version.strip().casefold()))
+    return tuple(
+        (0, int(teil)) if i % 2 else (1, teil)
+        for i, teil in enumerate(teile) if teil
+    )
 
 
 class ModRow:
-    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "is_data_override", "folder_name", "color", "file_count", "child_count", "group_name", "is_group_head", "deploy_path", "is_foreign", "has_stray_preset", "keep_file_names")
+    __slots__ = ("enabled", "name", "conflicts", "markers", "category", "version", "priority", "is_framework", "is_error", "is_separator", "is_data_override", "folder_name", "color", "file_count", "child_count", "group_name", "is_group_head", "deploy_path", "is_foreign", "has_stray_preset", "keep_file_names", "install_ts", "total_size", "archive_key")
 
-    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, is_data_override=False, folder_name="", color="", file_count=0, child_count=0, group_name="", is_group_head=False, deploy_path="", is_foreign=False, has_stray_preset=False, keep_file_names=False):
+    def __init__(self, enabled, name, conflicts="", markers="", category="", version="", priority=0, is_framework=False, is_error=False, is_separator=False, is_data_override=False, folder_name="", color="", file_count=0, child_count=0, group_name="", is_group_head=False, deploy_path="", is_foreign=False, has_stray_preset=False, keep_file_names=False, install_ts=0.0, total_size=0, archive_key=""):
         self.enabled = enabled
         self.name = name
         self.conflicts = conflicts
@@ -80,6 +116,9 @@ class ModRow:
         self.is_foreign = is_foreign
         self.has_stray_preset = has_stray_preset
         self.keep_file_names = keep_file_names
+        self.install_ts = install_ts
+        self.total_size = total_size
+        self.archive_key = archive_key
 
 
 def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_manager=None) -> ModRow:
@@ -103,6 +142,16 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_m
             is_group_head = group_manager.is_group_head(entry.name)
 
     keep_names = getattr(entry, "keep_file_names", False)
+    # Einmal beim Zeilenbau umrechnen -- data() und das Sortieren sollen
+    # keinen Text parsen.
+    install_ts = 0.0
+    if getattr(entry, "install_date", ""):
+        try:
+            install_ts = datetime.fromisoformat(entry.install_date).timestamp()
+        except (ValueError, OverflowError, OSError):
+            install_ts = 0.0
+    archive_file = getattr(entry, "installation_file", "") or ""
+    archive_key = Path(archive_file.replace("\\", "/")).name.casefold() if archive_file else ""
     return ModRow(
         enabled=entry.enabled,
         name=entry.display_name or entry.name,
@@ -126,6 +175,9 @@ def mod_entry_to_row(entry: ModEntry, conflict_data: dict | None = None, group_m
         is_foreign=getattr(entry, "is_foreign", False),
         has_stray_preset=getattr(entry, "has_stray_preset", False),
         keep_file_names=keep_names,
+        install_ts=install_ts,
+        total_size=getattr(entry, "total_size", 0) or 0,
+        archive_key=archive_key,
     )
 
 
@@ -160,6 +212,11 @@ class ModListModel(QAbstractItemModel):
         # ── Collapsed separators reference (set by view) ──
         self._collapsed_separators: set[str] = set()
 
+        # Archivdaten aus dem Downloads-Scan: Name -> (Groesse, mtime).
+        # Haengen am Modell, nicht an den Zeilen, und ueberleben set_mods.
+        self._archive_by_file: dict = {}
+        self._archive_by_mod: dict = {}
+
     def set_category_manager(self, manager) -> None:
         """Set CategoryManager reference for resolving category names."""
         self._category_manager = manager
@@ -192,6 +249,63 @@ class ModListModel(QAbstractItemModel):
                 self.index(len(self._rows) - 1, COL_COUNT - 1),
                 [Qt.ItemDataRole.BackgroundRole],
             )
+
+    def set_archive_stats(self, by_file: dict, by_mod: dict) -> None:
+        """Archivgroesse und -datum aus dem Downloads-Tab uebernehmen."""
+        self._archive_by_file = dict(by_file or {})
+        self._archive_by_mod = dict(by_mod or {})
+        if self._rows:
+            self.dataChanged.emit(
+                self.index(0, COL_DOWNLOAD_DATE),
+                self.index(len(self._rows) - 1, COL_ARCHIVE_SIZE),
+                [Qt.ItemDataRole.DisplayRole],
+            )
+
+    def archive_info(self, r: ModRow):
+        """(Groesse, mtime) des Archivs, aus dem die Mod stammt -- oder None."""
+        if r.is_separator:
+            return None
+        info = None
+        if r.archive_key:
+            info = self._archive_by_file.get(r.archive_key)
+        if info is None and r.folder_name:
+            info = self._archive_by_mod.get(r.folder_name.casefold())
+        return info
+
+    def sort_value(self, row: int, col: int) -> tuple[bool, object]:
+        """Sortierwert einer Zeile: (hat_wert, wert). Ohne Plattenzugriff."""
+        if row < 0 or row >= len(self._rows):
+            return False, None
+        r = self._rows[row]
+        if col == COL_NAME:
+            return True, r.name.casefold()
+        if col == COL_CONFLICTS:
+            ctype = r.conflicts.get("type", "") if isinstance(r.conflicts, dict) else ""
+            rang = _CONFLICT_RANK.get(ctype)
+            return rang is not None, rang
+        if col == COL_MARKERS:
+            if r.markers and self._keep_names_wirkt():
+                return True, 0
+            return False, None
+        if col == COL_CATEGORY:
+            name = self._resolve_category_name(r.category)
+            return bool(name), name.casefold()
+        if col == COL_VERSION:
+            if not r.version:
+                return False, None
+            return True, _version_key(r.version)
+        if col == COL_PRIORITY:
+            return True, row
+        if col == COL_INSTALLED_AT:
+            return bool(r.install_ts), r.install_ts
+        if col == COL_SIZE:
+            return not r.is_separator, r.total_size
+        if col in (COL_DOWNLOAD_DATE, COL_ARCHIVE_SIZE):
+            info = self.archive_info(r)
+            if info is None:
+                return False, None
+            return True, info[1] if col == COL_DOWNLOAD_DATE else info[0]
+        return False, None
 
     def _is_separator_collapsed(self, folder_name: str) -> bool:
         """Check if a separator is currently collapsed."""
@@ -327,6 +441,17 @@ class ModListModel(QAbstractItemModel):
                 return r.version
             if c == COL_PRIORITY:
                 return str(r.priority)
+            if c == COL_INSTALLED_AT:
+                return _format_timestamp(r.install_ts) if r.install_ts else ""
+            if c == COL_SIZE:
+                return "" if r.is_separator else _format_size(r.total_size)
+            if c in (COL_DOWNLOAD_DATE, COL_ARCHIVE_SIZE):
+                info = self.archive_info(r)
+                if info is None:
+                    return ""
+                if c == COL_DOWNLOAD_DATE:
+                    return _format_timestamp(info[1])
+                return _format_size(info[0])
         if role == Qt.ItemDataRole.DecorationRole:
             # Normal mod conflict icons
             if c == COL_CONFLICTS and not r.is_separator:
@@ -365,6 +490,8 @@ class ModListModel(QAbstractItemModel):
                 return Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
             if c == COL_PRIORITY:
                 return Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
+            if c in _SIZE_COLUMNS:
+                return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         if role == Qt.ItemDataRole.FontRole:
             if r.is_separator and c == COL_NAME:
                 font = QFont()
@@ -466,6 +593,8 @@ class ModListModel(QAbstractItemModel):
             if isinstance(r.conflicts, dict):
                 return r.conflicts.get("type", "")
             return ""
+        if role == ROLE_SORT_VALUE:
+            return self.sort_value(index.row(), c)
         return None
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
@@ -823,6 +952,10 @@ class ModListModel(QAbstractItemModel):
             tr("label.header_category"),
             tr("label.header_version"),
             tr("label.header_priority"),
+            tr("label.header_installed_at"),
+            tr("label.header_mod_size"),
+            tr("label.header_download_date"),
+            tr("label.header_archive_size"),
         ]
         if 0 <= section < len(headers):
             # Modern: Spaltenköpfe in VERSALIEN (Handoff-Typografie)
@@ -853,16 +986,3 @@ class ModListModel(QAbstractItemModel):
             if row.is_separator:
                 result.append((i, row.folder_name, row.name))
         return result
-
-    def sort(self, column, order=Qt.SortOrder.AscendingOrder):
-        self.layoutAboutToBeChanged.emit()
-        rev = order == Qt.SortOrder.DescendingOrder
-        if column == COL_NAME:
-            self._rows.sort(key=lambda x: x.name.lower(), reverse=rev)
-        elif column == COL_PRIORITY:
-            self._rows.sort(key=lambda x: x.priority, reverse=rev)
-        elif column == COL_VERSION:
-            self._rows.sort(key=lambda x: x.version, reverse=rev)
-        elif column == COL_CATEGORY:
-            self._rows.sort(key=lambda x: self._resolve_category_name(x.category).lower(), reverse=rev)
-        self.layoutChanged.emit()

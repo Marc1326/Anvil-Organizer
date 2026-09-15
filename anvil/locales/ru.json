@@ -363,6 +363,11 @@
     "header_category": "Категория",
     "header_priority": "Приоритет",
     "header_mod_name": "Имя мода",
+    "header_installed_at": "Установлен",
+    "header_mod_size": "Размер",
+    "header_download_date": "Загружен",
+    "header_archive_size": "Размер архива",
+    "sort_by_priority": "Сортировать по приоритету",
     "header_author": "Автор",
     "type_framework": "Фреймворк",
     "type_data_override": "Data-Override",
@@ -547,7 +552,9 @@
     "fw_update_error": "Проверка обновления для {name} не удалась:\n{reason}",
     "fw_no_nexus_id": "Для {name} не указан Nexus ID.",
     "catch_all_created": "Разделитель «{name}» создан — новые моды будут попадать туда",
-    "tidy_catch_all_done": "Перемещено в «{ziel}»: {count}"
+    "tidy_catch_all_done": "Перемещено в «{ziel}»: {count}",
+    "modlist_sort_locked": "Перемещать моды можно только при сортировке по приоритету (по возрастанию).",
+    "plugins_sort_locked": "Перемещать плагины можно только при сортировке по индексу (по возрастанию)."
   },
   "log": {
     "keep_file_names_on": "{name}: имена файлов остаются без изменений",

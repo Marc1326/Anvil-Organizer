@@ -1,6 +1,9 @@
 """Mod-Liste (QTreeView) + Filter-Leiste."""
 
+from pathlib import Path
+
 from PySide6.QtWidgets import (
+    QMenu,
     QWidget,
     QVBoxLayout,
     QTreeView,
@@ -11,17 +14,27 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate,
     QHeaderView,
     QScrollBar,
+    QStyle,
     QStyleOptionSlider,
+    QStyleOptionViewItem,
 )
-from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect, Signal, QPoint, QTimer, QItemSelection
-from PySide6.QtGui import QPainter, QColor, QPen, QBrush
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QModelIndex, QSize, QRect, Signal, QPoint, QTimer, QItemSelection, QSettings
+from PySide6.QtGui import QAction, QFont, QFontMetrics, QPainter, QColor, QPen, QBrush
 
 from anvil.core.mod_installer import is_installable_archive
 from anvil.core.translator import tr
 from anvil.core.persistent_header import PersistentHeader
 from anvil.styles.dark_theme import theme_color
+from anvil.styles.header_arrow_style import (
+    apply_header_arrow_style, header_title_font, title_arrow_width,
+)
 from anvil.widgets.collapsible_bar import CollapsibleSectionBar
-from anvil.models.mod_list_model import ModListModel, COL_CHECK, COL_NAME, COL_CONFLICTS, COL_CATEGORY, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME, ROLE_SEP_COLOR, ROLE_IS_DATA_OVERRIDE, ROLE_GROUP_NAME, ROLE_IS_GROUP_HEAD, ROLE_CONFLICT_TYPE
+from anvil.models.mod_list_model import (
+    ModListModel, COL_CHECK, COL_NAME, COL_CONFLICTS, COL_MARKERS, COL_CATEGORY, COL_VERSION,
+    COL_PRIORITY, COL_INSTALLED_AT, COL_SIZE, COL_DOWNLOAD_DATE, COL_ARCHIVE_SIZE, COL_COUNT,
+    MIME_MOD_ROWS, ROLE_IS_SEPARATOR, ROLE_FOLDER_NAME, ROLE_SEP_COLOR, ROLE_IS_DATA_OVERRIDE,
+    ROLE_GROUP_NAME, ROLE_IS_GROUP_HEAD, ROLE_CONFLICT_TYPE,
+)
 
 
 def _modern_active() -> bool:
@@ -46,6 +59,64 @@ _SECTION_BAR_HEIGHT = 34
 
 # So viel bleibt der Mod-Liste beim Ziehen mindestens.
 _MOD_LIST_MIN = 120
+
+# Stabile Namen fuer die Einstellungen -- Spaltennummern koennen sich aendern.
+_COLUMN_KEYS = {
+    COL_NAME: "name",
+    COL_CONFLICTS: "conflicts",
+    COL_MARKERS: "markers",
+    COL_CATEGORY: "category",
+    COL_VERSION: "version",
+    COL_PRIORITY: "priority",
+    COL_INSTALLED_AT: "installed_at",
+    COL_SIZE: "size",
+    COL_DOWNLOAD_DATE: "download_date",
+    COL_ARCHIVE_SIZE: "archive_size",
+}
+_KEY_COLUMNS = {key: col for col, key in _COLUMN_KEYS.items()}
+_COLUMN_TITLES = {
+    COL_NAME: "label.header_mod_name",
+    COL_CONFLICTS: "label.header_conflicts",
+    COL_MARKERS: "label.header_markers",
+    COL_CATEGORY: "label.header_category",
+    COL_VERSION: "label.header_version",
+    COL_PRIORITY: "label.header_priority",
+    COL_INSTALLED_AT: "label.header_installed_at",
+    COL_SIZE: "label.header_mod_size",
+    COL_DOWNLOAD_DATE: "label.header_download_date",
+    COL_ARCHIVE_SIZE: "label.header_archive_size",
+}
+_DEFAULT_WIDTHS = {
+    COL_NAME: 300,
+    COL_CONFLICTS: 80,
+    COL_MARKERS: 80,
+    COL_CATEGORY: 100,
+    COL_VERSION: 80,
+    # Titel + Sortierpfeil brauchen in allen Sprachen etwa 90 px
+    COL_PRIORITY: 90,
+    COL_INSTALLED_AT: 130,
+    COL_SIZE: 80,
+    COL_DOWNLOAD_DATE: 130,
+    COL_ARCHIVE_SIZE: 90,
+}
+# Ohne Priorität gäbe es keinen Weg zurück in die Ordnung, in der man ziehen kann.
+_NOT_HIDEABLE = {COL_CHECK, COL_NAME, COL_PRIORITY}
+_EXTRA_COLUMNS = (COL_INSTALLED_AT, COL_SIZE, COL_DOWNLOAD_DATE, COL_ARCHIVE_SIZE)
+# Breitester Wert, den die Zusatzspalten anzeigen -- er soll ganz hineinpassen
+_SAMPLE_VALUES = {
+    COL_INSTALLED_AT: "2026-09-14 21:27",
+    COL_SIZE: "1023.99 MB",
+    COL_DOWNLOAD_DATE: "2026-09-14 21:27",
+    COL_ARCHIVE_SIZE: "1023.99 MB",
+}
+# Kopf klassisch: Innenabstand 2 x 5 px und Sortierpfeil 10 px mit 4 px Rand
+# (modern rechnet title_arrow_width, der Pfeil steht dort neben dem Titel)
+_HEADER_TITLE_EXTRA = 24
+
+
+def _view_settings() -> QSettings:
+    path = str(Path.home() / ".config" / "AnvilOrganizer" / "AnvilOrganizer.conf")
+    return QSettings(path, QSettings.Format.IniFormat)
 
 
 def _check_col_width(with_grip: bool = True) -> int:
@@ -601,6 +672,170 @@ class ModListProxyModel(QSortFilterProxyModel):
         self._mod_entries: list = []  # Reference to MainWindow._current_mod_entries
         self._category_manager = None
         self._group_manager = None  # Set by MainWindow for group-head visibility
+        # Rang je Quellzeile fuer die aktuelle Sortierung (None = neu bauen)
+        self._ranks: list[int] | None = None
+        self._ranks_desc = False
+        self._resort_timer = QTimer(self)
+        self._resort_timer.setSingleShot(True)
+        self._resort_timer.setInterval(0)
+        self._resort_timer.timeout.connect(self._resort)
+
+    # ── Sortierung ────────────────────────────────────────────────
+    #
+    # Priorität aufsteigend ist die natuerliche Reihenfolge (sortColumn -1).
+    # Alles andere sortiert nur die Abbildung: Trenner bleiben stehen,
+    # sortiert wird innerhalb ihrer Bloecke. Das Quellmodell bleibt unberuehrt.
+
+    def setSourceModel(self, model):
+        old = self.sourceModel()
+        if old is not None:
+            for signal in (old.modelAboutToBeReset, old.layoutAboutToBeChanged,
+                           old.rowsAboutToBeMoved, old.rowsAboutToBeInserted,
+                           old.rowsAboutToBeRemoved):
+                try:
+                    signal.disconnect(self._drop_ranks)
+                except (RuntimeError, TypeError):
+                    pass
+            try:
+                old.dataChanged.disconnect(self._on_source_data_changed)
+            except (RuntimeError, TypeError):
+                pass
+        if model is not None:
+            # Vor super() verbinden: diese Slots laufen vor der eigenen
+            # Umsortierung des Proxys.
+            model.modelAboutToBeReset.connect(self._drop_ranks)
+            model.layoutAboutToBeChanged.connect(self._drop_ranks)
+            model.rowsAboutToBeMoved.connect(self._drop_ranks)
+            model.rowsAboutToBeInserted.connect(self._drop_ranks)
+            model.rowsAboutToBeRemoved.connect(self._drop_ranks)
+            model.dataChanged.connect(self._on_source_data_changed)
+        self._ranks = None
+        super().setSourceModel(model)
+
+    def _drop_ranks(self, *args) -> None:
+        self._ranks = None
+
+    def _on_source_data_changed(self, top_left, bottom_right, roles=()) -> None:
+        if self.is_priority_order():
+            return
+        col = self.sortColumn()
+        if not (top_left.column() <= col <= bottom_right.column()):
+            return
+        if roles:
+            werte = {getattr(r, "value", r) for r in roles}
+            if not werte & {Qt.ItemDataRole.DisplayRole.value, Qt.ItemDataRole.CheckStateRole.value}:
+                return
+        self._ranks = None
+        self._resort_timer.start()
+
+    def _resort(self) -> None:
+        # Qt hat die geaenderten Zeilen schon einsortiert. Neu sortieren nur,
+        # wenn dabei etwas liegen blieb (z. B. Gruppenmitglieder hinter ihrem Kopf).
+        if self.is_priority_order():
+            return
+        source = self.sourceModel()
+        ranks = self._ranks
+        if ranks is None or source is None or len(ranks) != source.rowCount():
+            ranks = self._ranks = self._build_ranks()
+        vorher = -1
+        for row in range(self.rowCount()):
+            rang = ranks[self.mapToSource(self.index(row, 0)).row()]
+            if rang <= vorher:
+                self.invalidate()
+                return
+            vorher = rang
+
+    def sort(self, column, order=Qt.SortOrder.AscendingOrder):
+        if column == COL_PRIORITY and order == Qt.SortOrder.AscendingOrder:
+            column = -1
+        if column < 0:
+            order = Qt.SortOrder.AscendingOrder
+        self._ranks = None
+        super().sort(column, order)
+
+    def is_priority_order(self) -> bool:
+        """True, solange die Liste in ihrer echten Reihenfolge steht."""
+        return self.sortColumn() < 0
+
+    def lessThan(self, left, right):
+        ranks = self._ranks
+        if ranks is None or left.row() >= len(ranks) or right.row() >= len(ranks):
+            ranks = self._ranks = self._build_ranks()
+        # Qt vertauscht die Argumente beim absteigenden Sortieren. Der Rang
+        # gilt schon fuer die gewuenschte Richtung.
+        if self._ranks_desc:
+            return ranks[left.row()] > ranks[right.row()]
+        return ranks[left.row()] < ranks[right.row()]
+
+    def _build_ranks(self) -> list[int]:
+        source = self.sourceModel()
+        rows = getattr(source, "_rows", None) or []
+        col = self.sortColumn()
+        desc = self.sortOrder() == Qt.SortOrder.DescendingOrder
+        self._ranks_desc = desc
+
+        # Bloecke: ein Trenner beginnt einen neuen, Mods davor bilden Block 0
+        blocks: list[tuple[int | None, list[int]]] = []
+        sep_row: int | None = None
+        members: list[int] = []
+        for i, r in enumerate(rows):
+            if r.is_separator:
+                if sep_row is not None or members:
+                    blocks.append((sep_row, members))
+                sep_row, members = i, []
+            else:
+                members.append(i)
+        if sep_row is not None or members:
+            blocks.append((sep_row, members))
+
+        ranks = [0] * len(rows)
+        pos = 0
+        for sep_row, block in blocks:
+            if sep_row is not None:
+                ranks[sep_row] = pos
+                pos += 1
+            # Gruppen bleiben zusammen, wenn ihr Kopf im selben Block steht
+            heads: dict[str, int] = {}
+            for i in block:
+                r = rows[i]
+                if r.is_group_head and r.group_name and r.group_name not in heads:
+                    heads[r.group_name] = i
+            followers: dict[int, list[int]] = {}
+            leads: list[int] = []
+            for i in block:
+                r = rows[i]
+                head = heads.get(r.group_name) if r.group_name else None
+                if head is not None and head != i:
+                    followers.setdefault(head, []).append(i)
+                else:
+                    leads.append(i)
+            mit_wert = []
+            ohne_wert = []
+            for lead in leads:
+                hat_wert, wert = source.sort_value(lead, col)
+                if hat_wert:
+                    mit_wert.append((wert, lead))
+                else:
+                    ohne_wert.append(lead)
+            mit_wert.sort(key=lambda t: t[0], reverse=desc)
+            # Leere Werte stehen in beiden Richtungen unten
+            for lead in [t[1] for t in mit_wert] + ohne_wert:
+                ranks[lead] = pos
+                pos += 1
+                for i in followers.get(lead, ()):
+                    ranks[i] = pos
+                    pos += 1
+        return ranks
+
+    def canDropMimeData(self, data, action, row, column, parent):
+        if data.hasFormat(MIME_MOD_ROWS) and not self.is_priority_order():
+            return False
+        return super().canDropMimeData(data, action, row, column, parent)
+
+    def dropMimeData(self, data, action, row, column, parent):
+        if data.hasFormat(MIME_MOD_ROWS) and not self.is_priority_order():
+            return False
+        return super().dropMimeData(data, action, row, column, parent)
 
     def set_group_manager(self, manager):
         """Set GroupManager reference for group-head filter logic."""
@@ -741,6 +976,7 @@ class _DropTreeView(QTreeView):
 
     archives_dropped = Signal(list)  # list of file path strings
     archives_dropped_at = Signal(list, int)  # list of file paths + target source row
+    reorder_blocked = Signal()  # Ziehversuch, waehrend nicht nach Priorität sortiert ist
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -782,6 +1018,15 @@ class _DropTreeView(QTreeView):
         # ── Group manager reference ──
         self._group_manager = None
 
+    def _collapse_allowed(self) -> bool:
+        """Einklappen je nach Sortierung; andere Spalten folgen „aufsteigend"."""
+        proxy = self.model()
+        if not isinstance(proxy, ModListProxyModel) or proxy.is_priority_order():
+            return self._collapsible_asc
+        if proxy.sortColumn() == COL_PRIORITY:
+            return self._collapsible_dsc
+        return self._collapsible_asc
+
     def _apply_separator_filter(self):
         """Recalculate which rows to hide based on collapsed separators and groups."""
         proxy = self.model()
@@ -794,17 +1039,7 @@ class _DropTreeView(QTreeView):
         # Sync collapsed state to source model for data() queries (Settings 5, 7-10)
         source._collapsed_separators = set(self._collapsed_separators)
 
-        # Guard: Collapsible nur bei Prioritäts-Sortierung (COL_CHECK)
-        sort_col = proxy.sortColumn()
-        if sort_col > COL_CHECK:
-            proxy.set_hidden_rows(set())
-            return
-
-        sort_order = proxy.sortOrder()
-        if sort_order == Qt.SortOrder.AscendingOrder and not self._collapsible_asc:
-            proxy.set_hidden_rows(set())
-            return
-        if sort_order == Qt.SortOrder.DescendingOrder and not self._collapsible_dsc:
+        if not self._collapse_allowed():
             proxy.set_hidden_rows(set())
             return
 
@@ -923,9 +1158,16 @@ class _DropTreeView(QTreeView):
     def startDrag(self, supportedActions):
         """Hide selection highlight during drag, restore + reselect after drop."""
         from PySide6.QtGui import QPalette
+        proxy = self.model()
+        if isinstance(proxy, ModListProxyModel) and not proxy.is_priority_order():
+            # Sonst klappt das folgende Loslassen den Trenner um, den man
+            # ziehen wollte.
+            self._pending_separator_toggle = None
+            self._pending_group_toggle = None
+            self.reorder_blocked.emit()
+            return
         # Save dragged mod names for reselection after drop
         self._dragged_mod_names = []
-        proxy = self.model()
         if isinstance(proxy, ModListProxyModel):
             source = proxy.sourceModel()
             if source:
@@ -1059,6 +1301,11 @@ class _DropTreeView(QTreeView):
                         paths.append(path)
             if paths:
                 event.acceptProposedAction()
+                proxy = self.model()
+                if isinstance(proxy, ModListProxyModel) and not proxy.is_priority_order():
+                    # Sortiert sagt die Ablagestelle nichts ueber die Priorität
+                    self.archives_dropped.emit(paths)
+                    return
                 # Compute drop target source row
                 proxy_idx = self.indexAt(event.position().toPoint())
                 if proxy_idx.isValid():
@@ -1268,14 +1515,24 @@ class ModListView(QWidget):
     fw_active_toggle = Signal(dict)  # Left-click on framework status column
     preset_toggled = Signal(str, bool)  # Mod-Ordnername + neuer Zustand
     preset_context_menu_requested = Signal(QPoint, str)  # global pos + Ordnername
+    reorder_blocked = Signal()  # forwarded from _DropTreeView
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
+        # Sortierung/Spaltenwahl: _restoring unterdrueckt das Speichern,
+        # _view_features ist bei BG3 aus.
+        self._sort_guard = False
+        self._restoring = False
+        self._view_features = True
+        self._sort_indicator = (COL_PRIORITY, Qt.SortOrder.AscendingOrder)
+        self._header_menu: QMenu | None = None
+
         self._tree = _DropTreeView()
         self._tree.archives_dropped.connect(self.archives_dropped)
         self._tree.archives_dropped_at.connect(self.archives_dropped_at)
+        self._tree.reorder_blocked.connect(self.reorder_blocked)
         self._tree.setRootIsDecorated(False)
         self._tree.setAlternatingRowColors(True)
         self._tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1296,8 +1553,14 @@ class ModListView(QWidget):
         self._proxy_model = ModListProxyModel(self)
         self._proxy_model.setSourceModel(self._source_model)
         self._tree.setModel(self._proxy_model)
-        self._tree.header().setSortIndicatorShown(False)
-        self._tree.header().setSectionsClickable(False)
+        # Kein setSortingEnabled: das wuerde sofort nach Spalte 0 sortieren
+        header = self._tree.header()
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(True)
+        header.setSortIndicator(COL_PRIORITY, Qt.SortOrder.AscendingOrder)
+        header.sortIndicatorChanged.connect(self._on_sort_indicator_changed)
+        header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        header.customContextMenuRequested.connect(self._on_header_context_menu)
         self._model = self._proxy_model  # Für Kompatibilität
 
         # Connect model signals to update scrollbar separator markings
@@ -1325,12 +1588,12 @@ class ModListView(QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(COL_CHECK, QHeaderView.ResizeMode.Fixed)
         self._tree.setColumnWidth(COL_CHECK, _check_col_width())
-        self._tree.setColumnWidth(COL_NAME, 300)
-        self._tree.setColumnWidth(2, 80)
-        self._tree.setColumnWidth(3, 80)
-        self._tree.setColumnWidth(4, 100)
-        self._tree.setColumnWidth(5, 80)
-        self._tree.setColumnWidth(6, 60)
+        for col, width in _DEFAULT_WIDTHS.items():
+            self._tree.setColumnWidth(col, width)
+        # Vor dem PersistentHeader ausblenden -- sonst speichert schon der
+        # Konstruktor Breiten.
+        for col in _EXTRA_COLUMNS:
+            self._tree.setColumnHidden(col, True)
         self._persistent_header = PersistentHeader(
             header, "modlist", fixed_columns=frozenset({COL_CHECK}),
         )
@@ -1559,10 +1822,218 @@ class ModListView(QWidget):
         self._persistent_header.restore()
         # Fixe Schalter-Spalte immer erzwingen (theme-abhängige Breite)
         self._tree.setColumnWidth(COL_CHECK, _check_col_width())
+        self._widen_visible_columns()
+        self._apply_saved_view_state()
+
+    def _standard_width(self, col: int) -> int:
+        """Breite, in der Titel, Sortierpfeil und ein typischer Wert Platz haben."""
+        title = self._source_model.headerData(col, Qt.Orientation.Horizontal) or ""
+        header = self._tree.header()
+        text_width = QFontMetrics(header_title_font(header)).horizontalAdvance(title)
+        if _modern_active():
+            width = title_arrow_width(text_width, header.defaultAlignment())
+        else:
+            width = text_width + _HEADER_TITLE_EXTRA
+        width = max(_DEFAULT_WIDTHS[col], width)
+        sample = _SAMPLE_VALUES.get(col)
+        if sample:
+            self._tree.ensurePolished()
+            opt = QStyleOptionViewItem()
+            opt.initFrom(self._tree)
+            opt.font = self._tree.font()
+            opt.text = sample
+            opt.features |= QStyleOptionViewItem.ViewItemFeature.HasDisplay
+            cell = self._tree.style().sizeFromContents(
+                QStyle.ContentsType.CT_ItemViewItem, opt, QSize(), self._tree)
+            width = max(width, cell.width())
+        return width
+
+    def _apply_modern_widths(self) -> None:
+        # Modern sind die Spalten fest und nicht ziehbar: jede bekommt ihre
+        # Standardbreite in der aktiven Sprache. Nur Anzeige -- modern wird
+        # nichts gespeichert.
+        if not _modern_active():
+            return
+        for col in _DEFAULT_WIDTHS:
+            if col != COL_NAME:
+                self._tree.setColumnWidth(col, self._standard_width(col))
+
+    def _widen_visible_columns(self) -> None:
+        if _modern_active():
+            self._apply_modern_widths()
+            return
+        # Ohne brauchbare gespeicherte Breite (0 = war ausgeblendet, fehlt in
+        # einer aelteren Liste) mindestens die Standardbreite; die Mindestbreite
+        # liesse die Spalte unlesbar schmal.
+        header = self._tree.header()
+        gespeichert = self._persistent_header.saved_widths()
+        with self._persistent_header.silenced():
+            for col in _DEFAULT_WIDTHS:
+                if self._tree.isColumnHidden(col):
+                    continue
+                breite = header.sectionSize(col)
+                ohne_wert = bool(gespeichert) and (
+                    col >= len(gespeichert) or gespeichert[col] <= 0)
+                if breite <= header.minimumSectionSize() or ohne_wert:
+                    standard = self._standard_width(col)
+                    if breite < standard:
+                        self._tree.setColumnWidth(col, standard)
+
+    # ── Sortierung und Spaltenwahl ────────────────────────────────
+
+    def is_priority_order(self) -> bool:
+        """True, solange nach Priorität aufsteigend sortiert ist."""
+        return self._proxy_model.is_priority_order()
+
+    def _set_indicator_quietly(self, col: int, order) -> None:
+        self._sort_guard = True
+        try:
+            self._tree.header().setSortIndicator(col, order)
+        finally:
+            self._sort_guard = False
+
+    def _on_sort_indicator_changed(self, col: int, order) -> None:
+        if self._sort_guard:
+            return
+        if col == COL_CHECK or not self._view_features:
+            self._set_indicator_quietly(*self._sort_indicator)
+            return
+        vorher = self._tree._collapse_allowed()
+        self._proxy_model.sort(col, order)
+        self._sort_indicator = (col, order)
+        # Nur bei Bedarf -- der Reset kostet Auswahl und Scrollposition
+        if self._tree._collapse_allowed() != vorher:
+            self._tree._apply_separator_filter()
+        if not self._restoring:
+            s = _view_settings()
+            s.setValue("modlist/sort_column", _COLUMN_KEYS.get(col, "priority"))
+            s.setValue(
+                "modlist/sort_order",
+                "desc" if order == Qt.SortOrder.DescendingOrder else "asc",
+            )
+        self._update_scrollbar_markings()
+        current = self._tree.currentIndex()
+        if current.isValid():
+            self._tree.scrollTo(current)
+
+    def set_column_visible(self, col: int, visible: bool) -> None:
+        """Spalte ein- oder ausblenden und die Wahl merken."""
+        if col in _NOT_HIDEABLE or col not in _COLUMN_KEYS or not self._view_features:
+            return
+        header = self._tree.header()
+        self._tree.setColumnHidden(col, not visible)
+        if visible:
+            standard = self._standard_width(col)
+            if header.sectionSize(col) < standard:
+                self._tree.setColumnWidth(col, standard)
+        if not visible and col == header.sortIndicatorSection():
+            # Unsichtbar sortiert waere Ziehen unerklaerlich gesperrt
+            header.setSortIndicator(COL_PRIORITY, Qt.SortOrder.AscendingOrder)
+        if not self._restoring:
+            _view_settings().setValue(f"modlist/column_visible/{_COLUMN_KEYS[col]}", bool(visible))
+
+    def _apply_saved_view_state(self) -> None:
+        """Gespeicherte Spaltenwahl und Sortierung anwenden (mehrfach aufrufbar)."""
+        if not self._view_features:
+            return
+        s = _view_settings()
+        header = self._tree.header()
+        self._restoring = True
+        try:
+            with self._persistent_header.silenced():
+                for col, key in _COLUMN_KEYS.items():
+                    visible = col < COL_INSTALLED_AT
+                    name = f"modlist/column_visible/{key}"
+                    if col not in _NOT_HIDEABLE and s.contains(name):
+                        visible = s.value(name, visible, type=bool)
+                    self._tree.setColumnHidden(col, not visible)
+            self._widen_visible_columns()
+
+            col = _KEY_COLUMNS.get(str(s.value("modlist/sort_column", "priority")), COL_PRIORITY)
+            order = (Qt.SortOrder.DescendingOrder
+                     if str(s.value("modlist/sort_order", "asc")) == "desc"
+                     else Qt.SortOrder.AscendingOrder)
+            if self._tree.isColumnHidden(col):
+                col, order = COL_PRIORITY, Qt.SortOrder.AscendingOrder
+            if (header.sortIndicatorSection(), header.sortIndicatorOrder()) != (col, order):
+                header.setSortIndicator(col, order)
+            else:
+                ziel = -1 if (col == COL_PRIORITY and order == Qt.SortOrder.AscendingOrder) else col
+                if (self._proxy_model.sortColumn() != ziel
+                        or (ziel >= 0 and self._proxy_model.sortOrder() != order)):
+                    self._on_sort_indicator_changed(col, order)
+        finally:
+            self._restoring = False
+
+    def set_view_features_enabled(self, enabled: bool) -> None:
+        """Sortieren und Spaltenwahl ein-/ausschalten (aus bei BG3).
+
+        Aus: Liste in Prioritätsordnung, Standardspalten, nichts wird gespeichert.
+        """
+        header = self._tree.header()
+        if enabled:
+            self._view_features = True
+            header.setSectionsClickable(True)
+            header.setSortIndicatorShown(True)
+            header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self._apply_saved_view_state()
+            return
+        vorher = self._tree._collapse_allowed()
+        self._view_features = False
+        with self._persistent_header.silenced():
+            self._set_indicator_quietly(COL_PRIORITY, Qt.SortOrder.AscendingOrder)
+            self._sort_indicator = (COL_PRIORITY, Qt.SortOrder.AscendingOrder)
+            self._proxy_model.sort(-1)
+            header.setSectionsClickable(False)
+            header.setSortIndicatorShown(False)
+            header.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+            for col in range(COL_NAME, COL_COUNT):
+                self._tree.setColumnHidden(col, col in _EXTRA_COLUMNS)
+        self._widen_visible_columns()
+        if self._tree._collapse_allowed() != vorher:
+            self._tree._apply_separator_filter()
+        self._update_scrollbar_markings()
+
+    def _build_header_menu(self) -> QMenu:
+        menu = QMenu(self)
+        header = self._tree.header()
+        act_priority = menu.addAction(tr("label.sort_by_priority"))
+        act_priority.setMenuRole(QAction.MenuRole.NoRole)
+        act_priority.setEnabled(not self.is_priority_order())
+        act_priority.triggered.connect(
+            lambda checked=False: header.setSortIndicator(
+                COL_PRIORITY, Qt.SortOrder.AscendingOrder))
+        menu.addSeparator()
+        for col in _COLUMN_KEYS:
+            act = menu.addAction(tr(_COLUMN_TITLES[col]))
+            act.setMenuRole(QAction.MenuRole.NoRole)
+            act.setCheckable(True)
+            act.setChecked(not self._tree.isColumnHidden(col))
+            act.setData(col)
+            if col in _NOT_HIDEABLE:
+                act.setEnabled(False)
+            act.toggled.connect(lambda checked, c=col: self.set_column_visible(c, checked))
+        return menu
+
+    def _on_header_context_menu(self, pos) -> None:
+        if not self._view_features:
+            return
+        if self._header_menu is not None:
+            self._header_menu.deleteLater()
+        self._header_menu = self._build_header_menu()
+        self._header_menu.exec(self._tree.header().viewport().mapToGlobal(pos))
 
     def apply_theme_metrics(self) -> None:
         """Theme-abhängige Maße nachziehen (Live-Theme-Wechsel):
         Schalter-Spalte 62/36 px, Name-Spalte füllt modern die Restbreite."""
+        ph = self._persistent_header
+        if _modern_active() and ph.enabled:
+            # Modern ist die Breite reine Anzeige: vor der ersten Aenderung
+            # abschalten, eine offene klassische Breite noch schreiben
+            ph.flush()
+            ph.enabled = False
+        # Modern: Sortierpfeil neben dem Titel statt am Spaltenrand
+        apply_header_arrow_style((self._tree.header(),))
         self._tree.setColumnWidth(COL_CHECK, _check_col_width())
         self._fw_tree.setColumnWidth(0, _check_col_width(with_grip=False))
         self._ps_tree.setColumnWidth(0, _check_col_width(with_grip=False))
@@ -1582,6 +2053,7 @@ class ModListView(QWidget):
             for col in range(ps_hdr.count()):
                 ps_hdr.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
             ps_hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            self._apply_modern_widths()
         else:
             header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
             header.setSectionResizeMode(COL_CHECK, QHeaderView.ResizeMode.Fixed)
@@ -1589,6 +2061,13 @@ class ModListView(QWidget):
             fw_hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
             ps_hdr.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
             ps_hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            war_modern = not ph.enabled
+            ph.enabled = True
+            if war_modern:
+                # Zurueck zu den klassisch gespeicherten Breiten
+                ph.restore()
+                self._tree.setColumnWidth(COL_CHECK, _check_col_width())
+                self._widen_visible_columns()
 
     def flush_column_widths(self) -> None:
         """Flush any pending debounced column-width write."""
@@ -1779,6 +2258,40 @@ class ModListView(QWidget):
             if name:
                 names.append(name)
         return names
+
+    def get_folder_name_from_index(self, proxy_idx):
+        """Ordnername der Mod zu einem Proxy-Index oder None."""
+        if not proxy_idx.isValid() or proxy_idx.row() < 0:
+            return None
+        source_idx = self._proxy_model.mapToSource(proxy_idx)
+        folder = self._source_model.data(
+            self._source_model.index(source_idx.row(), COL_NAME), ROLE_FOLDER_NAME)
+        return folder or None
+
+    def get_current_folder_name(self):
+        """Ordnername der aktuell gewählten Zeile oder None."""
+        return self.get_folder_name_from_index(self._tree.currentIndex())
+
+    def get_visible_mod_folder_names(self) -> list[str]:
+        """Sichtbare Mods (ohne Trenner) in Anzeige-Reihenfolge, als Ordnernamen."""
+        folders = []
+        for row in range(self._proxy_model.rowCount()):
+            proxy_idx = self._proxy_model.index(row, COL_NAME)
+            if self._proxy_model.data(proxy_idx, ROLE_IS_SEPARATOR):
+                continue
+            folder = self._proxy_model.data(proxy_idx, ROLE_FOLDER_NAME)
+            if folder:
+                folders.append(folder)
+        return folders
+
+    def select_mod_by_folder_name(self, folder: str) -> None:
+        """Mod anhand ihres Ordnernamens auswählen."""
+        for row in range(self._proxy_model.rowCount()):
+            proxy_idx = self._proxy_model.index(row, COL_NAME)
+            if self._proxy_model.data(proxy_idx, ROLE_FOLDER_NAME) == folder:
+                self._tree.setCurrentIndex(proxy_idx)
+                self._tree.scrollTo(proxy_idx)
+                return
 
     def get_selected_source_rows(self) -> list[int]:
         """Return sorted list of selected source-model row indices."""

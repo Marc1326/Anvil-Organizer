@@ -267,10 +267,19 @@ class _Baum:
         pass
 
 
+class _FilterProxy:
+    def __init__(self):
+        self.eintraege = None
+
+    def set_mod_entries(self, eintraege):
+        self.eintraege = eintraege
+
+
 class _Ansicht:
     def __init__(self, modell):
         self._modell = modell
         self._tree = _Baum()
+        self._proxy_model = _FilterProxy()
 
     def source_model(self):
         return self._modell
