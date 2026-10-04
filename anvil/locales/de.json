@@ -529,6 +529,7 @@
     "nexus_query_invalid_id": "Ungültige Mod-ID eingegeben.",
     "nexus_no_id_found": "Keine Nexus-ID gefunden. Lade die Mod über Nexus herunter.",
     "nexus_no_game_slug": "Kein Nexus-Spielname konfiguriert.",
+    "profile_settings_failed": "Spiel-Einstellungen des Profils konnten nicht getauscht werden — Details im Log.",
     "modindex_cleared": "Mod-Index Cache geleert. Wird beim naechsten Laden neu aufgebaut.",
     "update_available_mod": "Update verfügbar: {name} ({current} → {newest})",
     "categories_assigned": "Kategorien zugeordnet: {count} Mods aktualisiert",

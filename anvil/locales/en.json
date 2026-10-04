@@ -529,6 +529,7 @@
     "nexus_query_invalid_id": "Invalid Mod ID entered.",
     "nexus_no_id_found": "No Nexus ID found. Download the mod via Nexus.",
     "nexus_no_game_slug": "No Nexus game slug configured.",
+    "profile_settings_failed": "Could not swap the profile's game settings — see the log for details.",
     "modindex_cleared": "Mod index cache cleared. Will be rebuilt on next load.",
     "update_available_mod": "Update available: {name} ({current} → {newest})",
     "categories_assigned": "Categories assigned: {count} mods updated",

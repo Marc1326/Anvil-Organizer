@@ -51,6 +51,9 @@ class _Fenster:
     def _log_game_dir_state(self, phase):
         self.protokolliert += 1
 
+    def _store_profile_settings(self, purge):
+        pass
+
 
 def test_overlay_raeumt_nach_spielende_auf() -> None:
     """Der globale Mount darf nach dem Spiel nicht stehen bleiben."""

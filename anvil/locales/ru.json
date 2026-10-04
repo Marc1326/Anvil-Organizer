@@ -529,6 +529,7 @@
     "nexus_query_invalid_id": "Введён недопустимый Mod-ID.",
     "nexus_no_id_found": "Nexus-ID не найден. Загрузите мод через Nexus.",
     "nexus_no_game_slug": "Название игры для Nexus не настроено.",
+    "profile_settings_failed": "Не удалось переключить игровые настройки профиля — подробности в журнале.",
     "modindex_cleared": "Кэш индекса модов очищен. Будет перестроен при следующей загрузке.",
     "update_available_mod": "Доступно обновление: {name} ({current} → {newest})",
     "categories_assigned": "Категории назначены: {count} модов обновлено",

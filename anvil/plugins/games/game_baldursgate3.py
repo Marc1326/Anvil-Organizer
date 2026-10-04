@@ -383,3 +383,16 @@ class BaldursGate3Game(BaseGame):
     def iniFiles(self) -> list[str]:
         """Return config files managed by Baldur's Gate 3."""
         return []
+
+    def profileSettingsFiles(self) -> list[Path]:
+        # Options and key bindings live next to modsettings.lsx, but that
+        # file and the saves belong to the mod list — never swap them
+        docs = self.gameDocumentsDirectory()
+        ms = self.modsettings_path()
+        if docs is None or ms is None:
+            return []
+        return [
+            docs / "graphicSettings.lsx",
+            ms.parent / "config.lsf",
+            ms.parent / "inputconfig_p1.json",
+        ]

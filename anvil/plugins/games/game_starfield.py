@@ -279,3 +279,6 @@ class StarfieldGame(BaseGame):
         Located in the My Games/Starfield directory.
         """
         return ["StarfieldPrefs.ini", "StarfieldCustom.ini"]
+
+    def profileSettingsFiles(self) -> list[Path]:
+        return self._documents_ini_files()

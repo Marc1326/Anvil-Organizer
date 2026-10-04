@@ -49,6 +49,7 @@ class _Widget:
 def _bind_unlock_helpers(window: Any) -> Any:
     """Wire the real MainWindow helpers _unlock_ui delegates to."""
     window._purge_after_game = lambda: MainWindow._purge_after_game(window)
+    window._store_profile_settings = lambda _purge: None
     window._release_ui_lock = lambda: MainWindow._release_ui_lock(window)
     if not hasattr(window, "uses_overlay"):
         window.uses_overlay = lambda: False
@@ -74,6 +75,7 @@ class PredeployLaunchTests(unittest.TestCase):
             _redeploy_timer=timer,
             _game_running=False,
             _current_instance_path=Path("/tmp/instance"),
+            _current_profile_path=None,
             _auto_relock_instance=lambda _path, _reason: None,
             _game_panel=panel,
             _sync_separator_deploy_paths=lambda: None,

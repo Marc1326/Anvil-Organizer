@@ -977,6 +977,19 @@ class BaseGame:
         """
         return []
 
+    def profileSettingsFiles(self) -> list[Path]:
+        """Settings files each profile keeps its own copy of ("local INIs").
+
+        Default: none — the game opts in.
+        """
+        return []
+
+    def _documents_ini_files(self) -> list[Path]:
+        docs = self.gameDocumentsDirectory()
+        if docs is None:
+            return []
+        return [docs / name for name in self.iniFiles()]
+
     def listSaves(self, folder: Path) -> list[Path]:
         """Find save-game files inside *folder*.
 

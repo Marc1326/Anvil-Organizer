@@ -1224,6 +1224,9 @@ def test_active_profile_rename_updates_game_panel_and_instance_metadata(
         _game_panel = FakeGamePanel()
         _profile_bar: ProfileBar
 
+        def _profile_settings_files(self):
+            return []
+
     monkeypatch.setattr("anvil.mainwindow.Toast", lambda *_args, **_kwargs: None)
     window = FakeWindow()
     bar = ProfileBar()

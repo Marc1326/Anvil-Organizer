@@ -312,3 +312,6 @@ class SkyrimSEGame(BaseGame):
         Located in the My Games/Skyrim Special Edition directory.
         """
         return ["Skyrim.ini", "SkyrimPrefs.ini", "SkyrimCustom.ini"]
+
+    def profileSettingsFiles(self) -> list[Path]:
+        return self._documents_ini_files()

@@ -1673,6 +1673,27 @@ class GamePanel(QWidget):
         GamePanel._melde_deploy_luecken(self, result)
         return result
 
+    def ini_restored(self) -> bool:
+        """False while the custom INI still lists Anvil's own archives."""
+        plugin = self._current_plugin
+        if plugin is None or not getattr(plugin, "NeedsBa2Packing", False):
+            return True
+        ini = plugin.ba2_ini_path()
+        key = getattr(plugin, "Ba2IniKey", "").lower()
+        if ini is None or not key or not ini.is_file():
+            return True
+        from anvil.core.ba2_packer import BA2_PREFIX
+        try:
+            text = ini.read_text(encoding="cp1252", errors="replace")
+        except OSError:
+            return False
+        for line in text.splitlines():
+            name, sep, value = line.partition("=")
+            if sep and name.strip().lower() == key:
+                if any(e.strip().startswith(BA2_PREFIX) for e in value.split(",")):
+                    return False
+        return True
+
     def silent_purge(self) -> object | None:
         """Purge deployed mods silently.  Called automatically by MainWindow."""
         if getattr(self._current_plugin, "RequiresForgeDeployment", False):

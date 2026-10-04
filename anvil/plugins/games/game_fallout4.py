@@ -276,3 +276,6 @@ class Fallout4Game(BaseGame):
         Located in the My Games/Fallout4 directory.
         """
         return ["Fallout4.ini", "Fallout4Prefs.ini", "Fallout4Custom.ini"]
+
+    def profileSettingsFiles(self) -> list[Path]:
+        return self._documents_ini_files()

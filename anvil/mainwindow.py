@@ -65,6 +65,10 @@ from anvil.core.instance_paths import (
     unavailable_configured_storage,
 )
 from anvil.core.profile_name import is_valid_profile_name, safe_profile_directory
+from anvil.core.profile_settings import (
+    clear_owner, local_inis_enabled, rename_owner, save_to_owner,
+    switch_profile_settings,
+)
 from anvil.core.icon_manager import IconManager
 from anvil.core.mod_entry import ModEntry, scan_mods_directory
 from anvil.core.mod_installer import ModInstaller, SUPPORTED_EXTENSIONS
@@ -3848,6 +3852,13 @@ class MainWindow(QMainWindow):
                 print(f"[LAUNCH] pre-launch purge FAILED: {errors[:5]}", flush=True)
                 self._last_deploy_errors = list(errors)[:3]
                 return False
+            # A skipped swap (game was running) or another instance of the
+            # same game may have left someone else's settings behind
+            if self._current_profile_path:
+                # Without a recorded owner the live files count as this profile's
+                self._swap_profile_settings(self._current_profile_path,
+                                            self._current_profile_path,
+                                            purge=purge_result)
             print("[DEPLOY] Pre-launch full deploy (with BA2)", flush=True)
             self._sync_separator_deploy_paths()
             self._sync_keep_file_name_mods()
@@ -4125,6 +4136,26 @@ class MainWindow(QMainWindow):
             for err in getattr(purge_result, "errors", [])[:5]:
                 print(f"[LAUNCH]   ERROR: {err}", flush=True)
         self._log_game_dir_state("after cleanup")
+        self._store_profile_settings(purge_result)
+
+    def _store_profile_settings(self, purge) -> None:
+        """Keep what the user changed in the game with its profile right away.
+
+        Until the next swap the changes would otherwise only live in the
+        game's folder, where renaming the instance would orphan them.
+        """
+        files = self._profile_settings_files()
+        if not files:
+            return
+        current_instance = self.instance_manager.current_instance()
+        idata = (self.instance_manager.load_instance(current_instance)
+                 if current_instance else None)
+        if not local_inis_enabled(idata):
+            return
+        if not self._purge_left_clean_settings(purge):
+            return
+        for err in save_to_owner(files):
+            print(f"[PROFILE] game settings: {err}", flush=True)
 
     def _release_ui_lock(self) -> None:
         """Hide the lock overlay and hand the UI back to the user."""
@@ -6059,6 +6090,7 @@ class MainWindow(QMainWindow):
         except OSError as exc:
             reject_rename(str(exc))
             return
+        rename_owner(self._profile_settings_files(), old_path, new_path)
 
         # Update every active-profile consumer together.
         if self._current_profile_path and self._current_profile_path.name == old_name:
@@ -6093,6 +6125,9 @@ class MainWindow(QMainWindow):
         except ValueError:
             return
         new_profile_path.mkdir(parents=True, exist_ok=True)
+        # The active profile was just deleted — nothing left to save into
+        if self._current_profile_path and not self._current_profile_path.is_dir():
+            self._current_profile_path = None
 
         # ── BG3-Weiche: bg3_modstate.json pro Profil ──
         if self._bg3_installer is not None:
@@ -6102,6 +6137,7 @@ class MainWindow(QMainWindow):
                 state_src = self._bg3_installer._state_file_path()
                 if state_src and state_src.is_file():
                     shutil.copy2(state_src, self._current_profile_path / "bg3_modstate.json")
+            self._swap_profile_settings(self._current_profile_path, new_profile_path)
 
             # Update profile path
             self._current_profile_path = new_profile_path
@@ -6141,6 +6177,7 @@ class MainWindow(QMainWindow):
                 pass
 
         # 2. Update profile path
+        old_profile_path = self._current_profile_path
         self._current_profile_path = new_profile_path
 
         # 2b. Load groups for new profile
@@ -6187,7 +6224,9 @@ class MainWindow(QMainWindow):
             print("[PURGE] profile switch while the game may run — "
                   "deployment kept", flush=True)
         else:
-            self._game_panel.silent_purge()
+            purge = self._game_panel.silent_purge()
+            self._swap_profile_settings(old_profile_path, new_profile_path,
+                                        purge=purge)
         self._game_panel.set_instance_path(self._current_instance_path, profile_name=name)
         self._sync_separator_deploy_paths()
         self._sync_keep_file_name_mods()
@@ -6200,6 +6239,58 @@ class MainWindow(QMainWindow):
             print("[PURGE] keep-deployed is on — deploying the new profile",
                   flush=True)
             self._game_panel.silent_deploy()
+
+    def _purge_left_clean_settings(self, purge) -> bool:
+        if purge is not None and not getattr(purge, "success", False):
+            print("[PROFILE] purge failed — game settings not swapped",
+                  flush=True)
+            return False
+        # The custom INI only holds the user's own values after a clean purge
+        if not self._game_panel.ini_restored():
+            print("[PROFILE] custom INI still holds Anvil entries — "
+                  "game settings not swapped", flush=True)
+            return False
+        return True
+
+    def _profile_settings_files(self) -> list[Path]:
+        if self._current_plugin is None:
+            return []
+        try:
+            return self._current_plugin.profileSettingsFiles()
+        except OSError:
+            return []
+
+    def _swap_profile_settings(self, old_profile: Path | None,
+                               new_profile: Path, purge=None) -> None:
+        """Hand the game the new profile's own settings files.
+
+        *purge* is the result of the purge that ran just before, if any.
+        """
+        if self._game_running or self._game_panel.is_game_running():
+            print("[PROFILE] game may run — game settings not swapped",
+                  flush=True)
+            return
+        files = self._profile_settings_files()
+        if not files:
+            return
+        current_instance = self.instance_manager.current_instance()
+        idata = (self.instance_manager.load_instance(current_instance)
+                 if current_instance else None)
+        if not local_inis_enabled(idata):
+            # The live files are global now — a stale owner would get
+            # them filed under its name once the option is back on
+            clear_owner(files)
+            return
+        if not self._purge_left_clean_settings(purge):
+            self.statusBar().showMessage(
+                tr("status.profile_settings_failed"), 8000)
+            return
+        errors = switch_profile_settings(files, old_profile, new_profile)
+        for err in errors:
+            print(f"[PROFILE] game settings: {err}", flush=True)
+        if errors:
+            self.statusBar().showMessage(
+                tr("status.profile_settings_failed"), 8000)
 
     def _apply_active_state(self, active_mods: set[str]) -> None:
         """Update checkbox state for all mods without reloading.

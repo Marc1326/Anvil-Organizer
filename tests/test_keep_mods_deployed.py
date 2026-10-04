@@ -26,6 +26,7 @@ def _window(keep: bool, deployed: bool = True, running: bool = False):
         _current_instance_path="/tmp/instance",
         _bg3_installer=None,
         _log_game_dir_state=mock.MagicMock(),
+        _store_profile_settings=lambda _purge: None,
         keeps_mods_deployed=lambda: keep,
         uses_overlay=lambda: False,
     )
