@@ -4322,7 +4322,8 @@ class GamePanel(QWidget):
         if chosen == act_install:
             self.install_requested.emit(paths)
         elif chosen == act_nexus:
-            game = self._current_short_name or "site"
+            game = (getattr(self._current_plugin, "GameNexusName", "")
+                    or self._current_short_name or "site")
             host_open_url(f"https://www.nexusmods.com/{game}/mods/{mod_id}")
         elif act_query and chosen == act_query:
             self.dl_query_info_requested.emit(first)
