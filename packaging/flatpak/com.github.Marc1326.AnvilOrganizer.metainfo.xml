@@ -35,6 +35,11 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.9.0" date="2026-10-04">
+      <description>
+        <p>Each profile now keeps its own game settings (Skyrim SE, Fallout 4, Starfield, Baldur&apos;s Gate 3). Columns can be sorted by clicking their title. The Blood of Dawnwalker support. Fixes: Nexus link in the downloads tab, resizable sidebar in the modern theme.</p>
+      </description>
+    </release>
     <release version="1.7.0" date="2026-08-06">
       <description>
         <p>Stellar Blade support with separate targets for pak, logic, movie and cosmetic mods. Mods are now deployed at game start and removed afterwards. Downloads without a file extension are recognised by their file header.</p>

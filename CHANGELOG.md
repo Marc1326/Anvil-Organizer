@@ -1,9 +1,19 @@
 # Changelog
 
-## [Unveröffentlicht]
+## [1.9.0] — 2026-10-04
 
 ### Neu
+- **Jedes Profil behält seine eigenen Spiel-Einstellungen** (Einstellungen → Allgemein → „Lokale INIs"). Die Option gab es schon, sie tat bisher aber nichts. Jetzt sichert Anvil beim Profilwechsel die Einstellungsdateien des Spiels im alten Profil und spielt die des neuen zurück. Ein neues Profil startet mit den aktuellen Einstellungen. Nach dem Spielende landen Änderungen sofort im Profil. Unterstützt werden Skyrim SE, Fallout 4 und Starfield (die INI-Dateien im My-Games-Ordner) sowie Baldur's Gate 3 (Grafik, Spieloptionen und Tastenbelegung — Modliste und Spielstände bleiben unberührt). Läuft das Spiel gerade, wird nichts getauscht; das holt Anvil beim nächsten Start über Anvil nach.
+- **Spalten lassen sich per Klick auf den Titel sortieren.** Das ändert nur die Anzeige — Ladereihenfolge, `modlist.txt` und `plugins.txt` bleiben, wie sie sind.
 - **The Blood of Dawnwalker wird unterstützt** (Steam und GOG). Das Spiel hat keine offizielle Mod-Unterstützung; Anvil verteilt die vier Mod-Arten selbst: Pak-Mods nach `~mods`, Blueprint-Mods nach `LogicMods`, UE4SS samt Lua-Mods neben die Spiel-Exe und den SML-Konsolen-Loader direkt in den Paks-Ordner. UE4SS und der Console Enabler and Mod Loader sind als Frameworks hinterlegt. Hinweis: UE4SS läuft nur mit dem für Dawnwalker vorkonfigurierten Paket und ist an den jeweiligen Spiel-Build gebunden.
+
+### Fixes
+- **„Nexus-Seite öffnen" im Download-Tab führte ins Leere**, z. B. bei Skyrim SE auf `nexusmods.com/SkyrimSE/...` statt `.../skyrimspecialedition/...`. Der Link nutzt jetzt den Nexus-Namen des Spiels, wie es die Mod-Liste schon tat.
+- **Die Seitenleiste lässt sich im modernen Design wieder breiter und schmaler ziehen.**
+- Downloads landeten nach einem Instanzwechsel im Ordner der vorigen Instanz.
+- Beim Löschen des aktiven Profils legte der anschließende Profilwechsel dessen Ordner wieder an.
+
+## [1.8.4] — 2026-09-12
 
 ### Fixes
 - **Überschreiben sich zwei Mods bei einer Textdatei, sagt Anvil das jetzt.** Die Konfliktanzeige warf jede `.txt` weg, egal wo sie lag — auch Übersetzungen wie `Interface/Translations/MCM_en.txt`, die sehr wohl im Spiel landen. Zwei Mods mit derselben Übersetzungsdatei überschrieben sich also stillschweigend. Readmes und Änderungslisten bleiben weiterhin still.
